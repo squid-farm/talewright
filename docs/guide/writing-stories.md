@@ -303,15 +303,28 @@ them with a [custom C# ruleset](../developer/csharp-extensions.md), but you neve
 
 ## Skill checks
 
-Attach a check to a choice:
+Use `skill-check [actor] stat [dc number-expression][, hidden]` in a condition or numeric effect. With
+`dc`, it produces the ruleset's success result; without `dc`, it produces the numeric total:
 
 ```tale
-* [Climb the wall] skill-check athletics dc 14
+{if skill-check perception dc 12, hidden}
+You spot the loose stone.
+{/if}
+
+~ var:roll = skill-check perception
+{if var:roll >= 10}You notice the mark.{/if}
+{if var:roll >= 15}You identify it.{/if}
+
+* [Climb the wall] (requires skill-check athletics dc 14)
+  { var:attempt = skill-check athletics, hidden }
+  -> upper
+
+* [Climb with an explicit outcome] skill-check athletics dc 14
   success: -> upper
   failure: { player:hp -= 2 } -> fall
 ```
 
-Or resolve it at a particular point in the scene:
+An explicit check can also resolve at a particular point in the scene:
 
 ```tale
 ::: skill-check perception dc 12
@@ -321,10 +334,11 @@ failure: -> hall
 ```
 
 An entry-check outcome without `->` continues with the next line. An outcome with a target leaves
-immediately. Checks can appear inside block conditions or before later prose, but not after choices.
+immediately. A check expression is hidden only when you add `, hidden`; the check event and result
+still exist, but no check note is shown.
 
-Checks work on any stat, with or without `ruleset: rpg`. A check rolls a d20, adds a modifier and
-succeeds when the total is at least the DC. The modifier depends on the stat's category:
+Checks work on any declared stat. With the built-in rulesets, a check rolls a d20 and adds a modifier;
+the ruleset determines whether it beats the DC. The modifier depends on the stat's category:
 
 - `attribute`: `floor((score - 10) / 2)`, so 14 adds +2 and 5 adds −3.
 - Any other category: the stat's value, plus its linked attribute's modifier if it has one. Stats
@@ -333,11 +347,14 @@ succeeds when the total is at least the DC. The modifier depends on the stat's c
 
 For stats on a small scale, keep the default `custom` category; see
 [your own stats with skill checks](authoring-recipes.md#your-own-stats-with-skill-checks).
-Another character can make the check: `skill-check guide survival dc 10`. Results are shown to the
-player in the story. Dice are only rolled for checks.
+Another character can make the check: `skill-check guide survival dc 10`. An expression check resolves
+once per visit, and the same result is reused if it is evaluated again. Different authored checks,
+including nested checks of the same stat, are independent. `and`, `or`, and `not` short-circuit from
+left to right. Checks are not allowed in trigger `when` conditions.
 
-Want the same rolls every time? Set `seed: 1234` in `story.talewright.yaml`. For no dice at all, set
-`randomness: off`, which treats every roll as a 10.
+Set `seed: 1234` in `story.talewright.yaml` for repeatable rolls. With `randomness: off`, the ruleset
+provides a deterministic no-dice result. [The full reference](../reference/talemark-syntax.md#6-skill-checks)
+covers numeric checks, hidden notes, replay and custom rulesets.
 
 ## Conditions
 

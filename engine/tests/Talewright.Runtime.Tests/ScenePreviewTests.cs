@@ -133,12 +133,25 @@ public sealed class ScenePreviewTests
     {
         var story = Compile("""
             === start
+            @hub shop
+            @hub-limit 2
             ~ var:visits += 1
             ::: skill-check athletics dc 30
             success: { var:visits += 10 }
             failure: { var:visits += 20 }
             :::
+            {if skill-check perception dc 12}
+            You notice the hidden mark.
+            {else}
+            You miss the hidden mark.
+            {/if}
+            * [Check-dependent] (requires skill-check perception dc 12) -> END
             * [Stay] -> END
+
+            === shop-check
+            @tags shop
+            @requires skill-check perception dc 12
+            -> END
             """, CreateManifest());
         var log = new EventLog(story.World, 42);
         var state = log.State;
@@ -161,7 +174,14 @@ public sealed class ScenePreviewTests
             state.GetVariable(new VarId("visits")),
             state.GetStat(EntityId.Player, new StatId("athletics"))));
         Assert.DoesNotContain(log.Events, gameEvent => gameEvent is SkillCheckResolved);
-        Assert.Equal(["Stay"], preview.Menu.Select(entry => entry.Text));
+        Assert.Contains("Preview depends on a perception check.", preview.Document.ToPlainText());
+        Assert.Equal(
+            [
+                ("Preview depends on a perception check.", false),
+                ("Stay", true),
+                ("Preview depends on a perception check.", false),
+            ],
+            preview.Menu.Select(entry => (entry.Text, entry.IsAvailable)));
     }
 
     private static ManifestFaker CreateManifest()

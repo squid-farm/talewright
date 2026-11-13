@@ -18,6 +18,7 @@ internal sealed class ExpressionSyntaxParser
     private readonly Func<int, SourceLocation> _locate;
     private readonly DiagnosticBag _diagnostics;
     private readonly bool _highlightUnexpectedTokens;
+    private bool _allowSkillChecks;
     private int _position;
     private int _nestingDepth;
     private int _failureOffset;
@@ -38,10 +39,13 @@ internal sealed class ExpressionSyntaxParser
 
     internal static ExpressionSyntaxTree ParseExpression(TokenBuffer tokens, int endOffset,
         Func<int, SourceLocation> locate, DiagnosticBag diagnostics, bool sumOnly = false,
-        bool highlightUnexpectedTokens = false)
+        bool highlightUnexpectedTokens = false, bool allowSkillChecks = false)
     {
         var parser = new ExpressionSyntaxParser(tokens, endOffset, locate, diagnostics,
-            FindEndIndex(tokens, endOffset), highlightUnexpectedTokens);
+            FindEndIndex(tokens, endOffset), highlightUnexpectedTokens)
+        {
+            _allowSkillChecks = allowSkillChecks,
+        };
         try
         {
             var root = sumOnly ? parser.ParseSum() : parser.ParseOr();
@@ -86,10 +90,13 @@ internal sealed class ExpressionSyntaxParser
     }
 
     internal static EffectsSyntaxTree ParseEffects(TokenBuffer tokens, int expressionLength,
-        Func<int, SourceLocation> locate, DiagnosticBag diagnostics)
+        Func<int, SourceLocation> locate, DiagnosticBag diagnostics, bool allowSkillChecks = false)
     {
         var parser = new ExpressionSyntaxParser(tokens, expressionLength, locate, diagnostics,
-            FindEndIndex(tokens, expressionLength));
+            FindEndIndex(tokens, expressionLength))
+        {
+            _allowSkillChecks = allowSkillChecks,
+        };
         if (parser.ReportStringErrors())
         {
             return new(tokens,
@@ -408,6 +415,14 @@ internal sealed class ExpressionSyntaxParser
     private ExpressionNode ParseIdentifier()
     {
         var token = Next();
+        if (token.Is(SceneVocabulary.SkillCheck))
+        {
+            if (!_allowSkillChecks)
+                Fail(CompilerDiagnosticCodes.InvalidExpression,
+                    $"'{SceneVocabulary.SkillCheck}' is not allowed in this expression.", token.Offset, token.Length);
+            return ParseSkillCheck(token);
+        }
+
         if (token.Is(ExpressionVocabulary.Visited) &&
             TokenAt(_position).Kind == TokenKind.LeftParen &&
             TokenAt(_position + 1) is { Kind: TokenKind.Identifier } oldScene &&
@@ -494,6 +509,55 @@ internal sealed class ExpressionSyntaxParser
         }
 
         return new NameExpressionNode(Span(token), Span(token));
+    }
+
+    private ExpressionNode ParseSkillCheck(Token keyword)
+    {
+        var first = Expect(TokenKind.Identifier, $"a stat after '{SceneVocabulary.SkillCheck}'");
+        Token? actor = null;
+        var skill = first;
+        if (Peek.Kind == TokenKind.Identifier &&
+            !Peek.Is(SceneVocabulary.Difficulty) &&
+            !Peek.Is(ExpressionVocabulary.And) &&
+            !Peek.Is(ExpressionVocabulary.Or) &&
+            !Peek.Is(ExpressionVocabulary.Not))
+        {
+            actor = first;
+            skill = Next();
+        }
+
+        ExpressionNode? difficulty = null;
+        var end = skill.Offset + skill.Length;
+        if (IsKeyword(SceneVocabulary.Difficulty))
+        {
+            Next();
+            var wasAllowed = _allowSkillChecks;
+            _allowSkillChecks = false;
+            try
+            {
+                difficulty = ParseSum();
+            }
+            finally
+            {
+                _allowSkillChecks = wasAllowed;
+            }
+            end = difficulty.Span.End;
+        }
+
+        var hidden = false;
+        if (Peek.Kind == TokenKind.Comma)
+        {
+            Next();
+            var modifier = Expect(TokenKind.Identifier, $"'{SceneVocabulary.Hidden}' after the comma");
+            if (!modifier.Is(SceneVocabulary.Hidden))
+                Fail(CompilerDiagnosticCodes.InvalidExpression,
+                    $"The only skill-check modifier is '{SceneVocabulary.Hidden}'.", modifier.Offset, modifier.Length);
+            hidden = true;
+            end = modifier.Offset + modifier.Length;
+        }
+
+        return new SkillCheckExpressionNode(actor is { } actorToken ? Span(actorToken) : null, Span(skill),
+            difficulty, hidden, new(keyword.Offset, end - keyword.Offset));
     }
 
     private static ExpressionNode Binary(BinaryOp kind, Token op, ExpressionNode left, ExpressionNode right) =>

@@ -195,7 +195,7 @@ internal sealed partial class TaleBinder
                     { Kind = AuthoringTokenKind.Effects });
                 FlushParagraph();
                 var effects = ExpressionParser.ParseEffects(Value(syntax), At(Part(syntax).ValueStart), _symbols,
-                    _diagnostics);
+                    _diagnostics, CreateSkillCheckIdentity);
                 if (effects is not null)
                 {
                     var effectStart = At(indent);
@@ -289,7 +289,8 @@ internal sealed partial class TaleBinder
                 return true;
             case SceneMetadataKey.ChoiceLabel:
                 scene.ChoiceLabel = InlineParser.Parse(SourceText.Single(value, valueLocation), _symbols,
-                    _diagnostics, cancellationToken: _cancellationToken);
+                    _diagnostics, cancellationToken: _cancellationToken,
+                    createSkillCheckIdentity: CreateSkillCheckIdentity);
                 return true;
             case SceneMetadataKey.Continues:
                 scene.ContinuesPrevious = true;
@@ -351,7 +352,9 @@ internal sealed partial class TaleBinder
         }
 
         var condition = ExpressionParser.ParseCondition(Value(syntax),
-            At(syntax.Indent + 1 + SceneVocabulary.IfPrefix.Length), _symbols, _diagnostics, At(Part(syntax).ValueStart))
+            At(syntax.Indent + 1 + SceneVocabulary.IfPrefix.Length), _symbols, _diagnostics,
+            At(Part(syntax).ValueStart), allowSkillChecks: true,
+            createSkillCheckIdentity: CreateSkillCheckIdentity)
             ?? new BoolLiteral(false);
         scene.Frames.Push(new Frame(condition, At(syntax.Indent)));
     }
@@ -374,7 +377,8 @@ internal sealed partial class TaleBinder
             return;
         }
 
-        var inlines = InlineParser.Parse(scene.Paragraph, _symbols, _diagnostics, cancellationToken: _cancellationToken);
+        var inlines = InlineParser.Parse(scene.Paragraph, _symbols, _diagnostics,
+            cancellationToken: _cancellationToken, createSkillCheckIdentity: CreateSkillCheckIdentity);
         if (inlines.Count > 0)
         {
             var start = scene.Paragraph.Locate(0);
@@ -403,7 +407,8 @@ internal sealed partial class TaleBinder
             return;
         }
 
-        var inlines = InlineParser.Parse(text, _symbols, _diagnostics, cancellationToken: _cancellationToken);
+        var inlines = InlineParser.Parse(text, _symbols, _diagnostics,
+            cancellationToken: _cancellationToken, createSkillCheckIdentity: CreateSkillCheckIdentity);
         var start = At(syntax.Indent);
         _scene!.CurrentSteps.Add(new ProseStep(StepId(start), SpanFrom(start), new SpeechTemplate(speaker, inlines)));
     }
@@ -453,7 +458,8 @@ internal sealed partial class TaleBinder
                 case TaleClauseKind.Label:
                     labelLocation = location;
                     label = InlineParser.Parse(SourceText.Single(value, location), _symbols, _diagnostics,
-                        cancellationToken: _cancellationToken);
+                        cancellationToken: _cancellationToken,
+                        createSkillCheckIdentity: CreateSkillCheckIdentity);
                     break;
                 case TaleClauseKind.UnclosedLabel when _symbols.Analysis is not null:
                     InlineParser.AnalyzePartial(SourceText.Single(value, location), _symbols, _cancellationToken);
@@ -515,7 +521,8 @@ internal sealed partial class TaleBinder
                         malformedTextless = true;
                     }
 
-                    var parsedEffects = ExpressionParser.ParseEffects(value, location, _symbols, _diagnostics) ?? [];
+                    var parsedEffects = ExpressionParser.ParseEffects(value, location, _symbols, _diagnostics,
+                        CreateSkillCheckIdentity) ?? [];
                     if (!hasEffects)
                         effects = parsedEffects;
                     hasEffects = true;
@@ -723,11 +730,18 @@ internal sealed partial class TaleBinder
         var dc = ExpressionParser.ParseNumber(difficultyText!, At(difficultyClause!.Value.ValueStart), _symbols,
             _diagnostics);
         if (!bound || dc is null) return null;
-        var scene = _scene!.Id;
+        var hidden = clauses[1..].ToArray().Any(clause => clause.Kind == TaleClauseKind.CheckHidden);
+        var identity = CreateSkillCheckIdentity(actor, skill);
+        return (new SkillCheck(actor, skill, dc, hidden), identity);
+    }
+
+    private SkillCheckIdentity CreateSkillCheckIdentity(EntityId actor, StatId skill)
+    {
+        var scene = _scene?.Id ?? throw new InvalidOperationException("Skill checks must belong to a scene.");
         var key = (scene, actor, skill);
         var occurrence = _checkOccurrences.GetValueOrDefault(key);
         _checkOccurrences[key] = occurrence + 1;
-        return (new SkillCheck(actor, skill, dc), new SkillCheckIdentity(scene, actor, skill, occurrence));
+        return new SkillCheckIdentity(scene, actor, skill, occurrence);
     }
 
     /// <summary>
@@ -760,7 +774,7 @@ internal sealed partial class TaleBinder
             {
                 case TaleClauseKind.Effects:
                     effects = ExpressionParser.ParseEffects(Value(syntax, clause), At(clause.ValueStart), _symbols,
-                        _diagnostics) ?? [];
+                        _diagnostics, CreateSkillCheckIdentity) ?? [];
                     break;
                 case TaleClauseKind.UnclosedEffects:
                     _symbols.Analysis?.Expression(ExpressionContextKind.Effects, Value(syntax, clause),
@@ -814,7 +828,8 @@ internal sealed partial class TaleBinder
 
         var requirementText = value[..parsed.ExpressionLength];
         var requirement = ExpressionParser.ParseCondition(requirementText, location, _symbols, _diagnostics,
-            authoringLocation ?? location, highlightUnexpectedTokens: highlightUnexpectedTokens);
+            authoringLocation ?? location, highlightUnexpectedTokens: highlightUnexpectedTokens,
+            allowSkillChecks: true, createSkillCheckIdentity: CreateSkillCheckIdentity);
         if (!parsed.HasShown)
             return (requirement, null);
 
@@ -828,7 +843,8 @@ internal sealed partial class TaleBinder
                     $"An empty '{SceneVocabulary.Shown}' text will display no text while the requirement is false.",
                     sourceLocation.Offset(slot.QuoteOffset));
             text = InlineParser.Parse(quoted.ToSource(), _symbols, _diagnostics,
-                cancellationToken: _cancellationToken);
+                cancellationToken: _cancellationToken,
+                createSkillCheckIdentity: CreateSkillCheckIdentity);
         }
 
         return (requirement, new ShownDefinition(text));

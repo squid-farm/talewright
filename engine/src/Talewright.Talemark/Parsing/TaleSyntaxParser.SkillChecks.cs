@@ -46,11 +46,21 @@ internal static partial class TaleSyntaxParser
                 }
             }
 
+            TaleClause? hiddenClause = null;
+            if (TryStripHiddenModifier(text, out var withoutHidden, out var comma, out var hiddenStart))
+            {
+                text = withoutHidden;
+                hiddenClause = new(TaleClauseKind.CheckHidden, column + comma, column + hiddenStart,
+                    SceneVocabulary.Hidden.Length);
+            }
+
             // Words are separated by spaces only; dc is the first word spelled exactly "dc".
             var words = 0;
             var difficultyWord = -1;
             var checkIndex = _clauses.Count;
             Clause(default);
+            if (hiddenClause is { } clause)
+                Clause(clause);
             for (var pos = 0; pos < text.Length;)
             {
                 if (text[pos] == ' ')
@@ -98,6 +108,27 @@ internal static partial class TaleSyntaxParser
                     $"Skill checks look like '{SceneVocabulary.SkillCheck} {SceneVocabulary.OpenBracket}actor" +
                     $"{SceneVocabulary.CloseBracket} skill{SceneVocabulary.DifficultySeparator}12'.", column);
             }
+        }
+
+        private static bool TryStripHiddenModifier(string text, out string checkText, out int comma, out int hiddenStart)
+        {
+            var end = text.Length;
+            while (end > 0 && char.IsWhiteSpace(text[end - 1]))
+                end--;
+            hiddenStart = end - SceneVocabulary.Hidden.Length;
+            comma = hiddenStart - 1;
+            while (comma >= 0 && char.IsWhiteSpace(text[comma]))
+                comma--;
+            if (hiddenStart < 0 ||
+                !text.AsSpan(hiddenStart, SceneVocabulary.Hidden.Length).SequenceEqual(SceneVocabulary.Hidden) ||
+                comma < 0 || text[comma] != ExpressionVocabulary.ArgumentSeparator)
+            {
+                checkText = text;
+                return false;
+            }
+
+            checkText = text[..comma].TrimEnd();
+            return true;
         }
 
         /// <summary>Attaches the line to the open skill check if it continues it; otherwise closes the check.</summary>

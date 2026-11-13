@@ -34,6 +34,13 @@ public class ExpressionFormatterTests
         return Assert.IsType<SubstitutionTemplate>(Assert.Single(paragraph.Inlines)).Value;
     }
 
+    private static Expr ParseCondition(string source)
+    {
+        var result = Compile(source, condition: true);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        return result.Story!.Scenes[0].Requires!;
+    }
+
     [Theory]
     [InlineData(" 42 ", "42")]
     [InlineData("-2147483648", "-2147483648")]
@@ -196,6 +203,7 @@ public class ExpressionFormatterTests
             "player:inventory:lantern:count", "@CanGo", "not true", "1 + 2",
         ];
         var covered = representatives.Select(source => Parse(source).GetType()).ToHashSet();
+        covered.Add(ParseCondition("skill-check perception dc 12").GetType());
         var nodes = typeof(Expr).Assembly.GetTypes().Where(type => type.IsSubclassOf(typeof(Expr)) && !type.IsAbstract);
         Assert.Equal(nodes.OrderBy(type => type.Name), covered.OrderBy(type => type.Name));
     }

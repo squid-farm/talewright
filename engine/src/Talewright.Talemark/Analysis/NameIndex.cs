@@ -157,6 +157,12 @@ public sealed class NameIndex
                     Expression(binary.Left);
                     Expression(binary.Right);
                     break;
+                case SkillCheckExpressionNode skillCheck:
+                    if (skillCheck.Actor is { } actor)
+                        Add(AuthoringSymbolKind.Character, actor);
+                    Add(AuthoringSymbolKind.Stat, skillCheck.Skill);
+                    Expression(skillCheck.Difficulty);
+                    break;
                 case PlayerVisitedExpressionNode visited:
                     Add(AuthoringSymbolKind.Character, visited.Character);
                     Add(AuthoringSymbolKind.Scene, visited.Scene);
@@ -181,7 +187,7 @@ public sealed class NameIndex
         {
             case ExpressionContextKind.Condition or ExpressionContextKind.Number:
                 Expression(ExpressionSyntaxParser.ParseExpression(source.Tokens, source.ExpressionLength, Locate,
-                    diagnostics).Root);
+                    diagnostics, allowSkillChecks: true).Root);
                 break;
             case ExpressionContextKind.Substitution:
                 Expression(ExpressionSyntaxParser.ParseSubstitution(source.Tokens, source.ExpressionLength, Locate,
@@ -189,7 +195,7 @@ public sealed class NameIndex
                 break;
             case ExpressionContextKind.Effects:
                 foreach (var effect in ExpressionSyntaxParser.ParseEffects(source.Tokens, source.ExpressionLength,
-                             Locate, diagnostics).Effects)
+                             Locate, diagnostics, allowSkillChecks: true).Effects)
                 {
                     switch (effect)
                     {

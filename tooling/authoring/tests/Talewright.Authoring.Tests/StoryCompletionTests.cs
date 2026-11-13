@@ -152,6 +152,22 @@ public sealed class StoryCompletionTests
         Assert.DoesNotContain("name", labels);
     }
 
+    [Theory]
+    [InlineData("{if skill-check |}", "guide")]
+    [InlineData("{if skill-check |}", "athletics")]
+    [InlineData("{if skill-check |}", "dc")]
+    [InlineData("{if skill-check player |}", "athletics")]
+    [InlineData("{if skill-check perception |}", "dc")]
+    [InlineData("{if skill-check perception dc |}", "var:")]
+    [InlineData("{if skill-check guide perception dc |}", "var:")]
+    [InlineData("{if skill-check perception, |}", "hidden")]
+    public void Skill_check_expression_completion_offers_actors_stats_and_modifiers(string marked, string expected)
+    {
+        var (analysis, position) = Analyze("=== first\n" + marked);
+
+        Assert.Contains(StoryCompletion.Complete(analysis, position), item => item.Label == expected);
+    }
+
     [Fact]
     public void Hub_selector_completes_and_hovers_sentence_operators()
     {

@@ -11,6 +11,7 @@ internal enum TokenKind
     /// <summary><c>@Name</c>; text excludes the <c>@</c>.</summary>
     NamedPredicate,
     Colon,
+    Comma,
     Semicolon,
     LeftParen,
     RightParen,

@@ -53,6 +53,13 @@ test('fallback highlights templates, quoted strings, and escaped braces', () => 
     token.scopes.includes('meta.template.tale')));
 });
 
+test('fallback highlights skill-check expressions and their modifier', () => {
+  const line = '{if skill-check perception dc 12, hidden}You notice it.{/if}';
+  hasScope(line, 'skill-check', 'keyword.control.skill-check.tale');
+  hasScope(line, 'dc', 'keyword.control.skill-check.tale');
+  hasScope(line, 'hidden', 'keyword.control.skill-check.tale');
+});
+
 test('fallback keeps common bold and italic forms', () => {
   hasScope('**bold** text', 'bold', 'markup.bold.markdown');
   hasScope('__strong__ text', 'strong', 'markup.bold.markdown');

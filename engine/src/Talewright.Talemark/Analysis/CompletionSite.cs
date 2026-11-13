@@ -110,6 +110,37 @@ internal static class ExpressionCompletion
             {
                 if (kind == ExpressionContextKind.Condition) kinds = [AuthoringSymbolKind.Predicate];
             }
+            else if (tokenIndex > 0 && tokens[tokenIndex - 1].Is(SceneVocabulary.SkillCheck))
+            {
+                kinds = [AuthoringSymbolKind.Character, AuthoringSymbolKind.Stat];
+                keywords = [SceneVocabulary.Difficulty];
+            }
+            else if (tokenIndex >= 2 && tokens[tokenIndex - 2].Is(SceneVocabulary.SkillCheck) &&
+                     tokens[tokenIndex - 1].Kind == TokenKind.Identifier)
+            {
+                kinds = [AuthoringSymbolKind.Stat];
+                keywords = [SceneVocabulary.Difficulty];
+            }
+            else if (tokenIndex >= 3 && tokens[tokenIndex - 1].Is(SceneVocabulary.Difficulty) &&
+                     (tokens[tokenIndex - 3].Is(SceneVocabulary.SkillCheck) &&
+                      tokens[tokenIndex - 2].Kind == TokenKind.Identifier ||
+                      tokenIndex >= 4 && tokens[tokenIndex - 4].Is(SceneVocabulary.SkillCheck) &&
+                      tokens[tokenIndex - 3].Kind == TokenKind.Identifier &&
+                      tokens[tokenIndex - 2].Kind == TokenKind.Identifier))
+            {
+                kinds = [AuthoringSymbolKind.Character];
+                keywords = [VarPrefix, ScenePrefix, SceneVocabulary.SkillCheck];
+            }
+            else if (tokenIndex >= 3 && tokens[tokenIndex - 3].Is(SceneVocabulary.SkillCheck) &&
+                     tokens[tokenIndex - 2].Kind == TokenKind.Identifier &&
+                     tokens[tokenIndex - 1].Kind == TokenKind.Identifier)
+            {
+                keywords = [SceneVocabulary.Difficulty];
+            }
+            else if (before is [.., { Kind: TokenKind.Comma }])
+            {
+                keywords = [SceneVocabulary.Hidden];
+            }
             else if (before is [.., { Kind: TokenKind.Identifier } member, { Kind: TokenKind.Colon }] &&
                      tokenIndex >= 4 &&
                      tokens[tokenIndex - 4] is { Kind: TokenKind.Identifier } owner &&
@@ -197,12 +228,13 @@ internal static class ExpressionCompletion
                 keywords = kind switch
                 {
                     ExpressionContextKind.Effects when before.Length == 0 || before[^1].Kind == TokenKind.Semicolon
-                        => [.. EffectVerbs, VarPrefix, FactionPrefix],
-                    ExpressionContextKind.Effects => [VarPrefix, FactionPrefix, ScenePrefix],
-                    ExpressionContextKind.Number => [VarPrefix, ScenePrefix],
+                        => [.. EffectVerbs, VarPrefix, FactionPrefix, SceneVocabulary.SkillCheck],
+                    ExpressionContextKind.Effects => [VarPrefix, FactionPrefix, ScenePrefix, SceneVocabulary.SkillCheck],
+                    ExpressionContextKind.Number => [VarPrefix, ScenePrefix, SceneVocabulary.SkillCheck],
                     ExpressionContextKind.Substitution when before.Length == 0 => [VarPrefix, FlagPrefix, FactionPrefix, ItemPrefix, ScenePrefix, ImageCall],
                     ExpressionContextKind.Substitution => [VarPrefix, FlagPrefix, FactionPrefix, ItemPrefix, ScenePrefix],
-                    _ => [FlagPrefix, VarPrefix, FactionPrefix, ItemPrefix, ScenePrefix, True, False, Not]
+                    _ => [FlagPrefix, VarPrefix, FactionPrefix, ItemPrefix, ScenePrefix, True, False, Not,
+                        SceneVocabulary.SkillCheck]
                 };
             }
             if (kinds.Length == 0 && keywords.Length == 0) continue;

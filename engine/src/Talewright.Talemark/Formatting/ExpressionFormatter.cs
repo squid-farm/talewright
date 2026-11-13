@@ -93,10 +93,21 @@ public static class ExpressionFormatter
             visits.Scene is { } scene ? Name(scene.Value) : ExpressionVocabulary.Scene, Player, Visits),
         InventoryCountRef count => Reference(
             Character(count.Character), Inventory, Name(count.Item.Value), Count),
+        SkillCheckExpr check => SkillCheck(check),
         NamedPredicate predicate => $"{PredicateMarker}{Name(predicate.Name)}",
         UnaryExpr or BinaryExpr => throw new InvalidOperationException("Composite expressions are formatted separately."),
         _ => throw new NotSupportedException($"Expression kind '{expression.GetType().Name}' has no Talemark spelling."),
     };
+
+    private static string SkillCheck(SkillCheckExpr check)
+    {
+        var actor = check.Actor == EntityId.Player ? "" : check.Actor.Value + " ";
+        var difficulty = check.Difficulty is null
+            ? ""
+            : $" {SceneVocabulary.Difficulty} {Write(check.Difficulty)}";
+        var hidden = check.IsHidden ? ", " + SceneVocabulary.Hidden : "";
+        return $"{SceneVocabulary.SkillCheck} {actor}{check.Skill.Value}{difficulty}{hidden}";
+    }
 
     private static string Reference(params string[] parts) => string.Join(Separator, parts);
 

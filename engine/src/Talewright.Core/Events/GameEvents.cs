@@ -55,7 +55,10 @@ public sealed record SkillCheckResolved(
     int Roll,
     int Modifier,
     int Total,
-    bool? Success) : GameEvent;
+    bool? Success,
+    [property: System.Text.Json.Serialization.JsonIgnore(
+        Condition = System.Text.Json.Serialization.JsonIgnoreCondition.WhenWritingDefault)]
+    bool IsHidden = false) : GameEvent;
 
 public sealed record LevelChanged(EntityId Character, int OldLevel, int NewLevel) : GameEvent;
 

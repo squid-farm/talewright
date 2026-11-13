@@ -38,6 +38,9 @@ internal sealed record InventoryCountExpressionNode(ExpressionSpan Character, Ex
 internal sealed record InventoryItemNameExpressionNode(ExpressionSpan Character, ExpressionSpan Item,
     ExpressionSpan Span) : ExpressionNode(Span);
 
+internal sealed record SkillCheckExpressionNode(ExpressionSpan? Actor, ExpressionSpan Skill,
+    ExpressionNode? Difficulty, bool IsHidden, ExpressionSpan Span) : ExpressionNode(Span);
+
 internal sealed record HasItemExpressionNode(ExpressionSpan Character, ExpressionSpan Item,
     ExpressionSpan Span) : ExpressionNode(Span);
 

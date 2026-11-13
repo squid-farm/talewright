@@ -1,4 +1,5 @@
 using Talewright.Core.Identity;
+using Talewright.Core.Randomness;
 using Talewright.Core.Rulesets;
 
 namespace Talewright.Rules.Expressions;
@@ -140,6 +141,13 @@ public sealed record SceneVisitCountRef(SceneId? Scene) : Expr
 public sealed record InventoryCountRef(EntityId Character, ItemId Item) : Expr
 {
     public override ExprType Type => ExprType.Number;
+}
+
+/// <summary>A keyed skill check; without a DC it evaluates to the ruleset total, otherwise to pass/fail.</summary>
+public sealed record SkillCheckExpr(EntityId Actor, StatId Skill, SkillCheckIdentity Identity, Expr? Difficulty,
+    bool IsHidden = false) : Expr
+{
+    public override ExprType Type => Difficulty is null ? ExprType.Number : ExprType.Bool;
 }
 
 /// <summary><c>@CanPickLock</c>: a predicate registered from C# in <see cref="NamedPredicateRegistry"/>.</summary>

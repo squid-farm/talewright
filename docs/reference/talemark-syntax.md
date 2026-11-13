@@ -346,7 +346,7 @@ Optional double-quoted reader text replaces the scene title only while that requ
 | `@choice-label text`                               | Reader text for hub choices and bare `* -> scene` choices targeting this scene. Does not add a heading; otherwise hub choices fall back to `@title`, then the scene ID, and bare scene diverts show **Continue**. |
 | `@continues`                                       | Add this scene's text to the previous passage, without a heading or section break.              |
 | `@clear`                                           | Start this scene on a cleared play screen; earlier passages remain in History and saves.        |
-| `@requires expr[, shown ["reader text"]]`          | A rule that decides whether a scene is available when using a hub. Without `shown`, a false requirement hides the scene. The optional reader text replaces the normal choice text while unavailable. |
+| `@requires expr[, shown ["reader text"]]`          | A rule that decides whether a scene is available when using a hub. Without `shown`, a false requirement hides the scene. The optional reader text replaces the normal choice text while unavailable. A skill-check expression may include its own `, hidden` modifier before this optional `shown` suffix. |
 | `@tags a, b`                                       | Tags for hubs.                                                                                 |
 | `@priority n`                                      | Higher sorts first in hubs (default 0).                                                        |
 | `@once`                                            | A scene offered by a hub disappears after the player visits it once.                          |
@@ -358,7 +358,7 @@ Optional double-quoted reader text replaces the scene title only while that requ
 | `> who: text`                                      | Speaker line; `who` must be a character id.                                                    |
 | `{image("path", "alt text")}`                      | Image media in any narrative-template context; alt text is optional. Append `#decorative` only when the image is purely decorative and has no descriptive alt text. |
 | `~ effect`                                         | Effect batch applied when this line is reached.                                               |
-| `* [label] (requires expr[, shown ["reader text"]]) { effects } -> target` | Choice. `(requires…)` and `{effects}` are optional. Hidden when `requires` is false unless `shown` is present; its optional reader text replaces the label while unavailable. |
+| `* [label] (requires expr[, shown ["reader text"]]) { effects } -> target` | Choice. `(requires…)` and `{effects}` are optional. Hidden when `requires` is false unless `shown` is present; its optional reader text replaces the label while unavailable. A skill-check expression may include `, hidden` before the optional `shown` suffix. |
 | `* -> target`                                      | Textless choice; uses the destination's `@choice-label` when present, otherwise **Continue**. `* -> END` always shows **Continue**. It only supports a divert. |
 | `-> target`                                        | Leave now; later lines do not run. Shows **Continue**, or a final frame for `-> END`.          |
 | `{if expr}` / `{else}` / `{/if}`                   | Conditionals — on their own lines (block) or inside a paragraph (inline).                      |
@@ -459,17 +459,20 @@ If play reaches a scene whose choice requirements all fail and whose hub offers 
 "The story cannot continue" and ends. Validation does not predict which requirements will hold.
 
 **Advanced: hub selection.** A scene may have only one `@hub` and one
-`@hub-limit`. A hub checks tags, requirements and `@once`, then sorts matching scenes by priority
-before applying its limit. Multiple matching tags never duplicate a choice. Explicit choices are
-not capped. Generated choices follow written choices when the scene reaches its end. Give a hub an
-explicit exit choice; a scene-level `->` leaves immediately instead of offering the hub. These details
-matter when building a story around hubs; you can skip them when using direct choices.
+`@hub-limit`. A hub filters by tags, self-exclusion and `@once`, then visits matching scenes in priority
+order. It evaluates requirements only until the limit is filled; lower-priority candidates are not
+evaluated. Multiple matching tags never duplicate a choice. Explicit choices are not capped. Generated
+choices follow written choices when the scene reaches its end. Give a hub an explicit exit choice; a
+scene-level `->` leaves immediately instead of offering the hub. These details matter when building a
+story around hubs; you can skip them when using direct choices.
 
 For exact selection behavior: tags must be distinct and nonempty; the hub scene itself is never
 offered. Higher `@priority` scenes come first, with ties kept in declaration order. The limit applies
-only to generated hub choices, not choices written directly in the scene. When checking whether a
-scene can ever be reached, Talewright considers all matching tag scenes, even if the current limit
-would hide some; their requirements may change later.
+only to generated hub choices, not choices written directly in the scene. Shown-but-unavailable
+storylets remain eligible for leftover slots after available choices. Because selection is lazy, a
+check-dependent requirement below the cutoff never rolls. When checking whether a scene can ever be
+reached, Talewright considers all matching tag scenes, even if the current limit would hide some; their
+requirements may change later.
 
 **Conditional structure.** A block `{if}` selects one branch once, when reached. Its nested steps run in
 order without retesting that condition. Inline conditions are evaluated when their prose line renders.
@@ -866,46 +869,63 @@ take player rope
 
 ## 6. Skill checks
 
-Attached to a choice (outcome lines indented below it):
+`skill-check [actor] stat [dc number-expression][, hidden]` is an expression:
+
+- Without `dc`, it returns the ruleset's numeric total (the roll plus modifiers, or the ruleset's
+  no-dice result).
+- With `dc`, it returns the ruleset's boolean success result; custom rulesets need not use a simple
+  `total >= dc` comparison.
+- The actor is optional and defaults to `player`. The stat must be declared in the ruleset.
+- `, hidden` suppresses the check note, not the check event or its result. Checks are visible by default.
+
+Use the expression in `{if}` conditions, choice `(requires ...)`, scene `@requires`, and numeric
+effect assignments. It is also allowed in trigger `do` effects, but not in trigger `when` conditions:
 
 ```tale
-* [Climb the collapsed wall] skill-check athletics dc 14
-  success: -> temple.upper
-  failure: { player:hp -= 2 } -> temple.fall
-```
+=== morgue
+@requires skill-check perception dc 12, hidden
 
-Or as a block that resolves at its position in the scene:
+{if skill-check perception dc 5, hidden}
+The wound is clear. {if skill-check perception dc 10}It was made by a serrated blade.{/if}
+{/if}
 
-```tale
+~ var:roll = skill-check perception, hidden
+{if var:roll >= 10}You notice something.{/if}
+{if var:roll >= 15}You identify it.{/if}
+
+* [Try the shortcut] (requires skill-check guide athletics dc 12, hidden) -> upper-room
+
 ::: skill-check perception dc 12
-success: -> temple.hidden-door
+success: -> temple.upper
 failure: -> temple.hall
 :::
 ```
 
-An outcome's effects run there as one batch. An outcome with `->` leaves immediately; without it,
-an entry check continues with the next line. Multiple checks and checks inside block conditions
-are allowed, but all must precede the final choices. Choice-check outcomes always require targets.
+The numeric form stores one result for later comparisons; it does not reroll for each threshold.
+Separate authored `skill-check` expressions have separate identities, including nested checks of the
+same stat. `and`, `or`, and `not` compose normally; boolean operators short-circuit from left to right,
+so a check on an unevaluated side does not run. Each expression check resolves at most once per scene
+visit, including repeated rendering or evaluation; returning to the scene creates a new visit and a new
+result. `::: skill-check ...` blocks and choice checks with `success:` / `failure:` outcomes remain
+available for explicit branches. Each outcome's effects run as one batch; a divert leaves immediately.
 
-Optional actor: `skill-check guide survival dc 10`. Checks work on any declared stat. Both built-in
-rulesets (`none` and `rpg`) resolve them as `d20 + modifier ≥ DC`:
+During play, the check note appears when the result is resolved unless the check is hidden. Scene and
+map previews do not execute checks; they mark check-dependent content as depending on the named skill.
+Debugger traces and previews do not add events.
 
-- A stat with `category: attribute` adds `floor((score - 10) / 2)`, so a 0–10 attribute of 5 rolls at −3.
-- Any other stat (`custom`, the default for declared stats, `skill`, `resource` or `progression`)
-  adds its value, plus its `governing-attribute`'s modifier when it has one.
+Rolls use the keyed deterministic identity from [#268](https://github.com/squid-farm/talewright/issues/268):
+scene, actor, stat and source occurrence, plus the scene visit. Prose, source locations, difficulty,
+outcomes and checks for other stats do not shift the roll. History, Back/Forward and save/load replay
+recompute the same keyed roll and verify the same events. Saved `SkillCheckResolved` events are replay
+evidence, not an outcome cache; this feature adds no separately stored result or save-format change.
 
-Dice are seeded and recorded as events, and are only rolled for checks. A check's stable identity is its
-scene, actor, skill and source-order number among checks for that same scene, actor and skill. Prose,
-source locations, difficulty, outcomes and checks for other skills do not affect its die. Its execution
-identity also includes the visit of the scene that evaluates it; returning to a scene gives its checks
-new rolls, while evaluating the same check again during one visit reuses the recorded result. Gameplay
-randomness is isolated by its per-check identity; future random sites use their own identities with the
-same mechanism.
+Both built-in rulesets (`none` and `rpg`) resolve standard checks as `d20 + modifier` against the DC:
 
-The keyed-roll change intentionally changes results for existing stories with the same seed. Replay
-evidence has been versioned; saves made before this change do not load, and there is no migration.
-With `randomness: off`, checks are deterministic (`10 + modifier ≥ DC`). A ruleset registered from
-C# may define its own check rule; one without a check rule rejects `skill-check` (TW3005).
+- A stat with `category: attribute` adds `floor((score - 10) / 2)`.
+- Other stats add their value and, when defined, their governing attribute's modifier.
+- With `randomness: off`, the ruleset supplies the deterministic no-dice result.
+
+A C# ruleset can define its own check rule; a ruleset without one rejects `skill-check` (TW3005).
 
 ## 7. Diagnostics
 

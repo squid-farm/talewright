@@ -1,4 +1,6 @@
 using System.Text;
+using Talewright.Core.Identity;
+using Talewright.Core.Randomness;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Expressions;
 using Talewright.Talemark.Analysis;
@@ -143,7 +145,8 @@ internal static class InlineParser
         bool allowImages,
         bool allowFormattedOutput,
         CancellationToken cancellationToken,
-        List<TalemarkClassification>? classifications = null)
+        List<TalemarkClassification>? classifications = null,
+        Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null)
     {
         private int _remaining = CancellationInterval;
 
@@ -154,6 +157,8 @@ internal static class InlineParser
         public bool AllowFormattedOutput { get; } = allowFormattedOutput;
         public CancellationToken CancellationToken { get; } = cancellationToken;
         public List<TalemarkClassification>? Classifications { get; } = classifications;
+        public Func<EntityId, StatId, SkillCheckIdentity>? CreateSkillCheckIdentity { get; } =
+            createSkillCheckIdentity;
         public int WorkUnits { get; set; }
 
         public void Check()
@@ -181,14 +186,18 @@ internal static class InlineParser
     }
 
     internal static IReadOnlyList<TemplateInline> Parse(SourceText source, StorySymbols symbols, DiagnosticBag diagnostics,
-        bool allowImages = true, CancellationToken cancellationToken = default, bool allowFormattedOutput = true) =>
-        ParseWithWork(source, symbols, diagnostics, allowImages, cancellationToken, allowFormattedOutput).Inlines;
+        bool allowImages = true, CancellationToken cancellationToken = default, bool allowFormattedOutput = true,
+        Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null) =>
+        ParseWithWork(source, symbols, diagnostics, allowImages, cancellationToken, allowFormattedOutput,
+            createSkillCheckIdentity).Inlines;
 
     internal static InlineParseResult ParseWithWork(SourceText source, StorySymbols symbols, DiagnosticBag diagnostics,
-        bool allowImages = true, CancellationToken cancellationToken = default, bool allowFormattedOutput = true)
+        bool allowImages = true, CancellationToken cancellationToken = default, bool allowFormattedOutput = true,
+        Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        var context = new Context(source, symbols, diagnostics, allowImages, allowFormattedOutput, cancellationToken);
+        var context = new Context(source, symbols, diagnostics, allowImages, allowFormattedOutput, cancellationToken,
+            createSkillCheckIdentity: createSkillCheckIdentity);
         var text = source.Text;
         var scan = DelimiterScanner.Scan(text, DelimiterScanMode.ReaderText, cancellationToken: cancellationToken);
         context.WorkUnits += scan.WorkUnits;
@@ -611,7 +620,9 @@ internal static class InlineParser
             var condition = ExpressionParser.ParseCondition(trimmed[SceneVocabulary.IfPrefix.Length..],
                 location.Offset(lead + SceneVocabulary.IfPrefix.Length),
                 symbols, context.Diagnostics,
-                locate: offset => source.Locate(sourceOffset + lead + SceneVocabulary.IfPrefix.Length + offset));
+                locate: offset => source.Locate(sourceOffset + lead + SceneVocabulary.IfPrefix.Length + offset),
+                allowSkillChecks: context.CreateSkillCheckIdentity is not null,
+                createSkillCheckIdentity: context.CreateSkillCheckIdentity);
             return condition is null
                 ? null
                 : new IfPiece(condition, location, context.Source.Locate(sourceOffset - 1));

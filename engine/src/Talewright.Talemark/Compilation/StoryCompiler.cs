@@ -1,4 +1,5 @@
 using Talewright.Core.Identity;
+using Talewright.Core.Randomness;
 using Talewright.Core.World;
 using Talewright.Rules.Expressions;
 using Talewright.Rules.Triggers;
@@ -158,7 +159,18 @@ public static class StoryCompiler
         {
             cancellationToken.ThrowIfCancellationRequested();
             var when = ExpressionParser.ParseCondition(raw.When, raw.WhenLocation, symbols, diagnostics);
-            var effects = ExpressionParser.ParseEffects(raw.Do, raw.DoLocation, symbols, diagnostics);
+            var triggerScene = new SceneId($"trigger-{raw.Id}");
+            var checkOccurrences = new Dictionary<(EntityId Actor, StatId Skill), int>();
+            SkillCheckIdentity CreateSkillCheckIdentity(EntityId actor, StatId skill)
+            {
+                var key = (actor, skill);
+                var occurrence = checkOccurrences.GetValueOrDefault(key);
+                checkOccurrences[key] = occurrence + 1;
+                return new SkillCheckIdentity(triggerScene, actor, skill, occurrence);
+            }
+
+            var effects = ExpressionParser.ParseEffects(raw.Do, raw.DoLocation, symbols, diagnostics,
+                CreateSkillCheckIdentity);
             if (when is not null && effects is not null)
             {
                 triggers.Add(new TriggerDefinition(raw.Id, when, effects, raw.Once) { Save = raw.Save });

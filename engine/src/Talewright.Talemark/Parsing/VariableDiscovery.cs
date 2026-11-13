@@ -31,7 +31,8 @@ internal static class VariableDiscovery
             {
                 var diagnostics = new DiagnosticBag();
                 return ExpressionSyntaxParser.ParseExpression(Lexer.Tokenize(declaration.Expression),
-                    declaration.Expression.Length, declaration.Location.Offset, diagnostics, sumOnly: true);
+                    declaration.Expression.Length, declaration.Location.Offset, diagnostics, sumOnly: true,
+                    allowSkillChecks: true);
             });
         bool changed;
         do
@@ -42,7 +43,7 @@ internal static class VariableDiscovery
                 // Arithmetic and compound assignment constrain a variable to integers, including self-increments.
                 var type = declaration.Numeric ? ExprType.Number :
                     ExpressionBinder.Bind(syntax[declaration.Id], symbols, new DiagnosticBag(),
-                        declaration.Location.Offset)?.Type;
+                        declaration.Location.Offset, createSkillCheckIdentity: static (_, _) => default)?.Type;
                 if (type is not (ExprType.Number or ExprType.Text)) continue;
                 if (type == ExprType.Text) text.Add(declaration.Id, "");
                 else numbers.Add(declaration.Id, 0);
