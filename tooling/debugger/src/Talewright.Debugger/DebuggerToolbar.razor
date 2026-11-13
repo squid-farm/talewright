@@ -110,7 +110,7 @@
     private bool ShouldRestartFromSource => Model.RestartRequired &&
         !Model.Diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
 
-    private string SourceStatusAction => ShouldRestartFromSource ? "Restart from source" : "Open Problems";
+    private string SourceStatusAction => $"{SourceStatus}: {(ShouldRestartFromSource ? "Restart from source" : "Open Problems")}";
 
     private Task OnSourceStatusClick() => ShouldRestartFromSource ? Restart() : OnShowProblems.InvokeAsync();
 

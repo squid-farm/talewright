@@ -254,7 +254,7 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
         await Button(workbench, "Tools").ClickAsync(new MouseEventArgs());
         Assert.Empty(workbench.FindComponents<ToolTabs>());
 
-        Assert.Equal("Open Problems", workbench.Find(".source-status").GetAttribute("aria-label"));
+        Assert.Equal("Source up to date: Open Problems", workbench.Find(".source-status").GetAttribute("aria-label"));
         await workbench.Find(".source-status").ClickAsync(new MouseEventArgs());
 
         Assert.Equal("true", Button(workbench, "Tools").GetAttribute("aria-pressed"));
@@ -452,7 +452,7 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
         Assert.Equal("hall Great Hall", Passage(workbench));
 
         var status = workbench.Find(".source-status");
-        Assert.Equal("Open Problems", status.GetAttribute("aria-label"));
+        Assert.Equal("Source not adopted: Open Problems", status.GetAttribute("aria-label"));
         await status.ClickAsync(new MouseEventArgs());
 
         Assert.Equal("true", workbench.Find("#tool-problems-tab").GetAttribute("aria-selected"));
@@ -480,7 +480,7 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
         }, Reload);
 
         var status = workbench.Find(".source-status");
-        Assert.Equal("Restart from source", status.GetAttribute("aria-label"));
+        Assert.Equal("Restart required: Restart from source", status.GetAttribute("aria-label"));
         await status.ClickAsync(new MouseEventArgs());
 
         workbench.WaitForAssertion(() =>
@@ -516,7 +516,7 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
         }, Reload);
 
         var status = workbench.Find(".source-status");
-        Assert.Equal("Open Problems", status.GetAttribute("aria-label"));
+        Assert.Equal("Restart required: Open Problems", status.GetAttribute("aria-label"));
         await status.ClickAsync(new MouseEventArgs());
 
         Assert.Equal("true", workbench.Find("#tool-problems-tab").GetAttribute("aria-selected"));

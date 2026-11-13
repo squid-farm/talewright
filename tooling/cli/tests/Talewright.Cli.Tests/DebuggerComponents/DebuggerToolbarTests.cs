@@ -31,7 +31,8 @@ public sealed class DebuggerToolbarTests : BunitContext
             .Add(component => component.OnShowProblems, EventCallback.Factory.Create(this, () => { problemsCalls++; })));
 
         var status = toolbar.Find(".source-status");
-        Assert.Equal("Open Problems", status.GetAttribute("aria-label"));
+        Assert.Equal(requireRestart ? "Restart required: Open Problems" : "Source not adopted: Open Problems",
+            status.GetAttribute("aria-label"));
         await status.ClickAsync(new MouseEventArgs());
 
         Assert.Equal(0, restartCalls);

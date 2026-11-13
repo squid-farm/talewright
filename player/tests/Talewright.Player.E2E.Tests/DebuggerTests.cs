@@ -1111,7 +1111,7 @@ public sealed class DebuggerTests
 
             await driver.ClickToggleAsync("Tools");
             await WaitForToggle(driver, "Tools", false);
-            await driver.ClickAsync("Source up to date");
+            await driver.ClickAsync("Source up to date: Open Problems");
             snapshot = await WaitFor(driver, "Problems");
             Assert.Contains(snapshot.Descendants(), node => node.Role == "toggle button" && node.Name == "Tools" && node.Pressed);
             Assert.Contains(snapshot.Descendants(), node => node.Role == "page tab" && node.Name == "Problems");
