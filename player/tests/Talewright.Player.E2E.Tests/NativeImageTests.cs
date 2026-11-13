@@ -194,10 +194,12 @@ public sealed class NativeImageTests
         await WaitFor(driver, snapshot => snapshot.Descendants().Any(node =>
             node.Name == "Debugger camp" && node.Role == "image" && node.Bounds.Height > 100));
         await File.WriteAllTextAsync(files.TalePath, "=== start\n-> missing");
-        await WaitFor(driver, snapshot => snapshot.Content.Contains("Source not adopted.")
+        await WaitFor(driver, snapshot => snapshot.Content.Contains("Story has compiler errors. Fix and save, or select Rescan / retry watcher.")
+            && snapshot.Content.Contains("Source not adopted")
             && snapshot.Descendants().Any(node => node.Name == "Debugger camp" && node.Bounds.Height > 100));
         await File.WriteAllTextAsync(files.TalePath, tale);
-        await WaitFor(driver, snapshot => !snapshot.Content.Contains("Source not adopted."));
+        await WaitFor(driver, snapshot => snapshot.Content.Contains("Source up to date")
+            && !snapshot.Content.Contains("Story has compiler errors."));
         await File.WriteAllBytesAsync(files.ImagePath, [1, 2, 3]);
         await driver.ScrollToImageAsync("Debugger camp");
         await WaitFor(driver, snapshot => snapshot.Content.Contains("This image could not be displayed."));
