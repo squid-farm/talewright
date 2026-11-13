@@ -59,9 +59,12 @@ public sealed record CharacterSelection
     public string? Preset { get; init; }
     public IReadOnlyDictionary<string, int> Stats { get; init; } = new Dictionary<string, int>();
 
-    public static CharacterSelection? Validate(StoryDefinition story, CharacterSelection? selection)
+    public static CharacterSelection? Validate(StoryDefinition story, CharacterSelection? selection) =>
+        Validate(story, selection, seed: null);
+
+    public static CharacterSelection? Validate(StoryDefinition story, CharacterSelection? selection, ulong? seed)
     {
-        if (story.GetCreationOptions() is not { } creation)
+        if (story.GetCreationOptions(seed) is not { } creation)
         {
             if (selection is not null)
             {

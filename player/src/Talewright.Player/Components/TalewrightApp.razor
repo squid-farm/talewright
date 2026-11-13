@@ -6,6 +6,7 @@
 @using Talewright.Player.Diagnostics
 @using Talewright.Player.Saves
 @using Talewright.Runtime.Saves
+@using Talewright.Core.Randomness
 @implements IAsyncDisposable
 
 <ReaderPresentation Diagnostics="Report">
@@ -54,7 +55,7 @@
             }
             else if (_story.Creation is not null && _character is null)
             {
-                <CharacterCreator @key="_story" Story="_story" OnCreated="CharacterCreated" />
+                <CharacterCreator @key="_story" Story="_story" Seed="_creationSeed" OnCreated="CharacterCreated" />
                 @if (LibraryEnabled)
                 {
                     <button type="button" class="tw-link tw-creation-library" @onclick="ShowLibrary">Library</button>
@@ -62,7 +63,7 @@
             }
             else
             {
-                <StoryPlayer Story="_story" Character="_character" Visible="!_showLibrary" OnExit="@(LibraryEnabled ? EventCallback.Factory.Create(this, ShowLibrary) : default)" SaveStore="SaveStore" SaveExporter="Services.GetService<ISaveFileExporter>()" ResumeHistory="@(_resumeAccepted ? _resumeHistory : null)" AutosaveResumeChecked="true" PreserveRejectedAutosave="_preserveRejectedAutosave" RejectedAutosaveData="_rejectedAutosaveData" />
+                <StoryPlayer Story="_story" Seed="@(_story.Creation is null ? null : _creationSeed)" Character="_character" Visible="!_showLibrary" OnExit="@(LibraryEnabled ? EventCallback.Factory.Create(this, ShowLibrary) : default)" SaveStore="SaveStore" SaveExporter="Services.GetService<ISaveFileExporter>()" ResumeHistory="@(_resumeAccepted ? _resumeHistory : null)" AutosaveResumeChecked="true" PreserveRejectedAutosave="_preserveRejectedAutosave" RejectedAutosaveData="_rejectedAutosaveData" />
             }
         </div>
         </CascadingValue>
@@ -171,6 +172,7 @@
     private long _openGeneration;
     private bool _disposed;
     private CharacterSelection? _character;
+    private ulong _creationSeed;
     private bool _showLibrary;
     private bool _resumeCheckComplete = true;
     private bool _resumeAccepted;
@@ -283,6 +285,7 @@
             var previous = _loaded;
             _loaded = loaded;
             _story = result.Story;
+            _creationSeed = _story!.Seed ?? DeterministicDice.NewSeed();
             _character = null;
             _resumeAccepted = false;
             _resumeHistory = null;

@@ -28,7 +28,7 @@ public sealed class StoryDefinition
     public bool AutosaveEnabled { get; init; } = true;
     /// <summary>Character sheet sections and stats to present; hidden stats remain available to story rules.</summary>
     public CharacterSheetVisibility CharacterSheet { get; init; } = CharacterSheetVisibility.Shown;
-    /// <summary>Authored creation settings; use <see cref="GetCreationOptions"/> for selectable stats.</summary>
+    /// <summary>Authored creation settings; use <see cref="GetCreationOptions(ulong?)"/> for selectable stats.</summary>
     public CharacterCreation? Creation { get; init; }
     public required SceneId Start { get; init; }
     public required RandomnessMode Randomness { get; init; }
@@ -65,7 +65,10 @@ public sealed class StoryDefinition
     }
 
     /// <summary>Creation options visible before selection, presets, or story effects are applied.</summary>
-    public CharacterCreation? GetCreationOptions()
+    public CharacterCreation? GetCreationOptions() => GetCreationOptions(seed: null);
+
+    /// <summary>Creation options evaluated with the playthrough seed, or the story seed or zero if none is supplied.</summary>
+    public CharacterCreation? GetCreationOptions(ulong? seed)
     {
         if (Creation is not { } creation || creation.Stats.Count == 0)
         {
@@ -82,7 +85,7 @@ public sealed class StoryDefinition
             return creation;
         }
 
-        var initialState = GameState.CreateInitial(World, Seed ?? 0);
+        var initialState = GameState.CreateInitial(World, seed ?? Seed ?? 0);
         return creation.WithStats(creation.Stats.Where(pair => IsStatVisible(pair.Key, initialState)));
     }
 

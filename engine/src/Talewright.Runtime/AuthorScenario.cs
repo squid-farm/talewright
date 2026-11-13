@@ -66,7 +66,7 @@ public static class AuthorScenario
             differences.Add("Story version/fingerprint differs; source adoption is not exact reproduction or migration.");
         }
         var setup = data.Setup.ToSetup().Validate(story);
-        var character = CharacterSelection.Validate(story, data.Character);
+        var character = CharacterSelection.Validate(story, data.Character, data.Seed);
         story.GetScene(new(data.Target));
         var commands = data.Commands.Select(command => command.ToCommand(story)).ToArray();
         // Validate and execute redo too, before preparing the visible prefix.

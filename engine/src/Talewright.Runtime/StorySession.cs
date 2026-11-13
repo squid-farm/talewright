@@ -69,10 +69,10 @@ public sealed class StorySession : IStorySession
         AuthorSetup? setup, Action<RuleDecision>? observer,
         Action<SceneEntryBoundary, IReadOnlyList<GameEvent>>? beforeEntry = null)
     {
-        character = CharacterSelection.Validate(story, character);
+        Seed = seed ?? story.Seed ?? DeterministicDice.NewSeed();
+        character = CharacterSelection.Validate(story, character, Seed);
         _replayIdentities = story.ReplayIdentities;
         Story = story;
-        Seed = seed ?? story.Seed ?? DeterministicDice.NewSeed();
         _log = new EventLog(story.World, Seed);
         _log.Appending += gameEvent =>
         {

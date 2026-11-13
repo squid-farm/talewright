@@ -100,6 +100,57 @@ public sealed class CharacterStatVisibilityTests
         }));
     }
 
+    [Theory]
+    [InlineData(1UL, false)]
+    [InlineData(2UL, true)]
+    public void Creation_visibility_uses_the_playthrough_seed_through_save_and_author_replay(ulong seed, bool visible)
+    {
+        var options = new CompilerOptions
+        {
+            CompatibilityId = "creation-seed-test-v1",
+            Predicates = new NamedPredicateRegistry().Register("EvenSeed", state => state.Seed % 2 == 0),
+        };
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = """
+                game:
+                  id: creation-seed
+                  title: Creation seed
+                  start: beginning
+                  ruleset: rpg
+                  character-sheet:
+                    stats:
+                      str: "@EvenSeed"
+                  creation:
+                    stats:
+                      str: [8, 12]
+                characters:
+                  player: { first-name: Ada }
+                """,
+            ["main.tale"] = "=== beginning\n* [Next] -> ending\n=== ending\nDone.\n-> END\n",
+        }), options);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var story = result.Story!;
+        var creation = story.GetCreationOptions(seed)!;
+        Assert.Equal(visible, creation.Stats.ContainsKey(new StatId("str")));
+        var selection = creation.Default(story.World.Characters[EntityId.Player]);
+        var history = new StoryHistory(story, seed, selection);
+        Assert.Equal(seed, history.Seed);
+        Assert.Throws<ArgumentException>(() => new StorySession(story, seed == 1 ? 2UL : 1UL, character: selection));
+        history.Choose(Assert.Single(history.Current.Choices).Key);
+        var restored = StoryHistory.Restore(story, history.Save());
+        Assert.Equal(seed, restored.Seed);
+        restored.Back();
+        restored.Forward();
+        Assert.Equal(history.Events, restored.Events);
+
+        var author = AuthorSession.Create(story, story.Start, seed: seed, character: selection);
+        var scenario = AuthorScenario.Export(author, options.CompatibilityId!);
+        var imported = AuthorScenario.Import(story, scenario, options.CompatibilityId!);
+        Assert.Equal(seed, imported.Session.Seed);
+        Assert.Equal(visible, imported.Session.Character!.Stats.ContainsKey("str"));
+    }
+
     [Fact]
     public void Hidden_check_stat_change_and_level_notes_use_each_events_pre_event_visibility()
     {

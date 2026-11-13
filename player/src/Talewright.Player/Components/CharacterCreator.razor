@@ -55,6 +55,8 @@
     [Parameter, EditorRequired]
     public StoryDefinition Story { get; set; } = default!;
     [Parameter]
+    public ulong? Seed { get; set; }
+    [Parameter]
     public EventCallback<CharacterSelection> OnCreated { get; set; }
     [Parameter]
     public CharacterSelection? InitialSelection { get; set; }
@@ -77,11 +79,11 @@
 
     protected override void OnInitialized()
     {
-        _creation = Story.GetCreationOptions()
+        _creation = Story.GetCreationOptions(Seed)
             ?? throw new InvalidOperationException("This story has no character creation options.");
         var selection = InitialSelection is null
             ? _creation.Default(Story.World.Characters[EntityId.Player])
-            : CharacterSelection.Validate(Story, InitialSelection)!;
+            : CharacterSelection.Validate(Story, InitialSelection, Seed)!;
         _firstName = selection.FirstName;
         _lastName = selection.LastName;
         _pronouns = selection.Pronouns;
@@ -113,7 +115,7 @@
             {
                 FirstName = _firstName, LastName = _lastName, Pronouns = _pronouns,
                 Preset = _preset, Stats = _stats,
-            });
+            }, Seed);
         }
         catch (ArgumentException ex)
         {

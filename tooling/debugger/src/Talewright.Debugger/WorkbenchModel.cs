@@ -1,6 +1,7 @@
 using System.Globalization;
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
+using Talewright.Core.Randomness;
 using Talewright.Core.State;
 using Talewright.Core.World;
 using Talewright.Runtime;
@@ -67,6 +68,8 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
 {
     private StorySource? _acceptedSource;
     private string? _requestedScene = requestedScene;
+    private readonly ulong _randomSeed = DeterministicDice.NewSeed();
+    private string _seed = "";
     public StoryImages? Images { get; private set; }
     private readonly List<StoryImages> _retiredImages = [];
     public string Root { get; } = root;
@@ -113,7 +116,19 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
     public CharacterSelection? Character { get; private set; }
     public string Target { get; set; } = requestedScene ?? "";
     public string? RequestedSceneNotice { get; private set; }
-    public string Seed { get; set; } = "";
+    public string Seed
+    {
+        get => _seed;
+        set
+        {
+            if (_seed == value) return;
+            _seed = value;
+            Character = null;
+            ++CreationRevision;
+        }
+    }
+    public ulong CreationSeed => ulong.TryParse(Seed, NumberStyles.None, CultureInfo.InvariantCulture, out var seed)
+        ? seed : Story?.Seed ?? _randomSeed;
     public IReadOnlyList<SetupNumber> Numbers { get; private set; } = [];
     public IReadOnlyList<SetupFlag> Flags { get; private set; } = [];
     public IReadOnlyList<SetupText> Texts { get; private set; } = [];
@@ -199,9 +214,9 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
         Texts = texts;
         Session = candidate;
         Inspection = inspection;
-        Character = candidate.Character;
         Target = candidate.StartScene.Value;
         Seed = candidate.Seed.ToString(CultureInfo.InvariantCulture);
+        Character = candidate.Character;
         ++CreationRevision;
         RefreshEdits();
     }
@@ -400,7 +415,9 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
                 }
             }
             BuildSetup(numbers, flags, texts).Validate(story);
-            var selection = RevalidateCharacter(story);
+            var seed = Story is null ? story.Seed?.ToString(CultureInfo.InvariantCulture) ?? "" : Seed;
+            var resolvedSeed = ParseSeed(seed) ?? story.Seed ?? _randomSeed;
+            var selection = RevalidateCharacter(story, resolvedSeed);
             var requestedScene = _requestedScene;
             var target = requestedScene ?? (string.IsNullOrWhiteSpace(Target) ? story.Start.Value : Target);
             var requestedSceneExists = requestedScene is null ||
@@ -410,8 +427,6 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
                 target = story.Start.Value;
             }
             story.GetScene(new(target));
-            var seed = Story is null ? story.Seed?.ToString(CultureInfo.InvariantCulture) ?? "" : Seed;
-            ParseSeed(seed);
             return Publish(() =>
             {
                 Diagnostics = compiled.Diagnostics;
@@ -484,7 +499,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
     private static (SetupNumberKind Kind, string Id, string? Character) FieldKey(SetupNumber field) =>
         (field.Kind, field.Id, field.Character);
 
-    private CharacterSelection? RevalidateCharacter(StoryDefinition story)
+    private CharacterSelection? RevalidateCharacter(StoryDefinition story, ulong seed)
     {
         if (Character is null)
         {
@@ -501,7 +516,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
         {
             throw new ArgumentException($"Character selection IDs/options changed: {string.Join(", ", invalid)}. Clear character selection before restarting");
         }
-        return CharacterSelection.Validate(story, Character);
+        return CharacterSelection.Validate(story, Character, seed);
     }
 
     public IEnumerable<SceneDefinition> FindScenes(string query) => Story?.Scenes.Where(scene =>
@@ -509,7 +524,8 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
         (scene.Title?.Contains(query, StringComparison.OrdinalIgnoreCase) ?? false)) ?? [];
 
     public void SelectCharacter(CharacterSelection character) => Attempt(() => Character = CharacterSelection.Validate(
-        Story ?? throw new InvalidOperationException("Load a story first."), character));
+        Story ?? throw new InvalidOperationException("Load a story first."), character,
+        ParseSeed(Seed) ?? CreationSeed));
 
     public void ClearCharacter()
     {
@@ -523,7 +539,8 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
         {
             var story = Story ?? throw new InvalidOperationException("Load a valid story first.");
             var candidate = AuthorSession.Create(story, new SceneId(Target), captureDecisions: true,
-                BuildSetup(Numbers, Flags, Texts), ParseSeed(Seed), Character);
+                BuildSetup(Numbers, Flags, Texts),
+                story.Creation is null ? ParseSeed(Seed) : ParseSeed(Seed) ?? CreationSeed, Character);
             var inspection = candidate.Inspect();
             Session = candidate;
             Inspection = inspection;
@@ -545,7 +562,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
     private IGameStateView StartingState()
     {
         var story = Story ?? throw new InvalidOperationException("Load a story first.");
-        var state = GameState.CreateInitial(story.World, story.Seed ?? 0);
+        var state = GameState.CreateInitial(story.World, CreationSeed);
 
         void Apply(IEnumerable<GameEvent> events)
         {

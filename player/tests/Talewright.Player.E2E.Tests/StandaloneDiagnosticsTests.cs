@@ -49,6 +49,7 @@ public sealed class StandaloneDiagnosticsTests(WebHostFixture host, ITestOutputH
         }
         else
         {
+            await WaitForPublishedStoryAsync();
             await Page.Locator(".tw-diagnostic-report summary").ClickAsync();
             var preview = Page.GetByLabel("Diagnostic report");
             await Expect(preview).ToContainTextAsync("Host: Browser");

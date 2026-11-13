@@ -8,7 +8,7 @@
             @if (Story.Creation is not null)
             {
                 <div class="setup-character">
-                    <CharacterCreator @key="Model.CreationRevision" Story="Story" InitialSelection="Model.Character" OnCreated="Model.SelectCharacter" Compact="true" />
+                    <CharacterCreator @key="Model.CreationRevision" Story="Story" Seed="Model.CreationSeed" InitialSelection="Model.Character" OnCreated="Model.SelectCharacter" Compact="true" />
                     <div class="setup-character-status">
                         <p role="status" class="@(Model.Character is null ? "setup-character-missing" : "setup-character-ready")">@(Model.Character is null ? "Create a character before starting the selected scene. Start story above confirms the character only." : "Character selected. Start the selected scene below.")</p>
                         <button type="button" @onclick="OnClearCharacter">Clear character selection</button>
