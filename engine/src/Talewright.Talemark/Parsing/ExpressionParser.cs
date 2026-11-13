@@ -1,4 +1,5 @@
 using Talewright.Core.Identity;
+using Talewright.Core.Randomness;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
@@ -86,13 +87,15 @@ internal static class ExpressionParser
     /// <summary>Parses and binds a boolean condition.</summary>
     public static Expr? ParseCondition(string text, SourceLocation location, StorySymbols symbols,
         DiagnosticBag diagnostics, SourceLocation? authoringLocation = null, Func<int, SourceLocation>? locate = null,
-        bool highlightUnexpectedTokens = false)
+        bool highlightUnexpectedTokens = false, bool allowSkillChecks = false,
+        Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null)
     {
         var tokens = symbols.Analysis?.Expression(ExpressionContextKind.Condition, text,
             authoringLocation ?? location, locate) ?? Lexer.Tokenize(text);
         var syntax = ExpressionSyntaxParser.ParseExpression(tokens, text.Length, locate ?? location.Offset, diagnostics,
-            highlightUnexpectedTokens: highlightUnexpectedTokens);
-        return ExpressionBinder.Bind(syntax, symbols, diagnostics, locate ?? location.Offset, ExprType.Bool);
+            highlightUnexpectedTokens: highlightUnexpectedTokens, allowSkillChecks: allowSkillChecks);
+        return ExpressionBinder.Bind(syntax, symbols, diagnostics, locate ?? location.Offset, ExprType.Bool,
+            createSkillCheckIdentity);
     }
 
     /// <summary>Parses and binds a numeric expression.</summary>
@@ -118,12 +121,13 @@ internal static class ExpressionParser
 
     /// <summary>Parses and binds semicolon-separated effects.</summary>
     public static List<Effect>? ParseEffects(string text, SourceLocation location, StorySymbols symbols,
-        DiagnosticBag diagnostics)
+        DiagnosticBag diagnostics, Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null)
     {
         var tokens = symbols.Analysis?.Expression(ExpressionContextKind.Effects, text, location)
             ?? Lexer.Tokenize(text);
-        var syntax = ExpressionSyntaxParser.ParseEffects(tokens, text.Length, location.Offset, diagnostics);
-        return ExpressionBinder.Bind(syntax, symbols, diagnostics, location.Offset);
+        var syntax = ExpressionSyntaxParser.ParseEffects(tokens, text.Length, location.Offset, diagnostics,
+            allowSkillChecks: createSkillCheckIdentity is not null);
+        return ExpressionBinder.Bind(syntax, symbols, diagnostics, location.Offset, createSkillCheckIdentity);
     }
 
     /// <summary>True for words that can't be used as ids.</summary>
@@ -131,5 +135,5 @@ internal static class ExpressionParser
         id is ExpressionVocabulary.And or ExpressionVocabulary.Or or ExpressionVocabulary.Not or ExpressionVocabulary.Has or
             ExpressionVocabulary.True or ExpressionVocabulary.False or ExpressionVocabulary.Visited or ExpressionVocabulary.Scene or
             ExpressionVocabulary.Faction or ExpressionVocabulary.Item or ExpressionVocabulary.Flag or ExpressionVocabulary.Var or
-            SceneVocabulary.End;
+            SceneVocabulary.SkillCheck or SceneVocabulary.End;
 }

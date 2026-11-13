@@ -68,11 +68,11 @@ public sealed class ShownClauseTests
 
     [Theory]
     [InlineData("* [Go] (requires flag:ready, show) -> END", "TW1011", "shown")]
-    [InlineData("* [Go] (requires flag:ready, hidden) -> END", "TW1011", "shown")]
+    [InlineData("* [Go] (requires flag:ready, hidden) -> END", "TW1001", ",")]
     [InlineData("* [Go] (requires flag:ready, shown, shown) -> END", "TW1011", "only once")]
     [InlineData("* [Go] (shown) -> END", "TW1011", "requires a choice requirement")]
     [InlineData("* [Go] (shown \"Not yet\") -> END", "TW1011", "requires a choice requirement")]
-    [InlineData("@requires true, hidden", "TW1006", "shown")]
+    [InlineData("@requires true, hidden", "TW1001", ",")]
     public void Invalid_shown_clauses_report_actionable_diagnostics(string line, string code, string message)
     {
         var tale = line.StartsWith("@", StringComparison.Ordinal)

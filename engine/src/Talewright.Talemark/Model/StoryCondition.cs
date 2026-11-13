@@ -50,6 +50,9 @@ public enum StoryStateReadKind
 
     /// <summary>An item quantity, such as <c>player:inventory:rope:count</c>.</summary>
     InventoryCount,
+
+    /// <summary>A skill check whose result affects the condition.</summary>
+    SkillCheck,
 }
 
 /// <summary>Preview. One distinct reference to story state used by a condition.</summary>
@@ -110,6 +113,14 @@ public sealed class StoryCondition
             switch (current)
             {
                 case NumberLiteral or BoolLiteral or TextLiteral or TierLiteral:
+                    continue;
+                case SkillCheckExpr value:
+                    var checkRead = new StoryStateRead(StoryStateReadKind.SkillCheck,
+                        $"depends on a {value.Skill.Value} check", IsOpaque: false);
+                    if (seen.Add(checkRead))
+                        reads.Add(checkRead);
+                    if (value.Difficulty is { } difficulty)
+                        pending.Push(difficulty);
                     continue;
                 case UnaryExpr unary:
                     pending.Push(unary.Operand);

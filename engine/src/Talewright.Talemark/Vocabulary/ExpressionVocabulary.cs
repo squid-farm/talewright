@@ -93,6 +93,7 @@ internal static class ExpressionVocabulary
         (AddAssign, TokenKind.PlusAssign),
         (SubtractAssign, TokenKind.MinusAssign),
         (Separator.ToString(), TokenKind.Colon),
+        (ArgumentSeparator.ToString(), TokenKind.Comma),
         (StatementSeparator.ToString(), TokenKind.Semicolon),
         (OpenParen.ToString(), TokenKind.LeftParen),
         (CloseParen.ToString(), TokenKind.RightParen),

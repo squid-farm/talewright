@@ -27,6 +27,8 @@ public sealed record EvaluationContext(IGameStateView State, NamedPredicateRegis
 {
     public Action<ExpressionTrace>? Trace { get; init; }
 
+    public Func<SkillCheckExpr, Value>? ResolveSkillCheck { get; init; }
+
     public static EvaluationContext For(IGameStateView state) => new(state, NamedPredicateRegistry.Empty);
 }
 
@@ -159,6 +161,8 @@ public static class ExpressionEvaluator
                 ? state.VisitCount(scene)
                 : state.CurrentScene is { } current ? state.VisitCount(current) : 0),
             InventoryCountRef e => Value.Of(state.GetItemCount(e.Character, e.Item)),
+            SkillCheckExpr e => context.ResolveSkillCheck?.Invoke(e)
+                ?? throw new InvalidOperationException("A skill check requires an active play evaluation context."),
             NamedPredicate e => Value.Of(context.Predicates.Evaluate(e.Name, state)),
             _ => throw new NotSupportedException($"Unknown expression {expr.GetType().Name}."),
         };

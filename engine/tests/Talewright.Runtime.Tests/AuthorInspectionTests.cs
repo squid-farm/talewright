@@ -219,7 +219,7 @@ public sealed class AuthorInspectionTests
     }
 
     [Fact]
-    public void Selector_preserves_duplicate_removal_and_evaluates_eligible_requirements_before_limit()
+    public void Selector_fills_limit_lazily_and_removes_duplicate_ids()
     {
         var calls = 0;
         var predicates = new NamedPredicateRegistry().Register("Counted", _ => { calls++; return true; });
@@ -233,15 +233,28 @@ public sealed class AuthorInspectionTests
         var decisions = new List<RuleDecision>();
         var selected = StoryletSelector.SelectEligible(candidates, new StoryletTags(["hub"]), context,
             exclude: null, limit: 1, decisions.Add);
-        Assert.Equal(4, calls);
+        Assert.Equal(1, calls);
         Assert.Equal("a", Assert.Single(selected).Id.Value);
-        Assert.Equal(DecisionReason.Duplicate, decisions[1].Reason);
-        Assert.Equal(DecisionReason.HubLimit, decisions[2].Reason);
-        Assert.Equal(2, decisions[2].Rank);
+        Assert.Contains(decisions, decision => decision.Subject == "a" &&
+            decision.Outcome == DecisionOutcome.Selected);
+        Assert.Equal(["a", "b", "c"], decisions
+            .Where(decision => decision.Reason == DecisionReason.HubLimit)
+            .Select(decision => decision.Subject));
         Assert.All(decisions, decision => Assert.Null(decision.EventStart));
         Assert.All(decisions, decision => Assert.True(decision.Expression!.IsOpaque));
-        Assert.Equal(selected.Select(s => s.Id), StoryletSelector.SelectEligible(candidates, new StoryletTags(["hub"]),
-            context, limit: 1).Select(s => s.Id));
+
+        var unlimited = StoryletSelector.SelectEligible(candidates, new StoryletTags(["hub"]), context);
+        Assert.Equal(["a", "b", "c"], unlimited.Select(storylet => storylet.Id.Value));
+        Assert.Equal(5, calls);
+
+        var twoSlotDecisions = new List<RuleDecision>();
+        var twoSlot = StoryletSelector.SelectEligible(candidates, new StoryletTags(["hub"]), context,
+            exclude: null, limit: 2, twoSlotDecisions.Add);
+        Assert.Equal(["a", "b"], twoSlot.Select(storylet => storylet.Id.Value));
+        Assert.Contains(twoSlotDecisions, decision => decision.Subject == "a" &&
+            decision.Reason == DecisionReason.Duplicate);
+        Assert.Contains(twoSlotDecisions, decision => decision.Subject == "c" &&
+            decision.Reason == DecisionReason.HubLimit);
         Assert.Equal(8, calls);
     }
 

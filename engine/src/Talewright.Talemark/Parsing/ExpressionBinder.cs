@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using Talewright.Core.Identity;
+using Talewright.Core.Randomness;
 using Talewright.Core.World;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Effects;
@@ -16,23 +17,26 @@ internal sealed class ExpressionBinder
     private readonly Func<int, SourceLocation> _locate;
     private readonly StorySymbols _symbols;
     private readonly DiagnosticBag _diagnostics;
+    private readonly Func<EntityId, StatId, SkillCheckIdentity>? _createSkillCheckIdentity;
 
     private ExpressionBinder(TokenBuffer tokens, Func<int, SourceLocation> locate, StorySymbols symbols,
-        DiagnosticBag diagnostics)
+        DiagnosticBag diagnostics, Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null)
     {
         _tokens = tokens;
         _locate = locate;
         _symbols = symbols;
         _diagnostics = diagnostics;
+        _createSkillCheckIdentity = createSkillCheckIdentity;
     }
 
     private sealed class BindingException : Exception;
 
     internal static Expr? Bind(ExpressionSyntaxTree syntax, StorySymbols symbols, DiagnosticBag diagnostics,
-        Func<int, SourceLocation> locate, ExprType? expectedType = null)
+        Func<int, SourceLocation> locate, ExprType? expectedType = null,
+        Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null)
     {
         if (syntax.HasErrors) return null;
-        var binder = new ExpressionBinder(syntax.Tokens, locate, symbols, diagnostics);
+        var binder = new ExpressionBinder(syntax.Tokens, locate, symbols, diagnostics, createSkillCheckIdentity);
         try
         {
             var value = binder.Bind(syntax.Root);
@@ -148,10 +152,10 @@ internal sealed class ExpressionBinder
     }
 
     internal static List<Effect>? Bind(EffectsSyntaxTree syntax, StorySymbols symbols, DiagnosticBag diagnostics,
-        Func<int, SourceLocation> locate)
+        Func<int, SourceLocation> locate, Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null)
     {
         if (syntax.HasErrors) return null;
-        var binder = new ExpressionBinder(syntax.Tokens, locate, symbols, diagnostics);
+        var binder = new ExpressionBinder(syntax.Tokens, locate, symbols, diagnostics, createSkillCheckIdentity);
         try
         {
             var effects = new List<Effect>(syntax.Effects.Length);
@@ -181,11 +185,43 @@ internal sealed class ExpressionBinder
         ReferenceExpressionNode reference => BindReference(reference),
         InventoryCountExpressionNode count => BindInventoryCount(count),
         InventoryItemNameExpressionNode itemName => BindInventoryItemName(itemName),
+        SkillCheckExpressionNode skillCheck => BindSkillCheck(skillCheck),
         HasItemExpressionNode hasItem => new HasItem(Character(hasItem.Character), Item(hasItem.Item)),
         UnaryExpressionNode unary => BindUnary(unary),
         BinaryExpressionNode binary => BindBinary(binary),
         _ => throw new InvalidOperationException($"Unknown expression syntax node '{node.GetType().Name}'."),
     };
+
+    private Expr BindSkillCheck(SkillCheckExpressionNode syntax)
+    {
+        if (_createSkillCheckIdentity is null)
+            return Fail<Expr>(CompilerDiagnosticCodes.InvalidExpression,
+                $"'{SceneVocabulary.SkillCheck}' is not allowed in this expression.", syntax.Span.Start);
+
+        if (_symbols.World.Ruleset.SkillCheckRule is null)
+            Fail(CompilerDiagnosticCodes.SkillChecksUnsupported,
+                $"The '{_symbols.World.Ruleset.Id}' ruleset has no {SceneVocabulary.SkillCheck} rule, " +
+                $"so {SceneVocabulary.SkillCheck} cannot be used.", syntax.Span.Start);
+
+        var actor = syntax.Actor is { } actorSpan ? new EntityId(Text(actorSpan)) : EntityId.Player;
+        if (!_symbols.World.Characters.ContainsKey(actor))
+            Fail(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown character '{actor}'.",
+                syntax.Actor?.Start ?? syntax.Span.Start);
+
+        var skill = new StatId(Text(syntax.Skill));
+        if (!_symbols.World.Ruleset.HasStat(skill))
+            Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
+                $"Unknown stat '{skill}' (ruleset '{_symbols.World.Ruleset.Id}')." +
+                _symbols.StatGuidance?.ForMissingStat(skill), syntax.Skill.Start);
+
+        var difficulty = syntax.Difficulty is { } difficultySyntax ? Bind(difficultySyntax) : null;
+        if (difficulty is { Type: not ExprType.Number })
+            Fail(CompilerDiagnosticCodes.TypeMismatch,
+                $"'{SceneVocabulary.Difficulty}' needs a number.", syntax.Difficulty!.Span.Start);
+
+        var identity = _createSkillCheckIdentity(actor, skill);
+        return new SkillCheckExpr(actor, skill, identity, difficulty, syntax.IsHidden);
+    }
 
     private Expr BindName(NameExpressionNode name)
     {

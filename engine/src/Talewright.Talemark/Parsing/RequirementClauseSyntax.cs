@@ -31,8 +31,10 @@ internal readonly record struct RequirementClauseSyntax(
             return WithoutSuffix(text);
 
         var scan = DelimiterScanner.Scan(text, DelimiterScanMode.CodeGroup, cancellationToken: cancellationToken);
-        var commas = scan.FindTopLevel(text, ExpressionVocabulary.ArgumentSeparator, cancellationToken);
-        if (commas.Count == 0)
+        var commas = scan.FindTopLevel(text, ExpressionVocabulary.ArgumentSeparator, cancellationToken)
+            .Where(comma => !IsHiddenModifier(text, comma, cancellationToken))
+            .ToArray();
+        if (commas.Length == 0)
             return WithoutSuffix(text);
 
         var checkpoint = cancellationToken.CanBeCanceled ? new CancellationCheckpoint(cancellationToken) : null;
@@ -41,10 +43,10 @@ internal readonly record struct RequirementClauseSyntax(
         var textSlots = new List<RequirementClauseText>();
         var suffixStart = 0;
         var suffixLength = 0;
-        for (var clauseIndex = 0; clauseIndex < commas.Count; clauseIndex++)
+        for (var clauseIndex = 0; clauseIndex < commas.Length; clauseIndex++)
         {
             checkpoint?.Check();
-            var clauseEnd = clauseIndex + 1 < commas.Count ? commas[clauseIndex + 1] : text.Length;
+            var clauseEnd = clauseIndex + 1 < commas.Length ? commas[clauseIndex + 1] : text.Length;
             var start = TextScanning.SkipWhitespace(text, commas[clauseIndex] + 1, clauseEnd, cancellationToken);
             var end = TextScanning.TrimWhitespaceEnd(text, start, clauseEnd, cancellationToken);
             if (clauseIndex == 0)
@@ -91,6 +93,16 @@ internal readonly record struct RequirementClauseSyntax(
 
     private static RequirementClauseSyntax WithoutSuffix(string text) =>
         new(text.Length, false, 0, 0, false, null, [], [], [], []);
+
+    private static bool IsHiddenModifier(string text, int comma, CancellationToken cancellationToken)
+    {
+        var start = TextScanning.SkipWhitespace(text, comma + 1, cancellationToken);
+        var end = start + SceneVocabulary.Hidden.Length;
+        return end <= text.Length &&
+               text.AsSpan(start, SceneVocabulary.Hidden.Length).SequenceEqual(SceneVocabulary.Hidden) &&
+               (end == text.Length || char.IsWhiteSpace(text[end]) ||
+                text[end] == ExpressionVocabulary.ArgumentSeparator);
+    }
 }
 
 /// <param name="QuoteOffset">Offset of the opening quote.</param>

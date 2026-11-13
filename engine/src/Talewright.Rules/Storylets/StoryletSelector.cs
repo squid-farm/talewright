@@ -137,58 +137,100 @@ public static class StoryletSelector
             throw new ArgumentOutOfRangeException(nameof(limit), "A storylet limit must be positive.");
         }
 
-        var candidates = new List<(T Storylet, int Index, bool IsAvailable, ExpressionTrace? Trace)>();
+        var candidates = new List<(T Storylet, int Index)>();
+        var metadataExcluded = new List<(T Storylet, DecisionReason Reason)>();
         var index = 0;
         foreach (var storylet in storylets)
         {
-            DecisionReason? excluded = storylet.Id == exclude ? DecisionReason.SelfExcluded
+            DecisionReason? excludedReason = storylet.Id == exclude ? DecisionReason.SelfExcluded
                 : !tags.Matches(storylet.Tags) ? DecisionReason.TagMismatch : null;
-            ExpressionTrace? trace = null;
-            var available = false;
-            var showWhenUnavailable = false;
-            if (excluded is null && storylet.Once && context.State.VisitCount(storylet.Id) > 0)
+            if (excludedReason is null && storylet.Once && context.State.VisitCount(storylet.Id) > 0)
             {
-                excluded = DecisionReason.AlreadyVisited;
+                excludedReason = DecisionReason.AlreadyVisited;
             }
-            else if (excluded is null)
+            if (excludedReason is { } reason)
             {
-                if (evaluateRequirement is null)
-                {
-                    available = RuleObservation.Test(storylet.Requires, context, observer is not null, out trace);
-                }
-                else
-                {
-                    var result = evaluateRequirement(storylet);
-                    available = result.Available;
-                    showWhenUnavailable = result.ShowWhenUnavailable;
-                    trace = result.Trace;
-                }
-                if (!available && !showWhenUnavailable)
-                {
-                    excluded = DecisionReason.ConditionFalse;
-                }
+                metadataExcluded.Add((storylet, reason));
             }
-            if (excluded is { } reason)
+            else
             {
-                observer?.Invoke(new RuleDecision(DecisionKind.Storylet, storylet.Id.Value, context.State.CurrentScene,
-                    DecisionOutcome.Excluded, reason, trace ?? (storylet.Requires is { } expr ? ExpressionTrace.NotEvaluated(expr) : null),
-                    eventIndex, eventIndex, Priority: storylet.Priority, Limit: limit));
-            }
-
-            if (excluded is null || showWhenUnavailable)
-            {
-                candidates.Add((storylet, index, available, trace));
+                candidates.Add((storylet, index));
             }
             index++;
+        }
+
+        foreach (var (storylet, reason) in metadataExcluded)
+            observer?.Invoke(new RuleDecision(DecisionKind.Storylet, storylet.Id.Value, context.State.CurrentScene,
+                DecisionOutcome.Excluded, reason,
+                storylet.Requires is { } expr ? ExpressionTrace.NotEvaluated(expr) : null,
+                eventIndex, eventIndex, Priority: storylet.Priority, Limit: limit));
+
+        var prioritized = candidates.OrderByDescending(x => x.Storylet.Priority).ThenBy(x => x.Index).ToArray();
+        var evaluated = new List<(T Storylet, int Index, bool Available, bool ShowWhenUnavailable,
+            ExpressionTrace? Trace, bool WasEvaluated)>(prioritized.Length);
+        var availableIds = new HashSet<SceneId>();
+        var availableCount = 0;
+        var reachedLimit = false;
+        foreach (var (storylet, sourceIndex) in prioritized)
+        {
+            if (reachedLimit)
+            {
+                evaluated.Add((storylet, sourceIndex, false, false, null, false));
+                continue;
+            }
+
+            bool available;
+            bool showWhenUnavailable;
+            ExpressionTrace? trace;
+            if (evaluateRequirement is null)
+            {
+                available = RuleObservation.Test(storylet.Requires, context, observer is not null, out trace);
+                showWhenUnavailable = false;
+            }
+            else
+            {
+                var result = evaluateRequirement(storylet);
+                available = result.Available;
+                showWhenUnavailable = result.ShowWhenUnavailable;
+                trace = result.Trace;
+            }
+
+            evaluated.Add((storylet, sourceIndex, available, showWhenUnavailable, trace, true));
+            if (available && availableIds.Add(storylet.Id))
+            {
+                availableCount++;
+                reachedLimit = limit is { } cap && availableCount >= cap;
+            }
+        }
+
+        foreach (var (storylet, _, available, showWhenUnavailable, trace, wasEvaluated) in evaluated)
+        {
+            if (wasEvaluated && !available && !showWhenUnavailable)
+                observer?.Invoke(new RuleDecision(DecisionKind.Storylet, storylet.Id.Value, context.State.CurrentScene,
+                    DecisionOutcome.Excluded, DecisionReason.ConditionFalse,
+                    trace ?? (storylet.Requires is { } expr ? ExpressionTrace.NotEvaluated(expr) : null),
+                    eventIndex, eventIndex, Priority: storylet.Priority, Limit: limit));
+        }
+
+        foreach (var (storylet, _, _, _, _, wasEvaluated) in evaluated)
+        {
+            if (!wasEvaluated)
+                observer?.Invoke(new RuleDecision(DecisionKind.Storylet, storylet.Id.Value, context.State.CurrentScene,
+                    DecisionOutcome.Excluded, DecisionReason.HubLimit,
+                    storylet.Requires is { } expr ? ExpressionTrace.NotEvaluated(expr) : null,
+                    eventIndex, eventIndex, Priority: storylet.Priority, Limit: limit));
         }
 
         var selected = new List<(T Storylet, bool IsAvailable)>();
         var seen = new HashSet<SceneId>();
         var rank = 0;
-        foreach (var (storylet, _, available, trace) in candidates
-                     .OrderByDescending(x => x.IsAvailable)
-                     .ThenByDescending(x => x.Storylet.Priority)
-                     .ThenBy(x => x.Index))
+        foreach (var (storylet, _, available, _, trace, wasEvaluated) in evaluated
+                     .Where(x => x.Available)
+                     .OrderByDescending(x => x.Storylet.Priority)
+                     .ThenBy(x => x.Index)
+                     .Concat(evaluated.Where(x => !x.Available && x.ShowWhenUnavailable)
+                         .OrderByDescending(x => x.Storylet.Priority)
+                         .ThenBy(x => x.Index)))
         {
             var duplicate = !seen.Add(storylet.Id);
             if (!duplicate && available)
@@ -218,6 +260,13 @@ public static class StoryletSelector
                 observer?.Invoke(new RuleDecision(DecisionKind.Storylet, storylet.Id.Value, context.State.CurrentScene,
                     included ? DecisionOutcome.Selected : DecisionOutcome.Excluded, reason, trace, eventIndex, eventIndex,
                     Priority: storylet.Priority, Rank: duplicate ? null : rank, Limit: limit));
+            }
+            else if (!wasEvaluated)
+            {
+                observer?.Invoke(new RuleDecision(DecisionKind.Storylet, storylet.Id.Value, context.State.CurrentScene,
+                    DecisionOutcome.Excluded, DecisionReason.HubLimit,
+                    storylet.Requires is { } expr ? ExpressionTrace.NotEvaluated(expr) : null,
+                    eventIndex, eventIndex, Priority: storylet.Priority, Limit: limit));
             }
             else if (!duplicate && (limit is null || selected.Count < limit))
             {

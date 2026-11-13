@@ -31,6 +31,7 @@ public static class SceneVocabulary
     internal const string Difficulty = "dc";
     internal const string DifficultyPrefix = " " + Difficulty;
     internal const string DifficultySeparator = DifficultyPrefix + " ";
+    internal const string Hidden = "hidden";
     internal const string SuccessOutcome = "success:";
     internal const string FailureOutcome = "failure:";
     /// <summary>The reserved divert target that ends a story.</summary>

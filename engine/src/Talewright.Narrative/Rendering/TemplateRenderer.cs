@@ -8,8 +8,8 @@ using Talewright.Rules.Expressions;
 namespace Talewright.Narrative.Rendering;
 
 /// <summary>
-/// Renders template ASTs against a read-only game state. Pure: rendering never changes state, so the same
-/// template + state always produces the same document.
+/// Renders template ASTs against a read-only game state. The renderer does not mutate state directly, but a
+/// play context can resolve a skill-check expression and record its event during rendering.
 /// </summary>
 public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry predicates)
 {
@@ -21,17 +21,23 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
     public IGrammar Grammar => grammar;
 
     public RenderedDocument Render(IEnumerable<TemplateBlock> blocks, IGameStateView state)
+        => Render(blocks, new EvaluationContext(state, predicates));
+
+    public RenderedDocument Render(IEnumerable<TemplateBlock> blocks, EvaluationContext context)
     {
         var output = new List<RenderedBlock>();
-        RenderBlocks(blocks, new EvaluationContext(state, predicates), output);
+        RenderBlocks(blocks, context, output);
         return new RenderedDocument(output);
     }
 
     /// <summary>Renders inline content only (choice labels, titles).</summary>
     public IReadOnlyList<RenderedInline> RenderInlines(IEnumerable<TemplateInline> inlines, IGameStateView state)
+        => RenderInlines(inlines, new EvaluationContext(state, predicates));
+
+    public IReadOnlyList<RenderedInline> RenderInlines(IEnumerable<TemplateInline> inlines, EvaluationContext context)
     {
         var output = new List<RenderedInline>();
-        RenderInlines(inlines, TextStyle.None, new EvaluationContext(state, predicates), output);
+        RenderInlines(inlines, TextStyle.None, context, output);
         return Normalize(output);
     }
 

@@ -1,5 +1,6 @@
 using Talewright.Core.Identity;
 using Talewright.Narrative.Rendering;
+using Talewright.Narrative.Templates;
 using Talewright.Rules.Diagnostics;
 using Talewright.Rules.Expressions;
 using Talewright.Rules.Storylets;
@@ -22,7 +23,8 @@ internal static class StoryMenuBuilder
         Func<SceneDefinition, ChoiceCandidate> createHubCandidate,
         Action<RuleDecision>? observer,
         int eventIndex,
-        bool includeHubOffers = true)
+        bool includeHubOffers = true,
+        bool previewSkillChecks = false)
     {
         var offered = new List<VisibleChoice>(choices);
         if (includeHubOffers && scene.Hub is { } hub)
@@ -31,7 +33,26 @@ internal static class StoryMenuBuilder
             var storylets = StoryletSelector.SelectMenuCandidates(story.Scenes, hub, context, scene.Id,
                 scene.HubLimit, observer, eventIndex, storylet =>
                 {
-                    var offer = ChoiceAvailability.Evaluate(createHubCandidate(storylet), context,
+                    var candidate = createHubCandidate(storylet);
+                    if (previewSkillChecks &&
+                        SkillCheckPreview.TryDescribe(storylet.Requires, out var description))
+                    {
+                        candidate = candidate with
+                        {
+                            Requirement = new BoolLiteral(false),
+                            ShownLabelSource = () => [new RenderedText(description, TextStyle.None)],
+                        };
+                        var unresolved = ChoiceAvailability.Evaluate(candidate, context,
+                            capture: false, out var unresolvedTrace);
+                        if (unresolved is not null)
+                        {
+                            hubOffers.Add(storylet.Id, unresolved);
+                        }
+
+                        return (false, unresolved is not null, unresolvedTrace);
+                    }
+
+                    var offer = ChoiceAvailability.Evaluate(candidate, context,
                         observer is not null, out var trace);
                     if (offer is not null)
                     {

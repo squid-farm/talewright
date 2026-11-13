@@ -393,6 +393,18 @@ internal static class ChoiceReplayIdentity
                 writer.WriteStringValue(value.Character.Value);
                 writer.WriteStringValue(value.Item.Value);
                 break;
+            case SkillCheckExpr value:
+                writer.WriteStringValue("skill-check-expr");
+                writer.WriteStringValue(value.Actor.Value);
+                writer.WriteStringValue(value.Skill.Value);
+                writer.WriteStringValue(value.Identity.Scene.Value);
+                writer.WriteNumberValue(value.Identity.Occurrence);
+                writer.WriteBooleanValue(value.IsHidden);
+                if (value.Difficulty is null)
+                    writer.WriteNullValue();
+                else
+                    WriteExpr(writer, value.Difficulty);
+                break;
             case NamedPredicate value:
                 writer.WriteStringValue("predicate");
                 writer.WriteStringValue(value.Name);

@@ -130,7 +130,18 @@ triggers:
 
 ## Skill checks
 
-Choice:
+Expressions:
+
+```tale
+{if skill-check perception dc 12, hidden}You spot the clue.{/if}
+~ var:roll = skill-check perception
+{if var:roll >= 10}You notice it.{/if}
+```
+
+An expression check without `dc` returns a number; with `dc` it returns the ruleset's boolean result.
+The same expression resolves once per scene visit. `, hidden` hides its check note, not its event.
+
+Explicit choice outcome:
 
 ```tale
 * [Climb] skill-check athletics dc 12
@@ -138,7 +149,7 @@ Choice:
   failure: -> ground
 ```
 
-At a point in a scene:
+Explicit check at a point in a scene:
 
 ```tale
 ::: skill-check perception dc 12

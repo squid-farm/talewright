@@ -26,6 +26,7 @@ public sealed class TriggerEngine
     private readonly IReadOnlyList<TriggerDefinition> _triggers;
     private readonly NamedPredicateRegistry _predicates;
     private readonly Action<RuleDecision>? _observer;
+    private readonly Func<SkillCheckExpr, Value>? _resolveSkillCheck;
     private readonly HashSet<string> _currentlyTrue = [];
 
     /// <summary>Snapshot of rising-edge memory, without evaluating conditions again.</summary>
@@ -38,11 +39,13 @@ public sealed class TriggerEngine
     }
 
     public TriggerEngine(IReadOnlyList<TriggerDefinition> triggers, NamedPredicateRegistry predicates,
-        IGameStateView initialState, Action<RuleDecision>? observer, int? eventIndex = null)
+        IGameStateView initialState, Action<RuleDecision>? observer, int? eventIndex = null,
+        Func<SkillCheckExpr, Value>? resolveSkillCheck = null)
     {
         _triggers = triggers;
         _predicates = predicates;
         _observer = observer;
+        _resolveSkillCheck = resolveSkillCheck;
         Prime(initialState, eventIndex);
     }
 
@@ -103,7 +106,7 @@ public sealed class TriggerEngine
                 }
 
                 log.Append(new TriggerFired(trigger.Id));
-                EffectExecutor.ExecuteAll(trigger.Effects, log, _predicates);
+                EffectExecutor.ExecuteAll(trigger.Effects, log, _predicates, _resolveSkillCheck);
                 fired.Add(trigger.Id);
                 firedThisPass = true;
                 Observe(DecisionOutcome.Fired, DecisionReason.RisingEdge);

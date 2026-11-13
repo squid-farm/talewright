@@ -1,3 +1,4 @@
+using Talewright.Core.Events;
 using Talewright.Core.State;
 using Talewright.Narrative.Rendering;
 using Talewright.Narrative.Templates;
@@ -25,6 +26,10 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
     private readonly List<string> _visits = [];
     private readonly HashSet<string> _settled = new(StringComparer.Ordinal);
     private readonly List<ChoiceStep> _replayChoices = [];
+    internal EvaluationContext Context => new(log.State, story.Predicates)
+    {
+        ResolveSkillCheck = ResolveExpressionCheck,
+    };
     public IReadOnlyList<ChoiceStep> ReplayChoices => _replayChoices;
 
     /// <summary>
@@ -78,10 +83,14 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                 case ProseStep prose:
                     if (settled)
                     {
+                        if (_notes.TryGetValue(step.Id, out var savedNotes))
+                            blocks.AddRange(savedNotes);
                         blocks.AddRange(_prose[step.Id]);
                         break;
                     }
-                    var rendered = renderer.Render([prose.Block], log.State).Blocks;
+                    var renderMark = log.Events.Count;
+                    var rendered = renderer.Render([prose.Block], Context).Blocks;
+                    AppendSkillCheckNotes(step.Id, renderMark, blocks);
                     if (!refresh && rememberEntry) _prose[step.Id] = rendered;
                     blocks.AddRange(rendered);
                     break;
@@ -105,14 +114,18 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                     if (settled)
                     {
                         applies = _branches[step.Id];
+                        if (_notes.TryGetValue(step.Id, out var savedNotes))
+                            blocks.AddRange(savedNotes);
                     }
                     else
                     {
+                        var branchMark = log.Events.Count;
                         applies = Test(branch.Condition, out var trace);
+                        AppendSkillCheckNotes(step.Id, branchMark, blocks);
                         if (!refresh && rememberEntry) _branches[step.Id] = applies;
                         Observe(DecisionKind.Branch, step.Id,
                             applies ? DecisionOutcome.Passed : DecisionOutcome.Failed,
-                            applies ? DecisionReason.ConditionTrue : DecisionReason.ConditionFalse, trace, log.Events.Count);
+                            applies ? DecisionReason.ConditionTrue : DecisionReason.ConditionFalse, trace, branchMark);
                         foreach (var skipped in applies ? branch.Else : branch.Then)
                             Skip(skipped, DecisionReason.ConditionFalse);
                     }
@@ -122,8 +135,12 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                 case ChoiceStep choice:
                     replayChoices.Add(choice);
                     var candidate = CreateCandidate(scene, choice);
+                    var choiceMark = log.Events.Count;
+                    if (refresh && _notes.TryGetValue(step.Id, out var priorNotes))
+                        blocks.AddRange(priorNotes);
                     var offered = ChoiceAvailability.Evaluate(candidate,
-                        new(log.State, story.Predicates), observer is not null, out var requirement);
+                        Context, observer is not null, out var requirement);
+                    AppendSkillCheckNotes(step.Id, choiceMark, blocks);
                     DecisionOutcome choiceOutcome;
                     if (offered is not null)
                     {
@@ -148,7 +165,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                         choiceReason = DecisionReason.ConditionFalse;
                     }
 
-                    Observe(DecisionKind.Choice, step.Id, choiceOutcome, choiceReason, requirement, log.Events.Count);
+                    Observe(DecisionKind.Choice, step.Id, choiceOutcome, choiceReason, requirement, choiceMark);
                     if (offered is not null)
                     {
                         choices.Add(offered);
@@ -185,7 +202,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
 
     public void ApplyBatch(IReadOnlyList<Effect> effects)
     {
-        EffectExecutor.ExecuteAll(effects, log, story.Predicates);
+        EffectExecutor.ExecuteAll(effects, log, story.Predicates, ResolveExpressionCheck);
         afterBatch();
     }
 
@@ -207,7 +224,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
         ChoiceAvailability.CreateView(choice.Key, LabelSource(choice), _replayIdentities.For(choice));
 
     public IReadOnlyList<RenderedInline> Render(IReadOnlyList<TemplateInline> text) =>
-        renderer.RenderInlines(text, log.State);
+        renderer.RenderInlines(text, Context);
 
     private ChoiceCandidate CreateCandidate(SceneDefinition scene, ChoiceStep step)
     {
@@ -222,13 +239,13 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
     {
         if (choice.Label is { } label)
         {
-            return () => renderer.RenderInlines(label, log.State);
+            return () => renderer.RenderInlines(label, Context);
         }
 
         if (choice.Check is null && choice.Divert?.Scene is { } target &&
             story.GetScene(target).ChoiceLabel is { } choiceLabel)
         {
-            return () => renderer.RenderInlines(choiceLabel, log.State);
+            return () => renderer.RenderInlines(choiceLabel, Context);
         }
 
         return static () => ChoiceView.ContinueLabel;
@@ -243,7 +260,25 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
     }
 
     private bool Test(Expr? expression, out ExpressionTrace? trace) =>
-        RuleObservation.Test(expression, new(log.State, story.Predicates), observer is not null, out trace);
+        RuleObservation.Test(expression, Context, observer is not null, out trace);
+
+    internal Value ResolveExpressionCheck(SkillCheckExpr expression)
+    {
+        var check = new SkillCheck(expression.Actor, expression.Skill, expression.Difficulty, expression.IsHidden);
+        var result = SkillCheckResolver.Resolve(check, expression.Identity, log, story.Randomness, story.Predicates,
+            observer);
+        return expression.Type == ExprType.Number
+            ? Value.Of(result.Total)
+            : Value.Of(result.Success
+                ?? throw new InvalidOperationException("A check with a difficulty must produce a success result."));
+    }
+
+    private void AppendSkillCheckNotes(string stepId, int mark, List<RenderedBlock> blocks)
+    {
+        if (!log.Events.Skip(mark).OfType<SkillCheckResolved>().Any())
+            return;
+        AppendNotes(stepId, mark, blocks);
+    }
 
     private void Observe(DecisionKind kind, string subject, DecisionOutcome outcome, DecisionReason reason,
         ExpressionTrace? expression, int mark) =>

@@ -99,7 +99,8 @@ public sealed class StorySession : IStorySession
         _captureEntry = setup is not null;
         _observer = observer;
         _beforeEntry = beforeEntry;
-        _triggers = new TriggerEngine(story.Triggers, story.Predicates, _log.State, observer, _log.Events.Count);
+        _triggers = new TriggerEngine(story.Triggers, story.Predicates, _log.State, observer, _log.Events.Count,
+            ResolveTriggerSkillCheck);
         var renderer = new TemplateRenderer(grammar ?? new EnglishGrammar(), story.Predicates);
         _executor = new SceneExecutor(story, _log, renderer, AfterBatch, observer, _captureEntry, MakeChoice);
     }
@@ -119,7 +120,7 @@ public sealed class StorySession : IStorySession
     /// <inheritdoc/>
     public StoryFrame? Current { get; private set; }
 
-    private EvaluationContext Context => new(_log.State, Story.Predicates);
+    private EvaluationContext Context => _executor.Context;
 
     /// <inheritdoc/>
     public StoryFrame Start()
@@ -154,7 +155,9 @@ public sealed class StorySession : IStorySession
             throw new InvalidOperationException("This edit leaves no live continuation. Start a fresh scene with prerequisite overrides instead.");
         }
         var choices = execution.Target is null ? execution.Choices : ContinueTo(scene, execution.Target);
+        var menuMark = _log.Events.Count;
         var menu = BuildMenu(scene, choices, includeHubOffers: execution.Target is null);
+        blocks.AddRange(NotesSince(menuMark));
         if (menu.Choices.Count == 0)
         {
             throw new InvalidOperationException("This edit leaves no live continuation. Start a fresh scene with prerequisite overrides instead.");
@@ -301,7 +304,9 @@ public sealed class StorySession : IStorySession
             return next.IsEnd ? EndStory(blocks, scene) : Present(scene, blocks,
                 BuildMenu(scene, ContinueTo(scene, next), includeHubOffers: false));
         }
+        var menuMark = _log.Events.Count;
         var menu = BuildMenu(scene, execution.Choices);
+        blocks.AddRange(NotesSince(menuMark));
         if (menu.Choices.Count == 0)
         {
             blocks.Add(new RenderedNote(NoteKind.Info, $"The story cannot continue from '{scene.Id}': no choice or divert applies here."));
@@ -406,6 +411,9 @@ public sealed class StorySession : IStorySession
                 $"Level-up consequences did not settle after {TriggerEngine.MaxPasses} passes.");
         }
     }
+
+    private Value ResolveTriggerSkillCheck(SkillCheckExpr expression) =>
+        _executor.ResolveExpressionCheck(expression);
 
     private List<GameEvent> LevelChanges()
     {

@@ -35,18 +35,20 @@ public sealed record TakeItem(EntityId Character, ItemId Item, Expr Quantity) : 
 /// <summary>Executes effects against an <see cref="EventLog"/>, one at a time so later effects see earlier results.</summary>
 public static class EffectExecutor
 {
-    public static void ExecuteAll(IEnumerable<Effect> effects, EventLog log, NamedPredicateRegistry predicates)
+    public static void ExecuteAll(IEnumerable<Effect> effects, EventLog log, NamedPredicateRegistry predicates,
+        Func<SkillCheckExpr, Value>? resolveSkillCheck = null)
     {
         foreach (var effect in effects)
         {
-            Execute(effect, log, predicates);
+            Execute(effect, log, predicates, resolveSkillCheck);
         }
     }
 
-    public static void Execute(Effect effect, EventLog log, NamedPredicateRegistry predicates)
+    public static void Execute(Effect effect, EventLog log, NamedPredicateRegistry predicates,
+        Func<SkillCheckExpr, Value>? resolveSkillCheck = null)
     {
         var state = log.State;
-        var context = new EvaluationContext(state, predicates);
+        var context = new EvaluationContext(state, predicates) { ResolveSkillCheck = resolveSkillCheck };
         int Eval(Expr e) => ExpressionEvaluator.EvaluateNumber(e, context);
 
         IEnumerable<GameEvent> events = effect switch

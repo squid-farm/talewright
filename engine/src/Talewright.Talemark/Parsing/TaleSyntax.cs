@@ -173,6 +173,9 @@ internal enum TaleClauseKind : byte
 
     /// <summary>The difficulty expression after <c>dc</c>; empty at the spec end when <c>dc</c> has no value.</summary>
     Difficulty,
+
+    /// <summary>The optional <c>, hidden</c> skill-check modifier.</summary>
+    CheckHidden,
 }
 
 /// <summary>A clause on a choice, skill-check block or outcome line. Columns are relative to the raw line start.</summary>

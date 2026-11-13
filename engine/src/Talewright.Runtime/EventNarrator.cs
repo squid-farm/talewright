@@ -20,7 +20,7 @@ public static class EventNarrator
         {
             var note = e switch
             {
-                SkillCheckResolved c => new RenderedNote(NoteKind.Check, DescribeCheck(c, state)),
+                SkillCheckResolved { IsHidden: false } c => new RenderedNote(NoteKind.Check, DescribeCheck(c, state)),
                 StatChanged s when s.Stat != levelStat => new RenderedNote(NoteKind.Change,
                     $"{Who(s.Character, state)}{StatName(s.Stat, state)} {Signed(s.NewValue - s.OldValue)} ({s.NewValue})"),
                 ItemsGranted g => new RenderedNote(NoteKind.Change, $"{Who(g.Character, state)}Gained: {Items(g.Item, g.Quantity, state)}"),

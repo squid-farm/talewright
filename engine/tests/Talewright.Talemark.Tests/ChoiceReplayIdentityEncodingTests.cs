@@ -1,5 +1,6 @@
 using System.Text;
 using Talewright.Core.Identity;
+using Talewright.Core.Randomness;
 using Talewright.Core.Rulesets;
 using Talewright.Rules.Checks;
 using Talewright.Rules.Effects;
@@ -62,6 +63,10 @@ public sealed class ChoiceReplayIdentityEncodingTests
         { "inventory count", new InventoryCountRef(Player, Torch),
             """["inventory-count-ref","player","torch"]""" },
         { "predicate", new NamedPredicate("is-night"), """["predicate","is-night"]""" },
+        { "skill check", new SkillCheckExpr(Player, new StatId("athletics"),
+            new SkillCheckIdentity(new SceneId("start"), Player, new StatId("athletics"), 0),
+            new NumberLiteral(14), IsHidden: true),
+            """["skill-check-expr","player","athletics","start",0,true,["number",14]]""" },
         { "unary", new UnaryExpr(UnaryOp.Negate, new VarRef(Gold)), """["unary","Negate",["variable-ref","gold"]]""" },
         { "binary", new BinaryExpr(BinaryOp.GreaterOrEqual, new StatRef(Player, Hp), new NumberLiteral(3)),
             """["binary","GreaterOrEqual",["stat-ref","player","hp"],["number",3]]""" },

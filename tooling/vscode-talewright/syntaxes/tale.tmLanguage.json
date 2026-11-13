@@ -55,6 +55,17 @@
         {"include": "#string"},
         {"include": "#template"},
         {
+          "match": "\\b(skill-check|dc)\\b",
+          "name": "keyword.control.skill-check.tale"
+        },
+        {
+          "match": "(,\\s*)(hidden)\\b",
+          "captures": {
+            "1": {"name": "punctuation.separator.modifier.tale"},
+            "2": {"name": "keyword.control.skill-check.tale"}
+          }
+        },
+        {
           "begin": "(?<![\\p{L}\\p{N}*])\\*\\*(?!\\*)(?=\\S)",
           "end": "(?<!\\s)\\*\\*(?![\\p{L}\\p{N}*])|(?=$)",
           "name": "markup.bold.markdown",
