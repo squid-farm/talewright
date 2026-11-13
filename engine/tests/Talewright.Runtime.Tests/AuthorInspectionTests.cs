@@ -213,7 +213,7 @@ public sealed class AuthorInspectionTests
         unobserved.Choose("continue");
         Assert.Equal(session.Events, unobserved.Events);
         Assert.Equivalent(session.Current, unobserved.Current, strict: true);
-        Assert.Equal(["c0", "storylet:second", $"storylet:{next}"], session.Current.Choices.Select(c => c.Key));
+        Assert.Equal(["storylet:second", $"storylet:{next}", "c0"], session.Current.Choices.Select(c => c.Key));
         Assert.Contains(session.Decisions, d => d.Subject == "first" && d.Reason == DecisionReason.AlreadyVisited);
         Assert.Equal(0, neverCalls);
     }

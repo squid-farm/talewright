@@ -312,7 +312,7 @@ public class StorySessionTests
             """));
 
         var frame = session.Start();
-        Assert.Equal(["c0", "storylet:camp.map", "storylet:camp.talk"], frame.Choices.Select(c => c.Key));
+        Assert.Equal(["storylet:camp.map", "c0", "storylet:camp.talk"], frame.Choices.Select(c => c.Key));
         Assert.Equal("Talk to the guide", frame.Choices[2].Text);
 
         frame = session.Choose("storylet:camp.talk");
@@ -320,7 +320,7 @@ public class StorySessionTests
         frame = session.Choose(StorySession.ContinueKey);
 
         // @once: talked out.
-        Assert.Equal(["c0", "storylet:camp.map"], frame.Choices.Select(c => c.Key));
+        Assert.Equal(["storylet:camp.map", "c0"], frame.Choices.Select(c => c.Key));
     }
 
     [Fact]

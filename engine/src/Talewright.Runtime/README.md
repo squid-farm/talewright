@@ -37,8 +37,9 @@ Full description in [architecture §5](../../../docs/developer/architecture.md#5
 - **Enter scene:** `SceneEntered` → settle visit-trigger consequences → execute ordered steps. Render prose at
   its line; decide each block condition once; apply each effect batch, settle triggers/leveling and insert notes
   there. Checks resolve at their line. A reached divert stops execution with Continue (or a final END frame).
-  Otherwise offer collected choices, followed by eligible hub storylets. Both sources use the same choice-candidate
-  availability and view builder; hub filtering, priority and limits remain source-specific.
+  Otherwise combine collected choices with eligible hub storylets. Both sources use the same
+  choice-candidate availability and view builder. The hub limit caps generated choices, while the
+  combined menu sorts written and generated choices together by priority.
 - **Choose:** `ChoiceMade` → choice effect batch → optional check/outcome batch → explicit target.
   `AfterBatch` settles triggers and leveling after each complete batch. `BeforeTransition` clears the old
   continuation and entry boundary. Choice consequences appear at the top of the next frame.

@@ -57,10 +57,10 @@ public sealed class RicherHubTests
     public void Filters_before_limiting_keeps_stable_ties_explicit_choices_and_replays_once(string query, string next)
     {
         var history = History(query);
-        Assert.Equal(["c0", "storylet:first", "storylet:second"], history.Current.Choices.Select(c => c.Key));
+        Assert.Equal(["storylet:first", "storylet:second", "c0"], history.Current.Choices.Select(c => c.Key));
         history.Choose("storylet:first");
         history.Choose("continue");
-        Assert.Equal(["c0", "storylet:second", $"storylet:{next}"], history.Current.Choices.Select(c => c.Key));
+        Assert.Equal(["storylet:second", $"storylet:{next}", "c0"], history.Current.Choices.Select(c => c.Key));
         var loaded = StoryHistory.Restore(history.Story, history.Save());
         Assert.Equal(history.Current.Choices.Select(c => c.Key), loaded.Current.Choices.Select(c => c.Key));
         loaded.Back();

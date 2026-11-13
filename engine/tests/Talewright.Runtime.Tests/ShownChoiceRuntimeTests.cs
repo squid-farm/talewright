@@ -56,14 +56,14 @@ public sealed class ShownChoiceRuntimeTests
         var frame = history.Current;
 
         Assert.Equal(
-            ["Earn", "Exit", "Need 25 credits", "Fallback label", "Available high", "Available low", "Need 25 from hub"],
+            ["Need 25 from hub", "Available high", "Available low", "Earn", "Exit", "Need 25 credits", "Fallback label"],
             frame.Menu.Select(entry => entry.Text));
         Assert.Equal(Enumerable.Range(1, frame.Menu.Count), frame.Menu.Select(entry => entry.Number));
         Assert.Equal(
-            [true, true, false, false, true, true, false],
+            [false, true, true, true, true, false, false],
             frame.Menu.Select(entry => entry.IsAvailable));
         Assert.Equal(
-            ["c0", "c1", "storylet:available-high", "storylet:available-low"],
+            ["storylet:available-high", "storylet:available-low", "c0", "c1"],
             frame.Choices.Select(choice => choice.Key));
         Assert.DoesNotContain(frame.Menu, entry => entry.Key == "storylet:unavailable-low");
 
@@ -214,7 +214,7 @@ public sealed class ShownChoiceRuntimeTests
 
         var history = new StoryHistory(story, 42);
         Assert.Equal(
-            ["c0", "storylet:once", "storylet:available"],
+            ["storylet:once", "storylet:available", "c0"],
             history.Current.Menu.Select(entry => entry.Key));
         Assert.DoesNotContain(history.Current.Menu, entry => entry.Key == "storylet:blocked");
 
@@ -222,10 +222,79 @@ public sealed class ShownChoiceRuntimeTests
         history.Choose(StorySession.ContinueKey);
 
         Assert.Equal(
-            ["c0", "storylet:available", "storylet:blocked"],
+            ["storylet:blocked", "storylet:available", "c0"],
             history.Current.Menu.Select(entry => entry.Key));
         Assert.Equal("Blocked", Assert.Single(history.Current.Menu, entry => entry.Key == "storylet:blocked").Text);
         Assert.False(Assert.Single(history.Current.Menu, entry => entry.Key == "storylet:blocked").IsAvailable);
+    }
+
+    [Fact]
+    public void Hub_choices_merge_by_priority_and_generated_limit_does_not_count_written_choices()
+    {
+        var story = Compile("""
+            === hub
+            @hub shop
+            @hub-limit 4
+            * [Written first] -> END
+            * [Written second] -> END
+
+            === generated-positive
+            @tags shop
+            @priority 5
+            -> END
+
+            === generated-zero-first
+            @tags shop
+            -> END
+
+            === generated-zero-second
+            @tags shop
+            -> END
+
+            === generated-negative
+            @tags shop
+            @priority -1
+            -> END
+
+            === generated-below-cap
+            @tags shop
+            @priority -2
+            -> END
+            """);
+
+        var history = new StoryHistory(story, 42);
+
+        Assert.Equal(
+            ["storylet:generated-positive", "c0", "c1", "storylet:generated-zero-first",
+                "storylet:generated-zero-second", "storylet:generated-negative"],
+            history.Current.Menu.Select(entry => entry.Key));
+        Assert.DoesNotContain(history.Current.Menu, entry => entry.Key == "storylet:generated-below-cap");
+    }
+
+    [Fact]
+    public void Equal_zero_priorities_keep_written_choices_before_generated_choices()
+    {
+        var story = Compile("""
+            === hub
+            @hub shop
+            * [Written first] -> END
+            * [Written second] -> END
+
+            === generated-first
+            @tags shop
+            @requires false, shown
+            -> END
+
+            === generated-second
+            @tags shop
+            -> END
+            """);
+
+        var history = new StoryHistory(story, 42);
+
+        Assert.Equal(
+            ["c0", "c1", "storylet:generated-first", "storylet:generated-second"],
+            history.Current.Menu.Select(entry => entry.Key));
     }
 
     [Fact]

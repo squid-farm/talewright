@@ -114,7 +114,7 @@ public partial class LostRelicTests
     public void Dream_intersection_caps_offers_and_all_six_roles_preserve_counts_and_replay()
     {
         var history = Dream(journal: true);
-        Assert.Equal(["Wake before going further", "Speak to the lost explorer", "Answer the Spiral"],
+        Assert.Equal(["Speak to the lost explorer", "Answer the Spiral", "Wake before going further"],
             history.Current.Choices.Select(choice => choice.Text));
         Assert.DoesNotContain(history.Current.Choices, choice => choice.Text == "Approach the Sleeper");
         Choose(history, "Speak to the lost explorer");
@@ -123,7 +123,7 @@ public partial class LostRelicTests
         Assert.Contains("Tell Tomas I remember the river", history.Current.Document.ToPlainText());
         Choose(history, "Promise to carry her message");
         MeetSpiral(history);
-        Assert.Equal(["Wake before going further", "Face the Watcher", "Hear the guild ghost"],
+        Assert.Equal(["Face the Watcher", "Hear the guild ghost", "Wake before going further"],
             history.Current.Choices.Select(choice => choice.Text));
         MeetWatcher(history);
         var check = Assert.Single(history.Events.OfType<SkillCheckResolved>(),

@@ -565,11 +565,14 @@ flowchart LR
 5. Collect choices when reached: evaluate requirements and render their labels then. The compiler requires
    choices to be the final block, but the executor itself does not impose a separate choice phase.
 6. A reached divert stops all later steps, offering **Continue**, or ending with the current frame for END.
-   Otherwise offer collected choices followed by eligible hub storylets (keys `storylet:<scene-id>`).
-   Filter tags/self/once, order by priority then declaration order, and evaluate requirements lazily until
-   `@hub-limit` available candidates are found. Candidates below that cutoff are reported as dropped
-   without evaluating their requirements. Shown-but-unavailable candidates use only remaining slots.
-   A scene divert never acts as a fallback for choices or hubs.
+   Otherwise combine collected choices with eligible hub storylets (keys `storylet:<scene-id>`).
+   Filter generated choices by tags/self/once, order candidates by priority then declaration order, and
+   evaluate requirements lazily until `@hub-limit` available candidates are found. If fewer are
+   available, shown-but-unavailable candidates use remaining generated-choice slots. Candidates below
+   the cutoff are reported as dropped without evaluating their requirements. Then sort written and
+   selected generated choices together by priority: written choices have priority 0 and precede
+   generated choices on ties; ties among generated choices retain declaration order. A scene divert
+   never acts as a fallback for choices or hubs.
 
 One choice, end to end:
 

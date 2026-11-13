@@ -295,7 +295,7 @@ public static class TestStories
                 new(null, "First passage", ["Walk onward", "Finish early"]),
                 new("Finish early", "Finished safely.", [], Ended: true)]),
             new("gates", "gates", [
-                new(null, "Inventory: empty.", ["Leave empty", "Collect supplies", "Talk once"]),
+                new(null, "Inventory: empty.", ["Collect supplies", "Leave empty", "Talk once"]),
                 new("Collect supplies", "Supplies collected.", ["Continue"], ["Test rope ×2", "Test charm", "(+2)", "Friendly"]),
                 new("Continue", "Inventory: ready.", ["Use the rope", "Read the flag", "Trusted passage", "Strong passage", "Leave empty", "Talk once"]),
                 new("Read the flag", "The flag is ready.", ["Continue"]),
