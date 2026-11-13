@@ -326,10 +326,13 @@ public static class TalemarkClassifier
             if (part.HeadLength > 0)
                 Add(scene.FileLine(line.Line) + 1, part.HeadStart, part.HeadLength,
                     TalemarkClassificationKind.Identifier);
-            var colon = raw[(part.HeadStart + part.HeadLength)..].IndexOf(ExpressionVocabulary.Separator);
-            if (colon >= 0)
-                Add(scene.FileLine(line.Line) + 1, part.HeadStart + part.HeadLength + colon, 1,
-                    TalemarkClassificationKind.Punctuation);
+            if (part.HeadLength > 0)
+            {
+                var colon = raw[(part.HeadStart + part.HeadLength)..].IndexOf(ExpressionVocabulary.Separator);
+                if (colon >= 0)
+                    Add(scene.FileLine(line.Line) + 1, part.HeadStart + part.HeadLength + colon, 1,
+                        TalemarkClassificationKind.Punctuation);
+            }
 
             var value = syntax.Value(scene, line);
             AddInline(SourceText.Single(value.ToString(), At(scene, line, part.ValueStart)));

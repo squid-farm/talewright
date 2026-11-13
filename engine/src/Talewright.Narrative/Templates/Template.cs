@@ -21,8 +21,8 @@ public abstract record TemplateBlock;
 
 public sealed record ParagraphTemplate(IReadOnlyList<TemplateInline> Inlines) : TemplateBlock;
 
-/// <summary>A line of dialogue (<c>&gt; guide: …</c>).</summary>
-public sealed record SpeechTemplate(EntityId Speaker, IReadOnlyList<TemplateInline> Inlines) : TemplateBlock;
+/// <summary>A character's speech, containing one or more paragraphs.</summary>
+public sealed record SpeechTemplate(EntityId Speaker, IReadOnlyList<IReadOnlyList<TemplateInline>> Paragraphs) : TemplateBlock;
 
 /// <summary>Block-level conditional (<c>{if}</c> … <c>{/if}</c> on their own lines).</summary>
 public sealed record ConditionalBlockTemplate(Expr Condition, IReadOnlyList<TemplateBlock> Then, IReadOnlyList<TemplateBlock> Else) : TemplateBlock;

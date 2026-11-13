@@ -24,6 +24,23 @@
       }
     },
     {
+      "begin": "^[ \\t]*(>)[ \\t]*([A-Za-z_][A-Za-z0-9_.-]*)(:)",
+      "beginCaptures": {
+        "1": {"name": "punctuation.definition.speech.tale"},
+        "2": {"name": "entity.name.character.tale"},
+        "3": {"name": "punctuation.separator.speech.tale"}
+      },
+      "end": "^(?![ \\t]*>)",
+      "name": "meta.speech.tale",
+      "patterns": [
+        {
+          "match": "^[ \\t]*(>)",
+          "captures": {"1": {"name": "punctuation.definition.speech.tale"}}
+        },
+        {"include": "#inline"}
+      ]
+    },
+    {
       "match": "^\\s*(?:\\*[^\\r\\n]*?)?(->)\\s*([A-Za-z_][A-Za-z0-9_.-]*)?",
       "captures": {
         "1": {"name": "keyword.control.divert.tale"},

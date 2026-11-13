@@ -25,6 +25,7 @@ internal static partial class TaleSyntaxParser
         private bool _hasTitle;
         private bool _hasContinues;
         private bool _hasClear;
+        private bool _speechOpen;
         // The skill check whose outcome lines are being attached: its line and column, and the outcomes seen so far.
         private (int Line, int Column, bool InsideBlock, bool Success, bool Failure)? _check;
 
@@ -56,6 +57,9 @@ internal static partial class TaleSyntaxParser
         /// <summary>Adds the line's parts and block state, reporting structural errors.</summary>
         public TaleLineSyntax Describe(TaleLineSyntax line, ReadOnlySpan<char> content)
         {
+            if (line.Kind != TaleLineKind.Speech)
+                _speechOpen = false;
+
             if (_check is not null && TryAttach(ref line, content))
                 return line;
 
@@ -110,6 +114,12 @@ internal static partial class TaleSyntaxParser
         private TaleLineSyntax Speech(TaleLineSyntax line, ReadOnlySpan<char> content)
         {
             var body = content[1..];
+            if (_speechOpen)
+            {
+                var valueStart = line.Indent + 1 + Lead(body);
+                return WithPart(line, new(0, 0, valueStart, body.Trim().Length));
+            }
+
             var colon = body.IndexOf(ExpressionVocabulary.Separator);
             var speaker = (colon < 0 ? body : body[..colon]).Trim();
             var headStart = line.Indent + 1 + Lead(body);
@@ -123,6 +133,7 @@ internal static partial class TaleSyntaxParser
             }
 
             var text = body[(colon + 1)..];
+            _speechOpen = true;
             return WithPart(line, new(headStart, speaker.Length, line.Indent + colon + 2 + Lead(text), text.Trim().Length));
         }
 

@@ -230,7 +230,10 @@ public static class AuthorScenario
                     case RenderedSpeech speech:
                         writer.WriteStringValue(speech.Speaker.Value);
                         writer.WriteStringValue(speech.SpeakerName);
-                        WriteInlines(writer, speech.Inlines);
+                        writer.WriteStartArray();
+                        foreach (var paragraph in speech.Paragraphs)
+                            WriteInlines(writer, paragraph);
+                        writer.WriteEndArray();
                         break;
                     case RenderedNote note:
                         writer.WriteNumberValue((int)note.Kind);

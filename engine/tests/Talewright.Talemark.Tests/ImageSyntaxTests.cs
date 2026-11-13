@@ -71,7 +71,8 @@ public sealed class ImageSyntaxTests
         var prose = Assert.IsType<ParagraphTemplate>(body[0]);
         Assert.Equal(new MediaTemplate("images/camp.png", "Camp"), prose.Inlines.OfType<MediaTemplate>().Single());
         var speech = Assert.IsType<SpeechTemplate>(body[1]);
-        Assert.Equal(new MediaTemplate("images/map.png", "A } ] map"), speech.Inlines.OfType<MediaTemplate>().Single());
+        Assert.Equal(new MediaTemplate("images/map.png", "A } ] map"),
+            Assert.Single(Assert.Single(speech.Paragraphs).OfType<MediaTemplate>()));
         var choiceLabel = Assert.IsAssignableFrom<IReadOnlyList<TemplateInline>>(scene.Choices[0].Label);
         Assert.Equal(new MediaTemplate("images/coin.png", "A } ] coin"), choiceLabel.OfType<MediaTemplate>().Single());
         var bold = Assert.IsType<StyledTemplate>(Assert.IsType<ParagraphTemplate>(body[2]).Inlines.Single());

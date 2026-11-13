@@ -8,10 +8,15 @@
             <p class="tw-paragraph"><InlineView Inlines="paragraph.Inlines" /></p>
             break;
         case RenderedSpeech speech:
-            <p class="tw-speech">
+            <div class="tw-speech">
                 <span class="tw-speaker">@speech.SpeakerName</span>
-                <span class="tw-line"><InlineView Inlines="speech.Inlines" /></span>
-            </p>
+                <div class="tw-speech-body">
+                    @foreach (var paragraph in speech.Paragraphs)
+                    {
+                        <p class="tw-line"><InlineView Inlines="paragraph" /></p>
+                    }
+                </div>
+            </div>
             break;
         case RenderedNote note:
             <p class="tw-note tw-note-@note.Kind.ToString().ToLowerInvariant()" role="@(HistoryReading ? null : "status")">@note.Text</p>

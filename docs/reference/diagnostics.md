@@ -28,7 +28,7 @@ page against them.
 | TW1004 | A `{` is never closed. | Close it, or write `\{` for a literal brace. |
 | TW1005 | Unbalanced `{if}` / `{else}` / `{/if}`. | Inline conditions must open and close in the same paragraph. Block conditions need their own lines. |
 | TW1006 | Bad scene metadata (`@title`, `@hub`, `@hub-limit`, ...), including an invalid `shown` requirement clause. | Put metadata directly after the `===` line, once each. `@hub-limit` needs `@hub`. After the full requirement expression, use `shown` with optional double-quoted reader text. A skill-check's own `, hidden` modifier belongs inside the expression and comes before `, shown`. Empty `shown ""` text is allowed but warns that the scene will have no text. |
-| TW1007 | Malformed dialogue line. | `> who: text`, where `who` is a character id. |
+| TW1007 | Malformed dialogue line outside a speech block. | Start with `> who: text`, where `who` is a character id. |
 | TW1008 | Invalid scene id. | Use the shared ASCII identifier form: start with a letter or `_`, then use letters, digits, `_`, and single `.` or `-` separators, e.g. `temple.entrance`. |
 | TW1009 | Skill check outcomes are missing or misplaced, or an outcome effect block is unclosed. | Put both `success:` and `failure:` lines directly below the check and close each outcome's `{ effects }`. |
 | TW1010 | `->` without a target. | `-> scene.id` or `-> END`. |
@@ -39,6 +39,7 @@ page against them.
 | TW1015 | Unexpected syntax in reader text, including the simple `![alt](path)` image form. | Use `{image("path", "alt")}` for an image. |
 | TW1016 | Expression, condition or formatting nesting exceeds the safe parsing limit. | Reduce nesting. Expressions allow 256 levels; block and inline conditions and formatting spans allow 64. |
 | TW1017 | A reader-text line ends with an unpaired backslash. | Remove the trailing `\`; line breaks render as written. |
+| TW1018 | Speech for another character directly follows an open speech block. | Insert a blank line between different speakers. |
 
 ## TW2xxx: names and types
 

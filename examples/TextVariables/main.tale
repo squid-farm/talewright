@@ -1,5 +1,9 @@
 === clearing
 ~ var:forecast = "stormy"
+> player: The forecast says {var:forecast}.
+>
+> I hope the storm passes soon.
+
 The weather is {var:weather}.
 The forecast is {var:forecast}.
 * [Watch the storm arrive] { var:remembered-weather = var:weather; var:weather = var:forecast } -> shelter

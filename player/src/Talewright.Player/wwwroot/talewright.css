@@ -158,6 +158,7 @@ button { font: inherit; color: inherit; }
 .tw-past { border-top: 1px solid var(--tw-border); margin-top: 1rem; padding-top: 1rem; }
 .tw-scene-title { font-size: 1.25rem; margin: var(--tw-scene-title-margin-top, 1.5rem) 0 0.5rem; }
 .tw-speech { margin-left: 1rem; }
+.tw-speech-body .tw-line { margin: 0.25em 0; }
 .tw-speaker { font-variant: small-caps; font-weight: bold; margin-right: 0.5rem; }
 .tw-note { font-family: var(--tw-ui-font); font-size: 0.85rem; color: var(--tw-muted); border-left: 3px solid var(--tw-border); padding-left: 0.75rem; margin: 0.25rem 0; }
 :root[data-tw-hide-mechanical-notes="true"] .tw-note { display: none; }

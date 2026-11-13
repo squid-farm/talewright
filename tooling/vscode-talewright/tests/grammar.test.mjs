@@ -43,6 +43,19 @@ test('fallback keeps lightweight structural scopes', () => {
     token.scopes.includes('keyword.control.divert.tale')));
 });
 
+test('fallback scopes multi-paragraph speech blocks', () => {
+  const first = tokens('> guide: First paragraph.');
+  hasScope('> guide: First paragraph.', '>', 'punctuation.definition.speech.tale');
+  hasScope('> guide: First paragraph.', 'guide', 'entity.name.character.tale');
+  hasScope('> guide: First paragraph.', ':', 'punctuation.separator.speech.tale');
+
+  const continuation = tokens('> Tuesday: it is ordinary dialogue.', first.ruleStack);
+  assert.ok(!continuation.tokens.some(token => token.scopes.includes('entity.name.character.tale')));
+  const separator = tokens('>', continuation.ruleStack);
+  const ended = tokens('Narration ends the speech.', separator.ruleStack);
+  assert.ok(!ended.tokens.some(token => token.scopes.includes('meta.speech.tale')));
+});
+
 test('fallback highlights templates, quoted strings, and escaped braces', () => {
   hasScope('{player:first-name}', 'first-name', 'meta.template.tale');
   hasScope('{image("camp", "A camp")}', 'camp', 'string.quoted.double.tale');

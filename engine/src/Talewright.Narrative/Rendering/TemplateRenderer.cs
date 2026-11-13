@@ -57,7 +57,8 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
                     break;
                 case SpeechTemplate s:
                     var speaker = context.State.GetCharacterDefinition(s.Speaker);
-                    output.Add(new RenderedSpeech(s.Speaker, speaker.FirstName, Render(s.Inlines, context)));
+                    output.Add(new RenderedSpeech(s.Speaker, speaker.FirstName,
+                        s.Paragraphs.Select(paragraph => Render(paragraph, context)).ToArray()));
                     break;
                 case ConditionalBlockTemplate c:
                     RenderBlocks(ExpressionEvaluator.IsTrue(c.Condition, context) ? c.Then : c.Else, context, output);

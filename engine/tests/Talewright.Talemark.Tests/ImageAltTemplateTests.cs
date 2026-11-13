@@ -45,7 +45,7 @@ public sealed class ImageAltTemplateTests
         return document.Blocks.SelectMany(block => block switch
         {
             RenderedParagraph paragraph => paragraph.Inlines,
-            RenderedSpeech speech => speech.Inlines,
+            RenderedSpeech speech => speech.Paragraphs.SelectMany(paragraph => paragraph),
             _ => [],
         }).OfType<RenderedMedia>().Select(media => media.AltText).ToArray();
     }
@@ -63,7 +63,7 @@ public sealed class ImageAltTemplateTests
         Assert.Equal(["Bea at the South gate", "a stranger", "The guide"], Alts(story));
         var scene = story.GetScene(new SceneId("gate"));
         var speech = Assert.IsType<SpeechTemplate>(CompilerTests.Templates(scene)[1]);
-        var speechAlt = Assert.IsType<MediaTemplate>(Assert.Single(speech.Inlines)).AltTemplate;
+        var speechAlt = Assert.IsType<MediaTemplate>(Assert.Single(Assert.Single(speech.Paragraphs))).AltTemplate;
         Assert.NotNull(speechAlt);
         var label = new TemplateRenderer().RenderInlines(scene.Choices[0].Label!, GameState.CreateInitial(story.World, 1));
         Assert.Equal("Bea", Assert.IsType<RenderedMedia>(label.Single(inline => inline is RenderedMedia)).AltText);
