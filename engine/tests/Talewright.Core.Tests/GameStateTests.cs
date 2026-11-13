@@ -96,6 +96,16 @@ public class GameStateTests
         Assert.Equal(0, log.State.VisitCount(new SceneId("b")));
     }
 
+    [Theory]
+    [InlineData(0UL, 2UL, 3UL, 0UL)]
+    [InlineData(null, 2UL, 3UL, 2UL)]
+    [InlineData(null, null, 0UL, 0UL)]
+    public void Seed_resolution_prefers_supplied_values_in_order(
+        ulong? primary, ulong? secondary, ulong? fallback, ulong expected)
+    {
+        Assert.Equal(expected, DeterministicDice.ResolveSeed(primary, secondary, fallback));
+    }
+
     [Fact]
     public void Dice_are_deterministic_and_in_range()
     {

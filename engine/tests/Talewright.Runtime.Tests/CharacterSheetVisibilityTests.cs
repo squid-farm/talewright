@@ -36,7 +36,20 @@ public class CharacterSheetVisibilityTests
 
         var shownPlay = Play(TestStories.Gates.Compile());
         shownPlay.History.Choose(Assert.Single(shownPlay.History.Current.Choices, choice => choice.Text == "Use the rope").Key);
-        Assert.Equal(shownPlay.Frames, hiddenPlay.Frames);
+        Assert.Equal(shownPlay.Frames[0], hiddenPlay.Frames[0]);
+        var statsHidden = sheet == false || hidden?.Split(',').Contains("stats") == true;
+        if (statsHidden)
+        {
+            Assert.Contains("Strength", shownPlay.Frames[1]);
+            Assert.DoesNotContain("Strength", hiddenPlay.Frames[1]);
+        }
+        else
+        {
+            Assert.Contains("Strength", hiddenPlay.Frames[1]);
+        }
+        Assert.Contains("Test rope", hiddenPlay.Frames[1]);
+        Assert.Contains("Friendly", hiddenPlay.Frames[1]);
+        Assert.Equal(shownPlay.Frames[^1], hiddenPlay.Frames[^1]);
         Assert.Equal(shownPlay.History.Events, hiddenHistory.Events);
         Assert.Equal(Describe(shownPlay.History.Current), Describe(hiddenHistory.Current));
     }

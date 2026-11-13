@@ -72,35 +72,28 @@
     [Parameter, EditorRequired]
     public IGameStateView State { get; set; } = default!;
 
+    [Parameter, EditorRequired]
+    public StoryDefinition Story { get; set; } = default!;
+
     /// <summary>Whose sheet to show; defaults to the player.</summary>
     [Parameter]
     public EntityId CharacterId { get; set; } = EntityId.Player;
 
-    /// <summary>Sections the author allows; defaults to every declared section.</summary>
-    [Parameter]
-    public CharacterSheetVisibility Visibility { get; set; } = CharacterSheetVisibility.Shown;
-
     /// <summary>Whether a sheet for <paramref name="character"/> has any section to show.</summary>
-    public static bool HasSections(WorldDefinition world, CharacterSheetVisibility visibility, EntityId character) =>
-        ShowsStatsFor(world, visibility) || ShowsInventoryFor(world, visibility) ||
-        ShowsStandingFor(world, visibility, character);
+    public static bool HasSections(StoryDefinition story, IGameStateView state, EntityId character) =>
+        story.World.Ruleset.Stats.Any(stat => story.IsStatVisible(stat.Id, state))
+        || story.CharacterSheet.Inventory && story.World.Items.Count > 0
+        || story.CharacterSheet.Standing && character == EntityId.Player && story.World.Factions.Count > 0;
 
-    private static bool ShowsStatsFor(WorldDefinition world, CharacterSheetVisibility visibility) =>
-        visibility.Stats && world.Ruleset.Stats.Count > 0;
+    private bool ShowsStats => VisibleStats.Any();
 
-    private static bool ShowsInventoryFor(WorldDefinition world, CharacterSheetVisibility visibility) =>
-        visibility.Inventory && world.Items.Count > 0;
+    private IEnumerable<StatDefinition> VisibleStats =>
+        Ruleset.Stats.Where(stat => Story.IsStatVisible(stat.Id, State));
 
-    private static bool ShowsStandingFor(WorldDefinition world, CharacterSheetVisibility visibility, EntityId character) =>
-        visibility.Standing && character == EntityId.Player && world.Factions.Count > 0;
+    private bool ShowsInventory => Story.CharacterSheet.Inventory && State.World.Items.Count > 0;
 
-    private bool ShowsStats => ShowsStatsFor(State.World, Visibility);
-
-    private IEnumerable<StatDefinition> VisibleStats => ShowsStats ? Ruleset.Stats : [];
-
-    private bool ShowsInventory => ShowsInventoryFor(State.World, Visibility);
-
-    private bool ShowsStanding => ShowsStandingFor(State.World, Visibility, CharacterId);
+    private bool ShowsStanding => Story.CharacterSheet.Standing
+        && CharacterId == EntityId.Player && State.World.Factions.Count > 0;
 
     private Ruleset Ruleset => State.World.Ruleset;
 

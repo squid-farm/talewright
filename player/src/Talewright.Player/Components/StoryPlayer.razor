@@ -244,7 +244,7 @@
 
     private async Task Restart()
     {
-        ResetSession(new StoryHistory(Story, Seed, _session.Character), initialAutosave: true,
+        ResetSession(new StoryHistory(Story, _session.Character is null ? Seed : _session.Seed, _session.Character), initialAutosave: true,
             clearAutosaveError: false, initialTriggerSave: true);
         _initialTriggerSavePending = false;
         await QueueTriggerSaveAsync();

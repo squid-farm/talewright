@@ -39,11 +39,11 @@ internal static class DebuggerDecisionStatus
             return [];
 
         var entryEvent = -1;
-        for (var index = inspection.Events.Count - 1; index >= 0; index--)
+        for (var index = inspection.EventEntries.Count - 1; index >= 0; index--)
         {
-            if (inspection.Events[index] is SceneEntered entered && entered.Scene == scene)
+            if (inspection.EventEntries[index].Event is SceneEntered entered && entered.Scene == scene)
             {
-                entryEvent = index;
+                entryEvent = inspection.EventEntries[index].Offset;
                 break;
             }
         }

@@ -138,7 +138,13 @@ game:
   seed: 1234 # optional; omitted = random per playthrough
   undo: true # default; false hides Back/Forward without disabling saves
   autosave: true # default; false stops new automatic recovery writes
-  character-sheet: true # default; false hides the sheet, { inventory: false } hides sections
+  character-sheet: # optional; false hides the sheet, mappings control sections
+    stats:
+      shown: true # default; false hides the entire stats section
+      str: flag:interview.str-known # true, false, or a condition
+      wis: false # hidden until its rule becomes true
+    inventory: true
+    standing: true
   ruleset: # optional; omitted = no stats or levelling (skill checks work on declared stats)
     base: rpg # turns on the built-in RPG stats and levelling
     disable: [cha] # remove stats from the base ruleset
@@ -168,7 +174,7 @@ items:
   rope: { name: coil of rope }
   relic: { name: Relic of Ysh, modifiers: { wis: 2 } } # held items modify stats
 
-flags: [door-open] # optional; flags/vars are also auto-declared when an effect sets them
+flags: [door-open, interview.str-known] # optional; flags/vars can also be auto-declared by effects
 vars:
   torches-lit: 0
   weather: "sunny"
@@ -194,8 +200,10 @@ error (TW4004) that lists the available rulesets.
 
 Manifest booleans use `true` or `false`; quoted `'true'` and `"false"` are also
 accepted. Values such as `yes`, `no`, `1`, or `sometimes` produce TW4003.
-This applies to `game.undo`, `game.autosave`, `game.character-sheet` and its
-sections, `game.creation.name`, item `uncountable`, and trigger `once`.
+This applies to `game.undo`, `game.autosave`, `game.character-sheet`,
+`game.character-sheet.stats.shown`, `game.character-sheet.inventory`,
+`game.character-sheet.standing`, `game.creation.name`, item `uncountable`, and
+trigger `once`.
 
 `game.character-sheet` controls what the player's character sheet shows. By
 default each section appears when the story declares something for it: stats
@@ -203,10 +211,34 @@ when the ruleset has stats, inventory when the story declares items, and
 standing when it declares factions. `character-sheet: false` hides the whole
 sheet, and the story text takes the full width. A mapping hides only the
 sections set to `false`: `character-sheet: { inventory: false, standing: false }`.
-The sections are `stats`, `inventory` and `standing`; omitted sections keep the
-default, and other keys produce TW4006. Hiding is presentation only: hidden
-stats, items and standing still work in conditions, effects, skill checks and
-item modifiers.
+`inventory` and `standing` remain booleans. `stats` must be a mapping; the old
+scalar `stats: true` and `stats: false` forms are invalid. Unlisted stat IDs are
+shown by default. Give a stat `true`, `false`, or a Talemark condition to reveal
+it when that condition becomes true:
+
+```yaml
+game:
+  character-sheet:
+    stats:
+      shown: true
+      str: flag:interview.str-known
+      dex: player:dex >= 10
+      fear: false
+    inventory: true
+    standing: true
+```
+
+`shown` is a reserved boolean property for the whole stats section and defaults
+to `true`; `shown: false` hides every stat regardless of per-stat rules. Stat
+conditions use the same boolean expressions as trigger conditions; skill checks
+are not allowed. They are re-evaluated against current state whenever visibility
+is queried. Unknown or disabled stat IDs and invalid conditions produce compiler
+diagnostics. Hiding a stat is presentation only: it still works in conditions,
+effects, skill checks and item modifiers. Generated stat notes and inspection
+disclosures are suppressed while the stat is hidden; authored prose is unchanged.
+Character creation checks visibility against the initial world state and the
+playthrough's seed before applying selections or presets. Hidden stats are omitted from direct selection,
+but their preset values still apply.
 
 Optional mappings and lists may be omitted. Where empty containers are allowed,
 write `{}` or `[]` explicitly. YAML null values (`null`, `~`, or a key with no

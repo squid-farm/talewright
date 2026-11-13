@@ -2,7 +2,7 @@
     <summary>Initialization before target entry</summary>
     <p class="tool-note">Setup applies before trigger priming. Base stats may be clamped; inspect actual initialization events below. Scene entry effects are separate.</p>
     <ul>
-        @foreach (var item in Session.Events.TakeWhile(e => e is not Talewright.Core.Events.SceneEntered))
+        @foreach (var item in VisibleEvents.TakeWhile(e => e is not Talewright.Core.Events.SceneEntered))
         {
             <li>@item</li>
         }
@@ -11,4 +11,6 @@
 
 @code {
     [Parameter, EditorRequired] public AuthorSession Session { get; set; } = null!;
+
+    private IReadOnlyList<Talewright.Core.Events.GameEvent> VisibleEvents => Session.Inspect().Events;
 }

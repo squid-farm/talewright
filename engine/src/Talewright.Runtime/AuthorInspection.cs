@@ -9,6 +9,7 @@ using Talewright.Talemark.Analysis;
 namespace Talewright.Runtime;
 
 public sealed record AuthorStatInspection(StatId Id, string Name, int BaseValue, int EffectiveValue);
+public sealed record AuthorEventInspection(int Offset, GameEvent Event);
 public sealed record AuthorItemInspection(ItemId Id, string Name, int Quantity);
 public sealed record AuthorCharacterInspection(EntityId Id, string FirstName, string LastName, Pronouns Pronouns,
     IReadOnlyList<AuthorStatInspection> Stats, IReadOnlyList<AuthorItemInspection> Inventory);
@@ -34,12 +35,15 @@ public sealed class AuthorInspection
         CurrentScene = state.CurrentScene;
         IsEnded = state.IsEnded;
         DecisionsCaptured = decisionsCaptured;
-        Events = events;
+        var eventState = GameState.CreateInitial(story.World, state.Seed);
+        EventEntries = VisibleEvents(story, eventState, events);
+        Events = Array.AsReadOnly(EventEntries.Select(entry => entry.Event).ToArray());
         Decisions = decisions;
         Characters = Array.AsReadOnly(story.World.Characters.Keys.Select(id =>
         {
             var identity = state.GetCharacterDefinition(id);
-            var stats = story.World.Ruleset.Stats.Select(stat => new AuthorStatInspection(stat.Id, stat.Name,
+            var stats = story.World.Ruleset.Stats.Where(stat => story.IsStatVisible(stat.Id, state))
+                .Select(stat => new AuthorStatInspection(stat.Id, stat.Name,
                 state.GetBaseStat(id, stat.Id), state.GetStat(id, stat.Id))).ToArray();
             var inventory = state.GetInventory(id).Select(item => new AuthorItemInspection(item.Key,
                 story.World.Items[item.Key].Name, item.Value)).ToArray();
@@ -69,6 +73,8 @@ public sealed class AuthorInspection
     public bool IsEnded { get; }
     public bool DecisionsCaptured { get; }
     public IReadOnlyList<GameEvent> Events { get; }
+    /// <summary>Visible event disclosures paired with their original zero-based event offsets.</summary>
+    public IReadOnlyList<AuthorEventInspection> EventEntries { get; }
     public IReadOnlyList<RuleDecision> Decisions { get; }
     public IReadOnlyList<AuthorCharacterInspection> Characters { get; }
     public IReadOnlyList<AuthorFactionInspection> Factions { get; }
@@ -95,5 +101,22 @@ public sealed class AuthorInspection
         return Characters.Where(character => character.Id.Value.Contains(query, StringComparison.OrdinalIgnoreCase) ||
             character.FirstName.Contains(query, StringComparison.OrdinalIgnoreCase) ||
             character.LastName.Contains(query, StringComparison.OrdinalIgnoreCase));
+    }
+
+    internal static IReadOnlyList<AuthorEventInspection> VisibleEvents(StoryDefinition story, GameState state,
+        IReadOnlyList<GameEvent> events)
+    {
+        var visible = new List<AuthorEventInspection>();
+        for (var offset = 0; offset < events.Count; offset++)
+        {
+            var gameEvent = events[offset];
+            if (StatDisclosureVisibility.IsVisible(story, gameEvent, state))
+            {
+                visible.Add(new AuthorEventInspection(offset, gameEvent));
+            }
+            state.Apply(gameEvent);
+        }
+
+        return Array.AsReadOnly(visible.ToArray());
     }
 }

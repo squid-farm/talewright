@@ -253,7 +253,7 @@ async function testYamlSchema() {
       'Schema key completion should offer the character-sheet game setting');
 
     const withSheetLine = valid.replace('  randomness: checks-only\n',
-      '  randomness: checks-only\n  character-sheet:\n    stats: false\n    \n');
+      '  randomness: checks-only\n  character-sheet:\n    stats:\n      shown: false\n    \n');
     await replaceDocument(document, withSheetLine);
     const sheetCompletions = await vscode.commands.executeCommand('vscode.executeCompletionItemProvider',
       document.uri, document.positionAt(withSheetLine.indexOf('    \n') + 4));

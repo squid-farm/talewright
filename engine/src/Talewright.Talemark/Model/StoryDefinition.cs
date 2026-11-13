@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Talewright.Core.Identity;
 using Talewright.Core.Randomness;
+using Talewright.Core.State;
 using Talewright.Core.World;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Checks;
@@ -25,8 +26,9 @@ public sealed class StoryDefinition
     public string? ReplayCompatibilityId { get; init; }
     public bool UndoEnabled { get; init; } = true;
     public bool AutosaveEnabled { get; init; } = true;
-    /// <summary>Character sheet sections the author allows; presentation only.</summary>
+    /// <summary>Character sheet sections and stats to present; hidden stats remain available to story rules.</summary>
     public CharacterSheetVisibility CharacterSheet { get; init; } = CharacterSheetVisibility.Shown;
+    /// <summary>Authored creation settings; use <see cref="GetCreationOptions(ulong?)"/> for selectable stats.</summary>
     public CharacterCreation? Creation { get; init; }
     public required SceneId Start { get; init; }
     public required RandomnessMode Randomness { get; init; }
@@ -43,6 +45,49 @@ public sealed class StoryDefinition
 
     /// <summary>Predicates referenced by <c>@Name</c> expressions; the runtime evaluates with the same registry.</summary>
     public required NamedPredicateRegistry Predicates { get; init; }
+
+    /// <summary>Whether a declared stat is currently visible to the player.</summary>
+    public bool IsStatVisible(StatId stat, IGameStateView state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (!World.Ruleset.StatsById.ContainsKey(stat))
+        {
+            throw new KeyNotFoundException($"Unknown stat '{stat}'.");
+        }
+
+        if (!CharacterSheet.Stats)
+        {
+            return false;
+        }
+
+        return !CharacterSheet.StatRules.TryGetValue(stat, out var condition)
+            || ExpressionEvaluator.IsTrue(condition, new EvaluationContext(state, Predicates));
+    }
+
+    /// <summary>Creation options visible before selection, presets, or story effects are applied.</summary>
+    public CharacterCreation? GetCreationOptions() => GetCreationOptions(seed: null);
+
+    /// <summary>Creation options evaluated with the playthrough seed, or the story seed or zero if none is supplied.</summary>
+    public CharacterCreation? GetCreationOptions(ulong? seed)
+    {
+        if (Creation is not { } creation || creation.Stats.Count == 0)
+        {
+            return Creation;
+        }
+
+        if (!CharacterSheet.Stats)
+        {
+            return creation.WithStats([]);
+        }
+
+        if (CharacterSheet.StatRules.Count == 0)
+        {
+            return creation;
+        }
+
+        var initialState = GameState.CreateInitial(World, DeterministicDice.ResolveSeed(seed, Seed, 0));
+        return creation.WithStats(creation.Stats.Where(pair => IsStatVisible(pair.Key, initialState)));
+    }
 
     private Dictionary<SceneId, SceneDefinition>? _byId;
     private StoryReachability? _reachability;

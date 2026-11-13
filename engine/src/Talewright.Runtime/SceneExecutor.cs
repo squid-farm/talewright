@@ -16,7 +16,8 @@ internal sealed record SceneExecution(IReadOnlyList<RenderedBlock> Blocks,
 /// <summary>Executes authored steps; StorySession owns entry, transitions, history and presentation.</summary>
 internal sealed class SceneExecutor(StoryDefinition story, EventLog log, TemplateRenderer renderer,
     Action afterBatch, Action<RuleDecision>? observer, bool rememberEntry,
-    Action<SceneDefinition, ChoiceStep, List<RenderedBlock>> makeChoice)
+    Action<SceneDefinition, ChoiceStep, List<RenderedBlock>> makeChoice,
+    Func<int, IEnumerable<RenderedBlock>> notesSince)
 {
     private readonly ReplayIdentityTable _replayIdentities = story.ReplayIdentities;
     private readonly Dictionary<string, IReadOnlyList<RenderedBlock>> _notes = new(StringComparer.Ordinal);
@@ -26,6 +27,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
     private readonly List<string> _visits = [];
     private readonly HashSet<string> _settled = new(StringComparer.Ordinal);
     private readonly List<ChoiceStep> _replayChoices = [];
+    private readonly Func<int, IEnumerable<RenderedBlock>> _notesSince = notesSince;
     internal EvaluationContext Context => new(log.State, story.Predicates)
     {
         ResolveSkillCheck = ResolveExpressionCheck,
@@ -312,7 +314,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
 
     private void AppendNotes(string stepId, int mark, List<RenderedBlock> blocks)
     {
-        var notes = EventNarrator.Describe(log.Events.Skip(mark).ToList(), log.State).ToArray();
+        var notes = _notesSince(mark).ToArray();
         if (rememberEntry) _notes[stepId] = notes;
         blocks.AddRange(notes);
     }

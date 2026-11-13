@@ -14,6 +14,15 @@ public sealed class CharacterCreation
     public IReadOnlyList<CharacterPreset> Presets { get; init; } = [];
     public IReadOnlyDictionary<StatId, IReadOnlyList<int>> Stats { get; init; } = new Dictionary<StatId, IReadOnlyList<int>>();
 
+    internal CharacterCreation WithStats(IEnumerable<KeyValuePair<StatId, IReadOnlyList<int>>> stats) =>
+        new()
+        {
+            EditName = EditName,
+            Pronouns = Pronouns,
+            Presets = Presets,
+            Stats = new ReadOnlyDictionary<StatId, IReadOnlyList<int>>(stats.ToDictionary(pair => pair.Key, pair => pair.Value)),
+        };
+
     public CharacterSelection Default(CharacterDefinition player, string? presetId = null)
     {
         var preset = presetId is null ? Presets.FirstOrDefault()
@@ -50,9 +59,12 @@ public sealed record CharacterSelection
     public string? Preset { get; init; }
     public IReadOnlyDictionary<string, int> Stats { get; init; } = new Dictionary<string, int>();
 
-    public static CharacterSelection? Validate(StoryDefinition story, CharacterSelection? selection)
+    public static CharacterSelection? Validate(StoryDefinition story, CharacterSelection? selection) =>
+        Validate(story, selection, seed: null);
+
+    public static CharacterSelection? Validate(StoryDefinition story, CharacterSelection? selection, ulong? seed)
     {
-        if (story.Creation is not { } creation)
+        if (story.GetCreationOptions(seed) is not { } creation)
         {
             if (selection is not null)
             {

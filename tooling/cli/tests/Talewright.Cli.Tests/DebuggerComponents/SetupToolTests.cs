@@ -1,13 +1,25 @@
 using AngleSharp.Dom;
 using Bunit;
+using Bunit.TestDoubles;
+using Talewright.Core.Identity;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
 using Talewright.Debugger;
 using Talewright.Player.Components;
+using Talewright.Player.Library;
+using Talewright.Player.Preferences;
+using Talewright.Rules.Expressions;
+using Talewright.Runtime;
+using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
 
 namespace Talewright.Cli.Tests.DebuggerComponents;
 
-public sealed class SetupToolTests : BunitContext
+public sealed class SetupToolTests : BunitContext, IAsyncLifetime
 {
+    Task IAsyncLifetime.InitializeAsync() => Task.CompletedTask;
+    async Task IAsyncLifetime.DisposeAsync() => await base.DisposeAsync();
+
     [Fact]
     public void Picking_a_scene_updates_the_target_field()
     {
@@ -110,6 +122,122 @@ public sealed class SetupToolTests : BunitContext
 
         Assert.False(creator.Instance.Compact);
         Assert.Empty(creator.FindAll(".tw-creation--compact"));
+    }
+
+    [Fact]
+    public void Character_creator_omits_stats_hidden_in_the_initial_state()
+    {
+        var files = ComponentStory.Files(creation: true);
+        files[StorySource.ManifestFileName] = files[StorySource.ManifestFileName].Replace(
+            "  creation:", "  character-sheet:\n    stats:\n      str: flag:ready\n  creation:");
+        using var model = ComponentStory.Load(files);
+        var creator = Render<CharacterCreator>(parameters => parameters
+            .Add(component => component.Story, model.Story!));
+
+        Assert.Empty(creator.FindAll("select[aria-label='Strength']"));
+        Assert.NotEmpty(creator.FindAll("input[aria-label='First name']"));
+    }
+
+    [Fact]
+    public void Seed_changes_reset_the_debugger_character_and_update_creation_options()
+    {
+        var source = SeedSensitiveSource();
+        var compilation = StoryCompiler.Compile(source, SeedSensitiveOptions());
+        Assert.True(compilation.Success, string.Join("\n", compilation.Diagnostics));
+        using var model = new WorkbenchModel("unused");
+        Assert.True(model.ApplySource(new SourceCompilation(source, compilation, null), restart: true));
+        model.Seed = "2";
+        var tool = Show(model, start: model.Start);
+        Assert.NotEmpty(tool.FindAll("select[aria-label='Strength']"));
+        Button(tool, "Start story").Click();
+        Assert.NotNull(model.Character);
+
+        tool.Find("input[aria-label='Seed']").Change("1");
+        Assert.Null(model.Character);
+        Assert.Empty(tool.FindAll("select[aria-label='Strength']"));
+        Button(tool, "Start story").Click();
+        Button(tool, "Start selected scene").Click();
+        Assert.Null(model.Error);
+        Assert.Equal(1UL, model.Session!.Seed);
+        Assert.Empty(model.Session.Character!.Stats);
+
+        tool.Find("input[aria-label='Seed']").Change("");
+        var randomSeed = model.CreationSeed;
+        Assert.Null(model.Character);
+        Assert.Equal(randomSeed % 2 == 0, tool.FindAll("select[aria-label='Strength']").Count > 0);
+        Button(tool, "Start story").Click();
+        Button(tool, "Start selected scene").Click();
+        Assert.Null(model.Error);
+        Assert.Equal(randomSeed, model.Session!.Seed);
+    }
+
+    [Fact]
+    public async Task Player_passes_the_creation_seed_and_selection_to_the_playthrough()
+    {
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        Services.AddLogging();
+        await using var preferences = new PlayerPreferencesStore(JSInterop.JSRuntime, NullLogger<PlayerPreferencesStore>.Instance);
+        Services.AddSingleton(preferences);
+        Services.AddSingleton<IStoryLibrary>(new SeedStoryLibrary(SeedSensitiveSource()));
+        ComponentFactories.AddStub<StoryPlayer>();
+        var app = Render<TalewrightApp>(parameters => parameters
+            .Add(component => component.AutoStartStoryId, "seed")
+            .Add(component => component.LibraryEnabled, false)
+            .Add(component => component.Options, SeedSensitiveOptions()));
+
+        var creator = app.FindComponent<CharacterCreator>().Instance;
+        var seed = creator.Seed!.Value;
+        Assert.Equal(seed % 2 == 0, app.FindAll("select[aria-label='Strength']").Count > 0);
+        app.FindAll("button").Single(button => button.TextContent == "Start story").Click();
+        var player = app.FindComponent<Stub<StoryPlayer>>().Instance.Parameters;
+        Assert.Equal(seed, player.Get(component => component.Seed));
+        Assert.Equal(seed % 2 == 0, player.Get(component => component.Character)!.Stats.ContainsKey("str"));
+    }
+
+    [Fact]
+    public async Task Restarting_a_resumed_character_uses_the_saved_seed()
+    {
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        await using var preferences = new PlayerPreferencesStore(JSInterop.JSRuntime, NullLogger<PlayerPreferencesStore>.Instance);
+        Services.AddSingleton(preferences);
+        var result = StoryCompiler.Compile(SeedSensitiveSource(), SeedSensitiveOptions());
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var story = result.Story!;
+        var character = story.GetCreationOptions(1)!.Default(story.World.Characters[EntityId.Player]);
+        var history = new StoryHistory(story, 1, character);
+        var player = Render<StoryPlayer>(parameters => parameters
+            .Add(component => component.Story, story)
+            .Add(component => component.Seed, 2UL)
+            .Add(component => component.Character, character)
+            .Add(component => component.ResumeHistory, history)
+            .Add(component => component.AutosaveResumeChecked, true));
+
+        await player.InvokeAsync(() => player.FindComponent<StoryStage>().Instance.OnRestart.InvokeAsync());
+
+        var restarted = Assert.IsType<StoryHistory>(player.FindComponent<StoryStage>().Instance.Identity);
+        Assert.Equal(1UL, restarted.Seed);
+        Assert.Empty(restarted.Character!.Stats);
+    }
+
+    private static StorySource SeedSensitiveSource()
+    {
+        var files = ComponentStory.Files(creation: true);
+        files[StorySource.ManifestFileName] = files[StorySource.ManifestFileName].Replace(
+            "  creation:", "  character-sheet:\n    stats:\n      str: \"@EvenSeed\"\n  creation:");
+        return new StorySource(files);
+    }
+
+    private static CompilerOptions SeedSensitiveOptions() => new()
+    {
+        CompatibilityId = "creation-seed-components-v1",
+        Predicates = new NamedPredicateRegistry().Register("EvenSeed", state => state.Seed % 2 == 0),
+    };
+
+    private sealed class SeedStoryLibrary(StorySource source) : IStoryLibrary
+    {
+        public Task<IReadOnlyList<StoryEntry>> ListAsync() =>
+            Task.FromResult<IReadOnlyList<StoryEntry>>([new("seed", "Seed", "Test")]);
+        public Task<StorySource> LoadAsync(string id) => Task.FromResult(source);
     }
 
     [Fact]

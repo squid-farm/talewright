@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using Talewright.Player.Components;
+using Talewright.Rulesets.Generic;
 using Talewright.Runtime;
 using Talewright.Testing;
 
@@ -63,6 +64,23 @@ public sealed class StoryStageRenderTests
     }
 
     [Fact]
+    public async Task Hidden_stats_collapse_the_sheet_and_it_reappears_when_a_rule_becomes_true()
+    {
+        var story = VisibilityStory();
+        var history = new StoryHistory(story, 42);
+
+        var hidden = await RenderStageAsync(story, history);
+        Assert.DoesNotContain("aria-label=\"Character sheet\"", hidden);
+        Assert.Contains("class=\"tw-columns tw-columns--full\"", hidden);
+
+        history.Choose(Assert.Single(history.Current.Choices).Key);
+        var visible = await RenderStageAsync(story, history);
+        Assert.Contains("aria-label=\"Character sheet\"", visible);
+        Assert.Contains("<dt>Strength</dt>", visible);
+        Assert.DoesNotContain("tw-columns--full", visible);
+    }
+
+    [Fact]
     public async Task Continued_scenes_render_in_the_previous_passage_without_a_section_break()
     {
         var story = new StoryFixture("continued-stage", TestStories.DefaultYaml, """
@@ -93,6 +111,32 @@ public sealed class StoryStageRenderTests
         Assert.Contains("We can use that.", html);
         Assert.Contains("I can mend boats.", html);
         Assert.DoesNotContain("tw-past", html);
+    }
+
+    private static Talewright.Talemark.Model.StoryDefinition VisibilityStory()
+    {
+        var stats = new[] { "str", "dex", "con", "int", "wis", "cha", "hp", "xp", "level" }
+            .Concat(GenericRuleset.Skills.Select(skill => skill.Id));
+        var rules = string.Join('\n', stats.Select(stat =>
+            $"      {stat}: {(stat == "str" ? "flag:revealed" : "false")}"));
+        var yaml = $$"""
+            game:
+              id: visibility-render
+              title: Visibility render
+              start: beginning
+              ruleset: rpg
+              character-sheet:
+                stats:
+            {{rules}}
+            flags: { revealed: false }
+            characters:
+              player:
+                first-name: Ada
+            """;
+        return new StoryFixture("visibility-render", yaml, """
+            === beginning
+            * [Reveal] { set flag:revealed } -> END
+            """).Compile();
     }
 
     private static async Task<string> RenderStageAsync(Talewright.Talemark.Model.StoryDefinition story,

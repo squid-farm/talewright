@@ -1,5 +1,6 @@
 using System.Security.Cryptography;
 using System.Diagnostics.CodeAnalysis;
+using Talewright.Core.Randomness;
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Core.State;
@@ -25,10 +26,11 @@ public sealed class StoryHistory
 
     public StoryHistory(StoryDefinition story, ulong? seed = null, CharacterSelection? character = null)
     {
-        Character = CharacterSelection.Validate(story, character);
+        var resolvedSeed = DeterministicDice.ResolveSeed(seed, story.Seed);
+        Character = CharacterSelection.Validate(story, character, resolvedSeed);
         Story = story;
         _timeline = new ReplayCursor(0, 0);
-        _session = new StorySession(story, seed, character: Character);
+        _session = new StorySession(story, resolvedSeed, character: Character);
         var initialState = ReplayEvidence.InitialState(story, _session.State);
         var eventStart = _session.Events.Count;
         _frames = [new HistoryFrame(_session.Start())];
@@ -274,7 +276,7 @@ public sealed class StoryHistory
         CharacterSelection? character;
         try
         {
-            character = CharacterSelection.Validate(story, save.Character);
+            character = CharacterSelection.Validate(story, save.Character, save.Seed);
         }
         catch (ArgumentException ex)
         {

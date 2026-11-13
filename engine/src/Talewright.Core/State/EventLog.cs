@@ -27,8 +27,12 @@ public sealed class EventLog
     /// <summary>Raised after each event is applied.</summary>
     public event Action<GameEvent>? Appended;
 
+    /// <summary>Raised immediately before an event is applied.</summary>
+    public event Action<GameEvent>? Appending;
+
     public void Append(GameEvent gameEvent)
     {
+        Appending?.Invoke(gameEvent);
         State.Apply(gameEvent);
         _events.Add(gameEvent);
         Appended?.Invoke(gameEvent);

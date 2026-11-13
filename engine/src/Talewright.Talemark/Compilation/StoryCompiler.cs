@@ -137,6 +137,10 @@ public static class StoryCompiler
         };
         if (analysis is not null) analysis.SymbolContext = symbols;
 
+        var characterSheet = CompileCharacterSheet(manifest, symbols, diagnostics);
+        if (analysis is not null && !diagnostics.HasErrors)
+            analysis.CharacterSheet = characterSheet;
+
         var parsed = new List<ParsedScene>();
         var seen = new HashSet<SceneId>();
         foreach (var (path, syntax) in syntaxes)
@@ -199,7 +203,7 @@ public static class StoryCompiler
                 ? null : $"{ReplayVersion}\n{options.CompatibilityId}",
             UndoEnabled = manifest.UndoEnabled,
             AutosaveEnabled = manifest.AutosaveEnabled,
-            CharacterSheet = manifest.CharacterSheet,
+            CharacterSheet = characterSheet,
             Creation = manifest.Creation,
             Start = new SceneId(manifest.Start),
             Randomness = manifest.Randomness,
@@ -216,6 +220,29 @@ public static class StoryCompiler
             SourceMap = new StorySourceMap(source, parsed.ToDictionary(scene => scene.Definition.Id,
                 scene => new SceneSourceRange(scene.Location.File, scene.Location.Line, scene.EndLine))),
         };
+    }
+
+    private static CharacterSheetVisibility CompileCharacterSheet(StoryManifest manifest, StorySymbols symbols,
+        DiagnosticBag diagnostics)
+    {
+        if (manifest.CharacterSheetStatRules.Count == 0)
+        {
+            return manifest.CharacterSheet;
+        }
+
+        var rules = new Dictionary<StatId, Expr>();
+        foreach (var rule in manifest.CharacterSheetStatRules)
+        {
+            var condition = rule.Visible is { } visible
+                ? new BoolLiteral(visible)
+                : ExpressionParser.ParseCondition(rule.Condition!, rule.Location, symbols, diagnostics);
+            if (condition is not null)
+            {
+                rules.Add(rule.Stat, condition);
+            }
+        }
+
+        return manifest.CharacterSheet with { StatRules = new System.Collections.ObjectModel.ReadOnlyDictionary<StatId, Expr>(rules) };
     }
 
     private static string? Fingerprint(StorySource source, string? compatibilityId)

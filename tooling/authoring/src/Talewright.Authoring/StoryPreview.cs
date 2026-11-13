@@ -52,6 +52,10 @@ public static class StoryPreview
     private static SubstitutionPreview Preview(StoryAnalysis analysis, AuthoredSubstitution substitution, EvaluationContext context)
     {
         var template = substitution.Template;
+        if (UsesUnavailableStat(template.Value, analysis, context.State))
+            return new(substitution.Range, null, [],
+                "This substitution uses a stat hidden from the player or whose visibility is unavailable for this gameplay state.");
+
         // Direct variables are previewed only when they have an explicit manifest default.
         var variable = template.Value switch
         {
@@ -93,6 +97,18 @@ public static class StoryPreview
         }
         return new(substitution.Range, value, steps.AsReadOnly(), null);
     }
+
+    private static bool UsesUnavailableStat(Expr expression, StoryAnalysis analysis, IGameStateView state) =>
+        expression switch
+        {
+            StatRef stat => state.Ruleset.Modifiers.Count > 0 ||
+                !AuthoringStatVisibility.IsVisible(analysis, stat.Stat, state),
+            SkillCheckExpr check => !AuthoringStatVisibility.IsVisible(analysis, check.Skill, state),
+            UnaryExpr unary => UsesUnavailableStat(unary.Operand, analysis, state),
+            BinaryExpr binary => UsesUnavailableStat(binary.Left, analysis, state) ||
+                UsesUnavailableStat(binary.Right, analysis, state),
+            _ => false,
+        };
 
     private static bool HasNumericDefault(Expr expression, StoryAnalysis analysis) => expression switch
     {

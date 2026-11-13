@@ -30,7 +30,7 @@
             }
             @if (decision.EventStart is { } start && decision.EventEnd is { } end && end > start)
             {
-                <ul>@foreach (var item in Inspection.Events.Skip(start).Take(end - start)) { <li>@item</li> }</ul>
+                <ul>@foreach (var item in Inspection.EventEntries.Where(entry => entry.Offset >= start && entry.Offset < end)) { <li>@item.Event</li> }</ul>
             }
         </details>
         @if (status == DebuggerDecisionStatus.ShownUnavailable && decision.Expression is { } trace)

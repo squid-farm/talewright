@@ -1,9 +1,9 @@
 <details open="@Open">
     <summary>Events</summary>
     <p class="tool-note">Zero-based event offsets; showing the most recent 200 matching events.</p>
-    <ul>@foreach (var entry in Inspection.Events.Select((item, index) => (item, index)).Where(e => Match(e.item.ToString())).TakeLast(200))
+    <ul>@foreach (var entry in Inspection.EventEntries.Where(e => Match(e.Event.ToString())).TakeLast(200))
     {
-        <li>@entry.index: @entry.item</li>
+        <li>@entry.Offset: @entry.Event</li>
     }</ul>
 </details>
 

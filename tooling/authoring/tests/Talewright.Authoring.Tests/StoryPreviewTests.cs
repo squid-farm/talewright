@@ -1,6 +1,9 @@
+using Talewright.Core.Identity;
+using Talewright.Core.Rulesets;
 using Talewright.Core.State;
 using Talewright.Narrative.Rendering;
 using Talewright.Narrative.Templates;
+using Talewright.Rulesets.Generic;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
@@ -279,6 +282,110 @@ public sealed class StoryPreviewTests
         Assert.Contains("Result: \"Her\" (default)", hover.PlainText);
         Assert.Contains("#capitalize: \"Her\"", hover.PlainText);
         Assert.Contains("Declared at", character.PlainText);
+    }
+
+    [Fact]
+    public void Hidden_stat_values_are_withheld_from_preview_and_hover()
+    {
+        var manifest = Manifest.Replace("  ruleset: rpg",
+            "  ruleset: rpg\n  character-sheet:\n    stats:\n      str: false");
+        var analysis = StoryAnalyzer.Analyze(Source("=== start\n{player:str}\n-> END", manifest));
+
+        var preview = Assert.Single(StoryPreview.Get(analysis, "main.tale"));
+        Assert.Null(preview.Value);
+        Assert.Contains("hidden from the player", preview.UnavailableReason);
+        var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, new("main.tale", 2, 10)));
+        Assert.Contains("hidden from the player", hover.PlainText);
+        Assert.DoesNotContain("Input:", hover.PlainText);
+    }
+
+    [Fact]
+    public void Current_file_analysis_does_not_disclose_stats_without_visibility_context()
+    {
+        var manifest = Manifest.Replace("  ruleset: rpg",
+            "  ruleset: rpg\n  character-sheet:\n    stats:\n      str: false");
+        var tale = "=== start\n{player:str#one-many(\"one\", \"many\")}\n-> END";
+        var source = Source(tale, manifest);
+        var workspace = new StoryWorkspace(source);
+        var initial = workspace.AnalyzeCurrentFile("main.tale", tale, null, CancellationToken.None);
+        Assert.All(StoryPreview.Get(initial, "main.tale"), preview => Assert.Null(preview.Value));
+        var snapshot = StoryAnalyzer.Analyze(source);
+        var analysis = workspace.AnalyzeCurrentFile("main.tale", tale, snapshot, CancellationToken.None);
+
+        Assert.Null(analysis.Story);
+        var preview = Assert.Single(StoryPreview.Get(analysis, "main.tale"));
+        Assert.Null(preview.Value);
+        var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, new("main.tale", 2, 10)));
+        Assert.DoesNotContain("Input:", hover.PlainText);
+        Assert.DoesNotContain("Default:", hover.PlainText);
+    }
+
+    [Fact]
+    public void Metadata_predicate_visibility_does_not_execute_project_code_during_analysis_or_hover()
+    {
+        var manifest = Manifest.Replace("  ruleset: rpg",
+            "  ruleset: rpg\n  character-sheet:\n    stats:\n      str: \"not @Ready\"\n  creation:\n    stats:\n      str: [8, 12]");
+        var source = Source("=== start\n{player:str#one-many(\"one\", \"many\")}\n~ player:str += 1\n-> END", manifest);
+        var metadata = AuthoringProjectMetadata.Export(CompilerOptions.Default) with { Predicates = ["Ready"] };
+
+        var analysis = metadata.Analyze(source);
+        Assert.NotNull(analysis.Story);
+        var preview = Assert.Single(StoryPreview.Get(analysis, "main.tale"));
+        Assert.Null(preview.Value);
+        var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, new("main.tale", 2, 10)));
+        Assert.DoesNotContain("Input:", hover.PlainText);
+        Assert.DoesNotContain("Default:", hover.PlainText);
+        var statHover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, new("main.tale", 3, 11)));
+        Assert.DoesNotContain("Default:", statHover.PlainText);
+        Assert.DoesNotContain("Starting values:", statHover.PlainText);
+    }
+
+    [Theory]
+    [InlineData(true, "many")]
+    [InlineData(false, null)]
+    public void Built_in_flag_visibility_is_evaluated_when_context_is_available(bool revealed, string? expected)
+    {
+        var manifest = Manifest.Replace("  ruleset: rpg",
+            $"  ruleset: rpg\n  character-sheet:\n    stats:\n      str: flag:revealed") +
+            $"\nflags: {{ revealed: {revealed.ToString().ToLowerInvariant()} }}";
+        var analysis = StoryAnalyzer.Analyze(Source(
+            "=== start\n{player:str#one-many(\"one\", \"many\")}\n-> END", manifest));
+
+        Assert.Equal(expected, Assert.Single(StoryPreview.Get(analysis, "main.tale")).Value);
+    }
+
+    [Fact]
+    public void Visibility_and_previews_do_not_evaluate_project_stat_modifiers()
+    {
+        var ruleset = GenericRuleset.Create().ToBuilder("custom").AddModifier(new ThrowingStatModifier()).Build();
+        var options = new CompilerOptions
+        {
+            Rulesets = new Dictionary<string, Func<Ruleset>>(CompilerOptions.DefaultRulesets())
+            {
+                ["custom"] = () => ruleset,
+            },
+        };
+        var manifest = Manifest.Replace("  ruleset: rpg",
+            "  ruleset: custom\n  character-sheet:\n    stats:\n      str: player:dex >= 10");
+        var analysis = StoryAnalyzer.Analyze(Source(
+            "=== start\n{player:str#one-many(\"one\", \"many\")}\n-> END", manifest), options);
+
+        Assert.NotNull(analysis.Story);
+        Assert.Null(Assert.Single(StoryPreview.Get(analysis, "main.tale")).Value);
+        var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, new("main.tale", 2, 10)));
+        Assert.DoesNotContain("Input:", hover.PlainText);
+        Assert.DoesNotContain("Default:", hover.PlainText);
+
+        var metadataAnalysis = AuthoringProjectMetadata.Export(options).Analyze(Source(
+            "=== start\n{player:str#one-many(\"one\", \"many\")}\n-> END", manifest));
+        Assert.NotNull(metadataAnalysis.Story);
+        Assert.Null(Assert.Single(StoryPreview.Get(metadataAnalysis, "main.tale")).Value);
+    }
+
+    private sealed class ThrowingStatModifier : IStatModifier
+    {
+        public int GetModifier(IGameStateView state, EntityId character, StatId stat) =>
+            throw new InvalidOperationException("Authoring must not execute project stat modifiers.");
     }
 
     private static StorySource Source(string tale, string manifest = Manifest) => new(new Dictionary<string, string>

@@ -115,7 +115,10 @@ public sealed class AuthorSession
             default:
                 throw new NotSupportedException($"Unknown author command '{command.GetType().Name}'.");
         }
-        var events = Array.AsReadOnly(_session.Events.Skip(eventStart).ToArray());
+        var rawEvents = _session.Events.Skip(eventStart).ToArray();
+        var before = EventLog.Replay(Story.World, _session.Seed, _session.Events.Take(eventStart)).State;
+        var events = Array.AsReadOnly(AuthorInspection.VisibleEvents(Story, before, rawEvents)
+            .Select(entry => entry.Event).ToArray());
         return new AuthorCommandResult(eventStart, events, changes);
     }
 
@@ -161,10 +164,11 @@ public sealed class AuthorSession
     {
         ArgumentNullException.ThrowIfNull(story);
         story.GetScene(target);
-        var selection = CharacterSelection.Validate(story, character);
+        var resolvedSeed = DeterministicDice.ResolveSeed(seed, story.Seed);
+        var selection = CharacterSelection.Validate(story, character, resolvedSeed);
         var validated = (setup ?? new AuthorSetup()).Validate(story);
         return new AuthorSession(story, target, validated,
-            seed ?? story.Seed ?? DeterministicDice.NewSeed(), selection, [], new ReplayCursor(0, 0), captureDecisions);
+            resolvedSeed, selection, [], new ReplayCursor(0, 0), captureDecisions);
     }
 
     /// <summary>Snapshots declared state and recorded decisions; never reevaluates branch predicates.</summary>
@@ -185,7 +189,7 @@ public sealed class AuthorSession
         AuthorReloadComparison.Schema(Story, candidate);
         candidate.GetScene(checkpoint.Scene);
         var result = new AuthorSession(candidate, StartScene, Setup.Validate(candidate), Seed,
-            CharacterSelection.Validate(candidate, Character), _commands, _timeline, CaptureDecisions, checkpoint);
+            CharacterSelection.Validate(candidate, Character, Seed), _commands, _timeline, CaptureDecisions, checkpoint);
         AuthorReloadComparison.Require(result.Checkpoint?.Scene == checkpoint.Scene, "the replay no longer reaches the displayed scene");
         return result;
     }
