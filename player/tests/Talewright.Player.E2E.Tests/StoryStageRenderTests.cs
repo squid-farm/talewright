@@ -4,6 +4,9 @@ using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
+using Talewright.Core.Identity;
+using Talewright.Narrative.Rendering;
+using Talewright.Narrative.Templates;
 using Talewright.Player.Components;
 using Talewright.Rulesets.Generic;
 using Talewright.Runtime;
@@ -89,6 +92,37 @@ public sealed class StoryStageRenderTests
         Assert.Contains("<p class=\"tw-line\">First paragraph.</p>", html);
         Assert.Contains("<p class=\"tw-line\">Second paragraph.</p>", html);
         Assert.DoesNotContain("<p class=\"tw-speech\">", html);
+    }
+
+    [Fact]
+    public void Passage_rerenders_when_speech_paragraphs_change()
+    {
+        static HistoryFrame Speech(params string[] paragraphs) =>
+            new(new StoryFrame(null, null,
+                new RenderedDocument([
+                    new RenderedSpeech(EntityId.Player, "Ada",
+                        paragraphs.Select(text =>
+                            (IReadOnlyList<RenderedInline>)[new RenderedText(text, TextStyle.None)]).ToArray()),
+                ]), [], IsEnded: false));
+
+        var passage = new PassageRenderProbe();
+        passage.SetEntry(Speech("First", "Second"));
+        Assert.True(passage.NeedsRender());
+        passage.MarkRendered();
+
+        passage.SetEntry(Speech("First", "Second"));
+        Assert.False(passage.NeedsRender());
+
+        passage.SetEntry(Speech("First", "Changed"));
+        Assert.True(passage.NeedsRender());
+        passage.MarkRendered();
+
+        passage.SetEntry(Speech("First"));
+        Assert.True(passage.NeedsRender());
+        passage.MarkRendered();
+
+        passage.SetEntry(Speech("First", "Added"));
+        Assert.True(passage.NeedsRender());
     }
 
     [Fact]
@@ -201,5 +235,16 @@ public sealed class StoryStageRenderTests
         public ValueTask<TValue> InvokeAsync<TValue>(
             string identifier, CancellationToken cancellationToken, object?[]? args) =>
             throw new InvalidOperationException("Static rendering must not invoke JavaScript.");
+    }
+
+    private sealed class PassageRenderProbe : StoryPassage
+    {
+        public void SetEntry(HistoryFrame entry) =>
+            ParameterView.FromDictionary(new Dictionary<string, object?> { [nameof(Entry)] = entry })
+                .SetParameterProperties(this);
+
+        public bool NeedsRender() => ShouldRender();
+
+        public void MarkRendered() => OnAfterRender(firstRender: false);
     }
 }
