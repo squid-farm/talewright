@@ -422,8 +422,10 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
     {
         var workbench = Show(requestedScene: "missing");
 
-        Assert.Contains(workbench.FindAll("p[role=status]"),
-            status => status.TextContent == "Requested scene 'missing' was not found. The configured start scene is selected instead.");
+        var status = workbench.Find(".debugger-status-line p[role=status]");
+        Assert.Equal("Source restarted. Compatible setup retained and revalidated; select Start selected scene for a fresh run. "
+            + "Requested scene 'missing' was not found. The configured start scene is selected instead.", status.TextContent);
+        Assert.Single(workbench.FindAll(".debugger-status-line p[role=status], .debugger-status-line p[role=alert]"));
         Assert.Equal("hall", workbench.Find("input[aria-label='Target scene ID']").GetAttribute("value"));
     }
 
@@ -440,7 +442,8 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
         workbench.WaitForAssertion(() => Assert.Contains(workbench.FindAll("p[role=status]"),
             status => status.TextContent.StartsWith("Source not adopted.", StringComparison.Ordinal)), Reload);
         Assert.Equal("Story has compiler errors. Fix and save, or select Rescan / retry watcher. Any previous run is unchanged.",
-            workbench.Find("p[role=alert]").TextContent);
+            workbench.Find(".debugger-status-line p[role=alert]").TextContent);
+        Assert.Single(workbench.FindAll(".debugger-status-line p[role=status], .debugger-status-line p[role=alert]"));
         Assert.Contains("nowhere", workbench.FindComponent<Talewright.Player.Components.DiagnosticList>().Markup);
         Assert.Equal("hall Great Hall", Passage(workbench));
     }
@@ -453,8 +456,12 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
 
         File.WriteAllText(Path.Combine(_root.FullName, Talewright.Talemark.Compilation.StorySource.ManifestFileName),
             ComponentStory.Yaml.Replace("title: Debugger components", "title: Renamed story"));
-        workbench.WaitForAssertion(() => Assert.Contains(workbench.FindAll("p[role=status]"),
-            status => status.TextContent.StartsWith("Restart required.", StringComparison.Ordinal)), Reload);
+        workbench.WaitForAssertion(() =>
+        {
+            Assert.Equal("Source compiled, but explicit Restart from source is required. The last good run is unchanged.",
+                workbench.Find(".debugger-status-line p[role=alert]").TextContent);
+            Assert.Single(workbench.FindAll(".debugger-status-line p[role=status], .debugger-status-line p[role=alert]"));
+        }, Reload);
         Assert.Equal("Debugger components", workbench.FindComponent<SetupTool>().Instance.Story.Title);
         Assert.NotEmpty(workbench.FindAll("section[aria-label='Synthetic playtest']"));
 

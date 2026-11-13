@@ -429,7 +429,7 @@ public sealed class DebuggerTests
             await driver.ActivateAsync("Scene visits");
             snapshot = await WaitFor(driver, "current 1");
             await File.WriteAllTextAsync(manifest, yaml.Replace("Native reload", "Restarted title"));
-            snapshot = await WaitFor(driver, "Restart required.", "After reload.");
+            snapshot = await WaitFor(driver, "Source compiled, but explicit Restart from source is required", "After reload.");
             Assert.Contains("After reload.", snapshot.Content);
             await File.WriteAllTextAsync(tale, updated.Replace("After reload.", "After YAML restart."));
             snapshot = await WaitFor(driver, "Source compiled, but explicit Restart from source is required");

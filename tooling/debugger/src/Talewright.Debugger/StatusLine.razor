@@ -1,26 +1,55 @@
 <div class="debugger-status-line" aria-label="Debugger status">
-    @if (Model.RestartRequired)
+    @if (StatusMessage is { } status)
     {
-        <p role="status">Restart required. The last good compiled story/run is still displayed. Correct or disable incompatible setup before restarting.</p>
-    }
-    @if (Model.ReloadStatus is { } reloadStatus)
-    {
-        <p role="status">@reloadStatus</p>
-    }
-    @if (Model.RequestedSceneNotice is { } requestedSceneNotice)
-    {
-        <p role="status">@requestedSceneNotice</p>
-    }
-    @if (Model.SourceRejected)
-    {
-        <p role="status">Source not adopted. Displayed story and playtest, if any, use the last successful compilation.</p>
-    }
-    @if (Model.Error is { } error)
-    {
-        <p role="alert" class="tw-error debugger-error">@error</p>
+        @if (status.IsError)
+        {
+            <p role="alert" class="tw-error debugger-error">@status.Text</p>
+        }
+        else
+        {
+            <p role="status">@status.Text</p>
+        }
     }
 </div>
 
 @code {
     [Parameter, EditorRequired] public WorkbenchModel Model { get; set; } = null!;
+
+    private (string Text, bool IsError)? StatusMessage
+    {
+        get
+        {
+            if (Model.Error is { } error)
+            {
+                return (error, true);
+            }
+            if (Model.RestartRequired)
+            {
+                return (WithRequestedSceneNotice(
+                    "Restart required. The last good compiled story/run is still displayed. Correct or disable incompatible setup before restarting."), false);
+            }
+            if (Model.SourceRejected)
+            {
+                return (WithRequestedSceneNotice(
+                    "Source not adopted. Displayed story and playtest, if any, use the last successful compilation."), false);
+            }
+            if (Model.ReloadStatus is { } reloadStatus)
+            {
+                return (WithRequestedSceneNotice(reloadStatus), false);
+            }
+            if (Model.RequestedSceneNotice is { } notice && !IsCompilerNotice(notice))
+            {
+                return (notice, false);
+            }
+            return null;
+        }
+    }
+
+    private string WithRequestedSceneNotice(string message) =>
+        Model.RequestedSceneNotice is { } notice && !IsCompilerNotice(notice)
+            ? $"{message} {notice}"
+            : message;
+
+    private static bool IsCompilerNotice(string notice) =>
+        notice.Contains("could not be verified because the story has compiler errors.", StringComparison.Ordinal);
 }
