@@ -138,6 +138,8 @@ public static class StoryCompiler
         if (analysis is not null) analysis.SymbolContext = symbols;
 
         var characterSheet = CompileCharacterSheet(manifest, symbols, diagnostics);
+        if (analysis is not null && !diagnostics.HasErrors)
+            analysis.CharacterSheet = characterSheet;
 
         var parsed = new List<ParsedScene>();
         var seen = new HashSet<SceneId>();
@@ -213,7 +215,6 @@ public static class StoryCompiler
             Reachability = reachability,
             ReplayIdentities = replayIdentities,
         };
-        story.FilterInitialCreationStats();
         return new CompilationResult(story, diagnostics.Items)
         {
             SourceMap = new StorySourceMap(source, parsed.ToDictionary(scene => scene.Definition.Id,

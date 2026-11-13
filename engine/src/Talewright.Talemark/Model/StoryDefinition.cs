@@ -18,8 +18,6 @@ namespace Talewright.Talemark.Model;
 /// </summary>
 public sealed class StoryDefinition
 {
-    private CharacterCreation? _creation;
-
     public required string Id { get; init; }
     public required string Title { get; init; }
     public required string Version { get; init; }
@@ -30,11 +28,8 @@ public sealed class StoryDefinition
     public bool AutosaveEnabled { get; init; } = true;
     /// <summary>Character sheet sections and stats to present; hidden stats remain available to story rules.</summary>
     public CharacterSheetVisibility CharacterSheet { get; init; } = CharacterSheetVisibility.Shown;
-    public CharacterCreation? Creation
-    {
-        get => _creation;
-        init => _creation = value;
-    }
+    /// <summary>Authored creation settings; use <see cref="GetCreationOptions"/> for selectable stats.</summary>
+    public CharacterCreation? Creation { get; init; }
     public required SceneId Start { get; init; }
     public required RandomnessMode Randomness { get; init; }
 
@@ -69,15 +64,26 @@ public sealed class StoryDefinition
             || ExpressionEvaluator.IsTrue(condition, new EvaluationContext(state, Predicates));
     }
 
-    internal void FilterInitialCreationStats()
+    /// <summary>Creation options visible before selection, presets, or story effects are applied.</summary>
+    public CharacterCreation? GetCreationOptions()
     {
-        if (_creation is not { } creation)
+        if (Creation is not { } creation || creation.Stats.Count == 0)
         {
-            return;
+            return Creation;
+        }
+
+        if (!CharacterSheet.Stats)
+        {
+            return creation.WithStats([]);
+        }
+
+        if (CharacterSheet.StatRules.Count == 0)
+        {
+            return creation;
         }
 
         var initialState = GameState.CreateInitial(World, Seed ?? 0);
-        _creation = creation.WithStats(creation.Stats.Where(pair => IsStatVisible(pair.Key, initialState)));
+        return creation.WithStats(creation.Stats.Where(pair => IsStatVisible(pair.Key, initialState)));
     }
 
     private Dictionary<SceneId, SceneDefinition>? _byId;

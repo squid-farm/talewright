@@ -236,6 +236,9 @@ is queried. Unknown or disabled stat IDs and invalid conditions produce compiler
 diagnostics. Hiding a stat is presentation only: it still works in conditions,
 effects, skill checks and item modifiers. Generated stat notes and inspection
 disclosures are suppressed while the stat is hidden; authored prose is unchanged.
+Character creation checks visibility against the initial world state before
+applying selections or presets. Hidden stats are omitted from direct selection,
+but their preset values still apply.
 
 Optional mappings and lists may be omitted. Where empty containers are allowed,
 write `{}` or `[]` explicitly. YAML null values (`null`, `~`, or a key with no

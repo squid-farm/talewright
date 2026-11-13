@@ -61,7 +61,7 @@ public sealed record CharacterSelection
 
     public static CharacterSelection? Validate(StoryDefinition story, CharacterSelection? selection)
     {
-        if (story.Creation is not { } creation)
+        if (story.GetCreationOptions() is not { } creation)
         {
             if (selection is not null)
             {

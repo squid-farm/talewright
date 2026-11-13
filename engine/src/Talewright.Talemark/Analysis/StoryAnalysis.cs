@@ -80,6 +80,7 @@ public sealed class StoryAnalysis
         _classifications = original._classifications;
         World = original.World;
         Story = original.Story;
+        CharacterSheet = original.CharacterSheet;
         Substitutions = original.Substitutions;
         _scenes = original._scenes;
         SymbolContext = original.SymbolContext;
@@ -139,6 +140,7 @@ public sealed class StoryAnalysis
             .ToArray()));
         World = collector.AuthoredWorld;
         Story = currentFileAnalysis ? null : story;
+        CharacterSheet = currentFileAnalysis ? null : collector.CharacterSheet;
         Substitutions = Array.AsReadOnly(collector.Substitutions.ToArray());
         var scenes = Array.AsReadOnly(collector.Scenes.ToArray());
         _scenes = currentFileAnalysis && snapshot is not null
@@ -187,6 +189,8 @@ public sealed class StoryAnalysis
     public WorldDefinition? World { get; }
     /// <summary>The compiled story when the full source has no errors; null for incomplete or current-file analysis.</summary>
     public StoryDefinition? Story { get; }
+    /// <summary>Bound character sheet visibility when the full analysis can establish it safely.</summary>
+    public CharacterSheetVisibility? CharacterSheet { get; }
     public IReadOnlyList<AuthoredSubstitution> Substitutions { get; }
 
     /// <summary>Parsed scene definitions; the first declaration wins when IDs are duplicated.</summary>
@@ -431,6 +435,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal List<AuthoringToken> Tokens { get; } = [];
     internal List<(string File, TaleFileSyntax Syntax)> ClassificationSources { get; } = [];
     internal WorldDefinition? AuthoredWorld { get; private set; }
+    internal CharacterSheetVisibility? CharacterSheet { get; set; }
     internal List<AuthoredSubstitution> Substitutions { get; } = [];
     internal List<AuthoredScene> Scenes { get; } = [];
     internal List<Diagnostic> RecoveryImageDiagnostics { get; } = [];

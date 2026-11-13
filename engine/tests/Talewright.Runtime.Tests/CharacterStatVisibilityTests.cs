@@ -2,6 +2,7 @@ using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Core.State;
 using Talewright.Narrative.Rendering;
+using Talewright.Rules.Expressions;
 using Talewright.Runtime;
 using Talewright.Talemark.Compilation;
 
@@ -34,15 +35,69 @@ public sealed class CharacterStatVisibilityTests
                 stats: { str: 8 }
             """, "=== beginning\nHello.\n-> END\n");
 
-        Assert.DoesNotContain(new StatId("wis"), story.Creation!.Stats.Keys);
-        Assert.Contains(new StatId("str"), story.Creation.Stats.Keys);
-        var selection = story.Creation.Default(story.World.Characters[EntityId.Player], "scholar");
+        var creation = story.GetCreationOptions()!;
+        Assert.DoesNotContain(new StatId("wis"), creation.Stats.Keys);
+        Assert.Contains(new StatId("str"), creation.Stats.Keys);
+        var selection = creation.Default(story.World.Characters[EntityId.Player], "scholar");
         Assert.DoesNotContain("wis", selection.Stats.Keys);
 
         var session = new StorySession(story, 42, character: selection);
         Assert.Equal(12, session.State.GetBaseStat(EntityId.Player, new StatId("str")));
         Assert.Equal(8, session.State.GetBaseStat(EntityId.Player, new StatId("wis")));
         Assert.True(story.IsStatVisible(new StatId("wis"), session.State));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Predicate_visibility_is_evaluated_when_creation_options_are_requested_not_when_compiling(bool ready)
+    {
+        var calls = 0;
+        var options = new CompilerOptions
+        {
+            CompatibilityId = "creation-predicate-test-v1",
+            Predicates = new NamedPredicateRegistry().Register("Ready", state =>
+            {
+                calls++;
+                return state.GetFlag(new FlagId("ready"));
+            }),
+        };
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = """
+                game:
+                  id: creation-predicate
+                  title: Creation predicate
+                  start: beginning
+                  ruleset: rpg
+                  character-sheet:
+                    stats:
+                      str: "@Ready"
+                  creation:
+                    stats:
+                      str: [8, 12]
+                flags: { ready: false }
+                characters:
+                  player: { first-name: Ada }
+                """.Replace("flags: { ready: false }", $"flags: {{ ready: {ready.ToString().ToLowerInvariant()} }}"),
+            ["main.tale"] = "=== beginning\nHello.\n-> END\n",
+        }), options);
+
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        Assert.Equal(0, calls);
+        var story = result.Story!;
+        Assert.Contains(new StatId("str"), story.Creation!.Stats.Keys);
+        var creation = story.GetCreationOptions()!;
+        Assert.Equal(ready, creation.Stats.ContainsKey(new StatId("str")));
+        Assert.True(calls > 0);
+        var selection = creation.Default(story.World.Characters[EntityId.Player]);
+        var history = new StoryHistory(story, 42, selection);
+        Assert.Equal(ready, history.Character!.Stats.ContainsKey("str"));
+        Assert.Equal(history.Events, StoryHistory.Restore(story, history.Save()).Events);
+        Assert.Throws<ArgumentException>(() => new StoryHistory(story, 42, selection with
+        {
+            Stats = ready ? new Dictionary<string, int>() : new Dictionary<string, int> { ["str"] = 8 },
+        }));
     }
 
     [Fact]
@@ -174,9 +229,10 @@ public sealed class CharacterStatVisibilityTests
                 first-name: Ada
             """, "=== beginning\nHello.\n-> END\n");
 
-        Assert.Empty(story.Creation!.Stats);
-        Assert.Empty(story.Creation.Default(story.World.Characters[EntityId.Player]).Stats);
-        var session = new StorySession(story, 42, character: story.Creation.Default(story.World.Characters[EntityId.Player]));
+        var creation = story.GetCreationOptions()!;
+        Assert.Empty(creation.Stats);
+        Assert.Empty(creation.Default(story.World.Characters[EntityId.Player]).Stats);
+        var session = new StorySession(story, 42, character: creation.Default(story.World.Characters[EntityId.Player]));
         Assert.Equal(new SceneId("beginning"), session.Start().Scene);
     }
 

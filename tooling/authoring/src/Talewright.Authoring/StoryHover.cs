@@ -74,10 +74,11 @@ public static class StoryHover
     {
         if (symbol.Kind == AuthoringSymbolKind.Stat)
         {
-            if (analysis.Story is { } story && analysis.World is { } world &&
-                !story.IsStatVisible(new(symbol.Name), GameState.CreateInitial(world, story.Seed ?? 0)))
+            if (analysis.World is not { } world ||
+                !AuthoringStatVisibility.IsVisible(analysis, new(symbol.Name),
+                    GameState.CreateInitial(world, analysis.Story?.Seed ?? 0)))
             {
-                return null;
+                return Help(symbol.Name, $"Stat ({symbol.Type}). Details are unavailable until its visibility can be determined.", range);
             }
         }
 

@@ -2,6 +2,7 @@ using AngleSharp.Dom;
 using Bunit;
 using Talewright.Debugger;
 using Talewright.Player.Components;
+using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
 
 namespace Talewright.Cli.Tests.DebuggerComponents;
@@ -110,6 +111,20 @@ public sealed class SetupToolTests : BunitContext
 
         Assert.False(creator.Instance.Compact);
         Assert.Empty(creator.FindAll(".tw-creation--compact"));
+    }
+
+    [Fact]
+    public void Character_creator_omits_stats_hidden_in_the_initial_state()
+    {
+        var files = ComponentStory.Files(creation: true);
+        files[StorySource.ManifestFileName] = files[StorySource.ManifestFileName].Replace(
+            "  creation:", "  character-sheet:\n    stats:\n      str: flag:ready\n  creation:");
+        using var model = ComponentStory.Load(files);
+        var creator = Render<CharacterCreator>(parameters => parameters
+            .Add(component => component.Story, model.Story!));
+
+        Assert.Empty(creator.FindAll("select[aria-label='Strength']"));
+        Assert.NotEmpty(creator.FindAll("input[aria-label='First name']"));
     }
 
     [Fact]
