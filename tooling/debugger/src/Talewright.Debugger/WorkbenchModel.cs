@@ -127,8 +127,9 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
             ++CreationRevision;
         }
     }
-    public ulong CreationSeed => ulong.TryParse(Seed, NumberStyles.None, CultureInfo.InvariantCulture, out var seed)
-        ? seed : Story?.Seed ?? _randomSeed;
+    public ulong CreationSeed => DeterministicDice.ResolveSeed(
+        ulong.TryParse(Seed, NumberStyles.None, CultureInfo.InvariantCulture, out var seed) ? seed : null,
+        Story?.Seed, _randomSeed);
     public IReadOnlyList<SetupNumber> Numbers { get; private set; } = [];
     public IReadOnlyList<SetupFlag> Flags { get; private set; } = [];
     public IReadOnlyList<SetupText> Texts { get; private set; } = [];
@@ -416,7 +417,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
             }
             BuildSetup(numbers, flags, texts).Validate(story);
             var seed = Story is null ? story.Seed?.ToString(CultureInfo.InvariantCulture) ?? "" : Seed;
-            var resolvedSeed = ParseSeed(seed) ?? story.Seed ?? _randomSeed;
+            var resolvedSeed = DeterministicDice.ResolveSeed(ParseSeed(seed), story.Seed, _randomSeed);
             var selection = RevalidateCharacter(story, resolvedSeed);
             var requestedScene = _requestedScene;
             var target = requestedScene ?? (string.IsNullOrWhiteSpace(Target) ? story.Start.Value : Target);
@@ -525,7 +526,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
 
     public void SelectCharacter(CharacterSelection character) => Attempt(() => Character = CharacterSelection.Validate(
         Story ?? throw new InvalidOperationException("Load a story first."), character,
-        ParseSeed(Seed) ?? CreationSeed));
+        ValidatedCreationSeed()));
 
     public void ClearCharacter()
     {
@@ -540,13 +541,16 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
             var story = Story ?? throw new InvalidOperationException("Load a valid story first.");
             var candidate = AuthorSession.Create(story, new SceneId(Target), captureDecisions: true,
                 BuildSetup(Numbers, Flags, Texts),
-                story.Creation is null ? ParseSeed(Seed) : ParseSeed(Seed) ?? CreationSeed, Character);
+                story.Creation is null ? ParseSeed(Seed) : ValidatedCreationSeed(), Character);
             var inspection = candidate.Inspect();
             Session = candidate;
             Inspection = inspection;
             RefreshEdits();
         });
     }
+
+    private ulong ValidatedCreationSeed() =>
+        DeterministicDice.ResolveSeed(ParseSeed(Seed), Story?.Seed, _randomSeed);
 
     private static ulong? ParseSeed(string text)
     {

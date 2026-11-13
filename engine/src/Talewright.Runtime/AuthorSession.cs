@@ -164,7 +164,7 @@ public sealed class AuthorSession
     {
         ArgumentNullException.ThrowIfNull(story);
         story.GetScene(target);
-        var resolvedSeed = seed ?? story.Seed ?? DeterministicDice.NewSeed();
+        var resolvedSeed = DeterministicDice.ResolveSeed(seed, story.Seed);
         var selection = CharacterSelection.Validate(story, character, resolvedSeed);
         var validated = (setup ?? new AuthorSetup()).Validate(story);
         return new AuthorSession(story, target, validated,

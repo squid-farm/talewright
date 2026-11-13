@@ -34,4 +34,8 @@ public static class DeterministicDice
 
     /// <summary>Creates a fresh, non-deterministic seed for a new playthrough.</summary>
     public static ulong NewSeed() => (ulong)Random.Shared.NextInt64();
+
+    /// <summary>Uses the first supplied seed, or creates a fresh seed if none is supplied.</summary>
+    public static ulong ResolveSeed(ulong? primarySeed, ulong? secondarySeed, ulong? fallbackSeed = null) =>
+        primarySeed ?? secondarySeed ?? fallbackSeed ?? NewSeed();
 }

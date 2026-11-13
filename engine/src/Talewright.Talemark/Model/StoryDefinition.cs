@@ -85,7 +85,7 @@ public sealed class StoryDefinition
             return creation;
         }
 
-        var initialState = GameState.CreateInitial(World, seed ?? Seed ?? 0);
+        var initialState = GameState.CreateInitial(World, DeterministicDice.ResolveSeed(seed, Seed, 0));
         return creation.WithStats(creation.Stats.Where(pair => IsStatVisible(pair.Key, initialState)));
     }
 

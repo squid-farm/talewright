@@ -285,7 +285,7 @@
             var previous = _loaded;
             _loaded = loaded;
             _story = result.Story;
-            _creationSeed = _story!.Seed ?? DeterministicDice.NewSeed();
+            _creationSeed = DeterministicDice.ResolveSeed(null, _story!.Seed);
             _character = null;
             _resumeAccepted = false;
             _resumeHistory = null;

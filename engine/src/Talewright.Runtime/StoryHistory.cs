@@ -26,7 +26,7 @@ public sealed class StoryHistory
 
     public StoryHistory(StoryDefinition story, ulong? seed = null, CharacterSelection? character = null)
     {
-        var resolvedSeed = seed ?? story.Seed ?? DeterministicDice.NewSeed();
+        var resolvedSeed = DeterministicDice.ResolveSeed(seed, story.Seed);
         Character = CharacterSelection.Validate(story, character, resolvedSeed);
         Story = story;
         _timeline = new ReplayCursor(0, 0);
