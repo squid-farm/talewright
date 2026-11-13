@@ -1,5 +1,6 @@
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
+using Talewright.Core.Randomness;
 using Talewright.Core.Rulesets;
 using Talewright.Core.State;
 using Talewright.Core.World;
@@ -568,14 +569,78 @@ public class CompilerTests
 
         var climb = story.GetScene(new SceneId("a")).Choices[0].Check!;
         Assert.Equal(new SkillCheck(EntityId.Player, new StatId("athletics"), new NumberLiteral(14)), climb.Check);
+        Assert.Equal(new SkillCheckIdentity(new("a"), EntityId.Player, new("athletics"), 0), climb.Identity);
         Assert.Single(climb.Failure.Effects);
         var ask = story.GetScene(new SceneId("a")).Choices[1].Check!;
         Assert.Equal(new EntityId("guards"), ask.Check.Actor);
+        Assert.Equal(new SkillCheckIdentity(new("a"), new("guards"), new("perception"), 0), ask.Identity);
         Assert.IsType<BinaryExpr>(ask.Check.Difficulty);
 
         var block = Assert.Single(story.GetScene(new SceneId("b")).Steps.OfType<CheckStep>()).Check;
+        Assert.Equal(new SkillCheckIdentity(new("b"), EntityId.Player, new("perception"), 0), block.Identity);
         Assert.True(block.Success.Divert!.IsEnd);
         Assert.Null(block.Failure.Divert);
+    }
+
+    [Fact]
+    public void Skill_check_identities_ignore_prose_dc_and_different_checks()
+    {
+        const string authored = "=== a\n"
+            + "::: skill-check athletics dc 14\n"
+            + "success: { set flag:climbed }\n"
+            + "failure: { set flag:missed }\n"
+            + ":::\n"
+            + "::: skill-check perception dc 12\n"
+            + "success: { set flag:seen }\n"
+            + "failure: { set flag:unseen }\n"
+            + ":::\n"
+            + "::: skill-check athletics dc 18\n"
+            + "success: { set flag:climbed }\n"
+            + "failure: { set flag:missed }\n"
+            + ":::\n"
+            + "-> END";
+
+        static SkillCheckIdentity[] CheckIds(StoryDefinition story, string scene = "a") =>
+            story.GetScene(new SceneId(scene)).Steps.OfType<CheckStep>()
+                .Select(step => step.Check.Identity).ToArray();
+
+        var original = Ok(authored);
+        var originalIds = CheckIds(original);
+        var edited = Ok(authored.Replace("=== a\n", "=== a\nA line of new prose.\n", StringComparison.Ordinal)
+            .Replace("dc 14", "dc 20", StringComparison.Ordinal)
+            .Replace("dc 12", "dc 4", StringComparison.Ordinal)
+            .Replace("dc 18", "dc 1", StringComparison.Ordinal));
+        Assert.Equal(originalIds, CheckIds(edited));
+
+        var otherSkill = Ok(authored.Replace("=== a\n",
+            "=== a\n::: skill-check survival dc 9\nsuccess: { set flag:seen }\n"
+                + "failure: { set flag:unseen }\n:::\n", StringComparison.Ordinal));
+        Assert.Equal(originalIds.Where(id => id.Skill == new StatId("athletics")),
+            CheckIds(otherSkill).Where(id => id.Skill == new StatId("athletics")));
+
+        var anotherScene = Ok(authored + "\n=== b\n::: skill-check athletics dc 9\n"
+            + "success: { set flag:seen }\nfailure: { set flag:unseen }\n:::\n-> END");
+        Assert.Equal(originalIds, CheckIds(anotherScene));
+        Assert.Equal(new SkillCheckIdentity(new("b"), EntityId.Player, new("athletics"), 0), CheckIds(anotherScene, "b")[0]);
+
+        var actorChanged = Ok(authored.Replace("skill-check athletics dc 14",
+            "skill-check guards athletics dc 14", StringComparison.Ordinal));
+        Assert.NotEqual(originalIds[0], CheckIds(actorChanged)[0]);
+        Assert.Equal(new SkillCheckIdentity(new("a"), new("guards"), new("athletics"), 0), CheckIds(actorChanged)[0]);
+
+        var skillChanged = Ok(authored.Replace("skill-check athletics dc 14",
+            "skill-check survival dc 14", StringComparison.Ordinal));
+        Assert.NotEqual(originalIds[0], CheckIds(skillChanged)[0]);
+
+        const string identicalCheck = "::: skill-check athletics dc 15\n"
+            + "success: { set flag:climbed }\nfailure: { set flag:missed }\n:::\n";
+        var inserted = Ok(authored.Replace("::: skill-check athletics dc 18",
+            identicalCheck + "::: skill-check athletics dc 18", StringComparison.Ordinal));
+        var insertedIds = CheckIds(inserted);
+        Assert.Equal(originalIds[0], insertedIds[0]);
+        Assert.Equal(originalIds[1], insertedIds[1]);
+        Assert.Equal(new SkillCheckIdentity(new("a"), EntityId.Player, new("athletics"), 1), insertedIds[2]);
+        Assert.Equal(new SkillCheckIdentity(new("a"), EntityId.Player, new("athletics"), 2), insertedIds[3]);
     }
 
     [Fact]
@@ -886,13 +951,18 @@ public class CompilerTests
             return result.Story!;
         }
 
-        SkillCheckResult Check(StoryDefinition story, int? roll) => story.World.Ruleset.SkillCheckRule!.Resolve(
-            GameState.CreateInitial(story.World, 42), new(EntityId.Player, new StatId("nerve"), 12, roll));
+        (SkillCheckTotal Total, bool Success) Check(StoryDefinition story, int? roll)
+        {
+            var state = GameState.CreateInitial(story.World, 42);
+            var rule = story.World.Ruleset.SkillCheckRule!;
+            var total = rule.CalculateTotal(state, new(EntityId.Player, new StatId("nerve"), roll));
+            return (total, rule.IsSuccess(state, total, 12));
+        }
 
         var story = Compile(yaml);
         Assert.Equal("none", story.World.Ruleset.Id);
         Assert.Equal(StatCategory.Custom, story.World.Ruleset.StatsById[new StatId("nerve")].Category);
-        Assert.Equal(13, Check(story, null).Total);
+        Assert.Equal(13, Check(story, null).Total.Total);
         Assert.True(Check(story, 9).Success);
         Assert.False(Check(story, 8).Success);
 
@@ -900,7 +970,7 @@ public class CompilerTests
         var attribute = Compile(yaml
             .Replace("{ id: nerve, name: Nerve }", "{ id: nerve, name: Nerve, category: attribute, min: 0, max: 10 }")
             .Replace("nerve: 3", "nerve: 5"));
-        Assert.Equal(-3, Check(attribute, null).Modifier);
+        Assert.Equal(-3, Check(attribute, null).Total.Modifier);
     }
 
     [Theory]

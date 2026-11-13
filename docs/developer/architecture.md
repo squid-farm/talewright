@@ -220,7 +220,7 @@ These are load-bearing. Breaking one will break saves, replays, tests or the "de
    `EventLog.Append` is the only caller. State is `fold(initial, events)`. Want a new kind of change? Add an event.
 2. **Dice results live in events.** `DiceRolled` stores the value, so folding an existing event log never
    re-rolls. Player saves do not persist that log: they store a seed and choice history, then recreate the
-   session by replaying the story. `DeterministicDice.Roll(seed, index, sides)` makes that replay reproducible.
+   session by replaying the story. `DeterministicDice.Roll(seed, identity, executionIdentity, sides)` makes that replay reproducible.
 3. **The engine has no built-in stats.** Strength, hit points, levels, reputation tiers, how checks resolve: all
    come from the `Ruleset`. `Talewright.Core` does not mention "strength" anywhere. The d20 set is an
    opt-in module (`ruleset: rpg`; see decision D20 in the [design decisions](plan.md)).
@@ -273,8 +273,9 @@ Folders:
   - `StateChanges`: helpers that _compute_ the events for a change (`AdjustStat`, `GiveItem`, `SetStanding`,
     `CheckLevel` …). They clamp values and return nothing if nothing changes. Use these rather than building
     events by hand.
-- **`Randomness/DeterministicDice.cs`**: SplitMix64-based `Roll(seed, index, sides)`. The index is
-  `state.RollCount`, which advances with each `DiceRolled` event.
+- **`Randomness/DeterministicDice.cs`**: keyed SHA-256 `Roll(seed, identity, executionIdentity, sides)`.
+  Skill checks use scene/actor/skill/source-order identity plus the evaluating scene's visit. The
+  display-only `RollCount` advances with each `DiceRolled` event.
 
 ### 3.2 `Talewright.Rulesets.Generic` — the opt-in d20-flavoured RPG ruleset
 
@@ -678,7 +679,7 @@ event means touching `GameState.Apply`), and save formats.
 | Question                                   | Look in                                                                                                       |
 | ------------------------------------------ | ------------------------------------------------------------------------------------------------------------- |
 | Where does a stat's value come from?       | `GameState.GetStat` (base + `IStatModifier`s + held items, clamped)                                           |
-| Why did a skill check pass/fail?           | `D20SkillCheckRule.Resolve` (`none` and `rpg`) and `SkillCheckResolver.Resolve`; the note text is from `EventNarrator` |
+| Why did a skill check pass/fail?           | `D20SkillCheckRule.CalculateTotal` / `IsSuccess` (`none` and `rpg`) and `SkillCheckResolver.Resolve`; the note text is from `EventNarrator` |
 | Why was a choice not offered?              | its `requires` (`ChoiceDefinition.Requires`), evaluated in `StorySession` when building choices               |
 | Why isn't a storylet showing in a hub?     | `StoryletSelector.IsEligible`: tag, `requires`, `@once` + visit count                                         |
 | Why did a trigger fire / not fire?         | `TriggerEngine.Run` (edge-triggered, `MaxPasses`)                                                             |

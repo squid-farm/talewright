@@ -73,11 +73,22 @@ public class RulesetTests
     public void D20_check_adds_attribute_modifier_and_skill_ranks(int? roll, bool success)
     {
         var state = StateWith(new() { [GenericRuleset.Strength] = 14, [new StatId("athletics")] = 1 });
+        var rule = new D20SkillCheckRule();
+        var total = rule.CalculateTotal(state,
+            new SkillCheckRequest(EntityId.Player, new StatId("athletics"), roll));
 
-        var result = new D20SkillCheckRule().Resolve(state, new SkillCheckRequest(EntityId.Player, new StatId("athletics"), 14, roll));
+        Assert.Equal(3, total.Modifier);
+        Assert.Equal(success, rule.IsSuccess(state, total, 14));
+    }
 
-        Assert.Equal(3, result.Modifier);
-        Assert.Equal(success, result.Success);
+    [Fact]
+    public void D20_total_can_be_calculated_without_a_difficulty()
+    {
+        var state = StateWith(new() { [GenericRuleset.Strength] = 14, [new StatId("athletics")] = 1 });
+        var total = new D20SkillCheckRule().CalculateTotal(state,
+            new SkillCheckRequest(EntityId.Player, new StatId("athletics"), 9));
+
+        Assert.Equal(new SkillCheckTotal(9, 3, 12), total);
     }
 
     [Fact]

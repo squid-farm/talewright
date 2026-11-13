@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 using System.Text;
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
+using Talewright.Core.Randomness;
 using Talewright.Core.Rulesets;
 using Talewright.Core.State;
 using Talewright.Core.World;
@@ -45,8 +46,12 @@ public sealed class ReplayEvidenceEncodingTests
             """["ChoiceMade",{"scene":{"value":"cave"},"choiceKey":"c0"}]""" },
         { "dice", new DiceRolled(20, 17),
             """["DiceRolled",{"sides":20,"result":17}]""" },
-        { "check", new SkillCheckResolved(Player, new StatId("athletics"), 12, 17, 3, 20, true),
-            """["SkillCheckResolved",{"actor":{"value":"player"},"skill":{"value":"athletics"},"difficulty":12,"roll":17,"modifier":3,"total":20,"success":true}]""" },
+        { "check", new SkillCheckResolved(Player, new StatId("athletics"),
+            new(new SceneId("cave"), Player, new StatId("athletics"), 0), new("cave"), 1, 12, 17, 3, 20, true),
+            """["SkillCheckResolved",{"actor":{"value":"player"},"skill":{"value":"athletics"},"identity":{"scene":{"value":"cave"},"actor":{"value":"player"},"skill":{"value":"athletics"},"occurrence":0},"executionScene":{"value":"cave"},"visit":1,"difficulty":12,"roll":17,"modifier":3,"total":20,"success":true}]""" },
+        { "check without difficulty", new SkillCheckResolved(Player, new StatId("athletics"),
+            new(new SceneId("cave"), Player, new StatId("athletics"), 0), new("cave"), 1, null, 17, 3, 20, null),
+            """["SkillCheckResolved",{"actor":{"value":"player"},"skill":{"value":"athletics"},"identity":{"scene":{"value":"cave"},"actor":{"value":"player"},"skill":{"value":"athletics"},"occurrence":0},"executionScene":{"value":"cave"},"visit":1,"roll":17,"modifier":3,"total":20}]""" },
         { "level", new LevelChanged(Player, 1, 2),
             """["LevelChanged",{"character":{"value":"player"},"oldLevel":1,"newLevel":2}]""" },
         { "trigger", new TriggerFired("outcast"),
@@ -119,8 +124,8 @@ public sealed class ReplayEvidenceEncodingTests
         Assert.Equal(1, history.Cursor);
         Assert.Contains(history.Events, gameEvent => gameEvent is SkillCheckResolved);
         Assert.Contains(history.Events, gameEvent => gameEvent is TriggerFired);
-        Assert.Equal("03E91828F36103C192CC169BF37921844B97C98CD66FA9A64FD5005C57FA71A4A9",
-            Convert.ToHexString(SaveFormat.Read(history.Save()).ReplayEvidence!));
+        var evidence = Convert.ToHexString(SaveFormat.Read(history.Save()).ReplayEvidence!);
+        Assert.Equal("04F104ACB83649F68362EBE7BC87964D8B2F04EA638174F2FEB728FBA2DCB571AA", evidence);
     }
 
     private static StoryDefinition RichStory()

@@ -82,7 +82,7 @@ the generated formatter works in desktop and Blazor WebAssembly builds.
 | Choice key | 1–512 characters | Saving and reading |
 | Character stats | 1,000 | Reading; array size checked before deserialization |
 | Summary UTC offset | ±14 hours | Reading (invalid details are dropped, not fatal) |
-| Replay evidence | 33 bytes, version 3 | Reading; malformed or unsupported evidence rejects the save |
+| Replay evidence | 33 bytes, version 4 | Reading; malformed or unsupported evidence rejects the save |
 | Replay choice identity | 8 bytes, or 32 bytes for a colliding scene | Reading; count and encoding are checked before replay |
 
 Collection counts are checked with `MessagePackReader` before the generated deserializer allocates
@@ -119,7 +119,9 @@ Replay evidence is a versioned SHA-256 chain. Its start binds the story and repl
 seed, character selection, initial ruleset and world state, and start events. Each decision binds its
 scene, outcome identity, and every resulting gameplay event. The final evidence binds the complete
 timeline digest and cursor. Full evidence is recomputed during restore; short choice identities are
-never trusted alone. Evidence is a compatibility check, not an authentication mechanism.
+never trusted alone. Version 4 records keyed skill-check identity and execution visit. This intentionally
+changes seeded check results once; saves with earlier evidence versions do not load and are not migrated.
+Evidence is a compatibility check, not an authentication mechanism.
 `ReplayEvidence` owns the hash inputs. Event kinds, randomness modes and built-in rule types are
 written as tokens frozen in that class, not taken from CLR names; event payloads use the
 author-scenario serializer. Extension rule and modifier types have no frozen token, so renaming one

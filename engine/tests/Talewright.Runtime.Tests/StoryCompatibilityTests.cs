@@ -395,7 +395,7 @@ public sealed class StoryCompatibilityTests
     public void Initial_evidence_has_a_frozen_encoding()
     {
         var history = new StoryHistory(TestStories.Linear.Compile(), 42);
-        Assert.Equal("03F5D8BB2AD36D3D0A7873A7CDB25D725E0410DE1012E0EBE5E4C17B15224D7EFE",
+        Assert.Equal("04F5D8BB2AD36D3D0A7873A7CDB25D725E0410DE1012E0EBE5E4C17B15224D7EFE",
             Convert.ToHexString(SaveFormat.Read(history.Save()).ReplayEvidence!));
     }
 
@@ -407,8 +407,8 @@ public sealed class StoryCompatibilityTests
         history.Choose("c0");
         history.Back();
 
-        Assert.Equal("0329B4D5B051DBCEC68DF050B0C609FEF74208380503F7F580691D0F765C6EAE66",
-            Convert.ToHexString(SaveFormat.Read(history.Save()).ReplayEvidence!));
+        var evidence = Convert.ToHexString(SaveFormat.Read(history.Save()).ReplayEvidence!);
+        Assert.Equal("04C27605FEB49677834E3A4790C93A8E6F039A20C91F1B185977DB57995BDCBBF2", evidence);
     }
 
     [Fact]

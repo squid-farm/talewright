@@ -191,13 +191,15 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
 
     public DivertTarget? ResolveCheck(CheckBranch check, string stepId)
     {
-        var result = SkillCheckResolver.Resolve(check.Check, log, story.Randomness, story.Predicates,
+        var result = SkillCheckResolver.Resolve(check.Check, check.Identity, log, story.Randomness, story.Predicates,
             observer is null ? null : decision => observer(decision with { Subject = stepId }));
-        var outcome = result.Success ? check.Success : check.Failure;
+        var success = result.Success
+            ?? throw new InvalidOperationException("A check with no difficulty cannot select a success or failure outcome.");
+        var outcome = success ? check.Success : check.Failure;
         var mark = log.Events.Count;
         ApplyBatch(outcome.Effects);
         Observe(DecisionKind.CheckOutcome, stepId, DecisionOutcome.Applied,
-            result.Success ? DecisionReason.CheckSucceeded : DecisionReason.CheckFailed, null, mark);
+            success ? DecisionReason.CheckSucceeded : DecisionReason.CheckFailed, null, mark);
         return outcome.Divert;
     }
 

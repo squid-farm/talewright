@@ -94,7 +94,7 @@ public sealed class StorySceneDetailsTests
 
         var check = Assert.Single(details.EntryChecks);
         Assert.Equal("athletics", check.Check.Skill.Value);
-        Assert.Equal("12", ExpressionFormatter.Format(check.Check.Difficulty));
+        Assert.Equal("12", ExpressionFormatter.Format(check.Check.Difficulty!));
         Assert.Equal("flag:seen", check.Condition.Text);
         Assert.Single(check.Success.Effects);
         Assert.Single(check.Failure.Effects);
@@ -110,7 +110,7 @@ public sealed class StorySceneDetailsTests
 
         var checkedChoice = Assert.Single(details.Choices, choice => choice.SkillCheck is not null);
         Assert.Equal("athletics", checkedChoice.SkillCheck!.Skill.Value);
-        Assert.Equal("13", ExpressionFormatter.Format(checkedChoice.SkillCheck.Difficulty));
+        Assert.Equal("13", ExpressionFormatter.Format(checkedChoice.SkillCheck.Difficulty!));
         Assert.Equal(2, checkedChoice.DivertIds.Count);
         Assert.Single(checkedChoice.Success!.Effects);
         Assert.Single(checkedChoice.Failure!.Effects);
@@ -194,7 +194,9 @@ public sealed class StorySceneDetailsTests
 
     private static string Check(Talewright.Rules.Checks.SkillCheck? check) => check is null
         ? "-"
-        : $"{check.Actor}:{check.Skill} dc {ExpressionFormatter.Format(check.Difficulty)}";
+        : check.Difficulty is { } difficulty
+            ? $"{check.Actor}:{check.Skill} dc {ExpressionFormatter.Format(difficulty)}"
+            : $"{check.Actor}:{check.Skill} total";
 
     private static string Template(TemplateBlock block) => block switch
     {

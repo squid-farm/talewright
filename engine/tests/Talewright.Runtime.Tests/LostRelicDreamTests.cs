@@ -228,7 +228,7 @@ public partial class LostRelicTests
             Choose(history, "Slip beneath its gaze");
             var check = Assert.Single(history.Events.OfType<SkillCheckResolved>(),
                 check => check.Skill == new StatId("stealth"));
-            if (!check.Success) continue;
+            if (check.Success != true) continue;
             Assert.Equal("dream.eye-mark", history.Current.Scene!.Value.Value);
             AssertMarks(history, 2);
             Assert.Equal(history.Events, StoryHistory.Restore(history.Story, history.Save()).Events);

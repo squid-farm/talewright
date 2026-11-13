@@ -255,9 +255,10 @@ public class StorySessionTests
             Assert.Equal(3, check.Modifier);
             Assert.Equal(dice.Result + 3, check.Total);
             Assert.Equal(12, check.Difficulty);
-            Assert.Equal(check.Total >= 12, check.Success);
-            Assert.Equal(new SceneId(check.Success ? "far-side" : "river"), frame.Scene);
-            outcomes.Add(check.Success);
+            var success = check.Success ?? throw new InvalidOperationException("The check did not record its outcome.");
+            Assert.Equal(check.Total >= 12, success);
+            Assert.Equal(new SceneId(success ? "far-side" : "river"), frame.Scene);
+            outcomes.Add(success);
         }
 
         Assert.Equal([false, true], outcomes.Order());

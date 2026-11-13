@@ -1,4 +1,5 @@
 using Talewright.Core.Identity;
+using Talewright.Core.Randomness;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Checks;
 using Talewright.Rules.Effects;
@@ -36,6 +37,7 @@ internal sealed partial class TaleBinder
     private readonly CancellationToken _cancellationToken;
     private int _linesSinceCancellationCheck;
     private readonly List<ParsedScene> _scenes = [];
+    private readonly Dictionary<(SceneId Scene, EntityId Actor, StatId Skill), int> _checkOccurrences = [];
     private SceneBuilder? _scene;
     private TaleSceneSyntax? _sceneSyntax;
     private int _lineCursor;
@@ -526,7 +528,7 @@ internal sealed partial class TaleBinder
                     var spec = BindCheckSpec(syntax, clauses[index..]);
                     var (success, failure) = BindOutcomes();
                     if (spec is not null && success is not null && failure is not null)
-                        check = new CheckBranch(spec, success, failure);
+                        check = new CheckBranch(spec.Value.Check, success, failure, spec.Value.Identity);
                     index = clauses.Length;
                     break;
             }
@@ -611,12 +613,12 @@ internal sealed partial class TaleBinder
         if (syntax.IsInvalid)
             return;
         var location = At(syntax.Indent);
-        var check = BindCheckSpec(syntax, Clauses(syntax));
+        var boundCheck = BindCheckSpec(syntax, Clauses(syntax));
         var (success, failure) = BindOutcomes();
-        if (check is not null && success is not null && failure is not null)
+        if (boundCheck is { } check && success is not null && failure is not null)
         {
             _scene!.CurrentSteps.Add(new CheckStep(StepId(location), SpanFrom(location),
-                new CheckBranch(check, success, failure)));
+                new CheckBranch(check.Check, success, failure, check.Identity)));
         }
     }
 
@@ -624,7 +626,8 @@ internal sealed partial class TaleBinder
     /// Binds a <c>[actor] stat dc expr</c> spec: a <see cref="TaleClauseKind.SkillCheck"/> clause followed by its words
     /// and difficulty. The actor, stat and difficulty are checked independently so each mistake is reported.
     /// </summary>
-    private SkillCheck? BindCheckSpec(TaleLineSyntax syntax, ReadOnlySpan<TaleClause> clauses)
+    private (SkillCheck Check, SkillCheckIdentity Identity)? BindCheckSpec(
+        TaleLineSyntax syntax, ReadOnlySpan<TaleClause> clauses)
     {
         var spec = clauses[0];
         var column = spec.ValueStart;
@@ -719,7 +722,12 @@ internal sealed partial class TaleBinder
 
         var dc = ExpressionParser.ParseNumber(difficultyText!, At(difficultyClause!.Value.ValueStart), _symbols,
             _diagnostics);
-        return bound && dc is not null ? new SkillCheck(actor, skill, dc) : null;
+        if (!bound || dc is null) return null;
+        var scene = _scene!.Id;
+        var key = (scene, actor, skill);
+        var occurrence = _checkOccurrences.GetValueOrDefault(key);
+        _checkOccurrences[key] = occurrence + 1;
+        return (new SkillCheck(actor, skill, dc), new SkillCheckIdentity(scene, actor, skill, occurrence));
     }
 
     /// <summary>

@@ -43,8 +43,9 @@ public sealed class GoverningAttributeTests
         var world = result.Story!.World;
         var skill = world.Ruleset.StatsById[new("tracking")];
         Assert.Equal(new StatId("grit"), skill.GoverningAttribute);
-        var check = world.Ruleset.SkillCheckRule!.Resolve(GameState.CreateInitial(world, 42),
-            new(EntityId.Player, skill.Id, 14, 10));
+        var state = GameState.CreateInitial(world, 42);
+        var rule = world.Ruleset.SkillCheckRule!;
+        var check = rule.CalculateTotal(state, new(EntityId.Player, skill.Id, 10));
         Assert.Equal(3 + modifier, check.Modifier);
         Assert.Equal(10 + 3 + modifier, check.Total);
     }
@@ -149,8 +150,9 @@ public sealed class GoverningAttributeTests
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         var world = result.Story!.World;
         Assert.Null(world.Ruleset.StatsById[new("tracking")].GoverningAttribute);
-        var check = world.Ruleset.SkillCheckRule!.Resolve(GameState.CreateInitial(world, 42),
-            new(EntityId.Player, new("tracking"), 14, 10));
+        var rule = world.Ruleset.SkillCheckRule!;
+        var check = rule.CalculateTotal(GameState.CreateInitial(world, 42),
+            new(EntityId.Player, new("tracking"), 10));
         Assert.Equal(3, check.Modifier);
         Assert.Equal(13, check.Total);
     }
@@ -175,10 +177,11 @@ public sealed class GoverningAttributeTests
             Assert.True(result.Success, string.Join("\n", result.Diagnostics));
             Assert.Empty(result.Diagnostics);
             var world = result.Story!.World;
-            var check = world.Ruleset.SkillCheckRule!.Resolve(GameState.CreateInitial(world, 42),
-                new(EntityId.Player, new("tracking"), 14, null));
+            var state = GameState.CreateInitial(world, 42);
+            var rule = world.Ruleset.SkillCheckRule!;
+            var check = rule.CalculateTotal(state, new(EntityId.Player, new("tracking"), null));
             Assert.Equal(linked ? 15 : 13, check.Total);
-            Assert.Equal(linked, check.Success);
+            Assert.Equal(linked, rule.IsSuccess(state, check, 14));
         }
     }
 }

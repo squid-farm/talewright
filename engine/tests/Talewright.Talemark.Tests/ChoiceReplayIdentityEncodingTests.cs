@@ -92,7 +92,8 @@ public sealed class ChoiceReplayIdentityEncodingTests
             new SkillCheck(Player, new StatId("athletics"), new NumberLiteral(14)),
             new CheckOutcome([new SetFlag(new FlagId("climbed"), true)], new DivertTarget(new SceneId("top"))),
             new CheckOutcome([new ChangeStat(Player, Hp, AssignOp.Subtract, new NumberLiteral(2))],
-                new DivertTarget(null)));
+                new DivertTarget(null)),
+            new(new SceneId("start"), Player, new StatId("athletics"), 0));
 
         Assert.Equal(
             """["choice-replay-v1","start",null,[],["player","athletics",["number",14],"""

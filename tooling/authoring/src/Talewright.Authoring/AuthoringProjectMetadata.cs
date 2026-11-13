@@ -136,7 +136,9 @@ public sealed record AuthoringProjectMetadata(int FormatVersion, string[] Predic
     private sealed class AuthoringCheckRule : ISkillCheckRule
     {
         public int DieSides => throw new InvalidOperationException("Authoring metadata cannot roll dice.");
-        public SkillCheckResult Resolve(IGameStateView state, SkillCheckRequest request) =>
+        public SkillCheckTotal CalculateTotal(IGameStateView state, SkillCheckRequest request) =>
+            throw new InvalidOperationException("Authoring metadata cannot evaluate skill checks.");
+        public bool IsSuccess(IGameStateView state, SkillCheckTotal total, int difficulty) =>
             throw new InvalidOperationException("Authoring metadata cannot evaluate skill checks.");
     }
 }

@@ -38,8 +38,10 @@ public static class EventNarrator
 
     private static string DescribeCheck(SkillCheckResolved c, IGameStateView state)
     {
-        var outcome = c.Success ? "success" : "failure";
-        return $"{Who(c.Actor, state)}{StatName(c.Skill, state)} check: {c.Roll} {Signed(c.Modifier)} = {c.Total} vs DC {c.Difficulty} — {outcome}";
+        var total = $"{Who(c.Actor, state)}{StatName(c.Skill, state)} check: {c.Roll} {Signed(c.Modifier)} = {c.Total}";
+        if (c.Difficulty is not { } difficulty || c.Success is not { } success)
+            return total;
+        return $"{total} vs DC {difficulty} — {(success ? "success" : "failure")}";
     }
 
     private static string DescribeStanding(StandingChanged f, IGameStateView state)

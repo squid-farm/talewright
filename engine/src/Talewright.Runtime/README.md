@@ -94,7 +94,7 @@ events and checkpoint if a predicate, check or trigger cascade throws.
 
 `Checkpoint` captures the latest scene's boundary **before** its visit event,
 entry effects, triggers and entry check. It exposes pre-entry state, events,
-seed/roll position and pending transition notes. `checkpoint.Reenter()` returns
+seed, recorded roll count and pending transition notes. `checkpoint.Reenter()` returns
 an independent candidate at the displayed scene, including its normal entry.
 The checkpoint retains a private replay recipe, not just an event snapshot:
 re-executing the prefix reconstructs trigger-edge memory and pending actions.
@@ -310,6 +310,13 @@ Built-in compiler options provide a compatibility identity. Custom C# hosts must
 `CompilerOptions.CompatibilityId` and change it whenever registered extension behavior changes;
 otherwise saving is disabled. Extensions must themselves be deterministic. A matching source fingerprint
 cannot prove an arbitrary delegate is deterministic.
+
+Skill-check dice are keyed by the check's scene/actor/skill/source-order identity and the visit of the
+scene evaluating it. Difficulty, outcomes and surrounding prose do not change a check's identity.
+Re-entry gives the check a new execution key; repeated evaluation in the same visit reuses the recorded
+event. `RollCount` is display-only and does not influence any roll. Each future random site will use its
+own identity with the same mechanism. This contract intentionally changes existing seeded results once; replay
+evidence version 4 rejects saves made before the change, with no migration.
 
 `Saves/ISaveStore` lists, reads and writes named slots scoped by story ID. Writes refuse replacement by
 default. `FileSaveStore` stores desktop files under per-user local application data (`Talewright/saves`),

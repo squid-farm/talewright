@@ -13,10 +13,10 @@ public interface IGameStateView
 
     Ruleset Ruleset => World.Ruleset;
 
-    /// <summary>Seed for the deterministic dice stream.</summary>
+    /// <summary>Seed for keyed deterministic dice rolls.</summary>
     ulong Seed { get; }
 
-    /// <summary>How many dice have been rolled so far (the RNG cursor).</summary>
+    /// <summary>How many dice have been rolled so far; informational only, not a random cursor.</summary>
     int RollCount { get; }
 
     SceneId? CurrentScene { get; }

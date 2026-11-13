@@ -211,7 +211,7 @@ public sealed class AuthorSession
         Append(new AuthorEdit(values.Validate(Story)));
     }
 
-    /// <summary>Bypasses target eligibility, preserving state, trigger memory and the RNG cursor.</summary>
+    /// <summary>Bypasses target eligibility while preserving state and trigger memory.</summary>
     public void Jump(SceneId target)
     {
         Story.GetScene(target);
