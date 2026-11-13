@@ -16,7 +16,7 @@ namespace Talewright.Runtime;
 /// </summary>
 internal static class ReplayEvidence
 {
-    private const byte Version = 3;
+    private const byte Version = 4;
     internal const int Length = 1 + 32;
 
     public static bool IsValid(byte[] evidence) => evidence.Length == Length && evidence[0] == Version;

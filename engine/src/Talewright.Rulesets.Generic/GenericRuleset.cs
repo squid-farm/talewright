@@ -96,7 +96,7 @@ public sealed class D20SkillCheckRule : ISkillCheckRule
 {
     public int DieSides => 20;
 
-    public SkillCheckResult Resolve(IGameStateView state, SkillCheckRequest request)
+    public SkillCheckTotal CalculateTotal(IGameStateView state, SkillCheckRequest request)
     {
         var ruleset = state.Ruleset;
         var definition = ruleset.StatsById[request.Skill];
@@ -116,8 +116,11 @@ public sealed class D20SkillCheckRule : ISkillCheckRule
 
         var roll = request.Roll ?? 10;
         var total = roll + modifier;
-        return new SkillCheckResult(roll, modifier, total, request.Difficulty, total >= request.Difficulty);
+        return new SkillCheckTotal(roll, modifier, total);
     }
+
+    public bool IsSuccess(IGameStateView state, SkillCheckTotal total, int difficulty) =>
+        total.Total >= difficulty;
 }
 
 /// <summary>Level n requires 100 × n × (n − 1) / 2 experience (0, 100, 300, 600, …).</summary>

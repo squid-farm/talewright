@@ -99,20 +99,32 @@ public class GameStateTests
     [Fact]
     public void Dice_are_deterministic_and_in_range()
     {
-        var rolls = Enumerable.Range(0, 2000).Select(i => DeterministicDice.Roll(99, i, 20)).ToArray();
+        var rolls = Enumerable.Range(0, 2000)
+            .Select(i => DeterministicDice.Roll(99, $"random-site:{i}", "scene:start:visit:1", 20))
+            .ToArray();
 
-        Assert.Equal(rolls, Enumerable.Range(0, 2000).Select(i => DeterministicDice.Roll(99, i, 20)));
+        Assert.Equal(rolls, Enumerable.Range(0, 2000)
+            .Select(i => DeterministicDice.Roll(99, $"random-site:{i}", "scene:start:visit:1", 20)));
         Assert.All(rolls, r => Assert.InRange(r, 1, 20));
         Assert.Equal(20, rolls.Distinct().Count());
-        Assert.NotEqual(rolls.Take(20), Enumerable.Range(0, 20).Select(i => DeterministicDice.Roll(100, i, 20)));
+        Assert.NotEqual(rolls.Take(20), Enumerable.Range(0, 20)
+            .Select(i => DeterministicDice.Roll(100, $"random-site:{i}", "scene:start:visit:1", 20)));
     }
 
     [Fact]
-    public void Dice_sequence_never_changes_between_versions()
+    public void Keyed_dice_vectors_are_stable()
     {
-        // Golden values computed from the reference SplitMix64. If this fails, saved games would replay with
-        // different rolls: don't "fix" the expected values, fix the dice.
-        Assert.Equal([10, 7, 8, 17, 13, 18, 6, 12, 15, 9, 12, 7], Enumerable.Range(0, 12).Select(i => DeterministicDice.Roll(42, i, 20)));
-        Assert.Equal([1, 6, 2, 3, 1, 5, 4, 3, 5, 1, 3, 3], Enumerable.Range(0, 12).Select(i => DeterministicDice.Roll(0xDEADBEEF, i, 6)));
+        Assert.Equal(19, DeterministicDice.Roll(42, "cave:player:athletics:0", "scene:cave:visit:1", 20));
+        Assert.Equal(6, DeterministicDice.Roll(0xDEADBEEF, "hall:guide:survival:2", "scene:hall:visit:4", 6));
+    }
+
+    [Fact]
+    public void Other_random_sites_do_not_shift_a_roll()
+    {
+        var expected = DeterministicDice.Roll(42, "skill-check:cave:player:athletics:0", "scene:cave:visit:1", 20);
+        _ = DeterministicDice.Roll(42, "voice-line:3", "scene:cave:visit:1", 20);
+
+        Assert.Equal(expected,
+            DeterministicDice.Roll(42, "skill-check:cave:player:athletics:0", "scene:cave:visit:1", 20));
     }
 }

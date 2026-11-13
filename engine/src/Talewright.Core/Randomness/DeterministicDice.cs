@@ -1,52 +1,37 @@
+using System.Buffers;
+using System.Buffers.Binary;
+using System.Security.Cryptography;
+using System.Text.Json;
+
 namespace Talewright.Core.Randomness;
 
 /// <summary>
-/// Deterministic dice: the n-th roll of a playthrough is a pure function of <c>(seed, n)</c>.
-/// Player saves reuse the seed and choice history to regenerate the same rolls. Folding an existing
-/// event log instead uses the results in <see cref="Events.DiceRolled"/>.
+/// Deterministic dice: each roll is a pure function of its seed, check identity, execution key and die sides. Player
+/// saves reuse the seed and choice history to regenerate the same rolls. Folding an existing event log uses recorded
+/// results.
 /// </summary>
-/// <remarks>
-/// The hash is SplitMix64 (Steele, Lea &amp; Flood, "Fast splittable pseudorandom number generators", 2014; the
-/// same mixer Java's <c>SplittableRandom</c> uses). Its constants are the published ones: changing any of them
-/// changes the replay contract and requires invalidating saves and scenarios from the previous contract.
-/// </remarks>
 public static class DeterministicDice
 {
-    /// <summary>
-    /// Offset added to the roll index before hashing so that index 0 doesn't hash the bare seed. Any odd 64-bit
-    /// constant works; this one is part of the current deterministic replay contract.
-    /// </summary>
-    private const ulong IndexSalt = 0x632BE59BD9B4E019UL;
-
-    /// <summary>SplitMix64 increment: 2^64 / φ (the golden ratio), which spreads consecutive inputs apart.</summary>
-    private const ulong GoldenGamma = 0x9E3779B97F4A7C15UL;
-
-    /// <summary>SplitMix64's first avalanche multiplier (Stafford's "Mix13" variant).</summary>
-    private const ulong MixMultiplier1 = 0xBF58476D1CE4E5B9UL;
-
-    /// <summary>SplitMix64's second avalanche multiplier (Stafford's "Mix13" variant).</summary>
-    private const ulong MixMultiplier2 = 0x94D049BB133111EBUL;
-
-    private const int MixShift1 = 30;
-    private const int MixShift2 = 27;
-    private const int MixShift3 = 31;
-
-    /// <summary>Rolls a die with <paramref name="sides"/> faces (1..sides) for the given cursor position.</summary>
-    public static int Roll(ulong seed, int index, int sides)
+    /// <summary>Rolls a die with <paramref name="sides"/> faces (1..sides) for a stable execution key.</summary>
+    public static int Roll(ulong seed, string identity, string executionIdentity, int sides)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(sides, 1);
-        var value = SplitMix64(seed ^ SplitMix64((ulong)index + IndexSalt));
+        ArgumentNullException.ThrowIfNull(identity);
+        ArgumentNullException.ThrowIfNull(executionIdentity);
+        var buffer = new ArrayBufferWriter<byte>();
+        using (var writer = new Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartArray();
+            writer.WriteNumberValue(seed);
+            writer.WriteStringValue(identity);
+            writer.WriteStringValue(executionIdentity);
+            writer.WriteNumberValue(sides);
+            writer.WriteEndArray();
+        }
+        var value = BinaryPrimitives.ReadUInt64LittleEndian(SHA256.HashData(buffer.WrittenSpan));
         return (int)(value % (ulong)sides) + 1;
     }
 
     /// <summary>Creates a fresh, non-deterministic seed for a new playthrough.</summary>
     public static ulong NewSeed() => (ulong)Random.Shared.NextInt64();
-
-    private static ulong SplitMix64(ulong x)
-    {
-        x += GoldenGamma;
-        x = (x ^ (x >> MixShift1)) * MixMultiplier1;
-        x = (x ^ (x >> MixShift2)) * MixMultiplier2;
-        return x ^ (x >> MixShift3);
-    }
 }

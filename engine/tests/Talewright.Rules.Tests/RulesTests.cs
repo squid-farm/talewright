@@ -1,5 +1,6 @@
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
+using Talewright.Core.Randomness;
 using Talewright.Core.State;
 using Talewright.Core.World;
 using Talewright.Rules.Checks;
@@ -295,17 +296,66 @@ public class RulesTests
     public void Skill_checks_roll_seeded_dice_and_record_events()
     {
         var check = new SkillCheck(EntityId.Player, Athletics, new NumberLiteral(14));
+        var identity = new SkillCheckIdentity(new("start"), EntityId.Player, Athletics, 0);
         var first = NewLog(seed: 123);
         var second = NewLog(seed: 123);
 
-        var a = SkillCheckResolver.Resolve(check, first, RandomnessMode.ChecksOnly, NamedPredicateRegistry.Empty);
-        var b = SkillCheckResolver.Resolve(check, second, RandomnessMode.ChecksOnly, NamedPredicateRegistry.Empty);
+        var a = SkillCheckResolver.Resolve(check, identity, first, RandomnessMode.ChecksOnly, NamedPredicateRegistry.Empty);
+        var b = SkillCheckResolver.Resolve(check, identity, second, RandomnessMode.ChecksOnly, NamedPredicateRegistry.Empty);
 
         Assert.Equal(a, b);
         Assert.Equal(4, a.Modifier); // +2 STR mod, +2 ranks
         Assert.IsType<DiceRolled>(first.Events[0]);
         Assert.IsType<SkillCheckResolved>(first.Events[1]);
         Assert.Equal(1, first.State.RollCount);
+    }
+
+    [Fact]
+    public void Repeating_a_check_within_a_visit_reuses_its_recorded_result()
+    {
+        var check = new SkillCheck(EntityId.Player, Athletics, new NumberLiteral(14));
+        var identity = new SkillCheckIdentity(new("start"), EntityId.Player, Athletics, 0);
+        var log = NewLog(seed: 123);
+        var first = SkillCheckResolver.Resolve(check, identity, log, RandomnessMode.ChecksOnly, NamedPredicateRegistry.Empty);
+        var events = log.Events.ToArray();
+
+        var repeated = SkillCheckResolver.Resolve(check, identity, log, RandomnessMode.ChecksOnly, NamedPredicateRegistry.Empty);
+
+        Assert.Equal(first, repeated);
+        Assert.Equal(events, log.Events);
+        Assert.Equal(1, log.State.RollCount);
+    }
+
+    [Fact]
+    public void Reentering_a_scene_uses_a_new_check_visit_key()
+    {
+        var check = new SkillCheck(EntityId.Player, Athletics, new NumberLiteral(14));
+        var identity = new SkillCheckIdentity(new("start"), EntityId.Player, Athletics, 0);
+        var log = NewLog(seed: 123);
+        log.Append(new SceneEntered(new("start")));
+        SkillCheckResolver.Resolve(check, identity, log, RandomnessMode.ChecksOnly, NamedPredicateRegistry.Empty);
+        log.Append(new SceneEntered(new("start")));
+
+        SkillCheckResolver.Resolve(check, identity, log, RandomnessMode.ChecksOnly, NamedPredicateRegistry.Empty);
+
+        Assert.Equal([1, 2], log.Events.OfType<SkillCheckResolved>().Select(resolved => resolved.Visit));
+        Assert.Equal(2, log.Events.OfType<DiceRolled>().Count());
+    }
+
+    [Fact]
+    public void A_check_evaluated_from_a_hub_uses_the_hub_visit()
+    {
+        var check = new SkillCheck(EntityId.Player, Athletics, new NumberLiteral(14));
+        var identity = new SkillCheckIdentity(new("target"), EntityId.Player, Athletics, 0);
+        var log = NewLog(seed: 123);
+        log.Append(new SceneEntered(new("hub")));
+
+        SkillCheckResolver.Resolve(check, identity, log, RandomnessMode.ChecksOnly, NamedPredicateRegistry.Empty);
+
+        var resolved = Assert.Single(log.Events.OfType<SkillCheckResolved>());
+        Assert.Equal(new SceneId("target"), resolved.Identity.Scene);
+        Assert.Equal(new SceneId("hub"), resolved.ExecutionScene);
+        Assert.Equal(1, resolved.Visit);
     }
 
     private (TriggerEngine Engine, EventLog Log, FlagId[] Flags) CreateTriggerChain(int count)
@@ -330,9 +380,11 @@ public class RulesTests
     {
         var log = NewLog();
 
-        var result = SkillCheckResolver.Resolve(new SkillCheck(EntityId.Player, Athletics, new NumberLiteral(14)), log, RandomnessMode.Off, NamedPredicateRegistry.Empty);
+        var check = new SkillCheck(EntityId.Player, Athletics, new NumberLiteral(14));
+        var identity = new SkillCheckIdentity(new("start"), EntityId.Player, Athletics, 0);
+        var result = SkillCheckResolver.Resolve(check, identity, log, RandomnessMode.Off, NamedPredicateRegistry.Empty);
 
-        Assert.True(result.Success); // 10 + 4
+        Assert.True(result.Success == true); // 10 + 4
         Assert.Empty(log.Events.OfType<DiceRolled>());
     }
 }

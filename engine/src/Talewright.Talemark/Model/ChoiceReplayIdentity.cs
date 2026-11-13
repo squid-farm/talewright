@@ -237,7 +237,10 @@ internal static class ChoiceReplayIdentity
         writer.WriteStartArray();
         writer.WriteStringValue(check.Check.Actor.Value);
         writer.WriteStringValue(check.Check.Skill.Value);
-        WriteExpr(writer, check.Check.Difficulty);
+        if (check.Check.Difficulty is { } difficulty)
+            WriteExpr(writer, difficulty);
+        else
+            writer.WriteNullValue();
         WriteOutcome(writer, check.Success);
         WriteOutcome(writer, check.Failure);
         writer.WriteEndArray();

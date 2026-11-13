@@ -19,7 +19,7 @@ public class GoldenSaveTests
     public void Lost_relic_quick_save_restores_the_trigger_step()
     {
         var (save, history) = Restore("lost-relic-quick.twsave",
-            "3C311827E018C96B7B19C449D25BCB8305BCF585A64939FA3C9F12EFB33025AE", LostRelic());
+            "05B6D494EEE790DBF6CD183BE11C07854D86B5D35B4CFAB318B53722921BDECA", LostRelic());
 
         Assert.Equal(11, history.Cursor);
         Assert.False(history.CanForward);
@@ -34,7 +34,7 @@ public class GoldenSaveTests
     public void Lost_relic_named_save_restores_redo_before_the_skill_check()
     {
         var (save, history) = Restore("lost-relic-slot.twsave",
-            "E51EEF0AB484A3D7FD393891AA23603B749D3A5C050FA2AA747396AF6FB9353D", LostRelic());
+            "08EEA304D0CA77A4D903A129BCFD913609425F0FB531AE146C6183E66C667222", LostRelic());
 
         Assert.Equal(13, history.Cursor);
         Assert.Equal(14, save.Choices.Count);
@@ -46,19 +46,19 @@ public class GoldenSaveTests
         AssertSameEvidence(save, history);
 
         history.Forward();
-        AssertFailedDoorCheck(history);
+        AssertKeyedDoorChecks(history);
     }
 
     [Fact]
-    public void Lost_relic_autosave_restores_the_failed_skill_check()
+    public void Lost_relic_autosave_restores_keyed_skill_checks()
     {
         var (save, history) = Restore("lost-relic-autosave.twsave",
-            "EF233D6AD3CE301EB9B6EF97861C2E318BA8C6E8212069771CE82DF3ABAD3BDC", LostRelic());
+            "9643DF6A914B40D21253865B7600DCB5E0A3DE28499B69359129321A105A8DED", LostRelic());
 
         Assert.Equal(14, history.Cursor);
         Assert.False(history.CanForward);
         AssertCampAndTrigger(history);
-        AssertFailedDoorCheck(history);
+        AssertKeyedDoorChecks(history);
         AssertSameEvidence(save, history);
     }
 
@@ -68,7 +68,7 @@ public class GoldenSaveTests
         var fixture = Path.Combine(Root, "engine", "tests", "Talewright.Runtime.Tests", "SaveSamples", "golden",
             "lost-relic-trigger.twtrigger");
         var bytes = File.ReadAllBytes(fixture);
-        Assert.Equal("3711678F10D3B3B9A4D6C1DB1001399AB069A04E5A10960F8CA1AB9C775C6662",
+        Assert.Equal("16940BE4F5ED7C6C7F80DA4CD4C484604C21BAA915714A417D131A7CD19DD917",
             Convert.ToHexString(SHA256.HashData(bytes)));
 
         var (story, expected) = CreateLostRelicTriggerCheckpoint();
@@ -92,7 +92,7 @@ public class GoldenSaveTests
     public void Csharp_story_save_restores_through_registered_extensions()
     {
         var (save, history) = Restore("csharp-story.twsave",
-            "8F877E621AB6EE86DAF18F4491478DD0374E7013452FF40A2CDA4F99F885BF95", CSharpStory());
+            "7ECAF2710CB6FE954AFAE98DDBCB0A6C6FBEEE0F820E13AC098CF4F4BBB0C55D", CSharpStory());
 
         Assert.NotNull(save.ReplayChoiceIdentities);
         Assert.Equal(1, history.Cursor);
@@ -114,11 +114,18 @@ public class GoldenSaveTests
         Assert.True(history.State.GetFlag(new FlagId("steady")));
     }
 
-    private static void AssertFailedDoorCheck(StoryHistory history)
+    private static void AssertKeyedDoorChecks(StoryHistory history)
     {
-        Assert.Equal("temple.side", history.Current.Scene!.Value.Value);
-        Assert.Equal(new DiceRolled(20, 10), Assert.Single(history.Events.OfType<DiceRolled>()));
-        Assert.False(history.State.GetFlag(new FlagId("door-damaged")));
+        Assert.Equal("temple.hall", history.Current.Scene!.Value.Value);
+        Assert.Equal([19, 7], history.Events.OfType<DiceRolled>().Select(die => die.Result));
+        var checks = history.Events.OfType<SkillCheckResolved>().ToArray();
+        Assert.Equal(2, checks.Length);
+        Assert.Equal(new StatId("athletics"), checks[0].Skill);
+        Assert.Equal(19, checks[0].Roll);
+        Assert.True(checks[0].Success);
+        Assert.Equal(new StatId("perception"), checks[1].Skill);
+        Assert.Equal(7, checks[1].Roll);
+        Assert.False(checks[1].Success);
     }
 
     private static void AssertSameEvidence(SavedGame save, StoryHistory history)

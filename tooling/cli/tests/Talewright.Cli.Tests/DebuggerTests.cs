@@ -64,8 +64,11 @@ public sealed class DebuggerTests : IDisposable
             Assert.NotNull(compiled.Compilation);
             Assert.True(compiled.Compilation.Success, string.Join("\n", compiled.Compilation.Diagnostics));
             var story = compiled.Compilation.Story!;
-            var expected = story.World.Ruleset.SkillCheckRule!.Resolve(GameState.CreateInitial(story.World, 42),
-                new(EntityId.Player, new("tracking"), 14, null));
+            var expectedState = GameState.CreateInitial(story.World, 42);
+            var expectedRule = story.World.Ruleset.SkillCheckRule!;
+            var expected = expectedRule.CalculateTotal(expectedState,
+                new(EntityId.Player, new("tracking"), null));
+            var expectedSuccess = expectedRule.IsSuccess(expectedState, expected, 14);
             Assert.Equal(linked ? 5 : 3, expected.Modifier);
             Assert.Equal(linked ? 15 : 13, expected.Total);
             var model = new WorkbenchModel(_root);
@@ -75,7 +78,7 @@ public sealed class DebuggerTests : IDisposable
             var actual = Assert.Single(model.Inspection!.Events.OfType<SkillCheckResolved>());
             Assert.Equal(expected.Modifier, actual.Modifier);
             Assert.Equal(expected.Total, actual.Total);
-            Assert.Equal(expected.Success, actual.Success);
+            Assert.Equal(expectedSuccess, actual.Success);
         }
     }
 

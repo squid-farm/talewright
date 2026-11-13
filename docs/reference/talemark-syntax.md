@@ -894,7 +894,16 @@ rulesets (`none` and `rpg`) resolve them as `d20 + modifier ≥ DC`:
 - Any other stat (`custom`, the default for declared stats, `skill`, `resource` or `progression`)
   adds its value, plus its `governing-attribute`'s modifier when it has one.
 
-Dice are seeded and recorded as events, and are only rolled for checks.
+Dice are seeded and recorded as events, and are only rolled for checks. A check's stable identity is its
+scene, actor, skill and source-order number among checks for that same scene, actor and skill. Prose,
+source locations, difficulty, outcomes and checks for other skills do not affect its die. Its execution
+identity also includes the visit of the scene that evaluates it; returning to a scene gives its checks
+new rolls, while evaluating the same check again during one visit reuses the recorded result. Gameplay
+randomness is isolated by its per-check identity; future random sites use their own identities with the
+same mechanism.
+
+The keyed-roll change intentionally changes results for existing stories with the same seed. Replay
+evidence has been versioned; saves made before this change do not load, and there is no migration.
 With `randomness: off`, checks are deterministic (`10 + modifier ≥ DC`). A ruleset registered from
 C# may define its own check rule; one without a check rule rejects `skill-check` (TW3005).
 

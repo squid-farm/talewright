@@ -21,7 +21,7 @@ See [architecture §3.1](../../../docs/developer/architecture.md#31-talewrightco
 |---|---|
 | `Identity/Ids.cs` | `EntityId` (with `EntityId.Player`), `StatId`, `ItemId`, `FactionId`, `SceneId`, `FlagId`, `VarId`: readonly record structs over a string. |
 | `Rulesets/StatDefinition.cs` | `StatDefinition` (id, name, category, min/max/default, governing attribute for skills), `StatCategory`, `ReputationTier`. |
-| `Rulesets/RuleInterfaces.cs` | `ISkillCheckRule` (+ `SkillCheckRequest`/`SkillCheckResult`), `ILevelingRule`, `IStatModifier`. Implement these to change game mechanics. |
+| `Rulesets/RuleInterfaces.cs` | `ISkillCheckRule` (+ `SkillCheckRequest`/`SkillCheckTotal`), `ILevelingRule`, `IStatModifier`. Skill-check rules calculate a total and separately decide it against a difficulty. |
 | `Rulesets/Ruleset.cs` | Immutable ruleset: stats, tiers, rules. `TierFor(standing)`, `FindTier(id)`, `ToBuilder()`. `Ruleset.Empty`. |
 | `Rulesets/RulesetBuilder.cs` | Fluent builder: `AddStat`, `RemoveStat`, `ReplaceStat`, `WithTiers`, `WithSkillCheckRule`, `WithLevelingRule`, `AddModifier`, `Build`. Removing the level stat also drops the leveling rule. |
 | `World/Definitions.cs` | `CharacterDefinition` with `NameAgreement` for displayed-name grammar/possessives (default singular), `ItemDefinition` (stat modifiers while held), `FactionDefinition`, `WorldDefinition` (everything static + the ruleset). |
@@ -32,7 +32,8 @@ See [architecture §3.1](../../../docs/developer/architecture.md#31-talewrightco
 | `State/GameState.cs` | The projection. `CreateInitial(world, seed)`, `Apply(event)`, and the queries. Effective stat = base + `IStatModifier`s + held item modifiers, clamped. |
 | `State/EventLog.cs` | Owns the state and event list: `Append`, `AppendRange`, `Replay`, `Truncate`, `Appended` event. |
 | `State/StateChanges.cs` | Computes the events for a change (clamping; no events if nothing changes). Includes `CheckLevel`. Prefer these over hand-built events. |
-| `Randomness/DeterministicDice.cs` | `Roll(seed, index, sides)`: pure SplitMix64. The index is `state.RollCount`. `NewSeed()` for a random seed. |
+| `Randomness/DeterministicDice.cs` | `Roll(seed, identity, executionIdentity, sides)`: keyed SHA-256 derivation. `NewSeed()` creates a random seed. |
+| `Randomness/SkillCheckIdentity.cs` | Compile-time skill-check key: scene, actor, skill and source-order occurrence for that combination. |
 
 ## Using it directly
 

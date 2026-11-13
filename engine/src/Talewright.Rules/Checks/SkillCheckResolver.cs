@@ -19,7 +19,7 @@ public enum RandomnessMode
 }
 
 /// <summary>A skill check as declared in a story.</summary>
-public sealed record SkillCheck(EntityId Actor, StatId Skill, Expr Difficulty);
+public sealed record SkillCheck(EntityId Actor, StatId Skill, Expr? Difficulty);
 
 /// <summary>
 /// Resolves skill checks through the ruleset's <see cref="ISkillCheckRule"/>, rolling seeded dice and recording
@@ -27,31 +27,63 @@ public sealed record SkillCheck(EntityId Actor, StatId Skill, Expr Difficulty);
 /// </summary>
 public static class SkillCheckResolver
 {
-    public static SkillCheckResult Resolve(SkillCheck check, EventLog log, RandomnessMode randomness, NamedPredicateRegistry predicates)
-        => Resolve(check, log, randomness, predicates, observer: null);
-
-    public static SkillCheckResult Resolve(SkillCheck check, EventLog log, RandomnessMode randomness,
-        NamedPredicateRegistry predicates, Action<RuleDecision>? observer)
+    public static SkillCheckResult Resolve(SkillCheck check, SkillCheckIdentity identity, EventLog log,
+        RandomnessMode randomness, NamedPredicateRegistry predicates, Action<RuleDecision>? observer = null)
     {
-        var start = log.Events.Count;
         var state = log.State;
+        if (identity.Actor != check.Actor || identity.Skill != check.Skill)
+            throw new ArgumentException("The check identity must match the check's actor and skill.", nameof(identity));
+
+        var executionScene = state.CurrentScene ?? identity.Scene;
+        var visit = state.VisitCount(executionScene);
+        var existing = log.Events.OfType<SkillCheckResolved>().LastOrDefault(resolved =>
+            resolved.Identity == identity && resolved.ExecutionScene == executionScene && resolved.Visit == visit);
+        if (existing is not null)
+        {
+            var cached = new SkillCheckResult(existing.Roll, existing.Modifier, existing.Total,
+                existing.Difficulty, existing.Success);
+            Observe(cached, check, executionScene, observer, log.Events.Count, log.Events.Count, null);
+            return cached;
+        }
+
+        var start = log.Events.Count;
         var rule = state.Ruleset.SkillCheckRule
             ?? throw new InvalidOperationException($"Ruleset '{state.Ruleset.Id}' has no skill check rule.");
 
         int? roll = null;
         if (randomness != RandomnessMode.Off && rule.DieSides > 0)
         {
-            roll = DeterministicDice.Roll(state.Seed, state.RollCount, rule.DieSides);
+            roll = DeterministicDice.Roll(state.Seed, identity.ToKey(),
+                ExecutionKey(executionScene, visit), rule.DieSides);
             log.Append(new DiceRolled(rule.DieSides, roll.Value));
         }
 
-        var context = new EvaluationContext(log.State, predicates);
-        var difficulty = RuleObservation.Evaluate(check.Difficulty, context, observer is not null, out var trace).Number;
-        var result = rule.Resolve(log.State, new SkillCheckRequest(check.Actor, check.Skill, difficulty, roll));
-        log.Append(new SkillCheckResolved(check.Actor, check.Skill, difficulty, result.Roll, result.Modifier, result.Total, result.Success));
-        observer?.Invoke(new RuleDecision(DecisionKind.Check, $"{check.Actor}:{check.Skill}", state.CurrentScene,
-            result.Success ? DecisionOutcome.Passed : DecisionOutcome.Failed,
-            result.Success ? DecisionReason.CheckSucceeded : DecisionReason.CheckFailed, trace, start, log.Events.Count));
+        var total = rule.CalculateTotal(log.State, new SkillCheckRequest(check.Actor, check.Skill, roll));
+        int? difficulty = null;
+        bool? success = null;
+        ExpressionTrace? trace = null;
+        if (check.Difficulty is { } expression)
+        {
+            difficulty = RuleObservation.Evaluate(expression, new EvaluationContext(log.State, predicates),
+                observer is not null, out trace).Number;
+            success = rule.IsSuccess(log.State, total, difficulty.Value);
+        }
+        log.Append(new SkillCheckResolved(check.Actor, check.Skill, identity, executionScene, visit, difficulty,
+            total.Roll, total.Modifier, total.Total, success));
+        var result = new SkillCheckResult(total.Roll, total.Modifier, total.Total, difficulty, success);
+        Observe(result, check, executionScene, observer, start, log.Events.Count, trace);
         return result;
     }
+
+    private static void Observe(SkillCheckResult result, SkillCheck check, SceneId executionScene,
+        Action<RuleDecision>? observer, int start, int end, ExpressionTrace? trace)
+    {
+        if (result.Success is not { } success) return;
+        observer?.Invoke(new RuleDecision(DecisionKind.Check, $"{check.Actor}:{check.Skill}", executionScene,
+            success ? DecisionOutcome.Passed : DecisionOutcome.Failed,
+            success ? DecisionReason.CheckSucceeded : DecisionReason.CheckFailed, trace, start, end));
+    }
+
+    private static string ExecutionKey(SceneId scene, int visit) =>
+        $"{scene.Value.Length}:{scene.Value}:{visit.ToString(System.Globalization.CultureInfo.InvariantCulture)}";
 }

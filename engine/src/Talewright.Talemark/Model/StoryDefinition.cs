@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using Talewright.Core.Identity;
+using Talewright.Core.Randomness;
 using Talewright.Core.World;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Checks;
@@ -115,7 +116,11 @@ public sealed record DivertTarget(SceneId? Scene)
 public sealed record CheckOutcome(IReadOnlyList<Effect> Effects, DivertTarget? Divert);
 
 /// <summary>A skill check with its two outcomes.</summary>
-public sealed record CheckBranch(SkillCheck Check, CheckOutcome Success, CheckOutcome Failure);
+public sealed record CheckBranch(
+    SkillCheck Check,
+    CheckOutcome Success,
+    CheckOutcome Failure,
+    SkillCheckIdentity Identity);
 
 /// <summary>
 /// One scene / storylet, executed in source order.

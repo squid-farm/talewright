@@ -1,4 +1,5 @@
 using Talewright.Core.Identity;
+using Talewright.Core.Randomness;
 using Talewright.Core.World;
 
 namespace Talewright.Core.Events;
@@ -39,7 +40,7 @@ public sealed record SceneEntered(SceneId Scene) : GameEvent;
 public sealed record ChoiceMade(SceneId Scene, string ChoiceKey) : GameEvent;
 
 /// <summary>
-/// A die was rolled. Advances the RNG cursor. Folding an existing event log reads <paramref name="Result"/>;
+/// A die was rolled. Advances the display-only roll count. Folding an existing event log reads <paramref name="Result"/>;
 /// player-save restore instead replays choices with the saved seed and generates the event again.
 /// </summary>
 public sealed record DiceRolled(int Sides, int Result) : GameEvent;
@@ -47,11 +48,14 @@ public sealed record DiceRolled(int Sides, int Result) : GameEvent;
 public sealed record SkillCheckResolved(
     EntityId Actor,
     StatId Skill,
-    int Difficulty,
+    SkillCheckIdentity Identity,
+    SceneId ExecutionScene,
+    int Visit,
+    int? Difficulty,
     int Roll,
     int Modifier,
     int Total,
-    bool Success) : GameEvent;
+    bool? Success) : GameEvent;
 
 public sealed record LevelChanged(EntityId Character, int OldLevel, int NewLevel) : GameEvent;
 
