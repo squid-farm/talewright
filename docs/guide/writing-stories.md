@@ -410,9 +410,11 @@ available:
 Every scene tagged `camp` whose `@requires` is true appears as a choice, using its `@title`. A scene
 can add `, shown "reader text"` to `@requires` to stay visible while unavailable; that reader text
 replaces its title only while the requirement is false. `@once`
-removes it after the first visit, and `@priority` controls the order. You can also match every listed
-tag with `@hub camp and records`, or any listed tag with `@hub night or watch`; use one operator per
-selector. `@hub-limit 3` caps how many choices show.
+removes it after the first visit, and `@priority` controls the order alongside written choices.
+Written choices have priority 0; generated choices use their scene's `@priority` (also 0 by default).
+You can match every listed tag with `@hub camp and records`, or any listed tag with
+`@hub night or watch`; use one operator per selector. `@hub-limit 3` caps generated choices only.
+Equal-priority written choices stay in authored order before generated choices.
 See [scenes](../reference/talemark-syntax.md#2-scenes).
 
 ## Triggers

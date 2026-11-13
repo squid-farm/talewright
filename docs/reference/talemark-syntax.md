@@ -380,12 +380,12 @@ Optional double-quoted reader text replaces the scene title only while that requ
 | `@clear`                                           | Start this scene on a cleared play screen; earlier passages remain in History and saves.        |
 | `@requires expr[, shown ["reader text"]]`          | A rule that decides whether a scene is available when using a hub. Without `shown`, a false requirement hides the scene. The optional reader text replaces the normal choice text while unavailable. A skill-check expression may include its own `, hidden` modifier before this optional `shown` suffix. |
 | `@tags a, b`                                       | Tags for hubs.                                                                                 |
-| `@priority n`                                      | Higher sorts first in hubs (default 0).                                                        |
+| `@priority n`                                      | Higher priorities sort first among hub choices. Written choices have priority 0; generated scenes default to 0. |
 | `@once`                                            | A scene offered by a hub disappears after the player visits it once.                          |
 | `@hub tag`                                         | At this scene, offer each available scene with the tag as a choice.                            |
 | `@hub a and b [and c…]`                            | Offer scenes that have every listed tag.                                                      |
 | `@hub a or b [or c…]`                              | Offer scenes that have at least one listed tag.                                               |
-| `@hub-limit N`                                    | Cap generated hub choices at positive integer N; requires `@hub`.                         |
+| `@hub-limit N`                                    | Cap generated hub choices at positive integer N; written choices do not count toward the limit. Requires `@hub`. |
 | blank-line separated text                          | Paragraphs (bold and italic formatting).                                                       |
 | `> who: text`                                      | Speaker line; `who` must be a character id.                                                    |
 | `{image("path", "alt text")}`                      | Image media in any narrative-template context; alt text is optional. Append `#decorative` only when the image is purely decorative and has no descriptive alt text. |
@@ -491,20 +491,23 @@ If play reaches a scene whose choice requirements all fail and whose hub offers 
 "The story cannot continue" and ends. Validation does not predict which requirements will hold.
 
 **Advanced: hub selection.** A scene may have only one `@hub` and one
-`@hub-limit`. A hub filters by tags, self-exclusion and `@once`, then visits matching scenes in priority
-order. It evaluates requirements only until the limit is filled; lower-priority candidates are not
-evaluated. Multiple matching tags never duplicate a choice. Explicit choices are not capped. Generated
-choices follow written choices when the scene reaches its end. Give a hub an explicit exit choice; a
-scene-level `->` leaves immediately instead of offering the hub. These details matter when building a
-story around hubs; you can skip them when using direct choices.
+`@hub-limit`. A hub filters generated choices by tags, self-exclusion and `@once`, then selects them in
+priority order. It evaluates requirements only until the generated-choice limit is filled;
+lower-priority candidates are not evaluated. Multiple matching tags never duplicate a choice.
+Written choices are never capped. Once selected, written and generated choices are combined in descending
+priority order. Written choices have priority 0; generated scenes use their `@priority`, defaulting to
+0. At equal priority, written choices stay in authored order before generated choices, which stay in
+scene declaration order. Give a hub an explicit exit choice; a scene-level `->` leaves immediately
+instead of offering the hub. These details matter when building a story around hubs; you can skip them
+when using direct choices.
 
 For exact selection behavior: tags must be distinct and nonempty; the hub scene itself is never
-offered. Higher `@priority` scenes come first, with ties kept in declaration order. The limit applies
-only to generated hub choices, not choices written directly in the scene. Shown-but-unavailable
-storylets remain eligible for leftover slots after available choices. Because selection is lazy, a
-check-dependent requirement below the cutoff never rolls. When checking whether a scene can ever be
-reached, Talewright considers all matching tag scenes, even if the current limit would hide some; their
-requirements may change later.
+offered. Among generated choices, higher `@priority` scenes come first, with ties kept in declaration
+order. The limit applies only to generated hub choices, not choices written directly in the scene.
+Shown-but-unavailable storylets remain eligible for leftover slots after available choices, which take
+precedence for the generated limit. Because selection is lazy, a check-dependent requirement below
+the cutoff never rolls. When checking whether a scene can ever be reached, Talewright considers all
+matching tag scenes, even if the current limit would hide some; their requirements may change later.
 
 **Conditional structure.** A block `{if}` selects one branch once, when reached. Its nested steps run in
 order without retesting that condition. Inline conditions are evaluated when their prose line renders.

@@ -70,11 +70,11 @@ public sealed class ScenePreviewTests
             preview.Menu.Select(entry => (entry.Key, entry.Text, entry.Number, entry.IsAvailable)));
         Assert.Equal(
             [
-                ("c0", "Available", 1, true),
-                ("c2", "Need 10", 2, false),
-                ("c3", "Continue", 3, true),
-                ("storylet:shop-available", "Shop item", 4, true),
-                ("storylet:shop-shown", "Later", 5, false),
+                ("storylet:shop-available", "Shop item", 1, true),
+                ("storylet:shop-shown", "Later", 2, false),
+                ("c0", "Available", 3, true),
+                ("c2", "Need 10", 4, false),
+                ("c3", "Continue", 5, true),
             ],
             preview.Menu.Select(entry => (entry.Key, entry.Text, entry.Number, entry.IsAvailable)));
         Assert.Equal(live.Choices.Select(choice => choice.Key), preview.Choices.Select(choice => choice.Key));

@@ -26,10 +26,14 @@ internal static class StoryMenuBuilder
         bool includeHubOffers = true,
         bool previewSkillChecks = false)
     {
-        var offered = new List<VisibleChoice>(choices);
+        var offered = choices.Select((choice, index) =>
+            (Choice: choice, Priority: 0, IsGenerated: false, Order: index)).ToList();
         if (includeHubOffers && scene.Hub is { } hub)
         {
             var hubOffers = new Dictionary<SceneId, VisibleChoice>();
+            var declarationOrder = story.Scenes
+                .Select((storylet, index) => (storylet.Id, index))
+                .ToDictionary(entry => entry.Id, entry => entry.index);
             var storylets = StoryletSelector.SelectMenuCandidates(story.Scenes, hub, context, scene.Id,
                 scene.HubLimit, observer, eventIndex, storylet =>
                 {
@@ -63,15 +67,22 @@ internal static class StoryMenuBuilder
                 });
             foreach (var storylet in storylets)
             {
-                offered.Add(hubOffers[storylet.Storylet.Id]);
+                offered.Add((hubOffers[storylet.Storylet.Id], storylet.Storylet.Priority, true,
+                    declarationOrder[storylet.Storylet.Id]));
             }
         }
 
-        var entries = offered.Select((choice, index) =>
+        var ordered = offered
+            .OrderByDescending(entry => entry.Priority)
+            .ThenBy(entry => entry.IsGenerated)
+            .ThenBy(entry => entry.Order)
+            .Select(entry => entry.Choice)
+            .ToArray();
+        var entries = ordered.Select((choice, index) =>
             new ChoiceMenuEntry(index + 1, choice.View.Key, choice.View.Label, choice.IsAvailable)).ToArray();
-        var available = offered.Where(choice => choice.IsAvailable).Select(choice => choice.View).ToArray();
+        var available = ordered.Where(choice => choice.IsAvailable).Select(choice => choice.View).ToArray();
         return new(
-            Array.AsReadOnly(offered.ToArray()),
+            Array.AsReadOnly(ordered),
             Array.AsReadOnly(available),
             Array.AsReadOnly(entries));
     }

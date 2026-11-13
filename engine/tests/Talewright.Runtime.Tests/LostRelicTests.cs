@@ -160,14 +160,14 @@ public partial class LostRelicTests
         var history = History();
         Assert.Equal(3, history.State.GetBaseStat(EntityId.Player, new StatId("courage")));
         Choose(history, "Continue");
-        Assert.Equal(["Set out for the temple", "Haggle for supplies", "Sign the expedition register",
-            "Study your journal", "Ask your guide about the temple", "Agree on a night watchword"],
+        Assert.Equal(["Haggle for supplies", "Sign the expedition register", "Study your journal",
+            "Set out for the temple", "Ask your guide about the temple", "Agree on a night watchword"],
             history.Current.Choices.Select(c => c.Text));
         Choose(history, "Haggle for supplies");
         Assert.Equal(2, history.State.GetItemCount(EntityId.Player, new ItemId("ration")));
         Assert.True(history.State.GetFlag(new FlagId("packing-open")));
         Assert.Equal(2, history.State.GetVariable(new("supplies")));
-        Assert.Equal(["Return to camp", "Sign the expedition register"], history.Current.Choices.Select(choice => choice.Text));
+        Assert.Equal(["Sign the expedition register", "Return to camp"], history.Current.Choices.Select(choice => choice.Text));
         Choose(history, "Sign the expedition register");
         Choose(history, "Continue");
         Assert.Equal("camp.hub", history.Current.Scene!.Value.Value);
@@ -203,14 +203,14 @@ public partial class LostRelicTests
         Choose(history, "Set out for the temple");
         Choose(history, "Tie off the rope and cross carefully");
         Choose(history, "Make camp before the climb");
-        Assert.Equal(["Press on at dawn", "Eat a ration"], history.Current.Choices.Select(c => c.Text));
+        Assert.Equal(["Eat a ration", "Press on at dawn"], history.Current.Choices.Select(c => c.Text));
         Choose(history, "Eat a ration");
         Choose(history, "Share supper by the fire");
         Assert.Equal(1, history.State.GetItemCount(EntityId.Player, new("ration")));
         Assert.False(history.State.GetFlag(new("packing-open")));
         Assert.Contains("one ration left", history.Current.Document.ToPlainText());
         Choose(history, "Continue");
-        Assert.Equal(["Press on at dawn", "Stand your ground"], history.Current.Choices.Select(c => c.Text));
+        Assert.Equal(["Stand your ground", "Press on at dawn"], history.Current.Choices.Select(c => c.Text));
         var xp = history.State.GetBaseStat(EntityId.Player, new("xp"));
         Choose(history, "Stand your ground");
         Assert.Equal(10, history.State.GetStat(EntityId.Player, new StatId("courage")));
@@ -222,7 +222,7 @@ public partial class LostRelicTests
         saved.Forward();
         Assert.Equal(history.Events, saved.Events);
         Choose(history, "Catch your breath");
-        Assert.Equal(["Press on at dawn", "Follow the signal"], history.Current.Choices.Select(c => c.Text));
+        Assert.Equal(["Follow the signal", "Press on at dawn"], history.Current.Choices.Select(c => c.Text));
         Choose(history, "Follow the signal");
         Choose(history, "Continue");
         Assert.Equal("trail.wait", history.Current.Scene!.Value.Value);
