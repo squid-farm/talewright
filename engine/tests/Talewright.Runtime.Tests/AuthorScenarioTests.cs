@@ -161,6 +161,27 @@ public sealed class AuthorScenarioTests
     }
 
     [Fact]
+    public void Scenario_replay_preserves_multi_paragraph_speech()
+    {
+        var story = Story("""
+            === start
+            > guide: First paragraph.
+            >
+            > Second paragraph.
+            * [Continue] -> finish
+            === finish
+            * [Return] -> END
+            """);
+        var source = Start(story);
+
+        var bytes = AuthorScenario.Export(source, Extensions);
+        var restored = AuthorScenario.Import(story, bytes, Extensions).Session;
+
+        Assert.Equal("Guide: First paragraph.\n\nSecond paragraph.", restored.Current.Document.ToPlainText());
+        Assert.Equal(bytes, AuthorScenario.Export(restored, Extensions));
+    }
+
+    [Fact]
     public void Compatible_player_save_fork_preserves_original_and_pending_redo()
     {
         var story = Story();

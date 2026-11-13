@@ -52,7 +52,7 @@
                 (RenderedParagraph left, RenderedParagraph right) => SameInlines(left.Inlines, right.Inlines),
                 (RenderedSpeech left, RenderedSpeech right) =>
                     left.Speaker == right.Speaker && left.SpeakerName == right.SpeakerName &&
-                    SameInlines(left.Inlines, right.Inlines),
+                    SameParagraphs(left.Paragraphs, right.Paragraphs),
                 (RenderedNote left, RenderedNote right) => left == right,
                 _ => false,
             };
@@ -77,6 +77,28 @@
         for (var index = 0; index < previous.Count; index++)
         {
             if (previous[index] != current[index])
+            {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private static bool SameParagraphs(
+        IReadOnlyList<IReadOnlyList<RenderedInline>> previous,
+        IReadOnlyList<IReadOnlyList<RenderedInline>> current)
+    {
+        if (ReferenceEquals(previous, current))
+        {
+            return true;
+        }
+        if (previous.Count != current.Count)
+        {
+            return false;
+        }
+        for (var index = 0; index < previous.Count; index++)
+        {
+            if (!SameInlines(previous[index], current[index]))
             {
                 return false;
             }

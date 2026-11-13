@@ -170,7 +170,7 @@ internal static class SkillCheckPreview
     public static TemplateBlock Sanitize(TemplateBlock block) => block switch
     {
         ParagraphTemplate paragraph => paragraph with { Inlines = Sanitize(paragraph.Inlines) },
-        SpeechTemplate speech => speech with { Inlines = Sanitize(speech.Inlines) },
+        SpeechTemplate speech => speech with { Paragraphs = speech.Paragraphs.Select(Sanitize).ToArray() },
         ConditionalBlockTemplate conditional when TryDescribe(conditional.Condition, out var description) =>
             Marker(description),
         ConditionalBlockTemplate conditional => conditional with

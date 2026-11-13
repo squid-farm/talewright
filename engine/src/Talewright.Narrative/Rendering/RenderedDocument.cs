@@ -25,9 +25,10 @@ public sealed record RenderedParagraph(IReadOnlyList<RenderedInline> Inlines) : 
     public override string ToPlainText() => RenderedInline.ToPlainText(Inlines);
 }
 
-public sealed record RenderedSpeech(EntityId Speaker, string SpeakerName, IReadOnlyList<RenderedInline> Inlines) : RenderedBlock
+public sealed record RenderedSpeech(EntityId Speaker, string SpeakerName, IReadOnlyList<IReadOnlyList<RenderedInline>> Paragraphs) : RenderedBlock
 {
-    public override string ToPlainText() => $"{SpeakerName}: {RenderedInline.ToPlainText(Inlines)}";
+    public override string ToPlainText() =>
+        $"{SpeakerName}: {string.Join("\n\n", Paragraphs.Select(RenderedInline.ToPlainText))}";
 }
 
 public enum NoteKind

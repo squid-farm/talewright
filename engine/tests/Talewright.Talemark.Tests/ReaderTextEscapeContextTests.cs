@@ -37,7 +37,7 @@ public sealed class ReaderTextEscapeContextTests
 
         Assert.Equal(expected, Assert.IsType<RenderedParagraph>(document.Blocks[0]).ToPlainText());
         var speech = Assert.IsType<RenderedSpeech>(document.Blocks[1]);
-        Assert.Equal(expected, RenderedInline.ToPlainText(speech.Inlines));
+        Assert.Equal(expected, RenderedInline.ToPlainText(Assert.Single(speech.Paragraphs)));
         var image = Assert.IsType<RenderedParagraph>(document.Blocks[2]);
         Assert.Equal(expected, Assert.Single(image.Inlines.OfType<RenderedMedia>()).AltText);
         var choice = Assert.Single(scene.Choices);

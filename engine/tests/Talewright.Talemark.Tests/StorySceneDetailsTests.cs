@@ -30,6 +30,7 @@ public sealed class StorySceneDetailsTests
         ~ set flag:found
         {/if}
         > player: I understand.
+
         > guide: Then choose.
 
         {if flag:seen}
@@ -201,7 +202,7 @@ public sealed class StorySceneDetailsTests
     private static string Template(TemplateBlock block) => block switch
     {
         ParagraphTemplate paragraph => $"paragraph({Inlines(paragraph.Inlines)})",
-        SpeechTemplate speech => $"speech({speech.Speaker}:{Inlines(speech.Inlines)})",
+        SpeechTemplate speech => $"speech({speech.Speaker}:{string.Join("\\n\\n", speech.Paragraphs.Select(Inlines))})",
         ConditionalBlockTemplate conditional =>
             $"if({ExpressionFormatter.Format(conditional.Condition)};then=[{string.Join(",", conditional.Then.Select(Template))}];else=[{string.Join(",", conditional.Else.Select(Template))}])",
         _ => throw new NotSupportedException($"Unknown template block '{block.GetType().Name}'."),

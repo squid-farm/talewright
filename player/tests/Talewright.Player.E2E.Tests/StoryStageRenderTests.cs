@@ -64,6 +64,34 @@ public sealed class StoryStageRenderTests
     }
 
     [Fact]
+    public async Task Speech_paragraphs_render_inside_one_speaker_card()
+    {
+        var yaml = """
+            game: {id: speech-render, title: Speech Render, start: start}
+            characters:
+              player: {first-name: Ada}
+              guide: {first-name: Bea}
+            """;
+        var story = new StoryFixture("speech-render", yaml, """
+            === start
+            > guide: First paragraph.
+            >
+            > Second paragraph.
+            -> END
+            """).Compile();
+        var history = new StoryHistory(story, 42);
+
+        var html = await RenderStageAsync(story, history);
+
+        Assert.Contains("<div class=\"tw-speech\">", html);
+        Assert.Contains("<span class=\"tw-speaker\">Bea</span>", html);
+        Assert.Contains("<div class=\"tw-speech-body\">", html);
+        Assert.Contains("<p class=\"tw-line\">First paragraph.</p>", html);
+        Assert.Contains("<p class=\"tw-line\">Second paragraph.</p>", html);
+        Assert.DoesNotContain("<p class=\"tw-speech\">", html);
+    }
+
+    [Fact]
     public async Task Hidden_stats_collapse_the_sheet_and_it_reappears_when_a_rule_becomes_true()
     {
         var story = VisibilityStory();

@@ -107,7 +107,7 @@ public class NarrativeTests
         [
             new ParagraphTemplate([new TextTemplate("Cold "), new StyledTemplate(TextStyle.Strong, [new TextTemplate("air "), new StyledTemplate(TextStyle.Emphasis, [new TextTemplate("rushes")])])]),
             new ConditionalBlockTemplate(new FlagRef(new FlagId("lit")), [new ParagraphTemplate([new TextTemplate("Light!")])], [new ParagraphTemplate([new TextTemplate("Darkness.")])]),
-            new SpeechTemplate(EntityId.Player, [new TextTemplate("Hello.")]),
+            new SpeechTemplate(EntityId.Player, [[new TextTemplate("Hello.")]]),
         ], State());
 
         Assert.Equal("Cold air rushes\n\nDarkness.\n\nMara: Hello.", document.ToPlainText());
@@ -115,6 +115,29 @@ public class NarrativeTests
         Assert.Equal(
             [new RenderedText("Cold ", TextStyle.None), new RenderedText("air ", TextStyle.Strong), new RenderedText("rushes", TextStyle.Strong | TextStyle.Emphasis)],
             first.Inlines);
+        var speech = Assert.IsType<RenderedSpeech>(document.Blocks[2]);
+        Assert.Equal([[new RenderedText("Hello.", TextStyle.None)]], speech.Paragraphs);
+    }
+
+    [Fact]
+    public void Speech_paragraphs_render_as_one_speaker_block()
+    {
+        var document = new TemplateRenderer().Render(
+        [
+            new SpeechTemplate(EntityId.Player,
+            [
+                [new TextTemplate("First paragraph.")],
+                [new TextTemplate("Second paragraph.")],
+            ]),
+        ], State());
+
+        var speech = Assert.IsType<RenderedSpeech>(Assert.Single(document.Blocks));
+        Assert.Equal("Mara: First paragraph.\n\nSecond paragraph.", speech.ToPlainText());
+        Assert.Equal(
+        [
+            (IReadOnlyList<RenderedInline>)[new RenderedText("First paragraph.", TextStyle.None)],
+            [new RenderedText("Second paragraph.", TextStyle.None)],
+        ], speech.Paragraphs);
     }
 
     [Fact]

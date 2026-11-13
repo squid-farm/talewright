@@ -26,6 +26,13 @@ public sealed class CompilerDiagnosticCoverageTests
           player: {first-name: Ada}
         """;
 
+    private const string SpeechYaml = """
+        game: {id: coverage, title: Coverage, start: start}
+        characters:
+          player: {first-name: Ada}
+          guide: {first-name: Bea}
+        """;
+
     private const string DeclaredNerveYaml = """
         game:
           id: coverage
@@ -75,6 +82,8 @@ public sealed class CompilerDiagnosticCoverageTests
         Error("TW1006", Scene("@hub-limit 0\n-> END")),
         Error("TW1007", Scene("> player without a colon\n-> END"), new(MainFile, 2, 1),
             Scene("> player: Hello.\n-> END")),
+        Error("TW1018", Scene("> player: Hello.\n> guide: Hi.\n-> END", SpeechYaml), new(MainFile, 3, 1),
+            Scene("> player: Hello.\n\n> guide: Hi.\n-> END", SpeechYaml)),
         Error("TW1008", Scene("-> bad..id")),
         Error("TW1009", Scene("success: -> END\n-> END"), new(MainFile, 2, 1), ValidCheck),
         Error("TW1010", Scene("* ->")),
@@ -168,6 +177,7 @@ public sealed class CompilerDiagnosticCoverageTests
     [InlineData("TW1007")]
     [InlineData("TW1009")]
     [InlineData("TW1012")]
+    [InlineData("TW1018")]
     [InlineData("TW2015")]
     [InlineData("TW2016")]
     [InlineData("TW3001")]

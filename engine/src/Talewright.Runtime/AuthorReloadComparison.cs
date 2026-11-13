@@ -46,7 +46,7 @@ internal static class AuthorReloadComparison
     private static bool BuiltInBlocks(IEnumerable<TemplateBlock> blocks) => blocks.All(block => block switch
     {
         ParagraphTemplate paragraph => BuiltInInlines(paragraph.Inlines),
-        SpeechTemplate speech => BuiltInInlines(speech.Inlines),
+        SpeechTemplate speech => speech.Paragraphs.All(BuiltInInlines),
         ConditionalBlockTemplate conditional => BuiltInBlocks(conditional.Then) && BuiltInBlocks(conditional.Else),
         _ => false,
     });

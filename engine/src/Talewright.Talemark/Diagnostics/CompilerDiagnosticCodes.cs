@@ -20,6 +20,7 @@ public static class CompilerDiagnosticCodes
     public const string LegacyImageSyntax = "TW1015";
     public const string NestingLimitExceeded = "TW1016";
     public const string TrailingReaderTextBackslash = "TW1017";
+    public const string MissingSpeechSeparator = "TW1018";
 
     public const string UnknownNameOrProperty = "TW2001";
     public const string UnknownScene = "TW2002";

@@ -169,7 +169,7 @@ handled as reader text, so `\* [Go] -> hall` is prose rather than a choice.
 | `:::` | Opens and closes a `skill-check` block. Its `success:` and `failure:` outcomes are attached to the block; each outcome may contain effects and a divert. Append `, hidden` to the check to suppress its note. | `::: skill-check perception dc 12, hidden` | TW1012 unsupported or unclosed block; TW1009 missing or misplaced outcome. |
 | `*` | Choice at the start of a line (`* ` or `*[`). A prose `[label]` is optional with an explicit `->` target; a bare `* -> scene` uses the destination's `@choice-label` if present, otherwise the label is **Continue**. `* -> END` still shows **Continue**. At most one `(requires condition[, shown ["reader text"]])` and one `{ effects }` work on either form, in either order before the terminal divert or skill check. The opening `(requires ` is exact. The optional shown text is reader text that replaces the label only while the requirement is false. A choice skill check needs a label and may append `, hidden`. This is not multiplication in this context. | `* [Go] (requires skill-check perception dc 12, hidden, shown "Need a clue.") -> hall` | TW1011 malformed, duplicate or misplaced choice clause; TW3003 no usable target. |
 | `[` `]` | Bound a choice label; its contents are reader text with substitutions and formatting. Balanced inner brackets are literal text; the scanner skips backslash-escaped brackets and inline constructs. | `* [Open [the] door] -> hall` | TW1011 missing closing bracket. |
-| `>` | Dialogue at the start of a line; takes a character ID, `:`, then prose. Not a block quote. | `> guide: Follow me.` | TW1007 malformed speech; TW2001 unknown character. |
+| `>` | Starts dialogue with a character ID and `:`; consecutive `>` lines continue that speech. A bare `>` starts another paragraph. Not a block quote. | `> guide: Follow me.` | TW1007 malformed speech; TW1018 missing speaker separator; TW2001 unknown character. |
 | `~` | Effect batch at the start of a line; executes in source order. Triggers settle after the whole semicolon-separated batch. | `~ var:coins += 1` | TW1003 malformed effect; TW3011 after choices; name/type errors. |
 | `{` `}` | In prose, delimit a substitution or `if`/`else`/`/if`; in choices and outcomes, delimit effects. Block conditions occupy their own lines. Escape literal prose braces as `\{` and `\}`. | `{if player:hp > 0}Ready{else}Rest{/if}` | TW1004 unclosed brace; TW1005 unmatched condition; TW1011 unclosed choice effect; TW1009 unclosed outcome effect. |
 | `{image(...)}` | Construct image media in any narrative-template context, including choices and dialogue. Required quoted literal path and optional quoted alt, comma-separated. Alt uses the prose template language and cannot contain a nested image. Append `#decorative` only when the image has no descriptive alt text. Whitespace before `(` is allowed. This is a dedicated media construct, not a general function-call language or a property read. | `{image("maps/camp", "{guide:first-name} at the camp")}` or `{image("ornament.png")#decorative}` | TW1014 malformed call/escape, unsupported manipulator or nested image; TW2015 contradictory alt; TW2016 inaccessible choice label. Asset validation uses TW2010–TW2014. |
@@ -185,6 +185,18 @@ requires an explicit target (TW3003). Block conditions select a branch once; inl
 at their prose line. Unreachable steps after a guaranteed exit produce warning TW3012.
 Unknown names, incorrect types and malformed expressions can also produce the expression diagnostics
 below. See [error codes](diagnostics.md) for the complete messages.
+
+A speech block continues across each consecutive `>` line. Use a bare `>` to separate paragraphs; colons
+on continuation lines are ordinary dialogue punctuation. Any non-`>` line ends the block, so leave a blank
+line before another character speaks:
+
+```tale
+> guide: Tuesday: it's my least favorite day.
+>
+> Step 1: Stay low.
+
+> player: Understood.
+```
 
 ## Value and expression operators
 

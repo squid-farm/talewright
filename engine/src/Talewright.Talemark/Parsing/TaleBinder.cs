@@ -29,6 +29,21 @@ internal sealed record ParsedScene(SceneDefinition Definition, SourceLocation Lo
 /// </remarks>
 internal sealed partial class TaleBinder
 {
+    private sealed class SpeechBuilder(
+        EntityId speaker,
+        bool knownSpeaker,
+        SourceLocation start,
+        SourceLocation end,
+        SourceText paragraph)
+    {
+        public EntityId Speaker { get; } = speaker;
+        public bool KnownSpeaker { get; } = knownSpeaker;
+        public SourceLocation Start { get; } = start;
+        public SourceLocation End { get; set; } = end;
+        public SourceText Paragraph { get; set; } = paragraph;
+        public List<IReadOnlyList<TemplateInline>> Paragraphs { get; } = [];
+    }
+
     private readonly string _file;
     private readonly TaleFileSyntax _syntax;
     private readonly string _text;
@@ -40,6 +55,7 @@ internal sealed partial class TaleBinder
     private readonly Dictionary<(SceneId Scene, EntityId Actor, StatId Skill), int> _checkOccurrences = [];
     private SceneBuilder? _scene;
     private TaleSceneSyntax? _sceneSyntax;
+    private SpeechBuilder? _speech;
     private int _lineCursor;
     private int _index;
     private int _lineStart;
@@ -87,6 +103,8 @@ internal sealed partial class TaleBinder
                 var line = MoveTo(_lineCursor);
                 if (line.Kind != TaleLineKind.Comment)
                     ParseSceneLine(line);
+                else
+                    FlushSpeech();
                 CountLine();
             }
         }
@@ -140,6 +158,7 @@ internal sealed partial class TaleBinder
             return;
         }
 
+        FlushSpeech();
         FlushParagraph();
         // Syntax reported unclosed blocks; close them so their steps are kept.
         while (_scene.Frames.Count > 0)
@@ -157,6 +176,9 @@ internal sealed partial class TaleBinder
     private void ParseSceneLine(TaleLineSyntax syntax)
     {
         var scene = _scene!;
+        if (syntax.Kind != TaleLineKind.Speech)
+            FlushSpeech();
+
         // Attached lines are bound by their skill check.
         if (syntax.IsSuppressed || syntax.IsAttached)
             return;
@@ -391,6 +413,37 @@ internal sealed partial class TaleBinder
 
     private void ParseSpeech(TaleLineSyntax syntax)
     {
+        var marker = At(syntax.Indent);
+
+        if (_speech is not null)
+        {
+            var continuationPart = Part(syntax);
+            var text = Value(syntax);
+            if (TryGetDeclaredSpeechSpeaker(text, out var nextSpeaker, out var nextText, out var textOffset))
+            {
+                if (nextSpeaker != _speech.Speaker)
+                {
+                    _diagnostics.Error(CompilerDiagnosticCodes.MissingSpeechSeparator,
+                        $"Speech for '{nextSpeaker}' directly follows speech for '{_speech.Speaker}'. " +
+                        "Insert a blank line between different speakers.", marker);
+                    FlushSpeech();
+                    BeginSpeech(nextSpeaker, nextText, At(continuationPart.ValueStart + textOffset), marker);
+                    return;
+                }
+            }
+
+            if (text.Length == 0)
+            {
+                FlushSpeechParagraph();
+            }
+            else
+            {
+                _speech.Paragraph.AppendLine(text, At(continuationPart.ValueStart));
+            }
+            _speech.End = At(_lineLength);
+            return;
+        }
+
         var who = Head(syntax);
         var speakerLocation = At(Part(syntax).HeadStart);
         _symbols.Analysis?.Reference(who, speakerLocation, AuthoringSymbolKind.Character);
@@ -398,19 +451,79 @@ internal sealed partial class TaleBinder
             return;
 
         var speaker = new EntityId(who);
-        var text = SourceText.Single(Value(syntax), At(Part(syntax).ValueStart));
-        if (!_symbols.World.Characters.ContainsKey(speaker))
-        {
-            _diagnostics.Error(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Unknown character '{who}'. Declare it under characters in story.talewright.yaml.", speakerLocation);
-            if (_symbols.Analysis is not null)
-                InlineParser.Parse(text, _symbols, new DiagnosticBag(), cancellationToken: _cancellationToken);
-            return;
-        }
+        var part = Part(syntax);
+        BeginSpeech(speaker, Value(syntax), At(part.ValueStart), marker, At(_lineLength),
+            At(part.HeadStart));
+    }
 
-        var inlines = InlineParser.Parse(text, _symbols, _diagnostics,
-            cancellationToken: _cancellationToken, createSkillCheckIdentity: CreateSkillCheckIdentity);
-        var start = At(syntax.Indent);
-        _scene!.CurrentSteps.Add(new ProseStep(StepId(start), SpanFrom(start), new SpeechTemplate(speaker, inlines)));
+    private bool TryGetDeclaredSpeechSpeaker(
+        string text,
+        out EntityId speaker,
+        out string speech,
+        out int speechOffset)
+    {
+        speaker = default;
+        speech = string.Empty;
+        speechOffset = 0;
+        var colon = text.IndexOf(ExpressionVocabulary.Separator);
+        if (colon <= 0)
+            return false;
+
+        var id = text[..colon].Trim();
+        var candidate = new EntityId(id);
+        if (id.Length == 0 || !_symbols.World.Characters.ContainsKey(candidate))
+            return false;
+
+        var remainder = text[(colon + 1)..];
+        var trimmed = remainder.Trim();
+        speechOffset = colon + 1 + remainder.Length - remainder.TrimStart().Length;
+        speaker = candidate;
+        speech = trimmed;
+        return true;
+    }
+
+    private void BeginSpeech(EntityId speaker, string text, SourceLocation textLocation, SourceLocation start,
+        SourceLocation? end = null, SourceLocation? speakerLocation = null)
+    {
+        var knownSpeaker = _symbols.World.Characters.ContainsKey(speaker);
+        if (!knownSpeaker)
+            _diagnostics.Error(CompilerDiagnosticCodes.UnknownNameOrProperty,
+                $"Unknown character '{speaker}'. Declare it under characters in story.talewright.yaml.",
+                speakerLocation ?? textLocation);
+
+        var paragraph = new SourceText();
+        if (text.Length > 0)
+            paragraph.AppendLine(text, textLocation);
+        _speech = new SpeechBuilder(speaker, knownSpeaker, start, end ?? At(_lineLength), paragraph);
+    }
+
+    private void FlushSpeechParagraph()
+    {
+        var speech = _speech!;
+        if (speech.Paragraph.IsEmpty)
+            return;
+
+        speech.Paragraphs.Add(InlineParser.Parse(speech.Paragraph, _symbols,
+            speech.KnownSpeaker ? _diagnostics : new DiagnosticBag(),
+            cancellationToken: _cancellationToken, createSkillCheckIdentity: CreateSkillCheckIdentity));
+        speech.Paragraph = new SourceText();
+    }
+
+    private void FlushSpeech()
+    {
+        if (_speech is not { } speech)
+            return;
+
+        FlushSpeechParagraph();
+        if (speech.Paragraphs.Count == 0)
+            speech.Paragraphs.Add([]);
+        if (speech.KnownSpeaker)
+        {
+            var template = new SpeechTemplate(speech.Speaker, speech.Paragraphs.ToArray());
+            _scene!.CurrentSteps.Add(new ProseStep(StepId(speech.Start),
+                new SourceRange(speech.Start, speech.End), template));
+        }
+        _speech = null;
     }
 
     // ---- effects and diverts ---------------------------------------------------------------------------------------
