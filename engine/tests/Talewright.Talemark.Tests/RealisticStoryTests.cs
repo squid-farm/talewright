@@ -142,7 +142,10 @@ public sealed class RealisticStoryTests
 
         for (var step = 0; step < 10_000 && !history.Current.IsEnded; step++)
         {
-            history.Choose(history.Current.Choices[0].Key);
+            var choice = history.Current.Scene is { } scene && story.GetScene(scene).Hub is not null
+                ? Assert.Single(history.Current.Choices, choice => choice.Text == "Move on")
+                : history.Current.Choices[0];
+            history.Choose(choice.Key);
         }
 
         Assert.True(history.Current.IsEnded);

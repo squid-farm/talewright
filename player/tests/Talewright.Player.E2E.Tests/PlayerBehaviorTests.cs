@@ -337,7 +337,7 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
         await Choose("Set out for the temple");
         await Choose("Tie off the rope and cross carefully");
         await Choose("Make camp before the climb");
-        await AssertState(state => Assert.Equal(["Press on at dawn", "Eat a ration"], state.Choices));
+        await AssertState(state => Assert.Equal(["Eat a ration", "Press on at dawn"], state.Choices));
         await Choose("Eat a ration");
         await Choose("Share supper by the fire");
         await Observe(new(null, "one ration left"));
@@ -353,7 +353,7 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
         await Driver.ClickAsync("Load save");
         await Observe(new(null, "Your Courage is 10"));
         await Driver.ClickAsync("Back");
-        await AssertState(state => Assert.Equal(["Press on at dawn", "Stand your ground"], state.Choices));
+        await AssertState(state => Assert.Equal(["Stand your ground", "Press on at dawn"], state.Choices));
         await Driver.ClickAsync("Forward");
         await Choose("Catch your breath");
         await Choose("Follow the signal");

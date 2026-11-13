@@ -119,7 +119,7 @@ public sealed class LostRelicDreamTests(WebHostFixture host, ITestOutputHelper o
     private async Task MeetKeepers(string watcherRoute)
     {
         await AssertState(state => Assert.Equal(
-            ["Wake before going further", "Speak to the lost explorer", "Answer the Spiral"], state.Choices));
+            ["Speak to the lost explorer", "Answer the Spiral", "Wake before going further"], state.Choices));
         await Choose("Speak to the lost explorer");
         await Observe(new(null, "Tell Tomas I remember the river"));
         await Observe(new(null, "10"));
