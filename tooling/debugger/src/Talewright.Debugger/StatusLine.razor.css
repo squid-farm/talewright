@@ -1,6 +1,5 @@
 .debugger-status-line {
-    overflow: auto;
-    max-height: 84px;
+    min-width: 0;
 }
 
 .debugger-status-line:has(p) {
@@ -12,10 +11,8 @@
     padding: 3px 10px;
     border-left: 3px solid var(--tw-accent);
     background: var(--tw-panel);
-}
-
-.debugger-status-line p + p {
-    border-top: 1px solid var(--tw-border);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
 }
 
 .debugger-status-line p.debugger-error {
