@@ -1,4 +1,5 @@
 @using Microsoft.AspNetCore.Components.Web
+@using Talewright.Talemark.Diagnostics
 
 <header class="debugger-toolbar">
     <div class="toolbar-main">
@@ -21,7 +22,8 @@
         <button type="button" disabled="@(Story is null)" @onclick="OnRestartScene">Restart scene</button>
         <span class="toolbar-separator" aria-hidden="true"></span>
         <button type="button" aria-pressed="@(InspectMode ? "true" : "false")" disabled="@MapSelected" @onclick="OnToggleInspect">Inspect</button>
-        <button type="button" class="source-status @SourceStatusClass" @onclick="OnShowProblems">@SourceStatus</button>
+        <button type="button" class="source-status @SourceStatusClass" aria-label="@SourceStatusAction"
+                @onclick="OnSourceStatusClick">@SourceStatus</button>
     </div>
     <div class="toolbar-layout">
         <button type="button" disabled="@(!SettingsReady)" @onclick="OnOpenReaderSettings">Reader settings</button>
@@ -104,6 +106,13 @@
     private string SourceStatusClass => Model.RestartRequired || Model.SourceRejected ? "source-status-error"
         : Model.SourcePending ? "source-status-pending"
         : "source-status-ok";
+
+    private bool ShouldRestartFromSource => Model.RestartRequired &&
+        !Model.Diagnostics.Any(diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+
+    private string SourceStatusAction => ShouldRestartFromSource ? "Restart from source" : "Open Problems";
+
+    private Task OnSourceStatusClick() => ShouldRestartFromSource ? Restart() : OnShowProblems.InvokeAsync();
 
     private Task SelectMainView(bool map)
     {

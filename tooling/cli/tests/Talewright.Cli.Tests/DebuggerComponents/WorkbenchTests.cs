@@ -254,6 +254,7 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
         await Button(workbench, "Tools").ClickAsync(new MouseEventArgs());
         Assert.Empty(workbench.FindComponents<ToolTabs>());
 
+        Assert.Equal("Open Problems", workbench.Find(".source-status").GetAttribute("aria-label"));
         await workbench.Find(".source-status").ClickAsync(new MouseEventArgs());
 
         Assert.Equal("true", Button(workbench, "Tools").GetAttribute("aria-pressed"));
@@ -434,6 +435,9 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
     {
         var workbench = Show();
         await Button(workbench, "Start selected scene").ClickAsync(new MouseEventArgs());
+        var model = Services.GetRequiredService<WorkbenchModel>();
+        var lastGoodStory = model.Story;
+        var lastGoodSession = model.Session;
 
         File.WriteAllText(Path.Combine(_root.FullName, "main.tale"), ComponentStory.Tale.Replace("-> cave", "-> nowhere"));
         await Button(workbench, "Files").ClickAsync(new MouseEventArgs());
@@ -445,6 +449,80 @@ public sealed class WorkbenchTests : BunitContext, IAsyncLifetime
             workbench.Find(".debugger-status-line p[role=alert]").TextContent);
         Assert.Single(workbench.FindAll(".debugger-status-line p[role=status], .debugger-status-line p[role=alert]"));
         Assert.Contains("nowhere", workbench.FindComponent<Talewright.Player.Components.DiagnosticList>().Markup);
+        Assert.Equal("hall Great Hall", Passage(workbench));
+
+        var status = workbench.Find(".source-status");
+        Assert.Equal("Open Problems", status.GetAttribute("aria-label"));
+        await status.ClickAsync(new MouseEventArgs());
+
+        Assert.Equal("true", workbench.Find("#tool-problems-tab").GetAttribute("aria-selected"));
+        Assert.Contains("nowhere", workbench.FindComponent<Talewright.Player.Components.DiagnosticList>().Markup);
+        Assert.Same(lastGoodStory, model.Story);
+        Assert.Same(lastGoodSession, model.Session);
+        Assert.Equal("hall Great Hall", Passage(workbench));
+    }
+
+    [Fact]
+    public async Task Restart_required_status_restarts_from_source_and_adopts_it()
+    {
+        var workbench = Show();
+        await Button(workbench, "Start selected scene").ClickAsync(new MouseEventArgs());
+        var model = Services.GetRequiredService<WorkbenchModel>();
+        Assert.NotNull(model.Session);
+
+        File.WriteAllText(Path.Combine(_root.FullName, Talewright.Talemark.Compilation.StorySource.ManifestFileName),
+            ComponentStory.Yaml.Replace("title: Debugger components", "title: Renamed story"));
+        workbench.WaitForAssertion(() =>
+        {
+            Assert.StartsWith("Source compiled, but explicit Restart from source is required.",
+                workbench.Find(".debugger-status-line p[role=alert]").TextContent);
+            Assert.Equal("Restart required", workbench.Find(".source-status").TextContent);
+        }, Reload);
+
+        var status = workbench.Find(".source-status");
+        Assert.Equal("Restart from source", status.GetAttribute("aria-label"));
+        await status.ClickAsync(new MouseEventArgs());
+
+        workbench.WaitForAssertion(() =>
+        {
+            Assert.Equal("Renamed story", workbench.FindComponent<SetupTool>().Instance.Story.Title);
+            Assert.DoesNotContain(workbench.FindAll("p[role=status]"),
+                message => message.TextContent.StartsWith("Restart required.", StringComparison.Ordinal));
+        }, Reload);
+        Assert.Null(model.Session);
+        Assert.False(model.RestartRequired);
+    }
+
+    [Fact]
+    public async Task Restart_required_with_compiler_errors_opens_problems_without_replacing_the_last_good_run()
+    {
+        var workbench = Show();
+        await Button(workbench, "Start selected scene").ClickAsync(new MouseEventArgs());
+        var model = Services.GetRequiredService<WorkbenchModel>();
+        var lastGoodStory = model.Story;
+        var lastGoodSession = model.Session;
+
+        File.WriteAllText(Path.Combine(_root.FullName, Talewright.Talemark.Compilation.StorySource.ManifestFileName),
+            ComponentStory.Yaml.Replace("title: Debugger components", "title: Renamed story"));
+        File.WriteAllText(Path.Combine(_root.FullName, "main.tale"), ComponentStory.Tale.Replace("-> cave", "-> nowhere"));
+        await Button(workbench, "Files").ClickAsync(new MouseEventArgs());
+        await Button(workbench, "Rescan / retry watcher").ClickAsync(new MouseEventArgs());
+
+        workbench.WaitForAssertion(() =>
+        {
+            Assert.True(model.RestartRequired);
+            Assert.Equal("Restart required", workbench.Find(".source-status").TextContent);
+            Assert.Contains("nowhere", workbench.FindComponent<Talewright.Player.Components.DiagnosticList>().Markup);
+        }, Reload);
+
+        var status = workbench.Find(".source-status");
+        Assert.Equal("Open Problems", status.GetAttribute("aria-label"));
+        await status.ClickAsync(new MouseEventArgs());
+
+        Assert.Equal("true", workbench.Find("#tool-problems-tab").GetAttribute("aria-selected"));
+        Assert.Contains("nowhere", workbench.FindComponent<Talewright.Player.Components.DiagnosticList>().Markup);
+        Assert.Same(lastGoodStory, model.Story);
+        Assert.Same(lastGoodSession, model.Session);
         Assert.Equal("hall Great Hall", Passage(workbench));
     }
 
