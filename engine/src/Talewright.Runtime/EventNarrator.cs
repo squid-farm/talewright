@@ -13,20 +13,36 @@ namespace Talewright.Runtime;
 public static class EventNarrator
 {
     /// <summary>Describes <paramref name="events"/>; <paramref name="state"/> supplies display names.</summary>
-    public static IEnumerable<RenderedNote> Describe(IEnumerable<GameEvent> events, IGameStateView state)
+    public static IEnumerable<RenderedNote> Describe(IEnumerable<GameEvent> events, IGameStateView state) =>
+        DescribeCore(events, state, null);
+
+    internal static IEnumerable<RenderedNote> Describe(IEnumerable<GameEvent> events, IGameStateView state,
+        IReadOnlyList<bool?> statVisibilityBeforeEvents) =>
+        DescribeCore(events, state, statVisibilityBeforeEvents);
+
+    private static IEnumerable<RenderedNote> DescribeCore(IEnumerable<GameEvent> events, IGameStateView state,
+        IReadOnlyList<bool?>? statVisibilityBeforeEvents)
     {
-        var levelStat = state.Ruleset.LevelingRule?.LevelStat;
-        foreach (var e in events)
+        var eventList = events as IReadOnlyList<GameEvent> ?? events.ToArray();
+        if (statVisibilityBeforeEvents is not null && statVisibilityBeforeEvents.Count != eventList.Count)
         {
+            throw new ArgumentException("Stat visibility must be supplied for every event.", nameof(statVisibilityBeforeEvents));
+        }
+
+        var levelStat = state.Ruleset.LevelingRule?.LevelStat;
+        for (var index = 0; index < eventList.Count; index++)
+        {
+            var e = eventList[index];
+            var statVisible = statVisibilityBeforeEvents?[index] is not false;
             var note = e switch
             {
-                SkillCheckResolved { IsHidden: false } c => new RenderedNote(NoteKind.Check, DescribeCheck(c, state)),
-                StatChanged s when s.Stat != levelStat => new RenderedNote(NoteKind.Change,
+                SkillCheckResolved { IsHidden: false } c when statVisible => new RenderedNote(NoteKind.Check, DescribeCheck(c, state)),
+                StatChanged s when s.Stat != levelStat && statVisible => new RenderedNote(NoteKind.Change,
                     $"{Who(s.Character, state)}{StatName(s.Stat, state)} {Signed(s.NewValue - s.OldValue)} ({s.NewValue})"),
                 ItemsGranted g => new RenderedNote(NoteKind.Change, $"{Who(g.Character, state)}Gained: {Items(g.Item, g.Quantity, state)}"),
                 ItemsRemoved r => new RenderedNote(NoteKind.Change, $"{Who(r.Character, state)}Lost: {Items(r.Item, r.Quantity, state)}"),
                 StandingChanged f => new RenderedNote(NoteKind.Change, DescribeStanding(f, state)),
-                LevelChanged l => new RenderedNote(NoteKind.Change, $"{Who(l.Character, state)}Level {l.NewLevel}!"),
+                LevelChanged l when statVisible => new RenderedNote(NoteKind.Change, $"{Who(l.Character, state)}Level {l.NewLevel}!"),
                 _ => null,
             };
             if (note is not null)

@@ -14,6 +14,15 @@ public sealed class CharacterCreation
     public IReadOnlyList<CharacterPreset> Presets { get; init; } = [];
     public IReadOnlyDictionary<StatId, IReadOnlyList<int>> Stats { get; init; } = new Dictionary<StatId, IReadOnlyList<int>>();
 
+    internal CharacterCreation WithStats(IEnumerable<KeyValuePair<StatId, IReadOnlyList<int>>> stats) =>
+        new()
+        {
+            EditName = EditName,
+            Pronouns = Pronouns,
+            Presets = Presets,
+            Stats = new ReadOnlyDictionary<StatId, IReadOnlyList<int>>(stats.ToDictionary(pair => pair.Key, pair => pair.Value)),
+        };
+
     public CharacterSelection Default(CharacterDefinition player, string? presetId = null)
     {
         var preset = presetId is null ? Presets.FirstOrDefault()

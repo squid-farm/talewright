@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Talewright.Core.State;
 using Talewright.Core.Rulesets;
 using Talewright.Core.World;
 using Talewright.Talemark.Analysis;
@@ -69,8 +70,17 @@ public static class StoryHover
         return null;
     }
 
-    private static AuthoringHover Describe(StoryAnalysis analysis, AuthoringSymbol symbol, SourceRange range)
+    private static AuthoringHover? Describe(StoryAnalysis analysis, AuthoringSymbol symbol, SourceRange range)
     {
+        if (symbol.Kind == AuthoringSymbolKind.Stat)
+        {
+            if (analysis.Story is { } story && analysis.World is { } world &&
+                !story.IsStatVisible(new(symbol.Name), GameState.CreateInitial(world, story.Seed ?? 0)))
+            {
+                return null;
+            }
+        }
+
         if (symbol.Kind == AuthoringSymbolKind.Modifier &&
             AuthoringSyntaxVocabulary.TryGetKeywordHelp(symbol.Name, out var modifierHelp))
             return Help(modifierHelp.Spelling, modifierHelp.Description, range);

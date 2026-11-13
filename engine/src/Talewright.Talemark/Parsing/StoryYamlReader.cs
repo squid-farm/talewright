@@ -1,4 +1,5 @@
 using System.Globalization;
+using Talewright.Core.Identity;
 using Talewright.Core.World;
 using Talewright.Rules.Checks;
 using Talewright.Talemark.Analysis;
@@ -92,7 +93,7 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
 
         if (Get(game, ManifestVocabulary.CharacterSheet) is { } characterSheet)
         {
-            manifest.CharacterSheet = ReadCharacterSheet(characterSheet);
+            (manifest.CharacterSheet, manifest.CharacterSheetStatRules) = ReadCharacterSheet(characterSheet, ruleset);
         }
 
         ReadTriggers(Get(root, ManifestVocabulary.Triggers), manifest.Triggers);
@@ -100,28 +101,90 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
         return manifest;
     }
 
-    private CharacterSheetVisibility ReadCharacterSheet(YamlNode node)
+    private (CharacterSheetVisibility Visibility, IReadOnlyList<RawStatVisibilityRule> StatRules)
+        ReadCharacterSheet(YamlNode node, Talewright.Core.Rulesets.Ruleset ruleset)
     {
         if (node is YamlScalarNode scalar && bool.TryParse(scalar.Value, out var shown))
         {
-            return shown ? CharacterSheetVisibility.Shown : CharacterSheetVisibility.Hidden;
+            return (shown ? CharacterSheetVisibility.Shown : CharacterSheetVisibility.Hidden, []);
         }
 
         if (node is not YamlMappingNode map)
         {
-            return _yaml.Error(node, CompilerDiagnosticCodes.InvalidConfigurationValue,
+            return (_yaml.Error(node, CompilerDiagnosticCodes.InvalidConfigurationValue,
                 $"{ManifestVocabulary.CharacterSheet} must be true, false, or a mapping of " +
                 $"{ManifestVocabulary.Stats}, {ManifestVocabulary.Inventory} and {ManifestVocabulary.Standing} to true or false.",
-                CharacterSheetVisibility.Shown);
+                CharacterSheetVisibility.Shown), []);
         }
 
         _yaml.CheckKeys(map, ManifestVocabulary.Stats, ManifestVocabulary.Inventory, ManifestVocabulary.Standing);
-        return new CharacterSheetVisibility(
-            Section(ManifestVocabulary.Stats), Section(ManifestVocabulary.Inventory), Section(ManifestVocabulary.Standing));
+        var (statsShown, statRules) = ReadStatVisibility(Get(map, ManifestVocabulary.Stats), ruleset);
+        return (new CharacterSheetVisibility(
+            statsShown, Section(ManifestVocabulary.Inventory), Section(ManifestVocabulary.Standing)), statRules);
 
         bool Section(string key) => Get(map, key) is not { } value
             ? true
             : _yaml.Boolean(value, $"{ManifestVocabulary.CharacterSheet}.{key}", true);
+    }
+
+    private (bool Shown, IReadOnlyList<RawStatVisibilityRule> Rules) ReadStatVisibility(
+        YamlNode? node, Talewright.Core.Rulesets.Ruleset ruleset)
+    {
+        if (node is null)
+        {
+            return (true, []);
+        }
+
+        if (_yaml.Mapping(node, $"{ManifestVocabulary.CharacterSheet}.{ManifestVocabulary.Stats}") is not { } map)
+        {
+            return (true, []);
+        }
+
+        var shown = Get(map, ManifestVocabulary.Shown) is not { } shownNode
+            || _yaml.Boolean(shownNode, $"{ManifestVocabulary.CharacterSheet}.{ManifestVocabulary.Stats}.{ManifestVocabulary.Shown}", true);
+        var rules = new List<RawStatVisibilityRule>();
+        foreach (var (key, value) in map.Children)
+        {
+            if (Scalar(key) == ManifestVocabulary.Shown)
+            {
+                continue;
+            }
+
+            var rawId = _yaml.Identifier(key, IdentifierLabels.Stat);
+            if (rawId is null)
+            {
+                continue;
+            }
+
+            var stat = new StatId(rawId);
+            if (!ruleset.StatsById.ContainsKey(stat))
+            {
+                _yaml.Error(key, CompilerDiagnosticCodes.UnknownConfigurationReference,
+                    $"Unknown stat '{stat}' (ruleset '{ruleset.Id}')." + _statGuidance.ForMissingStat(stat), 0);
+                continue;
+            }
+
+            var scalarValue = Scalar(value);
+            if (bool.TryParse(scalarValue, out var visible))
+            {
+                rules.Add(new RawStatVisibilityRule(stat, visible, null, _yaml.At(value)));
+            }
+            else if (scalarValue is not null)
+            {
+                if (value is YamlScalarNode scalar)
+                {
+                    _analysis?.Expression(ExpressionContextKind.Condition, scalarValue, _yaml.At(scalar), cacheForReuse: true);
+                }
+                rules.Add(new RawStatVisibilityRule(stat, null, scalarValue, _yaml.At(value)));
+            }
+            else
+            {
+                _yaml.Error(value, CompilerDiagnosticCodes.InvalidConfigurationValue,
+                    $"{ManifestVocabulary.CharacterSheet}.{ManifestVocabulary.Stats}.{stat} must be true, false, or a condition expression.", 0);
+            }
+        }
+
+        return (shown, rules.AsReadOnly());
     }
 
     private void ReadTriggers(YamlNode? node, List<RawTrigger> triggers)

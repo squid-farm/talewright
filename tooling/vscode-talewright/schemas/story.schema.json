@@ -57,7 +57,7 @@
             }
           ],
           "default": true,
-          "description": "Which character sheet sections players see. Defaults to true: each section appears when the story declares something for it. false hides the whole sheet; a mapping such as { inventory: false } hides only those sections. Hiding is presentation only: stats, items and standing still work in conditions and effects."
+          "description": "Which character sheet sections players see. Defaults to true: each section appears when the story declares something for it. false hides the whole sheet; a mapping controls individual sections. Hiding is presentation only: stats, items and standing still work in conditions and effects."
         },
         "creation": {
           "$ref": "#/definitions/creation",
@@ -232,12 +232,11 @@
     },
     "characterSheet": {
       "type": "object",
-      "description": "Character sheet sections to show or hide. Omitted sections keep the default.",
+      "description": "Character sheet sections to show or hide. Omitted sections keep the default. Stats use a mapping with an optional shown boolean and per-stat visibility rules.",
       "properties": {
         "stats": {
-          "$ref": "#/definitions/booleanScalar",
-          "default": true,
-          "description": "Whether the sheet shows stats. false hides them without changing stats, skill checks or levelling."
+          "$ref": "#/definitions/statVisibilityMap",
+          "description": "Per-stat visibility rules. Unlisted stats are shown. Set shown: false to hide the whole stats section."
         },
         "inventory": {
           "$ref": "#/definitions/booleanScalar",
@@ -251,6 +250,43 @@
         }
       },
       "additionalProperties": false
+    },
+    "statVisibilityMap": {
+      "type": "object",
+      "propertyNames": {
+        "$ref": "#/definitions/identifier"
+      },
+      "properties": {
+        "shown": {
+          "$ref": "#/definitions/booleanScalar",
+          "default": true,
+          "description": "Whether the stats section is shown. false hides all stats regardless of per-stat rules."
+        }
+      },
+      "additionalProperties": {
+        "$ref": "#/definitions/statVisibility"
+      },
+      "description": "Stats keyed by enabled ruleset stat IDs. Unlisted stats are shown; each value is true, false, or a Talemark condition expression."
+    },
+    "statVisibility": {
+      "oneOf": [
+        {
+          "type": "boolean"
+        },
+        {
+          "type": "string",
+          "pattern": "^(true|false)$",
+          "description": "Quoted true or false."
+        },
+        {
+          "type": "string",
+          "minLength": 1,
+          "not": {
+            "pattern": "^(true|false)$"
+          },
+          "description": "Talemark boolean condition, using the same syntax as a trigger condition."
+        }
+      ]
     },
     "statDefinition": {
       "type": "object",

@@ -55,7 +55,7 @@ public sealed class ManifestFaker
     public bool? Autosave { get; init; }
     /// <summary>Writes <c>character-sheet: true|false</c>; takes precedence over <see cref="CharacterSheetSections"/>.</summary>
     public bool? CharacterSheet { get; init; }
-    /// <summary>Writes a <c>character-sheet</c> mapping of section names to true or false.</summary>
+    /// <summary>Writes a <c>character-sheet</c> mapping of sections to visibility settings.</summary>
     public IReadOnlyDictionary<string, bool>? CharacterSheetSections { get; init; }
     public bool? CreationName { get; init; }
 
@@ -308,7 +308,9 @@ public sealed class ManifestFaker
             var sheet = Mapping();
             foreach (var (section, shown) in CharacterSheetSections)
             {
-                Add(sheet, section, shown);
+                Add(sheet, section, section == "stats"
+                    ? new Dictionary<string, object?> { ["shown"] = shown }
+                    : shown);
             }
             Add(game, "character-sheet", sheet);
         }

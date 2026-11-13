@@ -4,6 +4,7 @@ using Talewright.Narrative.Grammar;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Expressions;
 using Talewright.Talemark.Analysis;
+using Talewright.Talemark.Model;
 using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Authoring;
@@ -52,6 +53,9 @@ public static class StoryPreview
     private static SubstitutionPreview Preview(StoryAnalysis analysis, AuthoredSubstitution substitution, EvaluationContext context)
     {
         var template = substitution.Template;
+        if (UsesHiddenStat(template.Value, analysis.Story, context.State))
+            return new(substitution.Range, null, [], "This substitution uses a stat hidden from the player.");
+
         // Direct variables are previewed only when they have an explicit manifest default.
         var variable = template.Value switch
         {
@@ -93,6 +97,17 @@ public static class StoryPreview
         }
         return new(substitution.Range, value, steps.AsReadOnly(), null);
     }
+
+    private static bool UsesHiddenStat(Expr expression, StoryDefinition? story, IGameStateView state) =>
+        expression switch
+        {
+            StatRef stat => story is not null && !story.IsStatVisible(stat.Stat, state),
+            SkillCheckExpr check => story is not null && !story.IsStatVisible(check.Skill, state),
+            UnaryExpr unary => UsesHiddenStat(unary.Operand, story, state),
+            BinaryExpr binary => UsesHiddenStat(binary.Left, story, state) ||
+                UsesHiddenStat(binary.Right, story, state),
+            _ => false,
+        };
 
     private static bool HasNumericDefault(Expr expression, StoryAnalysis analysis) => expression switch
     {

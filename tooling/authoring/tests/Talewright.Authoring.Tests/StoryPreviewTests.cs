@@ -281,6 +281,21 @@ public sealed class StoryPreviewTests
         Assert.Contains("Declared at", character.PlainText);
     }
 
+    [Fact]
+    public void Hidden_stat_values_are_withheld_from_preview_and_hover()
+    {
+        var manifest = Manifest.Replace("  ruleset: rpg",
+            "  ruleset: rpg\n  character-sheet:\n    stats:\n      str: false");
+        var analysis = StoryAnalyzer.Analyze(Source("=== start\n{player:str}\n-> END", manifest));
+
+        var preview = Assert.Single(StoryPreview.Get(analysis, "main.tale"));
+        Assert.Null(preview.Value);
+        Assert.Contains("hidden from the player", preview.UnavailableReason);
+        var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, new("main.tale", 2, 10)));
+        Assert.Contains("hidden from the player", hover.PlainText);
+        Assert.DoesNotContain("Input:", hover.PlainText);
+    }
+
     private static StorySource Source(string tale, string manifest = Manifest) => new(new Dictionary<string, string>
     {
         [StorySource.ManifestFileName] = manifest, ["main.tale"] = tale,

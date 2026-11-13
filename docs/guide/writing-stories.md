@@ -491,14 +491,24 @@ See [image syntax](../reference/talemark-syntax.md#images) for the complete rule
 ## Other options
 
 - `game.undo: false` in `story.talewright.yaml` hides the **Back** and **Forward** buttons. Saves still work.
-- `game.character-sheet` hides the character sheet. The sheet shows only what your story declares: stats,
-  inventory when you declare items, and standing when you declare factions. To keep tracking something without
-  showing it, turn its section off. `character-sheet: false` hides the whole sheet:
+- `game.character-sheet` controls what players see on the character sheet. The sheet shows only what your
+  story declares: stats, inventory when you declare items, and standing when you declare factions. To keep
+  tracking something without showing it, hide its section or an individual stat. `character-sheet: false`
+  hides the whole sheet:
 
   ```yaml
   game:
-    character-sheet: { inventory: false, standing: false }
+    ruleset: rpg
+    character-sheet:
+      stats:
+        str: flag:interview.str-known
+        wis: false
+      inventory: false
+      standing: false
+  flags: [interview.str-known]
   ```
 
-  Hidden sections still work: `(requires player has rope)`, item modifiers and faction tiers behave the same.
-  See [the manifest reference](../reference/talemark-syntax.md#1-storytalewrightyaml) for details.
+  Unlisted stats remain visible. Stat conditions are checked against the current state; `shown: false` hides
+  the entire stats section. Hidden stats, items and standing still work in conditions and effects, but the
+  engine omits its own generated disclosures of hidden stats. Authored story text is unchanged. See
+  [the manifest reference](../reference/talemark-syntax.md#1-storytalewrightyaml) for details.

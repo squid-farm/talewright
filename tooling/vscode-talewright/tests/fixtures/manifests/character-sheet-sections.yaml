@@ -2,7 +2,7 @@ game:
   id: character-sheet-sections
   title: Character sheet sections
   start: beginning
-  character-sheet: { inventory: false, standing: "false", stats: true }
+  character-sheet: { inventory: false, standing: "false", stats: { shown: true } }
 characters:
   player:
     first-name: Ada

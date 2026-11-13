@@ -79,6 +79,7 @@ public sealed class StoryAnalysis
         Tokens = original.Tokens;
         _classifications = original._classifications;
         World = original.World;
+        Story = original.Story;
         Substitutions = original.Substitutions;
         _scenes = original._scenes;
         SymbolContext = original.SymbolContext;
@@ -88,15 +89,16 @@ public sealed class StoryAnalysis
         _symbolsByIdentity = original._symbolsByIdentity;
         Diagnostics = Array.AsReadOnly(original.Diagnostics.Append(additional).ToArray());
     }
-    internal StoryAnalysis(StorySource source, AnalysisCollector collector, IReadOnlyList<Diagnostic> diagnostics)
-        : this(source, collector, diagnostics, null, null, false, null) { }
+    internal StoryAnalysis(StorySource source, AnalysisCollector collector, IReadOnlyList<Diagnostic> diagnostics,
+        StoryDefinition? story = null)
+        : this(source, collector, diagnostics, null, null, false, null, story) { }
     internal StoryAnalysis(StorySource source, AnalysisCollector collector, IReadOnlyList<Diagnostic> diagnostics,
         StoryAnalysis? snapshot, string currentFile, IReadOnlyList<string>? additionalTagNames = null)
-        : this(source, collector, diagnostics, snapshot, currentFile, true, additionalTagNames) { }
+        : this(source, collector, diagnostics, snapshot, currentFile, true, additionalTagNames, null) { }
 
     private StoryAnalysis(StorySource source, AnalysisCollector collector, IReadOnlyList<Diagnostic> diagnostics,
         StoryAnalysis? snapshot, string? currentFile, bool currentFileAnalysis,
-        IReadOnlyList<string>? additionalTagNames)
+        IReadOnlyList<string>? additionalTagNames, StoryDefinition? story)
     {
         Source = source;
         _currentFile = currentFileAnalysis ? currentFile : null;
@@ -136,6 +138,7 @@ public sealed class StoryAnalysis
             .SelectMany(input => TalemarkClassifier.Classify(input.File, input.Syntax, CancellationToken.None))
             .ToArray()));
         World = collector.AuthoredWorld;
+        Story = currentFileAnalysis ? null : story;
         Substitutions = Array.AsReadOnly(collector.Substitutions.ToArray());
         var scenes = Array.AsReadOnly(collector.Scenes.ToArray());
         _scenes = currentFileAnalysis && snapshot is not null
@@ -182,6 +185,8 @@ public sealed class StoryAnalysis
     /// <summary>Source classifications, computed once on first access from this snapshot's parsed syntax.</summary>
     public IReadOnlyList<TalemarkClassification> Classifications => _classifications.Value;
     public WorldDefinition? World { get; }
+    /// <summary>The compiled story when the full source has no errors; null for incomplete or current-file analysis.</summary>
+    public StoryDefinition? Story { get; }
     public IReadOnlyList<AuthoredSubstitution> Substitutions { get; }
 
     /// <summary>Parsed scene definitions; the first declaration wins when IDs are duplicated.</summary>
@@ -243,7 +248,8 @@ public static class StoryAnalyzer
         var collector = new AnalysisCollector(source, options);
         var result = StoryCompiler.CompileForAnalysis(source, options, collector, cancellationToken, syntax);
         cancellationToken.ThrowIfCancellationRequested();
-        var analysis = new StoryAnalysis(source, collector, result.Diagnostics.Concat(collector.RecoveryImageDiagnostics).ToArray());
+        var analysis = new StoryAnalysis(source, collector,
+            result.Diagnostics.Concat(collector.RecoveryImageDiagnostics).ToArray(), result.Story);
         cancellationToken.ThrowIfCancellationRequested();
         return analysis;
     }
@@ -805,6 +811,8 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                     else if (path is [ManifestVocabulary.Characters, _, ManifestVocabulary.Inventory]) ReferenceNode(key, AuthoringSymbolKind.Item, file: file);
                     else if (next is [ManifestVocabulary.Characters, _, ManifestVocabulary.Inventory] && value is YamlSequenceNode)
                         ReferenceNode(value, AuthoringSymbolKind.Item, file: file);
+                    else if (path is [ManifestVocabulary.Game, ManifestVocabulary.CharacterSheet, ManifestVocabulary.Stats]
+                        && name != ManifestVocabulary.Shown) ReferenceNode(key, AuthoringSymbolKind.Stat, file: file);
                     else if (path is [ManifestVocabulary.Characters, _, ManifestVocabulary.Stats] or [ManifestVocabulary.Items, _, ManifestVocabulary.Modifiers] or [ManifestVocabulary.Game, ManifestVocabulary.Creation, ManifestVocabulary.Stats]
                         or [ManifestVocabulary.Game, ManifestVocabulary.Creation, ManifestVocabulary.Presets, _, ManifestVocabulary.Stats]) ReferenceNode(key, AuthoringSymbolKind.Stat, file: file);
                     if (next is [ManifestVocabulary.Game] or [ManifestVocabulary.Characters] or [ManifestVocabulary.Characters, _] or [ManifestVocabulary.Characters, _, ManifestVocabulary.Inventory]

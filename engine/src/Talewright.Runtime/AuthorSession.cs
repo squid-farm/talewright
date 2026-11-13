@@ -115,7 +115,10 @@ public sealed class AuthorSession
             default:
                 throw new NotSupportedException($"Unknown author command '{command.GetType().Name}'.");
         }
-        var events = Array.AsReadOnly(_session.Events.Skip(eventStart).ToArray());
+        var rawEvents = _session.Events.Skip(eventStart).ToArray();
+        var before = EventLog.Replay(Story.World, _session.Seed, _session.Events.Take(eventStart)).State;
+        var events = Array.AsReadOnly(AuthorInspection.VisibleEvents(Story, before, rawEvents)
+            .Select(entry => entry.Event).ToArray());
         return new AuthorCommandResult(eventStart, events, changes);
     }
 

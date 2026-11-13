@@ -44,6 +44,8 @@ public sealed class StorySession : IStorySession
     private IReadOnlyList<RenderedBlock> _pendingNotes = [];
     private IReadOnlyList<RenderedBlock> _entryPrelude = [];
     private readonly List<RenderedBlock> _editNotes = [];
+    private readonly List<bool?> _statVisibilityBeforeEvents = [];
+    private bool? _nextStatVisibility;
 
     /// <summary>Creates a session. <paramref name="seed"/> defaults to the story's seed, else a random one.</summary>
     public StorySession(StoryDefinition story, ulong? seed = null, IGrammar? grammar = null, CharacterSelection? character = null)
@@ -72,6 +74,17 @@ public sealed class StorySession : IStorySession
         Story = story;
         Seed = seed ?? story.Seed ?? DeterministicDice.NewSeed();
         _log = new EventLog(story.World, Seed);
+        _log.Appending += gameEvent =>
+        {
+            _nextStatVisibility = StatDisclosureVisibility.StatFor(gameEvent, story.World.Ruleset) is { } stat
+                ? story.IsStatVisible(stat, _log.State)
+                : null;
+        };
+        _log.Appended += _ =>
+        {
+            _statVisibilityBeforeEvents.Add(_nextStatVisibility);
+            _nextStatVisibility = null;
+        };
         if (character is not null)
         {
             var player = story.World.Characters[EntityId.Player];
@@ -102,7 +115,7 @@ public sealed class StorySession : IStorySession
         _triggers = new TriggerEngine(story.Triggers, story.Predicates, _log.State, observer, _log.Events.Count,
             ResolveTriggerSkillCheck);
         var renderer = new TemplateRenderer(grammar ?? new EnglishGrammar(), story.Predicates);
-        _executor = new SceneExecutor(story, _log, renderer, AfterBatch, observer, _captureEntry, MakeChoice);
+        _executor = new SceneExecutor(story, _log, renderer, AfterBatch, observer, _captureEntry, MakeChoice, NotesSince);
     }
 
     /// <inheritdoc/>
@@ -426,8 +439,12 @@ public sealed class StorySession : IStorySession
         return changes;
     }
 
-    private IEnumerable<RenderedBlock> NotesSince(int mark) =>
-        EventNarrator.Describe(_log.Events.Skip(mark).ToList(), _log.State);
+    private IEnumerable<RenderedBlock> NotesSince(int mark)
+    {
+        var events = _log.Events.Skip(mark).ToArray();
+        var visibility = _statVisibilityBeforeEvents.Skip(mark).Take(events.Length).ToArray();
+        return EventNarrator.Describe(events, _log.State, visibility);
+    }
 
     private StoryFrame Present(SceneDefinition scene, List<RenderedBlock> blocks, StoryMenu menu)
     {

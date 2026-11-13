@@ -8,6 +8,7 @@ namespace Talewright.Talemark.Parsing;
 
 /// <summary>An expression or effect list written in story configuration, parsed later once all symbols are known.</summary>
 internal sealed record RawTrigger(string Id, string When, SourceLocation WhenLocation, string Do, SourceLocation DoLocation, bool Once, bool Save);
+internal sealed record RawStatVisibilityRule(StatId Stat, bool? Visible, string? Condition, SourceLocation Location);
 
 /// <summary>Core settings and declarations assembled from the story's configuration inputs.</summary>
 internal sealed class StoryManifest
@@ -22,6 +23,7 @@ internal sealed class StoryManifest
     public bool UndoEnabled { get; set; } = true;
     public bool AutosaveEnabled { get; set; } = true;
     public CharacterSheetVisibility CharacterSheet { get; set; } = CharacterSheetVisibility.Shown;
+    public IReadOnlyList<RawStatVisibilityRule> CharacterSheetStatRules { get; set; } = [];
     public CharacterCreation? Creation { get; set; }
     public required WorldDefinition World { get; init; }
     public IReadOnlyDictionary<EntityId, SourceLocation> CharacterLocations { get; init; } =

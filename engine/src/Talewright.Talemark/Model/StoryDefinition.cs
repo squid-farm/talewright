@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Talewright.Core.Identity;
 using Talewright.Core.Randomness;
+using Talewright.Core.State;
 using Talewright.Core.World;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Checks;
@@ -17,6 +18,8 @@ namespace Talewright.Talemark.Model;
 /// </summary>
 public sealed class StoryDefinition
 {
+    private CharacterCreation? _creation;
+
     public required string Id { get; init; }
     public required string Title { get; init; }
     public required string Version { get; init; }
@@ -25,9 +28,13 @@ public sealed class StoryDefinition
     public string? ReplayCompatibilityId { get; init; }
     public bool UndoEnabled { get; init; } = true;
     public bool AutosaveEnabled { get; init; } = true;
-    /// <summary>Character sheet sections the author allows; presentation only.</summary>
+    /// <summary>Character sheet sections and stats to present; hidden stats remain available to story rules.</summary>
     public CharacterSheetVisibility CharacterSheet { get; init; } = CharacterSheetVisibility.Shown;
-    public CharacterCreation? Creation { get; init; }
+    public CharacterCreation? Creation
+    {
+        get => _creation;
+        init => _creation = value;
+    }
     public required SceneId Start { get; init; }
     public required RandomnessMode Randomness { get; init; }
 
@@ -43,6 +50,35 @@ public sealed class StoryDefinition
 
     /// <summary>Predicates referenced by <c>@Name</c> expressions; the runtime evaluates with the same registry.</summary>
     public required NamedPredicateRegistry Predicates { get; init; }
+
+    /// <summary>Whether a declared stat is currently visible to the player.</summary>
+    public bool IsStatVisible(StatId stat, IGameStateView state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        if (!World.Ruleset.StatsById.ContainsKey(stat))
+        {
+            throw new KeyNotFoundException($"Unknown stat '{stat}'.");
+        }
+
+        if (!CharacterSheet.Stats)
+        {
+            return false;
+        }
+
+        return !CharacterSheet.StatRules.TryGetValue(stat, out var condition)
+            || ExpressionEvaluator.IsTrue(condition, new EvaluationContext(state, Predicates));
+    }
+
+    internal void FilterInitialCreationStats()
+    {
+        if (_creation is not { } creation)
+        {
+            return;
+        }
+
+        var initialState = GameState.CreateInitial(World, Seed ?? 0);
+        _creation = creation.WithStats(creation.Stats.Where(pair => IsStatVisible(pair.Key, initialState)));
+    }
 
     private Dictionary<SceneId, SceneDefinition>? _byId;
     private StoryReachability? _reachability;
