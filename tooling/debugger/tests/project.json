@@ -2,7 +2,7 @@
   "name": "talewright-debugger-map-tests",
   "tags": ["type:testing", "area:debugger"],
   "targets": {
-    "test": {
+    "check": {
       "executor": "nx:run-commands",
       "dependsOn": [],
       "cache": false,

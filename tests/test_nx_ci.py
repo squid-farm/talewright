@@ -208,6 +208,17 @@ class CiRoutingTests(unittest.TestCase):
                     {"project": "Talewright.Player.E2E.Tests", "target": "e2e-web"}, plan["browser"],
                 )
 
+    def test_debugger_javascript_suite_is_routed_to_checks(self):
+        plan = make_plan(affected_graph(
+            "tooling/debugger/src/Talewright.Debugger/wwwroot/map/map.js",
+        ))
+        self.assertIn(
+            {"project": "talewright-debugger-map-tests", "target": "check"}, plan["checks"],
+        )
+        self.assertNotIn(
+            {"project": "talewright-debugger-map-tests", "target": "test"}, plan["unit"],
+        )
+
     def test_core_grammar_changes_keep_all_regular_and_published_player_suites(self):
         plan = make_plan(affected_graph("engine/src/Talewright.Core/World/Pronouns.cs"))
         for group, targets in (
