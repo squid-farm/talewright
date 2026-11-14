@@ -392,16 +392,19 @@ public sealed class AuthorTimelineTests
     }
 
     [Fact]
-    public void Reload_rejects_redo_explicitly_and_does_not_drop_any_commands()
+    public void Reload_at_a_back_cursor_discards_the_forward_branch()
     {
         var session = Start();
         session.Edit(Flag(true));
         session.Jump(new("target"));
         session.Back();
-        var events = session.Events;
-        Assert.Contains("redo commands", Assert.Throws<InvalidOperationException>(() => session.Reload(Compile())).Message);
-        Assert.Same(events, session.Events);
-        Assert.Equal(2, session.Commands.Count);
-        Assert.True(session.CanForward);
+
+        var candidate = session.Reload(Compile());
+
+        Assert.Single(candidate.Commands);
+        Assert.Equal(1, candidate.Cursor);
+        Assert.False(candidate.CanForward);
+        Assert.True(candidate.CanBack);
+        Assert.Equal(new SceneId("start"), candidate.Current.Scene);
     }
 }

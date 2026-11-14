@@ -244,17 +244,16 @@ public sealed class AuthorReloadTests : IDisposable
     }
 
     [Fact]
-    public void New_tale_declarations_require_restart_and_candidate_runtime_errors_preserve_the_run()
+    public void New_tale_declarations_continue_and_candidate_runtime_errors_preserve_the_run()
     {
         var model = new WorkbenchModel(_root);
         model.Reload();
         model.Start();
         model.Choose("c0");
-        var original = model.Session;
         Write(Tale.Replace("Old passage.", "~ set flag:newflag"));
-        Assert.False(model.ApplySource(Load()));
-        Assert.True(model.RestartRequired);
-        Assert.Same(original, model.Session);
+        Assert.True(model.ApplySource(Load()));
+        Assert.False(model.RestartRequired);
+        Assert.True(model.Session!.State.GetFlag(new("newflag")));
         Write(Tale);
         var triggers = string.Join("\n", Enumerable.Range(0, 40).Reverse().Select(i => $"""
               - id: chain-{i}
@@ -267,7 +266,7 @@ public sealed class AuthorReloadTests : IDisposable
         model.Reload();
         model.Start();
         model.Choose("c0");
-        original = model.Session;
+        var original = model.Session;
         Write(Tale.Replace("~ var:count += 1", "~ set flag:chain-0"));
         Assert.False(model.ApplySource(Load()));
         Assert.Same(original, model.Session);
@@ -276,6 +275,25 @@ public sealed class AuthorReloadTests : IDisposable
         Write(Tale);
         Assert.True(model.ApplySource(Load()));
         Assert.False(model.SourceRejected);
+    }
+
+    [Fact]
+    public void Additive_item_configuration_continues_an_active_run_without_restart()
+    {
+        var model = new WorkbenchModel(_root);
+        model.Reload();
+        model.Start();
+        model.Choose("c0");
+        var manifestPath = Path.Combine(_root, "story.talewright.yaml");
+        File.WriteAllText(manifestPath, BuildManifest() + "\nitems:\n  artifact: {name: Artifact}\n");
+
+        Assert.True(model.ApplySource(Load(), yamlChanged: true));
+
+        Assert.False(model.RestartRequired);
+        Assert.False(model.SourceRejected);
+        Assert.Equal(1, model.Session!.State.GetVariable(new("count")));
+        Assert.Equal(0, model.Session.State.GetItemCount(new("player"), new("artifact")));
+        Assert.Equal("History changed; continuing from here with current state.", model.ReloadStatus);
     }
 
     [Fact]

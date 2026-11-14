@@ -70,13 +70,26 @@ public sealed class StorySession : IStorySession
     private StorySession(StoryDefinition story, ulong? seed, IGrammar? grammar, CharacterSelection? character,
         AuthorSetup? setup, Action<RuleDecision>? observer,
         Action<SceneEntryBoundary, IReadOnlyList<GameEvent>>? beforeEntry = null,
-        Action<SceneId, IReadOnlyList<AuthorEntryReplayStep>>? afterEntry = null)
+        Action<SceneId, IReadOnlyList<AuthorEntryReplayStep>>? afterEntry = null,
+        IReadOnlyList<GameEvent>? initialEvents = null, IReadOnlyList<string>? triggerEdges = null)
     {
         Seed = DeterministicDice.ResolveSeed(seed, story.Seed);
         character = CharacterSelection.Validate(story, character, Seed);
         _replayIdentities = story.ReplayIdentities;
         Story = story;
-        _log = new EventLog(story.World, Seed);
+        _log = initialEvents is null ? new EventLog(story.World, Seed) : EventLog.Replay(story.World, Seed, initialEvents);
+        if (initialEvents is not null)
+        {
+            var visibilityState = GameState.CreateInitial(story.World, Seed);
+            foreach (var gameEvent in initialEvents)
+            {
+                var stat = StatDisclosureVisibility.StatFor(gameEvent, story.World.Ruleset);
+                _statVisibilityBeforeEvents.Add(stat is { } id
+                    ? story.IsStatVisible(id, visibilityState)
+                    : null);
+                visibilityState.Apply(gameEvent);
+            }
+        }
         _log.Appending += gameEvent =>
         {
             _nextStatVisibility = StatDisclosureVisibility.StatFor(gameEvent, story.World.Ruleset) is { } stat
@@ -88,7 +101,7 @@ public sealed class StorySession : IStorySession
             _statVisibilityBeforeEvents.Add(_nextStatVisibility);
             _nextStatVisibility = null;
         };
-        if (character is not null)
+        if (initialEvents is null && character is not null)
         {
             var player = story.World.Characters[EntityId.Player];
             _log.Append(new CharacterIdentityChanged(EntityId.Player,
@@ -111,13 +124,16 @@ public sealed class StorySession : IStorySession
                 _log.Append(new StatChanged(EntityId.Player, stat, _log.State.GetBaseStat(EntityId.Player, stat), value));
             }
         }
-        setup?.Apply(_log);
-        _captureEntry = setup is not null;
+        if (initialEvents is null)
+        {
+            setup?.Apply(_log);
+        }
+        _captureEntry = setup is not null || initialEvents is not null;
         _observer = observer;
         _beforeEntry = beforeEntry;
         _afterEntry = afterEntry;
         _triggers = new TriggerEngine(story.Triggers, story.Predicates, _log.State, observer, _log.Events.Count,
-            ResolveTriggerSkillCheck);
+            ResolveTriggerSkillCheck, triggerEdges);
         var renderer = new TemplateRenderer(grammar ?? new EnglishGrammar(), story.Predicates);
         _executor = new SceneExecutor(story, _log, renderer, AfterBatch, observer, _captureEntry, MakeChoice, NotesSince);
     }
@@ -152,6 +168,23 @@ public sealed class StorySession : IStorySession
 
         return Enter(new DivertTarget(scene), []);
     }
+
+    internal StoryFrame ContinueAt(SceneId scene, IReadOnlyList<RenderedBlock> pending)
+    {
+        if (Current is not null || !_captureEntry)
+        {
+            throw new InvalidOperationException("Only a fresh author continuation can enter a scene.");
+        }
+
+        return Enter(new DivertTarget(scene), pending.ToList());
+    }
+
+    internal static StorySession Continue(StoryDefinition story, ulong seed, CharacterSelection? character,
+        IReadOnlyList<GameEvent> events,
+        IReadOnlyList<string> triggerEdges, Action<RuleDecision>? observer,
+        Action<SceneEntryBoundary, IReadOnlyList<GameEvent>>? beforeEntry,
+        Action<SceneId, IReadOnlyList<AuthorEntryReplayStep>>? afterEntry) =>
+        new(story, seed, null, character, null, observer, beforeEntry, afterEntry, events, triggerEdges);
 
     internal void EditAuthorState(AuthorSetup values)
     {

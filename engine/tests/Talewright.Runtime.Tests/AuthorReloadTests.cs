@@ -1,4 +1,5 @@
 using Talewright.Core.Events;
+using Talewright.Core.Identity;
 using Talewright.Narrative.Rendering;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Expressions;
@@ -62,6 +63,20 @@ public sealed class AuthorReloadTests
         }), options);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         return result.Story!;
+    }
+
+    private static string CompatibilityManifest(bool includeCount = true, bool includeReady = true,
+        bool textCount = false, string ruleset = "rpg")
+    {
+        var manifest = new ManifestFaker("reload", "Reload", "start") { BaseRuleset = ruleset };
+        if (includeCount)
+        {
+            if (textCount) manifest.Text("count", "zero");
+            else manifest.Number("count", 0);
+        }
+        if (includeReady) manifest.Flag("ready");
+        manifest.Character("player", "Tester");
+        return manifest.Build();
     }
 
     [Fact]
@@ -185,7 +200,7 @@ public sealed class AuthorReloadTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void Reload_rejects_changed_entry_effects_from_a_consumed_scene_even_when_events_match(bool autoDivert)
+    public void Reload_continues_after_changed_entry_effects_in_a_consumed_scene(bool autoDivert)
     {
         var tale = autoDivert
             ? """
@@ -217,8 +232,12 @@ public sealed class AuthorReloadTests
         equivalentRun.Choose("c0");
 
         Assert.Equal(original.Events, equivalentRun.Events);
-        Assert.Contains("previously entered", Assert.Throws<AuthorReloadException>(
-            () => original.Reload(candidate)).Message);
+        var continued = original.Reload(candidate, out var historyChanged);
+        Assert.True(historyChanged);
+        Assert.Equal(original.Events, continued.Events);
+        Assert.Equal(original.State.GetVariable(new("count")), continued.State.GetVariable(new("count")));
+        Assert.Equal(new SceneId("current"), continued.Current.Scene);
+        Assert.False(continued.CanBack);
     }
 
     [Theory]
@@ -228,7 +247,7 @@ public sealed class AuthorReloadTests
     [InlineData("condition", false)]
     [InlineData("unavailable", true)]
     [InlineData("target", true)]
-    public void Reload_validates_consumed_choice_availability_and_replay_identity(string change, bool rejected)
+    public void Reload_replays_or_continues_when_consumed_choice_meaning_changes(string change, bool continued)
     {
         var original = AuthorSession.Create(Compile(), new("start"), seed: 42);
         original.Choose("c0");
@@ -246,21 +265,13 @@ public sealed class AuthorReloadTests
             _ => Tale.Replace("[Travel] -> current", "[Travel] -> next"),
         };
         var events = original.Events;
-        if (rejected)
-        {
-            var ex = Assert.Throws<AuthorReloadException>(() => original.Reload(Compile(tale)));
-            if (change != "effect")
-            {
-                Assert.Contains("previously consumed", ex.Message);
-            }
-            Assert.Same(events, original.Events);
-            Assert.Equal(11, original.State.GetVariable(new("count")));
-        }
-        else
-        {
-            var candidate = original.Reload(Compile(tale));
-            Assert.Equal(events, candidate.Events);
-        }
+        var candidate = original.Reload(Compile(tale), out var historyChanged);
+        Assert.Equal(continued, historyChanged);
+        Assert.Equal(events, candidate.Events);
+        Assert.Equal(11, original.State.GetVariable(new("count")));
+        Assert.Equal(11, candidate.State.GetVariable(new("count")));
+        Assert.Equal(new SceneId("current"), candidate.Current.Scene);
+        Assert.Equal(continued, candidate.Commands.Count == 0);
     }
 
     [Fact]
@@ -295,13 +306,165 @@ public sealed class AuthorReloadTests
     }
 
     [Theory]
-    [InlineData("~ set flag:brandnew")]
-    [InlineData("~ var:brandnew = 1")]
-    public void Tale_auto_declarations_require_explicit_restart(string effect)
+    [InlineData("~ set flag:brandnew", true)]
+    [InlineData("~ var:brandnew = 1", false)]
+    public void Tale_auto_declarations_can_continue_in_place(string effect, bool flag)
     {
         var original = AuthorSession.Create(Compile(), new("current"), seed: 42);
-        var ex = Assert.Throws<AuthorReloadException>(() => original.Reload(Compile(Tale.Replace("Old passage.", effect))));
-        Assert.Contains("auto-declarations", ex.Message);
+        var candidate = original.Reload(Compile(Tale.Replace("Old passage.", effect)), out var historyChanged);
+
+        Assert.True(historyChanged);
+        Assert.False(candidate.CanBack);
+        Assert.Equal(flag, candidate.State.GetFlag(new("brandnew")));
+        if (!flag)
+        {
+            Assert.Equal(1, candidate.State.GetVariable(new("brandnew")));
+        }
+    }
+
+    [Theory]
+    [InlineData("effect")]
+    [InlineData("condition")]
+    [InlineData("target")]
+    public void Divergent_history_continues_at_the_current_scene_with_state_and_timeline_reset(string change)
+    {
+        var original = AuthorSession.Create(Compile(), new("start"), captureDecisions: true, seed: 42);
+        original.Choose("c0");
+        original.Edit(new()
+        {
+            Variables = new Dictionary<VarId, int> { [new("count")] = 50 },
+        });
+        var tale = change switch
+        {
+            "effect" => Tale.Replace("~ set flag:ready", "~ set flag:ready\n~ var:count += 100"),
+            "condition" => Tale.Replace("[Travel] -> current", "[Travel] (requires not flag:ready) -> current"),
+            _ => Tale.Replace("[Travel] -> current", "[Travel] -> next"),
+        };
+        var candidate = original.Reload(Compile(tale.Replace("Old passage.", "Updated passage.")), out var historyChanged);
+
+        Assert.True(historyChanged);
+        Assert.Equal(original.Events, candidate.Events);
+        Assert.Equal(original.State.GetVariable(new("count")), candidate.State.GetVariable(new("count")));
+        Assert.Equal(original.State.VisitCount(new("start")), candidate.State.VisitCount(new("start")));
+        Assert.Equal(original.State.VisitCount(new("current")), candidate.State.VisitCount(new("current")));
+        Assert.Equal(original.State.RollCount, candidate.State.RollCount);
+        Assert.Equal(2, candidate.Events.OfType<TriggerFired>().Count());
+        Assert.Equal(candidate.Events, candidate.Checkpoint!.Reenter().Events);
+        Assert.Contains("Updated passage.", candidate.Current.Document.ToPlainText());
+        Assert.Empty(candidate.Commands);
+        Assert.False(candidate.CanBack);
+        Assert.False(candidate.CanForward);
+
+        candidate.Choose("continue");
+        candidate.Back();
+        Assert.Equal(new SceneId("current"), candidate.Current.Scene);
+        Assert.Equal(original.State.GetVariable(new("count")), candidate.State.GetVariable(new("count")));
+        Assert.False(candidate.CanBack);
+        Assert.Throws<InvalidOperationException>(candidate.Back);
+
+        candidate.JumpFresh(new("next"), seed: 42);
+        candidate.Choose("c0");
+        candidate.Back();
+        Assert.Equal(new SceneId("next"), candidate.Current.Scene);
+    }
+
+    [Fact]
+    public void New_items_are_compatible_with_an_in_place_continuation()
+    {
+        var original = AuthorSession.Create(Compile(), new("current"), seed: 42);
+
+        var candidate = original.Reload(Compile(yaml: BuildManifest(includeItems: true).Build()),
+            out var historyChanged);
+
+        Assert.True(historyChanged);
+        Assert.Equal(0, candidate.State.GetItemCount(new("player"), new("pants")));
+        Assert.Equal(new SceneId("current"), candidate.Current.Scene);
+    }
+
+    [Fact]
+    public void In_place_continuation_preserves_the_created_character_and_applied_setup()
+    {
+        const string tale = """
+            === start
+            ~ set flag:ready
+            * [Travel] -> current
+            === current
+            Old passage.
+            ~ var:count += 1
+            * [Finish] -> END
+            """;
+        var manifest = new ManifestFaker("reload", "Reload", "start")
+        {
+            BaseRuleset = "rpg",
+            CreationName = true,
+        };
+        manifest.Flag("ready");
+        manifest.Number("count", 0);
+        manifest.Character("player", "Tester");
+        manifest.CreationPronouns("she", "they");
+        manifest.CreationStat("str", 8, 12, 16);
+        var yaml = manifest.Build();
+        var story = Compile(tale, yaml);
+        var selection = story.Creation!.Default(story.World.Characters[EntityId.Player]) with
+        {
+            FirstName = "Alex",
+        };
+        var original = AuthorSession.Create(story, new("start"), seed: 42, character: selection,
+            setup: new() { Variables = new Dictionary<VarId, int> { [new("count")] = 10 } });
+        original.Choose("c0");
+
+        var candidate = original.Reload(
+            Compile(tale.Replace("~ set flag:ready", "~ set flag:ready\n~ var:count += 5"), yaml),
+            out var historyChanged);
+
+        Assert.True(historyChanged);
+        Assert.Equal("Alex", candidate.State.GetCharacterDefinition(EntityId.Player).FirstName);
+        Assert.Equal("Alex", candidate.Character!.FirstName);
+        Assert.Equal(11, candidate.State.GetVariable(new("count")));
+        Assert.Equal(new SceneId("current"), candidate.Current.Scene);
+        Assert.Equal(candidate.Events, candidate.Checkpoint!.Reenter().Events);
+    }
+
+    [Theory]
+    [InlineData("deleted-scene")]
+    [InlineData("removed-variable")]
+    [InlineData("variable-type")]
+    [InlineData("removed-flag")]
+    [InlineData("changed-ruleset")]
+    public void Incompatible_continuations_are_rejected_with_author_reload_exception(string change)
+    {
+        const string tale = """
+            === start
+            * [Go] -> current
+            === current
+            Current passage.
+            * [Finish] -> END
+            """;
+        var original = AuthorSession.Create(Compile(tale, CompatibilityManifest()), new("current"), seed: 42);
+        var candidateTale = tale;
+        var candidateManifest = CompatibilityManifest();
+        switch (change)
+        {
+            case "deleted-scene":
+                candidateTale = "=== start\n* [Finish] -> END";
+                break;
+            case "removed-variable":
+                candidateManifest = CompatibilityManifest(includeCount: false);
+                break;
+            case "variable-type":
+                candidateManifest = CompatibilityManifest(textCount: true);
+                break;
+            case "removed-flag":
+                candidateManifest = CompatibilityManifest(includeReady: false);
+                break;
+            case "changed-ruleset":
+                candidateManifest = CompatibilityManifest(ruleset: "none");
+                break;
+        }
+
+        var candidate = Compile(candidateTale, candidateManifest);
+
+        Assert.Throws<AuthorReloadException>(() => original.Reload(candidate));
     }
 
     [Fact]
@@ -332,7 +495,7 @@ public sealed class AuthorReloadTests
     public void Deleted_target_and_missing_boundary_preserve_the_original_run()
     {
         var original = AuthorSession.Create(Compile(), new("current"), seed: 42);
-        Assert.Throws<KeyNotFoundException>(() => original.Reload(Compile("=== start\n-> END")));
+        Assert.Throws<AuthorReloadException>(() => original.Reload(Compile("=== start\n-> END")));
         var ended = AuthorSession.Create(Compile("=== start\n* [End] -> END"), new("start"), seed: 42);
         ended.Choose("c0");
         Assert.Null(ended.Checkpoint);
@@ -442,7 +605,7 @@ public sealed class AuthorReloadTests
     [InlineData("available-requires", false)]
     [InlineData("unavailable", true)]
     [InlineData("once", false)]
-    public void Reload_validates_selected_storylet_availability_and_target(string change, bool rejected)
+    public void Reload_replays_or_continues_when_selected_storylet_availability_changes(string change, bool continued)
     {
         const string tale = """
             === start
@@ -465,20 +628,12 @@ public sealed class AuthorReloadTests
             _ => tale.Replace("@tags camp", "@tags camp\n@once"),
         };
         var events = session.Events;
-        if (rejected)
+        var candidate = session.Reload(Compile(candidateTale), out var historyChanged);
+        Assert.Equal(continued, historyChanged);
+        Assert.Equal(events, candidate.Events);
+        if (change == "title")
         {
-            Assert.Contains("previously consumed", Assert.Throws<AuthorReloadException>(
-                () => session.Reload(Compile(candidateTale))).Message);
-            Assert.Same(events, session.Events);
-        }
-        else
-        {
-            var candidate = session.Reload(Compile(candidateTale));
-            Assert.Equal(events, candidate.Events);
-            if (change == "title")
-            {
-                Assert.Equal("Different title", candidate.Current.Title);
-            }
+            Assert.Equal("Different title", candidate.Current.Title);
         }
         var updated = session.Reload(Compile(tale.Replace("Old passage.", "Updated body.")));
         Assert.Contains("Updated body.", updated.Current.Document.ToPlainText());

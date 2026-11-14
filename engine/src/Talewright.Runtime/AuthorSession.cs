@@ -18,15 +18,17 @@ public sealed class AuthorSession
     private ReplayCursor _timeline;
     private readonly List<AuthorPlayedChoice> _playedChoices = [];
     private IReadOnlyList<AuthorCommandResult> _results = [];
+    private AuthorContinuation? _continuation;
 
     private AuthorSession(StoryDefinition story, SceneId target, AuthorSetup setup, ulong seed,
         CharacterSelection? character, AuthorCommand[] commands, ReplayCursor timeline, bool captureDecisions,
-        AuthorSceneCheckpoint? verify = null)
+        AuthorSceneCheckpoint? verify = null, AuthorContinuation? continuation = null)
     {
         Story = story;
-        StartScene = target;
-        Setup = setup;
-        Character = character;
+        StartScene = continuation?.Scene ?? target;
+        Setup = (continuation?.Setup ?? setup).Validate(story);
+        Character = CharacterSelection.Validate(story, continuation?.Character ?? character, seed);
+        _continuation = continuation;
         _commands = commands;
         if (timeline.Length != commands.Length)
         {
@@ -56,9 +58,22 @@ public sealed class AuthorSession
             entryReplay.Add(new(scene, replay.ToArray()));
         }
 
-        _session = new StorySession(story, seed, character, setup,
-            captureDecisions ? decisions.Add : null, verify is null ? null : VerifyEntry, CaptureEntryReplay);
-        _session.StartAt(target);
+        if (continuation is null)
+        {
+            _session = new StorySession(story, seed, Character, Setup,
+                captureDecisions ? decisions.Add : null, verify is null ? null : VerifyEntry, CaptureEntryReplay);
+            _session.StartAt(target);
+        }
+        else
+        {
+            _session = StorySession.Continue(story, seed, Character, continuation.Events, continuation.TriggerEdges,
+                captureDecisions ? decisions.Add : null, verify is null ? null : VerifyEntry, CaptureEntryReplay);
+            _session.ContinueAt(continuation.Scene, continuation.PendingNotes);
+            foreach (var command in continuation.EntryCommands)
+            {
+                ReplayCommand(command);
+            }
+        }
         for (var i = 0; i < appliedCommands.Length; i++)
         {
             var command = appliedCommands[i];
@@ -80,9 +95,12 @@ public sealed class AuthorSession
             {
                 throw new InvalidOperationException("The current scene entry has no replay evidence.");
             }
-            Checkpoint = new AuthorSceneCheckpoint(story, target, setup, seed, character,
+            var entryCommands = lastEntryCommand < 0
+                ? (continuation?.EntryCommands ?? []).Concat(appliedCommands).ToArray()
+                : appliedCommands.Skip(lastEntryCommand + 1).ToArray();
+            Checkpoint = new AuthorSceneCheckpoint(story, StartScene, Setup, seed, Character,
                 appliedCommands, boundary, Events, captureDecisions, _playedChoices.ToArray(),
-                entryReplay.Take(entryReplay.Count - 1).ToArray());
+                entryReplay.Take(entryReplay.Count - 1).ToArray(), continuation, entryCommands);
         }
     }
 
@@ -191,20 +209,37 @@ public sealed class AuthorSession
     /// Reconstructs a separate candidate, verifies schema, consumed scenes and the pre-entry boundary,
     /// then enters the displayed scene once. Never changes this session or player save compatibility.
     /// </summary>
-    public AuthorSession Reload(StoryDefinition candidate)
+    public AuthorSession Reload(StoryDefinition candidate) => Reload(candidate, out _);
+
+    public AuthorSession Reload(StoryDefinition candidate, out bool historyChanged)
     {
         ArgumentNullException.ThrowIfNull(candidate);
-        if (CanForward)
-        {
-            throw new InvalidOperationException("Automatic reload postponed: the author timeline has redo commands. Move Forward to its end and Rescan, or explicitly start a fresh scene. No commands were dropped.");
-        }
+        historyChanged = false;
         var checkpoint = Checkpoint ?? throw new AuthorReloadException("no current scene-entry boundary");
-        AuthorReloadComparison.Schema(Story, candidate);
-        candidate.GetScene(checkpoint.Scene);
-        var result = new AuthorSession(candidate, StartScene, Setup.Validate(candidate), Seed,
-            CharacterSelection.Validate(candidate, Character, Seed), _commands, _timeline, CaptureDecisions, checkpoint);
-        AuthorReloadComparison.Require(result.Checkpoint?.Scene == checkpoint.Scene, "the replay no longer reaches the displayed scene");
-        return result;
+        var commands = _commands.Take(_timeline.Position).ToArray();
+        var timeline = new ReplayCursor(commands.Length, commands.Length);
+        try
+        {
+            AuthorReloadComparison.Schema(Story, candidate);
+            AuthorReloadComparison.Require(candidate.Scenes.Any(scene => scene.Id == checkpoint.Scene),
+                $"the current scene '{checkpoint.Scene}' was removed");
+            var result = new AuthorSession(candidate, StartScene, Setup.Validate(candidate), Seed,
+                CharacterSelection.Validate(candidate, Character, Seed), commands, timeline, CaptureDecisions,
+                checkpoint, _continuation);
+            AuthorReloadComparison.Require(result.Checkpoint?.Scene == checkpoint.Scene,
+                "the replay no longer reaches the displayed scene");
+            return result;
+        }
+        catch (AuthorReloadException)
+        {
+            AuthorReloadComparison.Continuation(Story, candidate, State, checkpoint.Scene);
+            var continuation = checkpoint.ContinueInPlace();
+            var result = new AuthorSession(candidate, continuation.Scene, continuation.Setup.Validate(candidate),
+                continuation.Seed, CharacterSelection.Validate(candidate, continuation.Character, continuation.Seed),
+                [], new ReplayCursor(0, 0), CaptureDecisions, continuation: continuation);
+            historyChanged = true;
+            return result;
+        }
     }
 
     /// <summary>Conservative declaration/rule compatibility check, also usable before a run starts.</summary>
@@ -248,7 +283,7 @@ public sealed class AuthorSession
     }
 
     private void MoveTo(ReplayCursor timeline) => Adopt(new AuthorSession(Story, StartScene, Setup, Seed, Character,
-        _commands, timeline, CaptureDecisions));
+        _commands, timeline, CaptureDecisions, continuation: _continuation));
 
     private void Append(AuthorCommand command)
     {
@@ -258,7 +293,7 @@ public sealed class AuthorSession
         }
         AuthorCommand[] commands = [.. _commands.Take(_timeline.Position), command];
         Adopt(new AuthorSession(Story, StartScene, Setup, Seed, Character, commands,
-            _timeline.AfterAppend(), CaptureDecisions));
+            _timeline.AfterAppend(), CaptureDecisions, continuation: _continuation));
     }
 
     /// <summary>Starts a fresh synthetic candidate, not a preserve-current-state jump.</summary>
@@ -267,9 +302,10 @@ public sealed class AuthorSession
         => Adopt(Create(Story, target, CaptureDecisions, setup, seed, character));
 
     internal static AuthorSession Replay(StoryDefinition story, SceneId target, AuthorSetup setup, ulong seed,
-        CharacterSelection? character, AuthorCommand[] commands, bool captureDecisions = false)
+        CharacterSelection? character, AuthorCommand[] commands, bool captureDecisions = false,
+        AuthorContinuation? continuation = null)
         => new(story, target, setup, seed, character, commands,
-            new ReplayCursor(commands.Length, commands.Length), captureDecisions);
+            new ReplayCursor(commands.Length, commands.Length), captureDecisions, continuation: continuation);
 
     internal static AuthorSession RestoreTimeline(StoryDefinition story, SceneId target, AuthorSetup setup, ulong seed,
         CharacterSelection? character, AuthorCommand[] commands, int cursor, bool captureDecisions)
@@ -289,6 +325,7 @@ public sealed class AuthorSession
         _commands = candidate._commands;
         _timeline = candidate._timeline;
         _results = candidate._results;
+        _continuation = candidate._continuation;
         _playedChoices.Clear();
         _playedChoices.AddRange(candidate._playedChoices);
     }

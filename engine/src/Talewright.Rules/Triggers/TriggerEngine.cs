@@ -40,13 +40,23 @@ public sealed class TriggerEngine
 
     public TriggerEngine(IReadOnlyList<TriggerDefinition> triggers, NamedPredicateRegistry predicates,
         IGameStateView initialState, Action<RuleDecision>? observer, int? eventIndex = null,
-        Func<SkillCheckExpr, Value>? resolveSkillCheck = null)
+        Func<SkillCheckExpr, Value>? resolveSkillCheck = null, IReadOnlyList<string>? edgeMemory = null)
     {
         _triggers = triggers;
         _predicates = predicates;
         _observer = observer;
         _resolveSkillCheck = resolveSkillCheck;
         Prime(initialState, eventIndex);
+        if (edgeMemory is not null)
+        {
+            var triggerIds = triggers.Select(trigger => trigger.Id).ToHashSet(StringComparer.Ordinal);
+            if (edgeMemory.Any(id => !triggerIds.Contains(id)))
+            {
+                throw new ArgumentException("Trigger edge memory contains an unknown trigger.", nameof(edgeMemory));
+            }
+            _currentlyTrue.Clear();
+            _currentlyTrue.UnionWith(edgeMemory);
+        }
     }
 
     /// <summary>
