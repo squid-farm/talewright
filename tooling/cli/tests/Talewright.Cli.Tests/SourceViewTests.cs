@@ -53,7 +53,7 @@ public sealed class SourceViewTests
     }
 
     [Fact]
-    public void Accepted_reload_replaces_text_and_ranges_together_rejections_keep_the_accepted_snapshot()
+    public void Accepted_reload_replaces_text_and_ranges_and_allows_consumed_scene_prose_edits()
     {
         var model = Start();
         model.Choose("c0");
@@ -68,9 +68,11 @@ public sealed class SourceViewTests
         Assert.True(model.SourceRejected);
         Assert.False(model.SourcePending);
 
-        Assert.False(model.ApplySource(Compile(first: First.Replace("First source.", "Changed consumed scene."))));
-        Assert.Equal(accepted, model.CurrentSource);
-        Assert.True(model.RestartRequired);
+        Assert.True(model.ApplySource(Compile(first: First.Replace("First source.", "Changed consumed scene."))));
+        Assert.Equal(Second, model.CurrentSource!.Text);
+        Assert.Equal(new SceneSourceRange("nested/second.tale", 2, 4), model.CurrentSource.Range);
+        Assert.False(model.SourceRejected);
+        Assert.False(model.RestartRequired);
     }
 
     [Fact]

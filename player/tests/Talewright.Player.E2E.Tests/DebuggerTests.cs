@@ -446,7 +446,7 @@ public sealed class DebuggerTests
             await driver.ActivateAsync("Setup");
             snapshot = await WaitFor(driver, "Seed (empty uses story/random default)");
             Assert.Contains("42", Assert.Single(snapshot.Descendants(), node => node.Name == "Seed").Text);
-            await File.WriteAllTextAsync(tale, updated.Replace("[Go]", "[Changed positional meaning]")
+            await File.WriteAllTextAsync(tale, updated.Replace("[Go] -> current", "[Go] -> start")
                 .Replace("After reload.", "Incompatible progress."));
             snapshot = await WaitFor(driver, "previously consumed scene/choice meaning changed", "After YAML restart. Alex.");
             Assert.Contains("After YAML restart.", snapshot.Content);
@@ -586,7 +586,7 @@ public sealed class DebuggerTests
             await File.WriteAllTextAsync(latePath, "=== late\n// INVALID DISK SOURCE\n-> missing");
             snapshot = await WaitFor(driver, "Story has compiler errors", "// NEW ACCEPTED SOURCE", "not adopted");
             Assert.DoesNotContain("// INVALID DISK SOURCE", snapshot.Content);
-            await File.WriteAllTextAsync(firstPath, first.Replace("[Go]", "[Changed meaning]"));
+            await File.WriteAllTextAsync(firstPath, first.Replace("-> late", "-> other"));
             await File.WriteAllTextAsync(latePath, late.Replace("OLD ACCEPTED SOURCE", "REJECTED DISK SOURCE"));
             snapshot = await WaitFor(driver, "previously consumed scene/choice meaning changed", "// NEW ACCEPTED SOURCE");
             Assert.DoesNotContain("// REJECTED DISK SOURCE", snapshot.Content);

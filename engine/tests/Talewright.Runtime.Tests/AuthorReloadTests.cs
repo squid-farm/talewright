@@ -183,6 +183,45 @@ public sealed class AuthorReloadTests
     }
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Reload_rejects_changed_entry_effects_from_a_consumed_scene_even_when_events_match(bool autoDivert)
+    {
+        var tale = autoDivert
+            ? """
+                === start
+                ~ var:count = 0
+                -> middle
+                === middle
+                * [Travel] -> current
+                === current
+                Current passage.
+                * [Finish] -> END
+                """
+            : """
+                === start
+                ~ var:count = 0
+                * [Travel] -> current
+                === current
+                Current passage.
+                * [Finish] -> END
+                """;
+        var original = AuthorSession.Create(Compile(tale, BuildManifest(initialCount: 0).Build()),
+            new("start"), seed: 42);
+        if (autoDivert) original.Choose(StorySession.ContinueKey);
+        original.Choose("c0");
+        var candidate = Compile(tale.Replace("~ var:count = 0", "~ var:count += 0"),
+            BuildManifest(initialCount: 0).Build());
+        var equivalentRun = AuthorSession.Create(candidate, new("start"), seed: 42);
+        if (autoDivert) equivalentRun.Choose(StorySession.ContinueKey);
+        equivalentRun.Choose("c0");
+
+        Assert.Equal(original.Events, equivalentRun.Events);
+        Assert.Contains("previously entered", Assert.Throws<AuthorReloadException>(
+            () => original.Reload(candidate)).Message);
+    }
+
+    [Theory]
     [InlineData("label", false)]
     [InlineData("effect", true)]
     [InlineData("skill-check", true)]

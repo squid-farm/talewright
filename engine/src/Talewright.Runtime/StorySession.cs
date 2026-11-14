@@ -39,6 +39,7 @@ public sealed class StorySession : IStorySession
     private readonly bool _captureEntry;
     private readonly Action<RuleDecision>? _observer;
     private readonly Action<SceneEntryBoundary, IReadOnlyList<GameEvent>>? _beforeEntry;
+    private readonly Action<SceneId, IReadOnlyList<AuthorEntryReplayStep>>? _afterEntry;
     private readonly Dictionary<string,
         (Action<List<RenderedBlock>> Execute, ReadOnlyMemory<byte>? ReplayIdentity)> _actions = new(StringComparer.Ordinal);
     private IReadOnlyList<RenderedBlock> _pendingNotes = [];
@@ -60,14 +61,16 @@ public sealed class StorySession : IStorySession
     }
 
     internal StorySession(StoryDefinition story, ulong seed, CharacterSelection? character, AuthorSetup setup,
-        Action<RuleDecision>? observer = null, Action<SceneEntryBoundary, IReadOnlyList<GameEvent>>? beforeEntry = null)
-        : this(story, seed, grammar: null, character, setup, observer, beforeEntry)
+        Action<RuleDecision>? observer = null, Action<SceneEntryBoundary, IReadOnlyList<GameEvent>>? beforeEntry = null,
+        Action<SceneId, IReadOnlyList<AuthorEntryReplayStep>>? afterEntry = null)
+        : this(story, seed, grammar: null, character, setup, observer, beforeEntry, afterEntry)
     {
     }
 
     private StorySession(StoryDefinition story, ulong? seed, IGrammar? grammar, CharacterSelection? character,
         AuthorSetup? setup, Action<RuleDecision>? observer,
-        Action<SceneEntryBoundary, IReadOnlyList<GameEvent>>? beforeEntry = null)
+        Action<SceneEntryBoundary, IReadOnlyList<GameEvent>>? beforeEntry = null,
+        Action<SceneId, IReadOnlyList<AuthorEntryReplayStep>>? afterEntry = null)
     {
         Seed = DeterministicDice.ResolveSeed(seed, story.Seed);
         character = CharacterSelection.Validate(story, character, Seed);
@@ -112,6 +115,7 @@ public sealed class StorySession : IStorySession
         _captureEntry = setup is not null;
         _observer = observer;
         _beforeEntry = beforeEntry;
+        _afterEntry = afterEntry;
         _triggers = new TriggerEngine(story.Triggers, story.Predicates, _log.State, observer, _log.Events.Count,
             ResolveTriggerSkillCheck);
         var renderer = new TemplateRenderer(grammar ?? new EnglishGrammar(), story.Predicates);
@@ -281,7 +285,6 @@ public sealed class StorySession : IStorySession
     // ---- scene entry -----------------------------------------------------------------------------------------------
 
     internal SceneEntryBoundary? EntryBoundary { get; private set; }
-
     private StoryFrame Enter(DivertTarget target, List<RenderedBlock> pending)
     {
         BeforeTransition();
@@ -308,6 +311,7 @@ public sealed class StorySession : IStorySession
             _editNotes.Clear();
         }
         var execution = _executor.Run(scene);
+        _afterEntry?.Invoke(scene.Id, _executor.EntryReplay);
         var blocks = new List<RenderedBlock>(pending);
         blocks.AddRange(prelude);
         blocks.AddRange(execution.Blocks);
