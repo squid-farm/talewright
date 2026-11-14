@@ -7,6 +7,14 @@ that records issue status. Don't keep a parallel status list in the repository.
 - [Milestones](https://github.com/squid-farm/talewright/milestones): which issues belong to which release.
 - [Roadmap](../roadmap.md): where the project is headed, in plain language.
 
+## Project decision-making
+
+Talewright welcomes contributor debate and judgment. Contributors are encouraged to raise concerns,
+propose alternatives and make implementation decisions. The project lead, [@jwilkins88](https://github.com/jwilkins88),
+retains final authority over issue readiness, priority, scope and applicability, architecture,
+testing and other project standards, product direction, and the timing and approach of work.
+Contributing does not confer equal decision-making authority over the project.
+
 ## Working on an issue
 
 These steps apply to people and coding agents alike.
