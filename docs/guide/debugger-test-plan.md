@@ -228,6 +228,9 @@ remain YAML or Talemark, not JSON.
    only; it does not evaluate whether their conditions are satisfiable. Check both light and dark
    system themes: the canvas background must match the debugger theme, with readable scene and divert
    labels. Repeat these color checks on SVG and PNG exports.
+   In a disposable story with long dotted scene IDs, confirm labels widen up to 320px and wrap at
+   dots, while hover text, Inspector details and accessible scene names retain the full IDs. Repeat
+   with an unreachable-scene target stub and confirm selecting it still selects the complete target.
 5. With a playtest active, move to another scene while Map is open and confirm the map follows it.
    Pan and zoom separately; each must pause following while the current scene continues to update.
    Activate **Focus current scene** and confirm the map re-centers and follows again. While the current

@@ -2,7 +2,12 @@
 // canvas. The canvas is hidden from assistive technology: a roving group of scene buttons and the details panel carry
 // the same scenes, diverts and hub offers, and stay synchronized with what the canvas highlights.
 window.talewrightMap = (() => {
-  const NODE_WIDTH = 200;
+  const NODE_MIN_WIDTH = 200;
+  const NODE_MAX_WIDTH = 320;
+  const STUB_MIN_WIDTH = 24;
+  const NODE_HORIZONTAL_PADDING = 16;
+  const NODE_TEXT_TOP = 24;
+  const STUB_TEXT_TOP = 18;
   const LINE_HEIGHT = 15;
   const AREA_GAP = 160;
   const AREA_PADDING = 40;
@@ -14,21 +19,71 @@ window.talewrightMap = (() => {
   let elk = null;
   const layoutEngine = () => elk || (elk = new ELK({ workerUrl: "map/vendor/elk-worker.min.js" }));
 
-  function nodeSize(node) {
-    if (node.end) return { width: 90, height: 34 };
-    if (node.stub) return { width: Math.min(NODE_WIDTH, 24 + node.text[0].length * 7), height: 28 };
-    return { width: NODE_WIDTH, height: 14 + node.text.length * LINE_HEIGHT };
+  function nodeLayout(node, context) {
+    if (node.end) return { width: 90, height: 34, text: [], idLineCount: 0 };
+    const id = node.text[0];
+    const font = node.stub ? "11px monospace" : "10.5px monospace";
+    const previousFont = context.font;
+    context.font = font;
+    const measure = value => context.measureText(value).width;
+    const desiredWidth = measure(id) + NODE_HORIZONTAL_PADDING;
+    const width = node.stub
+      ? Math.min(NODE_MAX_WIDTH, Math.max(STUB_MIN_WIDTH, desiredWidth))
+      : Math.min(NODE_MAX_WIDTH, Math.max(NODE_MIN_WIDTH, desiredWidth));
+    const idLines = wrapId(id, width - NODE_HORIZONTAL_PADDING, measure);
+    context.font = previousFont;
+    const text = [...idLines, ...node.text.slice(1)];
+    const height = node.stub
+      ? 28 + (idLines.length - 1) * LINE_HEIGHT
+      : 20 + text.length * LINE_HEIGHT;
+    return { width, height, text, idLineCount: idLines.length };
+  }
+
+  function wrapId(id, maxWidth, measure) {
+    const segments = [];
+    let start = 0;
+    for (let dot = id.indexOf("."); dot !== -1; dot = id.indexOf(".", start)) {
+      segments.push(id.slice(start, dot));
+      start = dot + 1;
+    }
+    segments.push(id.slice(start));
+    const wrapped = [];
+    let line = "";
+    for (let index = 0; index < segments.length; index++) {
+      const segment = index === 0 ? segments[index] : `.${segments[index]}`;
+      if (measure(line + segment) <= maxWidth) {
+        line += segment;
+        continue;
+      }
+      if (line) wrapped.push(line);
+      line = measure(segment) > maxWidth ? middleEllipsis(segment, maxWidth, measure) : segment;
+    }
+    if (line || wrapped.length === 0) wrapped.push(line);
+    return wrapped.length > 4 ? [wrapped[0], wrapped[1], "…", wrapped.at(-1)] : wrapped;
+  }
+
+  function middleEllipsis(value, maxWidth, measure) {
+    const characters = Array.from(value);
+    let low = 1, high = Math.floor(characters.length / 2);
+    while (low < high) {
+      const middle = Math.ceil((low + high) / 2);
+      const candidate = `${characters.slice(0, middle).join("")}…${characters.slice(-middle).join("")}`;
+      if (measure(candidate) <= maxWidth) low = middle;
+      else high = middle - 1;
+    }
+    return `${characters.slice(0, low).join("")}…${characters.slice(-low).join("")}`;
   }
 
   // Children keep story order, with each tag group placed at its first member, so depth-first cycle breaking starts
   // from the start scene and hubs sit above the scenes that return to them.
-  function elkGraph(view, area) {
+  function elkGraph(view, area, nodeLayouts) {
     const children = [];
     const groups = new Map();
     const groupLabels = new Map(view.groups.map(group => [group.id, group.label]));
     const nodes = view.nodes.filter(node => node.area === area).sort((a, b) => Number(b.start) - Number(a.start));
     for (const node of nodes) {
-      const child = { id: node.id, ...nodeSize(node) };
+      const { width, height } = nodeLayouts.get(node.id);
+      const child = { id: node.id, width, height };
       if (!node.group) {
         children.push(child);
         continue;
@@ -75,9 +130,10 @@ window.talewrightMap = (() => {
   }
 
   // Lays out the main and unreachable areas separately and places the unreachable area to the right.
-  async function layout(view) {
+  async function layout(view, context) {
     const areas = ["main", "unreachable"].filter(area => view.nodes.some(node => node.area === area));
-    const results = await Promise.all(areas.map(area => layoutEngine().layout(elkGraph(view, area))));
+    const nodeLayouts = new Map(view.nodes.map(node => [node.id, nodeLayout(node, context)]));
+    const results = await Promise.all(areas.map(area => layoutEngine().layout(elkGraph(view, area, nodeLayouts))));
     const boxes = new Map();
     const lines = new Map();
     let unreachable = null;
@@ -114,7 +170,11 @@ window.talewrightMap = (() => {
       const xs = points.map(p => p.x), ys = points.map(p => p.y);
       line.bounds = { x: Math.min(...xs) - 12, y: Math.min(...ys) - 12, x2: Math.max(...xs) + 12, y2: Math.max(...ys) + 12 };
     }
-    return { boxes, lines, unreachable, width, height };
+    return {
+      boxes, lines, unreachable, width, height,
+      nodeText: new Map([...nodeLayouts].map(([id, value]) => [id, value.text])),
+      idLineCounts: new Map([...nodeLayouts].map(([id, value]) => [id, value.idLineCount])),
+    };
   }
 
   function palette(probe) {
@@ -335,12 +395,20 @@ window.talewrightMap = (() => {
         continue;
       }
       if (node.stub) {
-        text(node.text[0], b.x + 8, b.y + 18, "11px monospace", colors.muted);
+        laid.nodeText.get(node.id).forEach((line, i) =>
+          text(line, b.x + 8, b.y + STUB_TEXT_TOP + i * LINE_HEIGHT, "11px monospace", colors.muted));
         continue;
       }
-      node.text.forEach((line, i) => text(line, b.x + 8, b.y + 18 + i * LINE_HEIGHT,
-        i === 0 ? "10.5px monospace" : i === 2 ? "10px monospace" : `11px ${SANS}`,
-        i === 0 ? colors.muted : i === 2 ? kindColors.HubOffer : colors.text));
+      const textLines = laid.nodeText.get(node.id);
+      const idLineCount = laid.idLineCounts.get(node.id);
+      textLines.forEach((line, i) => {
+        const isId = i < idLineCount;
+        const originalIndex = i - idLineCount + 1;
+        const isRequirement = !isId && originalIndex === 2;
+        text(line, b.x + 8, b.y + NODE_TEXT_TOP + i * LINE_HEIGHT,
+          isId ? "10.5px monospace" : isRequirement ? "10px monospace" : `11px ${SANS}`,
+          isId ? colors.muted : isRequirement ? kindColors.HubOffer : colors.text);
+      });
       if (detail && visits) {
         const label = `${visits.first}${visits.count > 1 ? ` ×${visits.count}` : ""}`;
         text(label, b.x + b.width - 6, b.y + b.height - 4, `bold 9px ${SANS}`, kindColors.Success, "right");
@@ -600,7 +668,7 @@ window.talewrightMap = (() => {
     await reportStatus(state, "Laying out the map…");
     let laid;
     try {
-      laid = await layout(view);
+      laid = await layout(view, state.context);
     } catch (error) {
       if (generation === state.generation)
         await reportStatus(state, `The map could not be laid out: ${error.message || error}`);
