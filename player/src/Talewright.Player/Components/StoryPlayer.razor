@@ -38,7 +38,8 @@
                    CanBack="_session.CanBack" CanForward="_session.CanForward" CanSave="@(SaveStore is not null)"
                    Message="@(_showSaves ? null : _saveMessage)" Error="_saveError"
                    ReadingHistory="_showHistory" OnHistory="ToggleHistory"
-                   OnBack="Back" OnForward="Forward" OnQuickSave="QuickSaveAsync" OnSavedGames="ShowSavesAsync" OnRestart="Restart" OnExit="OnExit" />
+                   OnBack="Back" OnForward="Forward" OnQuickSave="QuickSaveAsync" OnSavedGames="ShowSavesAsync" OnRestart="Restart" OnExit="OnExit"
+                   OnOpenDiagnostics="OnOpenDiagnostics" />
 
     @if (_recoveredAutosaveSlot is not null)
     {
@@ -104,6 +105,9 @@
     /// <summary>Raised when the player asks to go back to the library. The button is hidden if unset.</summary>
     [Parameter]
     public EventCallback OnExit { get; set; }
+
+    [Parameter]
+    public EventCallback<ElementReference> OnOpenDiagnostics { get; set; }
 
     /// <summary>False while the host hides the player (e.g. behind the library); becoming visible again re-reveals the newest frame.</summary>
     [Parameter]

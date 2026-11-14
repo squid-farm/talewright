@@ -85,10 +85,10 @@ for the portable CLI and player requirements.
 
 ## Collecting diagnostics
 
-In the browser or desktop player, open **Diagnostics** near the bottom of the player. It is also
-available when a story fails to open, including in a published game. Review the report, then choose
-**Download diagnostic report** if you want to attach it to a bug report. Nothing is uploaded
-automatically.
+In the browser or desktop player, choose **Diagnostics** beside the build identity on the library
+screen. During play, choose **More actions > Diagnostics**. If a story fails to open, choose
+**Diagnostics** on the startup screen. Review the report, then choose **Download diagnostic
+report** if you want to attach it to a bug report. Nothing is uploaded automatically.
 
 The report lists the player version, your system, the story and scene IDs, and recent warnings and
 errors. It doesn't include your story text, saves or file paths, but IDs such as scene names can

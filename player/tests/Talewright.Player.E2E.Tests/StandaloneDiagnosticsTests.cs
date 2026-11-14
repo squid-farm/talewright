@@ -33,6 +33,11 @@ public sealed class StandaloneDiagnosticsTests(WebHostFixture host, ITestOutputH
         if (Driver is NativePlayerDriver native)
         {
             await native.StartAsync();
+            if (Environment.GetEnvironmentVariable("TALEWRIGHT_STANDALONE_CREATION") == "1")
+            {
+                await native.ActivateAsync("Start story");
+            }
+            await Driver.ClickAsync("More actions");
             await native.ActivateAsync("Diagnostics");
             var directory = Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_ONLY_SAVE_EXPORT_DIRECTORY")
                 ?? throw new InvalidOperationException("Run native tests through player/tests/run_e2e.py.");
@@ -50,7 +55,7 @@ public sealed class StandaloneDiagnosticsTests(WebHostFixture host, ITestOutputH
         else
         {
             await WaitForPublishedStoryAsync();
-            await Page.Locator(".tw-diagnostic-report summary").ClickAsync();
+            await OpenPlayDiagnosticsAsync();
             var preview = Page.GetByLabel("Diagnostic report");
             await Expect(preview).ToContainTextAsync("Host: Browser");
             var download = await Page.RunAndWaitForDownloadAsync(() =>
@@ -95,24 +100,19 @@ public sealed class StandaloneDiagnosticsTests(WebHostFixture host, ITestOutputH
             await using var native = new NativePlayerDriver(artifacts, copiedExecutable,
                 xdgDataHome: Path.Combine(artifacts, "xdg-data"));
             await native.StartAsync();
-            await native.ActivateAsync("Diagnostics");
-            var timer = Stopwatch.StartNew();
-            AccessibleNode snapshot;
-            while (true)
-            {
-                snapshot = await native.SnapshotAsync();
-                if (snapshot.Content.Contains("Compile story: compiler diagnostic (TW4001)", StringComparison.Ordinal)) break;
-                Assert.True(timer.Elapsed < TimeSpan.FromSeconds(15), "The failed published story was not reported.");
-                await Task.Delay(100);
-            }
+            var snapshot = await WaitForNativeAsync(native, "TW4001");
             Assert.DoesNotContain(snapshot.Descendants(), node => node.Name is "Library" or "Story archive");
+
+            await native.ActivateAsync("Diagnostics");
+            snapshot = await WaitForNativeAsync(native, "Compile story: compiler diagnostic (TW4001)");
+            Assert.Contains("Diagnostic report", snapshot.Content);
 
             var directory = Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_ONLY_SAVE_EXPORT_DIRECTORY")
                 ?? throw new InvalidOperationException("Run native tests through player/tests/run_e2e.py.");
             var reportPath = Path.Combine(directory, "talewright-diagnostics.txt");
             File.Delete(reportPath);
             await native.ClickAsync("Download diagnostic report");
-            timer.Restart();
+            var timer = Stopwatch.StartNew();
             string report;
             while (true)
             {
@@ -144,7 +144,7 @@ public sealed class StandaloneDiagnosticsTests(WebHostFixture host, ITestOutputH
         Assert.False(string.IsNullOrEmpty(version));
         Assert.False(string.IsNullOrEmpty(commit));
 
-        await Page.Locator(".tw-diagnostic-report summary").ClickAsync();
+        await OpenPlayDiagnosticsAsync();
         var preview = Page.GetByLabel("Diagnostic report");
         await Expect(preview).ToContainTextAsync($"Player version: {version}");
         await Expect(preview).ToContainTextAsync($"Player commit: {commit}");
@@ -170,7 +170,7 @@ public sealed class StandaloneDiagnosticsTests(WebHostFixture host, ITestOutputH
         await ReloadAsync();
         await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("Invalid published story index entry");
         await Expect(Page.GetByLabel("Story archive")).ToHaveCountAsync(0);
-        await Page.Locator(".tw-diagnostic-report summary").ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Diagnostics", Exact = true }).ClickAsync();
         var preview = Page.GetByLabel("Diagnostic report");
         await Expect(preview).ToContainTextAsync("Open story: invalid data");
         await Expect(preview).Not.ToContainTextAsync(privateUrl);
@@ -189,5 +189,27 @@ public sealed class StandaloneDiagnosticsTests(WebHostFixture host, ITestOutputH
             ? Page.GetByRole(AriaRole.Button, new() { Name = "Start story", Exact = true })
             : Latest;
         await Expect(ready).ToBeVisibleAsync(new() { Timeout = 15_000 });
+    }
+
+    private async Task OpenPlayDiagnosticsAsync()
+    {
+        if (Environment.GetEnvironmentVariable("TALEWRIGHT_STANDALONE_CREATION") == "1")
+        {
+            await Page.GetByRole(AriaRole.Button, new() { Name = "Start story", Exact = true }).ClickAsync();
+        }
+        await Page.GetByRole(AriaRole.Button, new() { Name = "More actions", Exact = true }).ClickAsync();
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Diagnostics", Exact = true }).ClickAsync();
+    }
+
+    private static async Task<AccessibleNode> WaitForNativeAsync(NativePlayerDriver driver, string expected)
+    {
+        var timer = Stopwatch.StartNew();
+        while (true)
+        {
+            var snapshot = await driver.SnapshotAsync();
+            if (snapshot.Content.Contains(expected, StringComparison.Ordinal)) return snapshot;
+            Assert.True(timer.Elapsed < TimeSpan.FromSeconds(15), $"Timed out waiting for {expected}.");
+            await Task.Delay(100);
+        }
     }
 }

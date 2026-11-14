@@ -165,7 +165,7 @@ public sealed class ToolbarTests(WebHostFixture host, ITestOutputHelper output) 
         var toggleBounds = (await toggle.BoundingBoxAsync())!;
         var backBounds = (await back.BoundingBoxAsync())!;
         Assert.True(toggleBounds.Y >= backBounds.Y + backBounds.Height, "The controls wrap onto a second row.");
-        foreach (var name in new[] { "Settings", "Restart", "Library" })
+        foreach (var name in new[] { "Settings", "Diagnostics", "Restart", "Library" })
         {
             var action = Page.GetByRole(AriaRole.Button, new() { Name = name, Exact = true });
             await Expect(action).ToBeVisibleAsync();

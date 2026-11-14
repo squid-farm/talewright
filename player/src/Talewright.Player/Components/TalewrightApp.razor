@@ -63,7 +63,7 @@
             }
             else
             {
-                <StoryPlayer Story="_story" Seed="@(_story.Creation is null ? null : _creationSeed)" Character="_character" Visible="!_showLibrary" OnExit="@(LibraryEnabled ? EventCallback.Factory.Create(this, ShowLibrary) : default)" SaveStore="SaveStore" SaveExporter="Services.GetService<ISaveFileExporter>()" ResumeHistory="@(_resumeAccepted ? _resumeHistory : null)" AutosaveResumeChecked="true" PreserveRejectedAutosave="_preserveRejectedAutosave" RejectedAutosaveData="_rejectedAutosaveData" />
+                <StoryPlayer Story="_story" Seed="@(_story.Creation is null ? null : _creationSeed)" Character="_character" Visible="!_showLibrary" OnExit="@(LibraryEnabled ? EventCallback.Factory.Create(this, ShowLibrary) : default)" OnOpenDiagnostics="OpenDiagnosticsAsync" SaveStore="SaveStore" SaveExporter="Services.GetService<ISaveFileExporter>()" ResumeHistory="@(_resumeAccepted ? _resumeHistory : null)" AutosaveResumeChecked="true" PreserveRejectedAutosave="_preserveRejectedAutosave" RejectedAutosaveData="_rejectedAutosaveData" />
             }
         </div>
         </CascadingValue>
@@ -85,7 +85,13 @@
             {
                 <button type="button" class="tw-choice" @onclick="RetryStoryAsync">Retry opening story</button>
             }
-            <BuildIdentity />
+            <div class="tw-app-footer">
+                @if (_error is not null || _diagnostics.Count > 0)
+                {
+                    <button type="button" class="tw-link" @onclick="() => OpenDiagnosticsAsync(_startupDiagnostics)" @ref="_startupDiagnostics">Diagnostics</button>
+                }
+                <BuildIdentity />
+            </div>
         </section>
     }
     else if (LibraryEnabled && (_story is null || _showLibrary))
@@ -139,11 +145,14 @@
                 <h2>@(_failedTitle ?? "Story") has problems</h2>
                 <DiagnosticList Diagnostics="_diagnostics" />
             }
-            <BuildIdentity />
+            <div class="tw-app-footer">
+                <button type="button" class="tw-link" @onclick="() => OpenDiagnosticsAsync(_libraryDiagnostics)" @ref="_libraryDiagnostics">Diagnostics</button>
+                <BuildIdentity />
+            </div>
         </section>
     }
-    <DiagnosticReport Diagnostics="Report" />
 </div>
+<DiagnosticReport @ref="_diagnosticReport" Diagnostics="Report" />
 </ReaderPresentation>
 
 @code {
@@ -186,8 +195,14 @@
     private string? _error;
     private string? _failedTitle;
     private readonly PlayerDiagnostics _fallbackReport = new();
+    private DiagnosticReport _diagnosticReport = default!;
+    private ElementReference _libraryDiagnostics;
+    private ElementReference _startupDiagnostics;
     private PlayerDiagnostics Report => Services.GetService<PlayerDiagnostics>() ?? _fallbackReport;
     private ISaveStore? SaveStore => Services.GetService<ISaveStore>();
+
+    private Task OpenDiagnosticsAsync(ElementReference returnFocus) =>
+        _diagnosticReport.OpenAsync(returnFocus);
 
     protected override async Task OnInitializedAsync()
     {

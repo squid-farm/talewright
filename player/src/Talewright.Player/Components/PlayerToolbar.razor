@@ -24,6 +24,10 @@
                     disabled="@(Busy || ReadingHistory || !_initialized)" @onclick="ToggleMenu" @ref="_toggle">More actions</button>
             <div class="tw-overflow-actions" hidden="@(!_menuOpen)" @ref="_menu">
                 <button type="button" class="tw-link" disabled="@(Busy || ReadingHistory || !_settingsReady)" @onclick="OpenSettings">Settings</button>
+                @if (OnOpenDiagnostics.HasDelegate)
+                {
+                    <button type="button" class="tw-link" disabled="@(Busy || ReadingHistory)" @onclick="OpenDiagnostics">Diagnostics</button>
+                }
                 <button type="button" class="tw-link" disabled="@(Busy || ReadingHistory)" @onclick="ConfirmRestart">Restart</button>
                 @if (OnExit.HasDelegate)
                 {
@@ -65,6 +69,7 @@
     [Parameter] public EventCallback OnQuickSave { get; set; }
     [Parameter] public EventCallback OnRestart { get; set; }
     [Parameter] public EventCallback OnExit { get; set; }
+    [Parameter] public EventCallback<ElementReference> OnOpenDiagnostics { get; set; }
     [Parameter] public bool ReadingHistory { get; set; }
     [Parameter] public EventCallback OnHistory { get; set; }
 
@@ -117,6 +122,12 @@
     {
         _menuOpen = false;
         await _settingsDialog.OpenAsync(_toggle);
+    }
+
+    private async Task OpenDiagnostics()
+    {
+        _menuOpen = false;
+        await OnOpenDiagnostics.InvokeAsync(_toggle);
     }
 
     private Task SettingsReady()
