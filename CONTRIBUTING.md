@@ -125,6 +125,7 @@ and [error codes](docs/reference/diagnostics.md) in the same PR.
 
 ## Language changes
 
+Coding agents should start with the repository's [agent guidance](AGENTS.md).
 Before proposing or implementing Talemark syntax, read the
 [operator registry](docs/reference/talemark-operators.md) and complete the
 [language-change checklist](docs/developer/language-changes.md). The checklist covers alternatives,
