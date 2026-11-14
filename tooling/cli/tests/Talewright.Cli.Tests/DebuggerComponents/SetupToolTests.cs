@@ -48,6 +48,26 @@ public sealed class SetupToolTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void Additive_reload_shows_new_setup_fields_without_enabling_them()
+    {
+        using var model = ComponentStory.Start();
+        var files = ComponentStory.Files();
+        files[StorySource.ManifestFileName] = files[StorySource.ManifestFileName]
+            .Replace("  lantern: {name: Lantern}", "  lantern: {name: Lantern}\n  rope: {name: Rope}");
+        files["main.tale"] = files["main.tale"]
+            .Replace("The cave.", "~ var:newcount = 3\n~ set flag:newflag\nThe cave.");
+        var source = new StorySource(files);
+
+        Assert.True(model.ApplySource(new(source, StoryCompiler.Compile(source), null), yamlChanged: true));
+
+        var tool = Show(model);
+        foreach (var label in new[] { "var:newcount", "flag:newflag", "player inventory:rope" })
+        {
+            Assert.False(tool.Find($"input[aria-label='Override {label}']").HasAttribute("checked"));
+        }
+    }
+
+    [Fact]
     public void Start_raises_its_action()
     {
         using var model = ComponentStory.Load();

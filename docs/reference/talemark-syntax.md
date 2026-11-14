@@ -126,8 +126,10 @@ Folder, ZIP, embedded, and published stories use the same inputs.
 
 Moving declarations preserves their meaning, but paths and text remain part of the source fingerprint.
 Reorganization is a source change, not a guarantee of compatibility with existing saves.
-The debugger can continue an active run after compatible additions to state declarations; other
-configuration changes may require an explicit restart. See [editing while you test](../guide/testing-your-story.md#editing-while-you-test).
+The debugger can continue an active run after compatible additions to state declarations. Removing
+a variable, flag, stat, item or faction, or changing a variable's type, drops that declaration's old
+state; other configuration changes may require an explicit restart. See
+[editing while you test](../guide/testing-your-story.md#editing-while-you-test).
 
 ```yaml
 game:

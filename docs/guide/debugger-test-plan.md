@@ -171,7 +171,9 @@ Keep a copy of the successful export. Test on copies only:
 1. Add a comment to `story.talewright.yaml`. Expect **Restart required**; passage and accepted source stay.
    More Talemark saves must not bypass that requirement.
 2. Click **Restart from source**. Expect the run cleared only after validation, with compatible
-   origin scene/seed/setup/character retained. **Start selected scene** starts a fresh run.
+   origin scene/seed/setup/character retained. If an enabled setup declaration was removed or
+   retyped, expect its field pruned and its name in the status message. **Start selected scene**
+   starts a fresh run.
 3. Open a normal desktop player on this exact story version and save an ordinary run. Copy its
    save file from the per-user `Talewright/saves` folder (on Linux usually
    `~/.local/share/Talewright/saves`). Record a checksum or copy before using it in the debugger.

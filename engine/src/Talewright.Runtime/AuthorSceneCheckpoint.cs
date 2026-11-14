@@ -65,8 +65,36 @@ public sealed class AuthorSceneCheckpoint
     public AuthorSession Reenter() => AuthorSession.Replay(_story, _start, _setup, Seed, _character,
         _commands, _captureDecisions, _continuation);
 
-    internal AuthorContinuation ContinueInPlace() => new(Scene, Seed, Events, _triggerEdges, PendingNotes,
-        _setup, _character, _entryCommands, _decisions);
+    internal AuthorContinuation ContinueInPlace(StoryDefinition candidate)
+    {
+        var world = candidate.World;
+        var setup = _setup with
+        {
+            Flags = _setup.Flags.Where(value => world.Flags.Contains(value.Key)).ToDictionary(),
+            Variables = _setup.Variables.Where(value => world.Variables.ContainsKey(value.Key)).ToDictionary(),
+            TextVariables = _setup.TextVariables.Where(value => world.TextVariables.ContainsKey(value.Key)).ToDictionary(),
+            Standings = _setup.Standings.Where(value => world.Factions.ContainsKey(value.Key)).ToDictionary(),
+            Stats = _setup.Stats.Where(value => world.Characters.ContainsKey(value.Character)
+                && world.Ruleset.StatsById.ContainsKey(value.Stat)).ToArray(),
+            Inventory = _setup.Inventory.Where(value => world.Items.ContainsKey(value.Item)).ToArray(),
+        };
+        var events = Events.Where(gameEvent => gameEvent switch
+        {
+            FlagChanged changed => world.Flags.Contains(changed.Flag),
+            VariableChanged changed => world.Variables.ContainsKey(changed.Variable),
+            TextVariableChanged changed => world.TextVariables.ContainsKey(changed.Variable),
+            StandingChanged changed => world.Factions.ContainsKey(changed.Faction),
+            StatChanged changed => world.Characters.ContainsKey(changed.Character)
+                && world.Ruleset.StatsById.ContainsKey(changed.Stat),
+            ItemsGranted changed => world.Items.ContainsKey(changed.Item),
+            ItemsRemoved changed => world.Items.ContainsKey(changed.Item),
+            LevelChanged => world.Ruleset.LevelingRule is { } leveling
+                && world.Ruleset.StatsById.ContainsKey(leveling.LevelStat),
+            _ => true,
+        }).ToArray();
+        return new(Scene, Seed, Array.AsReadOnly(events), _triggerEdges, PendingNotes,
+            setup, _character, _entryCommands, _decisions);
+    }
 
     internal void VerifyPlayedChoice(int index, AuthorPlayedChoice choice)
     {
