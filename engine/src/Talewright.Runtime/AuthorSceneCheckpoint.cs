@@ -54,13 +54,26 @@ public sealed class AuthorSceneCheckpoint
     /// </summary>
     public AuthorSession Reenter() => AuthorSession.Replay(_story, _start, _setup, Seed, _character, _commands, _captureDecisions);
 
-    internal void VerifyPlayedChoice(int index, AuthorPlayedChoice choice) =>
+    internal void VerifyPlayedChoice(int index, AuthorPlayedChoice choice)
+    {
+        var matchesReplayIdentity = index < _playedChoices.Length
+            && SameReplayIdentity(_playedChoices[index].Choice.ReplayIdentity, choice.Choice.ReplayIdentity);
         AuthorReloadComparison.Require(index < _playedChoices.Length
-            && AuthorReloadComparison.Equal(_playedChoices[index].Scene, choice.Scene)
-            && AuthorReloadComparison.Equal(_playedChoices[index].Choice.Label, choice.Choice.Label)
             && _playedChoices[index].Choice.Key == choice.Choice.Key
-            && AuthorReloadComparison.Equal(_playedChoices[index].Storylet, choice.Storylet),
+            && matchesReplayIdentity
+            && _playedChoices[index].Storylet?.Id == choice.Storylet?.Id,
             $"previously consumed scene/choice meaning changed at '{choice.Scene.Id}'");
+    }
+
+    private static bool SameReplayIdentity(ReadOnlyMemory<byte>? left, ReadOnlyMemory<byte>? right)
+    {
+        if (left is not { } leftIdentity || right is not { } rightIdentity)
+        {
+            return left is null && right is null;
+        }
+
+        return leftIdentity.Span.SequenceEqual(rightIdentity.Span);
+    }
 
     internal void VerifyBoundary(SceneEntryBoundary boundary, IReadOnlyList<GameEvent> events)
     {
@@ -81,14 +94,13 @@ internal sealed record AuthorPlayedChoice(SceneDefinition Scene, ChoiceView Choi
         if (choice.Key.StartsWith(StorySession.StoryletKeyPrefix, StringComparison.Ordinal))
         {
             var target = story.GetScene(new(choice.Key[StorySession.StoryletKeyPrefix.Length..]));
-            selected = new(target.Id, target.Title, target.Requires, target.Tags.ToArray(), target.Priority, target.Once);
+            selected = new(target.Id);
         }
         return new(scene, choice, selected);
     }
 }
 
-internal sealed record AuthorStoryletChoice(SceneId Id, string? Title, Talewright.Rules.Expressions.Expr? Requires,
-    IReadOnlyList<string> Tags, int Priority, bool Once);
+internal sealed record AuthorStoryletChoice(SceneId Id);
 
 internal sealed class AuthorStateView(GameState state) : IGameStateView
 {
