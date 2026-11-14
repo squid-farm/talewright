@@ -100,15 +100,7 @@ public sealed class StandaloneDiagnosticsTests(WebHostFixture host, ITestOutputH
             await using var native = new NativePlayerDriver(artifacts, copiedExecutable,
                 xdgDataHome: Path.Combine(artifacts, "xdg-data"));
             await native.StartAsync();
-            var timer = Stopwatch.StartNew();
-            AccessibleNode snapshot;
-            while (true)
-            {
-                snapshot = await native.SnapshotAsync();
-                if (snapshot.Content.Contains("Compile story: compiler diagnostic (TW4001)", StringComparison.Ordinal)) break;
-                Assert.True(timer.Elapsed < TimeSpan.FromSeconds(15), "The failed published story was not reported.");
-                await Task.Delay(100);
-            }
+            var snapshot = await WaitForNativeAsync(native, "TW4001");
             Assert.DoesNotContain(snapshot.Descendants(), node => node.Name is "Library" or "Story archive");
 
             await native.ActivateAsync("Diagnostics");
@@ -120,7 +112,7 @@ public sealed class StandaloneDiagnosticsTests(WebHostFixture host, ITestOutputH
             var reportPath = Path.Combine(directory, "talewright-diagnostics.txt");
             File.Delete(reportPath);
             await native.ClickAsync("Download diagnostic report");
-            timer.Restart();
+            var timer = Stopwatch.StartNew();
             string report;
             while (true)
             {
@@ -197,14 +189,14 @@ public sealed class StandaloneDiagnosticsTests(WebHostFixture host, ITestOutputH
             ? Page.GetByRole(AriaRole.Button, new() { Name = "Start story", Exact = true })
             : Latest;
         await Expect(ready).ToBeVisibleAsync(new() { Timeout = 15_000 });
-        if (Environment.GetEnvironmentVariable("TALEWRIGHT_STANDALONE_CREATION") == "1")
-        {
-            await ready.ClickAsync();
-        }
     }
 
     private async Task OpenPlayDiagnosticsAsync()
     {
+        if (Environment.GetEnvironmentVariable("TALEWRIGHT_STANDALONE_CREATION") == "1")
+        {
+            await Page.GetByRole(AriaRole.Button, new() { Name = "Start story", Exact = true }).ClickAsync();
+        }
         await Page.GetByRole(AriaRole.Button, new() { Name = "More actions", Exact = true }).ClickAsync();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Diagnostics", Exact = true }).ClickAsync();
     }
