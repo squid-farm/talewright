@@ -1,0 +1,19 @@
+{
+  "name": "talewright-debugger-map-tests",
+  "tags": ["type:testing", "area:debugger"],
+  "targets": {
+    "check": {
+      "executor": "nx:run-commands",
+      "dependsOn": [],
+      "cache": false,
+      "inputs": [
+        "default",
+        "{workspaceRoot}/tooling/debugger/src/Talewright.Debugger/wwwroot/map/map.js",
+        "testWorkflow"
+      ],
+      "options": {
+        "command": "node --test tooling/debugger/tests/*.test.mjs"
+      }
+    }
+  }
+}
