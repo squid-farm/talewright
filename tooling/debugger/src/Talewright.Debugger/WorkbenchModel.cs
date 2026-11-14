@@ -331,12 +331,8 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
                     Error = null;
                 });
             }
-            if (!restart && Story is { } previous)
+            if (!restart && Story is not null)
             {
-                if (Session is null)
-                {
-                    AuthorSession.ValidateReloadSchema(previous, story);
-                }
                 var historyChanged = false;
                 var session = Session is { } activeSession
                     ? activeSession.Reload(story, out historyChanged)
@@ -351,11 +347,17 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
                     });
                     return false;
                 }
+                var (updatedNumbers, updatedFlags, updatedTexts, disabledOverrides) = SynchronizeSetup(story);
+                var updatedSelection = Character is null ? null : RevalidateCharacter(story, ValidatedCreationSeed());
                 var inspection = session?.Inspect();
                 return Publish(() =>
                 {
                     Diagnostics = compiled.Diagnostics;
                     Story = story;
+                    Numbers = updatedNumbers;
+                    Flags = updatedFlags;
+                    Texts = updatedTexts;
+                    Character = updatedSelection;
                     Session = session;
                     Inspection = inspection;
                     _acceptedSource = candidate.Source;
@@ -368,74 +370,11 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
                     ReloadStatus = session is null ? "Talemark source adopted. Ready for scene setup."
                         : historyChanged ? "History changed; continuing from here with current state."
                         : $"Reload boundary: {session.Current.Scene}. Verified command prefix retained; current passage replaced, decisions rebuilt.";
+                    ReloadStatus = WithDisabledOverrides(ReloadStatus, disabledOverrides);
                     RefreshEdits();
                 });
             }
-            var numbers = new List<SetupNumber>();
-            foreach (var variable in story.World.Variables)
-            {
-                numbers.Add(new(SetupNumberKind.Variable, variable.Key.Value, $"var:{variable.Key}", variable.Value));
-            }
-            foreach (var faction in story.World.Factions.Values)
-            {
-                numbers.Add(new(SetupNumberKind.Standing, faction.Id.Value, $"faction:{faction.Id}", faction.InitialStanding));
-            }
-            foreach (var character in story.World.Characters.Values)
-            {
-                foreach (var stat in story.World.Ruleset.Stats)
-                {
-                    numbers.Add(new(SetupNumberKind.Stat, stat.Id.Value, $"{character.Id}:{stat.Id}",
-                        character.Stats.GetValueOrDefault(stat.Id, stat.Default), character.Id.Value));
-                }
-                foreach (var item in story.World.Items.Values)
-                {
-                    numbers.Add(new(SetupNumberKind.Inventory, item.Id.Value, $"{character.Id} inventory:{item.Id}",
-                        character.Inventory.GetValueOrDefault(item.Id), character.Id.Value));
-                }
-            }
-            var flags = story.World.Flags.Select(id => new SetupFlag(id)).ToArray();
-            var texts = story.World.TextVariables.Select(pair => new SetupText(pair.Key, pair.Value)).ToArray();
-            var newKeys = numbers.Select(FieldKey).ToHashSet();
-            var newFlagIds = flags.Select(flag => flag.Id).ToHashSet();
-            var newTextIds = texts.Select(field => field.Id).ToHashSet();
-            var oldNumbers = Numbers.ToDictionary(FieldKey);
-            var oldFlags = Flags.ToDictionary(flag => flag.Id);
-            var oldTexts = Texts.ToDictionary(field => field.Id);
-            var missing = Numbers.Where(old => old.Enabled && !newKeys.Contains(FieldKey(old)))
-                .Select(field => field.Label).Concat(Flags.Where(old => old.Enabled && !newFlagIds.Contains(old.Id))
-                    .Select(field => $"flag:{field.Id}"))
-                .Concat(Texts.Where(old => old.Enabled && !newTextIds.Contains(old.Id)).Select(field => field.Label)).ToArray();
-            if (missing.Length > 0)
-            {
-                throw new ArgumentException($"Setup IDs changed/removed: {string.Join(", ", missing)}. Disable or correct those overrides before restarting");
-            }
-            foreach (var field in numbers)
-            {
-                if (oldNumbers.TryGetValue(FieldKey(field), out var old))
-                {
-                    field.Enabled = old.Enabled;
-                    if (old.Enabled)
-                    {
-                        field.Value = old.Value;
-                    }
-                }
-            }
-            foreach (var flag in flags)
-            {
-                if (oldFlags.TryGetValue(flag.Id, out var old))
-                {
-                    flag.Enabled = old.Enabled;
-                    flag.Value = old.Value;
-                }
-            }
-            foreach (var field in texts)
-            {
-                if (oldTexts.TryGetValue(field.Id, out var old))
-                {
-                    field.Enabled = old.Enabled;
-                    if (old.Enabled) field.Value = old.Value;
-                }
-            }
+            var (numbers, flags, texts, missing) = SynchronizeSetup(story);
             BuildSetup(numbers, flags, texts).Validate(story);
             var seed = Story is null ? story.Seed?.ToString(CultureInfo.InvariantCulture) ?? "" : Seed;
             var resolvedSeed = DeterministicDice.ResolveSeed(ParseSeed(seed), story.Seed, _randomSeed);
@@ -453,9 +392,9 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
             {
                 Diagnostics = compiled.Diagnostics;
                 Story = story;
-                Numbers = numbers.AsReadOnly();
-                Flags = Array.AsReadOnly(flags);
-                Texts = Array.AsReadOnly(texts);
+                Numbers = numbers;
+                Flags = flags;
+                Texts = texts;
                 Target = target;
                 Seed = seed;
                 if (string.IsNullOrEmpty(ScenarioPath))
@@ -476,7 +415,8 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
                 AdoptImages(candidate.Source!);
                 AcceptedSourceMap = compiled.SourceMap;
                 Error = null;
-                ReloadStatus = "Source restarted. Compatible setup retained and revalidated; select Start selected scene for a fresh run.";
+                ReloadStatus = WithDisabledOverrides(
+                    "Source restarted. Compatible setup retained and revalidated; select Start selected scene for a fresh run.", missing);
             });
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException
@@ -520,6 +460,73 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
 
     private static (SetupNumberKind Kind, string Id, string? Character) FieldKey(SetupNumber field) =>
         (field.Kind, field.Id, field.Character);
+
+    private (IReadOnlyList<SetupNumber> Numbers, IReadOnlyList<SetupFlag> Flags,
+        IReadOnlyList<SetupText> Texts, string[] Missing) SynchronizeSetup(StoryDefinition story)
+    {
+        var numbers = new List<SetupNumber>();
+        foreach (var variable in story.World.Variables)
+        {
+            numbers.Add(new(SetupNumberKind.Variable, variable.Key.Value, $"var:{variable.Key}", variable.Value));
+        }
+        foreach (var faction in story.World.Factions.Values)
+        {
+            numbers.Add(new(SetupNumberKind.Standing, faction.Id.Value, $"faction:{faction.Id}", faction.InitialStanding));
+        }
+        foreach (var character in story.World.Characters.Values)
+        {
+            foreach (var stat in story.World.Ruleset.Stats)
+            {
+                numbers.Add(new(SetupNumberKind.Stat, stat.Id.Value, $"{character.Id}:{stat.Id}",
+                    character.Stats.GetValueOrDefault(stat.Id, stat.Default), character.Id.Value));
+            }
+            foreach (var item in story.World.Items.Values)
+            {
+                numbers.Add(new(SetupNumberKind.Inventory, item.Id.Value, $"{character.Id} inventory:{item.Id}",
+                    character.Inventory.GetValueOrDefault(item.Id), character.Id.Value));
+            }
+        }
+        var flags = story.World.Flags.Select(id => new SetupFlag(id, story.World.InitialFlags[id])).ToArray();
+        var texts = story.World.TextVariables.Select(pair => new SetupText(pair.Key, pair.Value)).ToArray();
+        var newKeys = numbers.Select(FieldKey).ToHashSet();
+        var newFlagIds = flags.Select(flag => flag.Id).ToHashSet();
+        var newTextIds = texts.Select(field => field.Id).ToHashSet();
+        var oldNumbers = Numbers.ToDictionary(FieldKey);
+        var oldFlags = Flags.ToDictionary(flag => flag.Id);
+        var oldTexts = Texts.ToDictionary(field => field.Id);
+        var missing = Numbers.Where(old => old.Enabled && !newKeys.Contains(FieldKey(old)))
+            .Select(field => field.Label).Concat(Flags.Where(old => old.Enabled && !newFlagIds.Contains(old.Id))
+                .Select(field => $"flag:{field.Id}"))
+            .Concat(Texts.Where(old => old.Enabled && !newTextIds.Contains(old.Id)).Select(field => field.Label)).ToArray();
+        foreach (var field in numbers)
+        {
+            if (oldNumbers.TryGetValue(FieldKey(field), out var old) && old.Enabled)
+            {
+                field.Enabled = true;
+                field.Value = old.Value;
+            }
+        }
+        foreach (var flag in flags)
+        {
+            if (oldFlags.TryGetValue(flag.Id, out var old) && old.Enabled)
+            {
+                flag.Enabled = true;
+                flag.Value = old.Value;
+            }
+        }
+        foreach (var field in texts)
+        {
+            if (oldTexts.TryGetValue(field.Id, out var old) && old.Enabled)
+            {
+                field.Enabled = true;
+                field.Value = old.Value;
+            }
+        }
+        return (numbers.AsReadOnly(), Array.AsReadOnly(flags), Array.AsReadOnly(texts), missing);
+    }
+
+    private static string WithDisabledOverrides(string status, string[] missing) =>
+        missing.Length == 0 ? status : $"{status} Disabled removed or incompatible setup overrides: {string.Join(", ", missing)}.";
 
     private CharacterSelection? RevalidateCharacter(StoryDefinition story, ulong seed)
     {

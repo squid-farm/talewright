@@ -219,12 +219,11 @@ public sealed class AuthorReloadTests : IDisposable
     }
 
     [Fact]
-    public void Removed_setup_ids_are_named_not_silently_dropped_and_restart_can_be_corrected()
+    public void Removed_setup_ids_are_disabled_and_named_on_restart()
     {
         var model = new WorkbenchModel(_root);
         model.Reload();
         model.Start();
-        var original = model.Session;
         Assert.Single(model.Flags).Enabled = true;
         var field = model.Numbers.Single(field => field.Label == "var:count");
         field.Enabled = true;
@@ -232,15 +231,195 @@ public sealed class AuthorReloadTests : IDisposable
         File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), BuildManifest(includeReady: false, includeCount: false));
         Write(Tale.Replace("~ var:count += 1", ""));
         model.Reload();
-        Assert.Same(original, model.Session);
-        Assert.Contains("var:count", model.Error);
-        Assert.Contains("flag:ready", model.Error);
-        field.Enabled = false;
-        Assert.Single(model.Flags).Enabled = false;
-        model.Reload();
         Assert.Null(model.Error);
         Assert.Null(model.Session);
         Assert.Empty(model.Flags);
+        Assert.DoesNotContain(model.Numbers, number => number.Label == "var:count");
+        Assert.Contains("var:count", model.ReloadStatus);
+        Assert.Contains("flag:ready", model.ReloadStatus);
+    }
+
+    [Fact]
+    public void In_place_reload_synchronizes_setup_and_live_edits_with_additive_declarations()
+    {
+        static string Manifest(bool addItem)
+        {
+            var manifest = new ManifestFaker("watched", "Watched", "start") { BaseRuleset = "rpg" };
+            manifest.Flag("ready");
+            manifest.Number("count", 0);
+            manifest.Text("weather", "sunny");
+            manifest.Character("player", "Tester");
+            manifest.Item("rope", "Rope");
+            if (addItem) manifest.Item("artifact", "Artifact");
+            return manifest.Build();
+        }
+
+        using var model = new WorkbenchModel(_root);
+        Assert.True(model.ApplySource(Source(Tale, Manifest(false)), restart: true));
+        model.Seed = "42";
+        model.Target = "current";
+        model.Start();
+        Assert.Null(model.Error);
+        var count = model.Numbers.Single(field => field.Label == "var:count");
+        count.Enabled = true;
+        count.Value = "21";
+        var rope = model.Numbers.Single(field => field.Label == "player inventory:rope");
+        rope.Enabled = true;
+        rope.Value = "3";
+        var stat = model.Numbers.First(field => field.Kind == SetupNumberKind.Stat);
+        stat.Enabled = true;
+        stat.Value = "12";
+        var flag = model.Flags.Single(field => field.Id.Value == "ready");
+        flag.Enabled = true;
+        flag.Value = true;
+        var text = model.Texts.Single(field => field.Id.Value == "weather");
+        text.Enabled = true;
+        text.Value = "rain";
+
+        var changed = Tale.Replace("Old passage.",
+            "New passage.\n~ var:newcount = 5\n~ set flag:newflag\n~ var:newtext = \"new\"");
+        Assert.True(model.ApplySource(Source(changed, Manifest(true)), yamlChanged: true));
+        Assert.False(model.RestartRequired);
+        Assert.Null(model.Error);
+        Assert.Equal("42", model.Seed);
+        Assert.Equal("current", model.Target);
+        Assert.Equal("21", model.Numbers.Single(field => field.Label == "var:count").Value);
+        Assert.True(model.Numbers.Single(field => field.Label == "var:count").Enabled);
+        Assert.Equal("3", model.Numbers.Single(field => field.Label == "player inventory:rope").Value);
+        Assert.True(model.Numbers.Single(field => field.Label == "player inventory:rope").Enabled);
+        Assert.True(model.Numbers.Single(field => field.Label == stat.Label).Enabled);
+        Assert.Equal("12", model.Numbers.Single(field => field.Label == stat.Label).Value);
+        Assert.True(model.Flags.Single(field => field.Id.Value == "ready").Enabled);
+        Assert.True(model.Flags.Single(field => field.Id.Value == "ready").Value);
+        Assert.True(model.Texts.Single(field => field.Id.Value == "weather").Enabled);
+        Assert.Equal("rain", model.Texts.Single(field => field.Id.Value == "weather").Value);
+        Assert.False(model.Numbers.Single(field => field.Label == "var:newcount").Enabled);
+        Assert.Equal("0", model.Numbers.Single(field => field.Label == "var:newcount").Value);
+        Assert.False(model.Numbers.Single(field => field.Label == "player inventory:artifact").Enabled);
+        Assert.False(model.Flags.Single(field => field.Id.Value == "newflag").Enabled);
+        Assert.False(model.Texts.Single(field => field.Id.Value == "newtext").Enabled);
+        Assert.Equal("1", model.EditNumbers.Single(field => field.Label == "var:count").Value);
+        Assert.Equal("5", model.EditNumbers.Single(field => field.Label == "var:newcount").Value);
+        Assert.Equal("0", model.EditNumbers.Single(field => field.Label == "player inventory:artifact").Value);
+        Assert.True(model.EditFlags.Single(field => field.Id.Value == "newflag").Value);
+        Assert.Equal("new", model.EditTexts.Single(field => field.Id.Value == "newtext").Value);
+        Assert.Equal("sunny", model.EditTexts.Single(field => field.Id.Value == "weather").Value);
+    }
+
+    [Fact]
+    public void Reload_before_start_prunes_removed_and_retyped_setup_overrides()
+    {
+        var original = Tale + """
+
+            === scratch
+            ~ var:oldnumber = 1
+            ~ set flag:oldflag
+            ~ var:changed = "text"
+            -> END
+            """;
+        var candidate = Tale + """
+
+            === scratch
+            ~ var:changed = 3
+            -> END
+            """;
+        using var model = new WorkbenchModel(_root);
+        Assert.True(model.ApplySource(Source(original), restart: true));
+        model.Numbers.Single(field => field.Label == "var:oldnumber").Enabled = true;
+        model.Flags.Single(field => field.Id.Value == "oldflag").Enabled = true;
+        model.Texts.Single(field => field.Id.Value == "changed").Enabled = true;
+
+        Assert.True(model.ApplySource(Source(candidate)));
+        Assert.Null(model.Error);
+        Assert.Null(model.Session);
+        Assert.DoesNotContain(model.Numbers, field => field.Label == "var:oldnumber");
+        Assert.DoesNotContain(model.Flags, field => field.Id.Value == "oldflag");
+        Assert.Empty(model.Texts);
+        Assert.False(model.Numbers.Single(field => field.Label == "var:changed").Enabled);
+        Assert.Contains("var:oldnumber", model.ReloadStatus);
+        Assert.Contains("flag:oldflag", model.ReloadStatus);
+        Assert.Contains("var:changed", model.ReloadStatus);
+    }
+
+    [Fact]
+    public void Restart_prunes_removed_inventory_override()
+    {
+        using var model = new WorkbenchModel(_root);
+        Assert.True(model.ApplySource(Source(Tale, Yaml + "\nitems:\n  rope: {name: Rope}\n"), restart: true));
+        model.Numbers.Single(field => field.Label == "player inventory:rope").Enabled = true;
+        model.Start();
+
+        Assert.True(model.ApplySource(Source(Tale), restart: true));
+
+        Assert.Null(model.Error);
+        Assert.Null(model.Session);
+        Assert.DoesNotContain(model.Numbers, field => field.Label == "player inventory:rope");
+        Assert.Contains("player inventory:rope", model.ReloadStatus);
+    }
+
+    [Fact]
+    public void Superseded_reload_does_not_prune_setup_fields_or_publish_a_notice()
+    {
+        var original = Tale + "\n=== scratch\n~ set flag:temporary\n-> END";
+        using var model = new WorkbenchModel(_root);
+        Assert.True(model.ApplySource(Source(original), restart: true));
+        var field = model.Flags.Single(flag => flag.Id.Value == "temporary");
+        field.Enabled = true;
+        var status = model.ReloadStatus;
+        var firstPublish = true;
+
+        Assert.False(model.ApplySource(Source(Tale), commit: action =>
+        {
+            if (!firstPublish) return false;
+            firstPublish = false;
+            action();
+            return true;
+        }));
+
+        Assert.Same(field, model.Flags.Single(flag => flag.Id.Value == "temporary"));
+        Assert.True(field.Enabled);
+        Assert.Equal(status, model.ReloadStatus);
+    }
+
+    [Fact]
+    public void Rejected_restart_leaves_removed_overrides_and_active_run_unchanged()
+    {
+        using var model = new WorkbenchModel(_root);
+        model.Reload();
+        model.Start();
+        var session = model.Session;
+        var flag = Assert.Single(model.Flags);
+        flag.Enabled = true;
+        var count = model.Numbers.Single(field => field.Label == "var:count");
+        count.Enabled = true;
+        count.Value = "not a number";
+        var candidate = BuildManifest(includeReady: false);
+
+        Assert.False(model.ApplySource(Source(Tale, candidate), restart: true));
+
+        Assert.Same(session, model.Session);
+        Assert.Same(flag, Assert.Single(model.Flags));
+        Assert.True(flag.Enabled);
+        Assert.Contains("32-bit integer", model.Error);
+    }
+
+    [Fact]
+    public void Setup_fields_use_new_initial_values_when_overrides_are_disabled()
+    {
+        var initial = Yaml.Replace("flags:\n- ready", "flags: { ready: true }");
+        using var model = new WorkbenchModel(_root);
+        Assert.True(model.ApplySource(Source(Tale, initial), restart: true));
+        Assert.True(Assert.Single(model.Flags).Value);
+        var count = model.Numbers.Single(field => field.Label == "var:count");
+        count.Value = "uncommitted";
+        Assert.False(count.Enabled);
+        Assert.Single(model.Flags).Value = false;
+
+        Assert.True(model.ApplySource(Source(Tale + "\n// updated", initial)));
+
+        Assert.Equal("0", model.Numbers.Single(field => field.Label == "var:count").Value);
+        Assert.True(Assert.Single(model.Flags).Value);
+        Assert.False(Assert.Single(model.Flags).Enabled);
     }
 
     [Fact]

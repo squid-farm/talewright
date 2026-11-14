@@ -153,7 +153,10 @@ way.
 Some changes still need **Restart from source**, including removing the current scene, changing or
 removing existing state declarations, changing rules or incompatible configuration, and YAML changes
 that do not trigger continuation (even a comment). The debugger keeps your selected scene, seed,
-overrides and character for restart, and tells you about any that no longer exist so you can fix them.
+compatible overrides and character for restart. Setup fields follow the accepted story on reload;
+new fields start without overrides. On restart, overrides for removed or retyped fields are
+disabled and named in the status message. If an active state declaration was removed or retyped,
+the debugger still requires a restart rather than discarding that state during an in-place reload.
 
 If a change has errors, the debugger keeps running your last good version and marks it out of date.
 Fix the error and save again, or click **Rescan / retry watcher**. If you reload after going Back,

@@ -33,6 +33,22 @@ public sealed class StatusLineTests : BunitContext
     }
 
     [Fact]
+    public void Restart_reports_disabled_overrides_in_the_single_status_message()
+    {
+        using var model = Load();
+        model.Texts.Single(field => field.Id.Value == "weather").Enabled = true;
+        var files = ComponentStory.Files();
+        files[StorySource.ManifestFileName] = files[StorySource.ManifestFileName]
+            .Replace("  weather: \"sunny\"\n", "", StringComparison.Ordinal);
+
+        Assert.True(model.ApplySource(Compile(files), restart: true));
+
+        AssertSingleMessage(Render(model), "status",
+            "Source restarted. Compatible setup retained and revalidated; select Start selected scene for a fresh run. "
+            + "Disabled removed or incompatible setup overrides: var:weather.");
+    }
+
+    [Fact]
     public void Divergent_history_is_adopted_with_one_continuation_status_message()
     {
         using var model = ComponentStory.Start();

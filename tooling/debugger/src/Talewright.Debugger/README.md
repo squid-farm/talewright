@@ -38,8 +38,10 @@ How it's built:
   other YAML changes latch an explicit restart. Failed compiles or reconstruction keep the last good
   run. Rescan retries and rearms the watcher. Disposal cancels pending work.
 - **Restart from source** revalidates the retained setup, character and seed before discarding the run.
-  Invalidated ids stay visible for correction. Creation forms keep their draft across Talemark reloads and
-  initialize from the retained selection on restart, via Player's optional `InitialSelection`.
+  Removed or retyped setup overrides are pruned and named in the status message. Setup fields are
+  also reconciled after accepted in-place reloads; new declarations begin disabled. Creation forms
+  keep their draft across Talemark reloads and initialize from the retained selection on restart,
+  via Player's optional `InitialSelection`.
 - **Tests.** The UI-independent model is covered by CLI tests; native interactions run through the Linux
   AT-SPI E2E harness, including export/import across two debugger processes. A CLI launch regression
   test opens a selected scene through `debug`, plays it, and checks the exit code when the window closes,
