@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Xunit.Abstractions;
 
 namespace Talewright.Player.E2E.Tests;
 
@@ -6,6 +7,10 @@ namespace Talewright.Player.E2E.Tests;
 [Collection(SerialCollection.Name)]
 public sealed class NativeImageTests
 {
+    private readonly ITestOutputHelper _output;
+
+    public NativeImageTests(ITestOutputHelper output) => _output = output;
+
     [Fact]
     public async Task Native_built_in_sample_opens_real_embedded_image_bytes()
     {
@@ -41,6 +46,44 @@ public sealed class NativeImageTests
             node.Role == "push button" && node.Name == "Reveal image: A camp");
         Assert.DoesNotContain(history.Descendants(), node => node.Role == "image" && node.Name == "A camp");
         Assert.DoesNotContain("unavailable", history.Content);
+    }
+
+    [Fact]
+    public async Task Folder_player_warms_a_direct_destination_image()
+    {
+        using var files = new ImageStoryFiles();
+        var paragraphs = string.Join("\n\n", Enumerable.Repeat(
+            "A reader studies the marked route and considers what might wait beyond the next ridge. " +
+            "The path winds through old growth, following the river until the stones turn east.", 60));
+        await File.WriteAllTextAsync(files.TalePath, $$"""
+            === start
+            Read this passage before choosing where to go.
+            * [Continue to the destination] -> destination
+            === destination
+            {{paragraphs}}
+
+            {image("photo.jpeg", "Destination map")}
+            * [Finish] -> END
+            """);
+
+        await using var driver = new NativePlayerDriver(Artifacts("image-warming"));
+        await driver.StartAsync(files.Root);
+        await WaitFor(driver, snapshot => snapshot.Content.Contains("Read this passage before choosing where to go."));
+        await Task.Delay(500);
+
+        var timer = Stopwatch.StartNew();
+        await driver.ChooseAsync("Continue to the destination");
+        await driver.ScrollToImageAsync("Destination map");
+        var snapshot = await WaitFor(driver, state => state.Descendants().Any(node =>
+            node.Role == "image" && node.Name == "Destination map" && node.Bounds.Height > 100));
+        timer.Stop();
+        _output.WriteLine(
+            $"Image warming measurement: host=Linux Photino; source=local story folder; " +
+            $"imageBytes={new FileInfo(files.ImagePath).Length}; HTTP/cache=not applicable; " +
+            $"readingInterval=500ms; method=choice click through decoded accessible image after scroll; " +
+            $"navigation-to-image-visible={timer.ElapsedMilliseconds}ms.");
+        Assert.Contains(snapshot.Descendants(), node =>
+            node.Role == "image" && node.Name == "Destination map" && node.Bounds.Height > 100);
     }
 
     [Fact]

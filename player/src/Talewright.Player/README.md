@@ -14,7 +14,7 @@ Story authors don't need it. See [C# extensions and packages](../../../docs/deve
 |---|---|
 | `ReaderPresentation` | Initializes `PlayerPreferencesStore`, then renders its child content with a `PlayerDiagnostics` cascade. Hosts can use it around reader surfaces so preferences and diagnostics are shared consistently. An optional `Diagnostics` parameter preserves a host-owned report instance. |
 | `ReaderSettingsDialog` | Standalone player Settings dialog. `OpenAsync(returnFocus)` opens it and restores focus to the supplied element when it closes. |
-| `TalewrightApp` | Root. Uses `ReaderPresentation` for preference initialization and the diagnostics cascade. Library screen listing `IStoryLibrary` stories plus a `.zip` upload (`InputFile`, buffered to memory because browser streams can't seek). Compiles the chosen story; offers an explicit autosave resume choice before character creation or play; shows `DiagnosticList` on errors, otherwise `StoryPlayer`. Parameters: `AutoStartStoryId`, `LibraryEnabled` (true by default), `MaxUploadBytes` (20 MB). |
+| `TalewrightApp` | Root. Uses `ReaderPresentation` for preference initialization and the diagnostics cascade. Library screen listing `IStoryLibrary` stories plus a `.zip` upload (`InputFile`, buffered to memory because browser streams can't seek). Compiles the chosen story; offers an explicit autosave resume choice before character creation or play; shows `DiagnosticList` on errors, otherwise `StoryPlayer`. Shares one bounded image warmer across keyed player replacements. Parameters: `AutoStartStoryId`, `LibraryEnabled` (true by default), `MaxUploadBytes` (20 MB). |
 | `StoryPlayer` | Composes the play screen and owns `StoryHistory`, save operations, busy/error state and transcript focus. Passes state and callbacks to focused children rather than mixing their markup with session orchestration. Shows a character sheet only when the story declares stats, items or factions that the author's `game.character-sheet` setting doesn't hide, and gives the transcript the full layout column when no sheet is needed. Parameters: `Story`, `Seed`, `Character`, `OnExit`, `Visible`, optional `SaveStore` and `SaveExporter`; direct consumers can pass a validated `ResumeHistory`. |
 | `DiagnosticReport` | Root-level modal with an inspectable session report and optional download control; opened from the library, failed-startup screen, or More actions during play. |
 | `PlayerToolbar` | Sticky themed title/navigation/save header, More actions disclosure for Settings/Diagnostics/Restart/Library, and modal Settings/Restart dialogs. Enabled states and actions come from the parent; Library and Diagnostics are omitted when their callbacks are not supplied. |
@@ -23,7 +23,7 @@ Story authors don't need it. See [C# extensions and packages](../../../docs/deve
 | `StoryChoices` | Numbered menu, with unavailable choices disabled and visibly marked; end/replay controls and visible history-limit notice. |
 | `DocumentView` | `RenderedDocument` → `<p>` paragraphs, speech (`.tw-speaker` + line) and notes (`.tw-note-check/-change/-info`). |
 | `InlineView` | Styled runs → `<strong>`/`<em>`/`<code>` (nested for combined styles), `<br>`, and `MediaView` for resolved images on every narrative surface. |
-| `MediaView` | Viewport-lazy image lease and independent decode/presentation. Responsive image, effective alt and accessible visible failures; releases its lease when unmounted. |
+| `MediaView` | Claims an already-warmed image lease when available; cold images retain viewport-lazy acquisition and all images decode/present independently. Responsive image, effective alt and accessible visible failures; releases its lease when unmounted. |
 | `CharacterSheet` | Built from story declarations: stats grouped by `StatCategory` (skills at 0 hidden), effective value with the modifier shown when items change it, inventory with counts (including “Nothing.” when declared items are not held), and player faction standings with tier names. `Visibility` (from `StoryDefinition.CharacterSheet`) removes sections the author hid; `HasSections` tells hosts whether any section remains. A dating-sim ruleset gets a dating-sim sheet automatically. |
 | `DiagnosticList` | Errors first, then warnings, each with `file:line:col`, code and message. |
 
@@ -130,6 +130,16 @@ entries and awaits asynchronous browser URL cleanup. Sharing removes duplicate t
 it does not bound distinct images retained by history or guarantee one decoded bitmap.
 There is no eviction, unique-image budget or history virtualization. Images are never exposed as
 filesystem browser URLs or fetched from remote addresses.
+
+The app's `StoryImageWarmer` discovers media in the current scene's direct incoming/outgoing
+connections and hub offers, excluding the current scene. It walks compiled content, including
+both conditional branches, without evaluating conditions or changing story state. A round-robin
+scheduler permits at most three speculative transfers at once. Back/Forward waits 500 ms before
+starting the replacement plan; work already in flight remains accounted for across story
+replacement and transfers its existing lease to arriving media occurrences. Warming never delays
+navigation or bypasses viewport-lazy presentation. Failed speculative transfers release their
+leases so normal lazy acquisition can retry. The concurrency cap does not limit the number of
+completed neighboring images retained while the current plan needs them.
 
 ZIP opens use `ArchiveStoryImages.Open`, which takes ownership of the compressed input even
 when loading fails. A loaded story retains one parsed archive, not expanded image copies.

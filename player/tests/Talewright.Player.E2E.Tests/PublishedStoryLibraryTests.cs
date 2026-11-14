@@ -2,6 +2,7 @@ using System.Net;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
+using Talewright.Core.Identity;
 using Talewright.Player.Library;
 using Talewright.Runtime;
 using Talewright.Talemark.Compilation;
@@ -10,6 +11,42 @@ namespace Talewright.Player.E2E.Tests;
 
 public sealed class PublishedStoryLibraryTests
 {
+    [Fact]
+    public async Task Published_web_destination_is_warmed_once_and_handed_off_from_the_existing_entry()
+    {
+        using var files = new ImageStoryFiles();
+        using var server = new StaticStory(files.Root);
+        using var client = server.Client();
+        await using var loaded = await new PublishedStoryLibrary(client).OpenAsync("Published");
+        var compilation = StoryCompiler.Compile(loaded.Source);
+        Assert.True(compilation.Success, string.Join("\n", compilation.Diagnostics));
+        var browser = new StoryImageWarmerTests.Browser();
+        browser.RegisterContent(await File.ReadAllBytesAsync(files.ImagePath), "images/photo.jpeg");
+        var warmer = new StoryImageWarmer(browser);
+        var owner = new object();
+        try
+        {
+            warmer.Navigate(owner, compilation.Story!, loaded.Images, compilation.Story!.Start, TimeSpan.Zero);
+            Assert.Equal("images/photo.jpeg", Assert.Single(await browser.ReadStartsAsync(1)));
+            await WaitUntilAsync(() => browser.Active == 0);
+
+            var requests = server.Requests.Where(uri =>
+                uri.AbsolutePath.EndsWith("/images/photo.jpeg", StringComparison.Ordinal)).ToArray();
+            Assert.Single(requests);
+            Assert.True(warmer.Navigate(owner, compilation.Story!, loaded.Images,
+                new SceneId("next"), TimeSpan.Zero));
+            var handoff = Assert.IsType<StoryImages.Lease>(loaded.Images!.TryAcquireExisting("images/photo.jpeg"));
+            await handoff.Url;
+            warmer.CompleteHandoff();
+            Assert.Equal(1, browser.StartedFor("images/photo.jpeg"));
+            await handoff.DisposeAsync();
+        }
+        finally
+        {
+            await warmer.DisposeAsync();
+        }
+    }
+
     [Fact]
     public async Task Split_source_is_detached_from_transport_and_images_are_fetched_lazily_at_the_subpath()
     {
@@ -164,5 +201,13 @@ public sealed class PublishedStoryLibraryTests
                 ? new HttpResponseMessage(HttpStatusCode.OK) { Content = new ByteArrayContent(File.ReadAllBytes(path)) }
                 : new HttpResponseMessage(HttpStatusCode.NotFound));
         }
+
+    }
+
+    private static async Task WaitUntilAsync(Func<bool> condition)
+    {
+        using var timeout = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        while (!condition())
+            await Task.Delay(10, timeout.Token);
     }
 }

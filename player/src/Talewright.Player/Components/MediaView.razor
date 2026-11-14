@@ -43,7 +43,10 @@
             var wasUnavailable = _error == "Images are unavailable for this story source.";
             _error = "Images are unavailable for this story source.";
             if (!wasUnavailable) Report?.Record(PlayerDiagnosticOperation.ImageLoad, PlayerDiagnosticCause.Unavailable);
+            return;
         }
+
+        _lease ??= Images.TryAcquireExisting(Media.MediaId);
     }
 
     protected override Task OnAfterRenderAsync(bool firstRender)
@@ -82,7 +85,7 @@
         var token = _loading.Token;
         try
         {
-            _lease = Images.Acquire(Media.MediaId, JS);
+            _lease ??= Images.Acquire(Media.MediaId, JS);
             var url = await _lease.Url.WaitAsync(token);
             if (_disposed || token.IsCancellationRequested) return;
             var loaded = await _module.InvokeAsync<bool>("display", token, _handle, url);

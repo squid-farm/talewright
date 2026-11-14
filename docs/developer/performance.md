@@ -43,6 +43,43 @@ See the [performance scorecard](performance-scorecard.md) for a cross-host view
 of browser observations, fixed-byte file-layout measurements, end-cursor versus
 redo-prefix restore, metric limitations, and the status of proposed budgets.
 
+## Player image warming
+
+The browser regression and measurement test is opt-in with the player E2E suite:
+
+```bash
+python3 player/tests/run_e2e.py web --browser chromium --filter FullyQualifiedName~Destination_image_warming_is_reused_and_offscreen_images_remain_lazy
+```
+
+One local observation used Linux Mint 22.3 x64, AMD Ryzen 9 7940HS (16 logical CPUs),
+.NET 10.0.15 and Chromium 153.0.8010.12. The fixture used a 53,477,376-byte JPEG
+(the real image followed by zero padding) in a local uploaded ZIP. Image bytes came
+from the archive on the loopback test host; there were no HTTP image requests or
+HTTP-cache reuse. Each case used a distinct story owner and Blob URL. The settled
+case allowed a 500 ms reading interval after warming; the immediate case navigated
+with warming incomplete. Timings stop after scrolling the image into view and
+observing a decoded `naturalWidth`.
+
+| Case | Image visible | `Finish` choice displacement |
+|---|---:|---:|
+| Cold named-save restore into the current scene | 1,544 ms | 473.2 px |
+| Immediate navigation with the image transfer held pending until viewport entry | 861 ms | 473.2 px |
+| Settled direct-neighbor warming (500 ms reading interval) | 450 ms | 473.2 px |
+
+On the same Linux Mint host, a Linux Photino run used a local folder story and the
+899,911-byte source image. With a 500 ms reading interval, choice-to-decoded-image
+after scrolling measured **678 ms**. Its method and source differ from the browser
+cases, so it is a local-host observation, not a direct cross-host comparison.
+
+The immediate case uses a test-only gate on the browser stream read to make the
+in-flight handoff deterministic; it is not a natural-network timing sample. The cold
+and warmed cases enter the image through different actions (save restore versus a
+choice), so these single observations are diagnostic, not a causal before/after
+claim or a performance target. Choice displacement is the document-Y difference
+before and after image decode; the identical values show that warming does not reserve
+image layout space. The 53 MiB image exercises a large expanded image, but browser
+peak/retained memory were not measured.
+
 ## File syntax reuse and edit diagnostics
 
 This measurement uses the deterministic 20-chapter realistic corpus:

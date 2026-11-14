@@ -2,8 +2,10 @@
    Hosts render just this component; everything else is shared between desktop and web. *@
 @inject IStoryLibrary Library
 @inject IServiceProvider Services
+@inject IJSRuntime JS
 @using Microsoft.Extensions.DependencyInjection
 @using Talewright.Player.Diagnostics
+@using Talewright.Player.Library
 @using Talewright.Player.Saves
 @using Talewright.Runtime.Saves
 @using Talewright.Core.Randomness
@@ -15,6 +17,7 @@
     {
         @* Kept mounted while the library is open so the playthrough survives a trip to the library. *@
         <CascadingValue Value="_loaded!.Images">
+        <CascadingValue Value="_imageWarmer">
         <div hidden="@_showLibrary" @key="_loaded">
             @if (!_resumeCheckComplete)
             {
@@ -66,6 +69,7 @@
                 <StoryPlayer Story="_story" Seed="@(_story.Creation is null ? null : _creationSeed)" Character="_character" Visible="!_showLibrary" OnExit="@(LibraryEnabled ? EventCallback.Factory.Create(this, ShowLibrary) : default)" OnOpenDiagnostics="OpenDiagnosticsAsync" SaveStore="SaveStore" SaveExporter="Services.GetService<ISaveFileExporter>()" ResumeHistory="@(_resumeAccepted ? _resumeHistory : null)" AutosaveResumeChecked="true" PreserveRejectedAutosave="_preserveRejectedAutosave" RejectedAutosaveData="_rejectedAutosaveData" />
             }
         </div>
+        </CascadingValue>
         </CascadingValue>
     }
 
@@ -178,6 +182,7 @@
     private IReadOnlyList<StoryEntry>? _entries;
     private StoryDefinition? _story;
     private LoadedStory? _loaded;
+    private StoryImageWarmer? _imageWarmer;
     private long _openGeneration;
     private bool _disposed;
     private CharacterSelection? _character;
@@ -192,6 +197,7 @@
     private bool _preserveRejectedAutosave;
     private byte[]? _rejectedAutosaveData;
     private IReadOnlyList<Diagnostic> _diagnostics = [];
+    private readonly List<Task> _retiredStories = [];
     private string? _error;
     private string? _failedTitle;
     private readonly PlayerDiagnostics _fallbackReport = new();
@@ -206,6 +212,7 @@
 
     protected override async Task OnInitializedAsync()
     {
+        _imageWarmer = new StoryImageWarmer(JS);
         if (!LibraryEnabled && AutoStartStoryId is null)
         {
             throw new InvalidOperationException("A story must be selected when the library is disabled.");
@@ -298,6 +305,7 @@
         if (result.Success)
         {
             var previous = _loaded;
+            _imageWarmer?.Clear();
             _loaded = loaded;
             _story = result.Story;
             _creationSeed = DeterministicDice.ResolveSeed(null, _story!.Seed);
@@ -312,7 +320,11 @@
             _resumeCheckComplete = false;
             _showLibrary = false;
             _diagnostics = [];
-            if (previous is not null) await previous.DisposeAsync();
+            if (previous is not null)
+            {
+                _retiredStories.RemoveAll(task => task.IsCompleted);
+                _retiredStories.Add(DisposeRetiredStoryAsync(previous));
+            }
             await OnTitleChanged.InvokeAsync(_story!.Title);
             await CheckAutosaveAsync(_story, generation);
         }
@@ -327,6 +339,18 @@
         _error = null;
         _failedTitle = null;
         _diagnostics = [];
+    }
+
+    private static async Task DisposeRetiredStoryAsync(LoadedStory story)
+    {
+        try
+        {
+            await story.DisposeAsync();
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Retired story cleanup failed: {ex.Message}");
+        }
     }
 
     private async Task CheckAutosaveAsync(StoryDefinition story, long generation)
@@ -425,6 +449,9 @@
     {
         _disposed = true;
         ++_openGeneration;
+        _imageWarmer?.Clear();
         if (_loaded is not null) await _loaded.DisposeAsync();
+        if (_imageWarmer is not null) await _imageWarmer.DisposeAsync();
+        await Task.WhenAll(_retiredStories);
     }
 }
