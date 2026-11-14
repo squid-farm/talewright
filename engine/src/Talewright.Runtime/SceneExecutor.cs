@@ -27,12 +27,14 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
     private readonly List<string> _visits = [];
     private readonly HashSet<string> _settled = new(StringComparer.Ordinal);
     private readonly List<ChoiceStep> _replayChoices = [];
+    private readonly List<AuthorEntryReplayStep> _entryReplay = [];
     private readonly Func<int, IEnumerable<RenderedBlock>> _notesSince = notesSince;
     internal EvaluationContext Context => new(log.State, story.Predicates)
     {
         ResolveSkillCheck = ResolveExpressionCheck,
     };
     public IReadOnlyList<ChoiceStep> ReplayChoices => _replayChoices;
+    public IReadOnlyList<AuthorEntryReplayStep> EntryReplay => _entryReplay;
 
     /// <summary>
     /// Runs a scene. A refresh (author live edit) keeps every step up to the scene's last executed effect batch or
@@ -49,6 +51,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
             _branches.Clear();
             _visits.Clear();
             _settled.Clear();
+            _entryReplay.Clear();
         }
         var blocks = new List<RenderedBlock>();
         var choices = new List<VisibleChoice>();
@@ -99,6 +102,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                 case EffectStep effect:
                     if (!refresh)
                     {
+                        if (rememberEntry) _entryReplay.Add(new("effect", effect.Effects));
                         var mark = log.Events.Count;
                         ApplyBatch(effect.Effects);
                         Observe(DecisionKind.EntryEffect, step.Id, DecisionOutcome.Applied,
@@ -131,8 +135,14 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                         foreach (var skipped in applies ? branch.Else : branch.Then)
                             Skip(skipped, DecisionReason.ConditionFalse);
                     }
+                    var replayMark = _entryReplay.Count;
                     target = Execute(scene, applies ? branch.Then : branch.Else, blocks, choices, replayChoices,
                         refresh, out stopReason);
+                    if (!refresh && rememberEntry && _entryReplay.Count > replayMark)
+                    {
+                        _entryReplay.Insert(replayMark, new("condition", branch.Condition));
+                        _entryReplay.Insert(replayMark + 1, new("branch", applies));
+                    }
                     break;
                 case ChoiceStep choice:
                     replayChoices.Add(choice);
@@ -174,6 +184,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                     }
                     break;
                 case DivertStep divert:
+                    if (!refresh && rememberEntry) _entryReplay.Add(new("divert", divert.Target));
                     Observe(DecisionKind.Divert, step.Id, DecisionOutcome.Selected,
                         DecisionReason.Unconditional, null, log.Events.Count);
                     target = divert.Target;
@@ -182,6 +193,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                 case CheckStep check:
                     if (!refresh)
                     {
+                        if (rememberEntry) _entryReplay.Add(new("check", check.Check));
                         var mark = log.Events.Count;
                         target = ResolveCheck(check.Check, step.Id);
                         if (rememberEntry) _checks[step.Id] = target;

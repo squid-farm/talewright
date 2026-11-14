@@ -128,12 +128,12 @@ public sealed class AuthorReloadTests
         original.Choose("c0");
         var candidate = original.Reload(Compile(tale.Replace("old.", "new."), yaml));
         Assert.Contains("These pants are new.", candidate.Current.Document.ToPlainText());
-        Assert.Throws<AuthorReloadException>(() => original.Reload(
-            Compile(tale.Replace("#the#", "#that#"), yaml)));
+        var changedLabel = original.Reload(Compile(tale.Replace("#the#", "#that#"), yaml));
+        Assert.Equal(original.Events, changedLabel.Events);
     }
 
     [Fact]
-    public void One_many_is_engine_owned_and_its_arguments_are_compared_during_reload()
+    public void One_many_is_engine_owned_in_choice_labels_and_prose_during_reload()
     {
         var tale = Tale.Replace("[Travel]", "[{player:pronoun#one-many(\"Travel\", \"Travel together\")}]")
             .Replace("Old passage.", "{player:pronoun#one-many(\"has\", \"have\")} arrived.");
@@ -141,9 +141,8 @@ public sealed class AuthorReloadTests
         original.Choose("c0");
         var candidate = original.Reload(Compile(tale.Replace("arrived.", "returned.")));
         Assert.Contains("have returned.", candidate.Current.Document.ToPlainText());
-        var error = Assert.Throws<AuthorReloadException>(() =>
-            original.Reload(Compile(tale.Replace("\"Travel together\"", "\"Leave together\""))));
-        Assert.Contains("previously consumed", error.Message);
+        var changedLabel = original.Reload(Compile(tale.Replace("\"Travel together\"", "\"Leave together\"")));
+        Assert.Equal(original.Events, changedLabel.Events);
     }
 
     [Fact]
@@ -184,26 +183,115 @@ public sealed class AuthorReloadTests
     }
 
     [Theory]
-    [InlineData("label")]
-    [InlineData("effect")]
-    [InlineData("condition")]
-    [InlineData("target")]
-    public void Changed_previous_choice_meaning_is_rejected_even_when_positional_key_survives(string change)
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Reload_rejects_changed_entry_effects_from_a_consumed_scene_even_when_events_match(bool autoDivert)
+    {
+        var tale = autoDivert
+            ? """
+                === start
+                ~ var:count = 0
+                -> middle
+                === middle
+                * [Travel] -> current
+                === current
+                Current passage.
+                * [Finish] -> END
+                """
+            : """
+                === start
+                ~ var:count = 0
+                * [Travel] -> current
+                === current
+                Current passage.
+                * [Finish] -> END
+                """;
+        var original = AuthorSession.Create(Compile(tale, BuildManifest(initialCount: 0).Build()),
+            new("start"), seed: 42);
+        if (autoDivert) original.Choose(StorySession.ContinueKey);
+        original.Choose("c0");
+        var candidate = Compile(tale.Replace("~ var:count = 0", "~ var:count += 0"),
+            BuildManifest(initialCount: 0).Build());
+        var equivalentRun = AuthorSession.Create(candidate, new("start"), seed: 42);
+        if (autoDivert) equivalentRun.Choose(StorySession.ContinueKey);
+        equivalentRun.Choose("c0");
+
+        Assert.Equal(original.Events, equivalentRun.Events);
+        Assert.Contains("previously entered", Assert.Throws<AuthorReloadException>(
+            () => original.Reload(candidate)).Message);
+    }
+
+    [Theory]
+    [InlineData("label", false)]
+    [InlineData("effect", true)]
+    [InlineData("skill-check", true)]
+    [InlineData("condition", false)]
+    [InlineData("unavailable", true)]
+    [InlineData("target", true)]
+    public void Reload_validates_consumed_choice_availability_and_replay_identity(string change, bool rejected)
     {
         var original = AuthorSession.Create(Compile(), new("start"), seed: 42);
         original.Choose("c0");
         var tale = change switch
         {
-            "label" => Tale.Replace("[Travel]", "[Different meaning]"),
-            "effect" => Tale.Replace("~ set flag:ready", "~ set flag:ready\n~ var:count += 1"),
+            "label" => Tale.Replace("[Travel]", "[Different label]"),
+            "effect" => Tale.Replace("[Travel] -> current", "[Travel] { var:count += 1 } -> current"),
+            "skill-check" => Tale.Replace("[Travel] -> current", """
+                [Travel] skill-check athletics dc 10
+                  success: -> current
+                  failure: -> current
+                """),
             "condition" => Tale.Replace("[Travel]", "[Travel] (requires flag:ready)"),
+            "unavailable" => Tale.Replace("[Travel]", "[Travel] (requires not flag:ready)"),
             _ => Tale.Replace("[Travel] -> current", "[Travel] -> next"),
         };
         var events = original.Events;
-        var ex = Assert.Throws<AuthorReloadException>(() => original.Reload(Compile(tale)));
-        Assert.Contains("previously consumed", ex.Message);
-        Assert.Same(events, original.Events);
-        Assert.Equal(11, original.State.GetVariable(new("count")));
+        if (rejected)
+        {
+            var ex = Assert.Throws<AuthorReloadException>(() => original.Reload(Compile(tale)));
+            if (change != "effect")
+            {
+                Assert.Contains("previously consumed", ex.Message);
+            }
+            Assert.Same(events, original.Events);
+            Assert.Equal(11, original.State.GetVariable(new("count")));
+        }
+        else
+        {
+            var candidate = original.Reload(Compile(tale));
+            Assert.Equal(events, candidate.Events);
+        }
+    }
+
+    [Fact]
+    public void Reload_ignores_unconsumed_choice_edits_and_additions()
+    {
+        const string tale = """
+            === start
+            ~ set flag:ready
+            * [Travel] -> current
+            * [Restricted] (requires flag:ready, shown "Not ready") -> next
+            === current
+            * [Return] -> start
+            === next
+            * [Return] -> start
+            """;
+        var original = AuthorSession.Create(Compile(tale), new("start"), seed: 42);
+        original.Choose("c0");
+        var candidateTale = tale
+            .Replace("[Travel]", "[Different label]")
+            .Replace("[Restricted] (requires flag:ready, shown \"Not ready\")",
+                "[Changed restriction] (requires not flag:ready, shown \"Still restricted\")")
+            .Replace("=== current\n* [Return] -> start",
+                "=== current\n* [Return] -> start\n* [New choice] -> next");
+
+        var candidate = original.Reload(Compile(candidateTale));
+
+        Assert.Equal(original.Events, candidate.Events);
+        Assert.Contains(candidate.Current.Choices, choice => choice.Key == "c0" && choice.Text == "Return");
+        Assert.Contains(candidate.Current.Choices, choice => choice.Key == "c1" && choice.Text == "New choice");
+        candidate.Choose("c1");
+        Assert.Equal(new("next"), candidate.Current.Scene);
     }
 
     [Theory]
@@ -349,12 +437,12 @@ public sealed class AuthorReloadTests
     }
 
     [Theory]
-    [InlineData("title")]
-    [InlineData("priority")]
-    [InlineData("requires")]
-    [InlineData("unavailable")]
-    [InlineData("once")]
-    public void Selected_hub_choice_semantics_are_verified_before_replaying_its_key(string change)
+    [InlineData("title", false)]
+    [InlineData("priority", false)]
+    [InlineData("available-requires", false)]
+    [InlineData("unavailable", true)]
+    [InlineData("once", false)]
+    public void Reload_validates_selected_storylet_availability_and_target(string change, bool rejected)
     {
         const string tale = """
             === start
@@ -372,14 +460,26 @@ public sealed class AuthorReloadTests
         {
             "title" => tale.Replace("Selected title", "Different title"),
             "priority" => tale.Replace("@tags camp", "@tags camp\n@priority 1"),
-            "requires" => tale.Replace("@tags camp", "@tags camp\n@requires not flag:ready"),
+            "available-requires" => tale.Replace("@tags camp", "@tags camp\n@requires not flag:ready"),
             "unavailable" => tale.Replace("@tags camp", "@tags camp\n@requires flag:ready"),
             _ => tale.Replace("@tags camp", "@tags camp\n@once"),
         };
         var events = session.Events;
-        Assert.Contains("previously consumed", Assert.Throws<AuthorReloadException>(
-            () => session.Reload(Compile(candidateTale))).Message);
-        Assert.Same(events, session.Events);
+        if (rejected)
+        {
+            Assert.Contains("previously consumed", Assert.Throws<AuthorReloadException>(
+                () => session.Reload(Compile(candidateTale))).Message);
+            Assert.Same(events, session.Events);
+        }
+        else
+        {
+            var candidate = session.Reload(Compile(candidateTale));
+            Assert.Equal(events, candidate.Events);
+            if (change == "title")
+            {
+                Assert.Equal("Different title", candidate.Current.Title);
+            }
+        }
         var updated = session.Reload(Compile(tale.Replace("Old passage.", "Updated body.")));
         Assert.Contains("Updated body.", updated.Current.Document.ToPlainText());
         Assert.Equivalent(events, updated.Events, strict: true);

@@ -36,6 +36,7 @@ public sealed class AuthorSession
         CaptureDecisions = captureDecisions;
         var decisions = new List<RuleDecision>();
         var results = new List<AuthorCommandResult>();
+        var entryReplay = new List<AuthorSceneEntryReplay>();
         var appliedCommands = commands.Take(_timeline.Position).ToArray();
         var lastEntryCommand = Array.FindLastIndex(appliedCommands,
             command => command is AuthorChoice or AuthorJump);
@@ -49,8 +50,14 @@ public sealed class AuthorSession
             }
         }
 
+        void CaptureEntryReplay(SceneId scene, IReadOnlyList<AuthorEntryReplayStep> replay)
+        {
+            verify?.VerifyEntryReplay(entryReplay.Count, scene, replay);
+            entryReplay.Add(new(scene, replay.ToArray()));
+        }
+
         _session = new StorySession(story, seed, character, setup,
-            captureDecisions ? decisions.Add : null, verify is null ? null : VerifyEntry);
+            captureDecisions ? decisions.Add : null, verify is null ? null : VerifyEntry, CaptureEntryReplay);
         _session.StartAt(target);
         for (var i = 0; i < appliedCommands.Length; i++)
         {
@@ -62,14 +69,20 @@ public sealed class AuthorSession
             verifyNextEntry = i == lastEntryCommand;
             results.Add(ReplayCommand(command));
         }
+        verify?.VerifyEntryReplayCount(entryReplay.Count);
         _results = results.AsReadOnly();
         Events = Array.AsReadOnly(_session.Events.ToArray());
         State = new AuthorStateView(EventLog.Replay(story.World, seed, Events).State);
         Decisions = decisions.AsReadOnly();
         if (_session.EntryBoundary is { } boundary)
         {
+            if (entryReplay.Count == 0 || entryReplay[^1].Scene != boundary.Scene)
+            {
+                throw new InvalidOperationException("The current scene entry has no replay evidence.");
+            }
             Checkpoint = new AuthorSceneCheckpoint(story, target, setup, seed, character,
-                appliedCommands, boundary, Events, captureDecisions, _playedChoices.ToArray());
+                appliedCommands, boundary, Events, captureDecisions, _playedChoices.ToArray(),
+                entryReplay.Take(entryReplay.Count - 1).ToArray());
         }
     }
 

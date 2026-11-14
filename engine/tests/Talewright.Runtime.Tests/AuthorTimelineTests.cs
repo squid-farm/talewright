@@ -387,7 +387,8 @@ public sealed class AuthorTimelineTests
         Assert.Equal(13, candidate.State.GetVariable(new("count")));
         candidate.Forward();
         Assert.Equal(session.Events, candidate.Events);
-        Assert.Throws<AuthorReloadException>(() => session.Reload(Compile(Tale.Replace("Count {var:count}.", "Consumed change."))));
+        var earlierProseChange = session.Reload(Compile(Tale.Replace("Count {var:count}.", "Updated count {var:count}.")));
+        Assert.Equal(session.Events, earlierProseChange.Events);
     }
 
     [Fact]
