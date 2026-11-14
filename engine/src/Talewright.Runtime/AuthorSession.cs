@@ -171,6 +171,7 @@ public sealed class AuthorSession
     public CharacterSelection? Character { get; private set; }
     public bool IsSynthetic => true;
     public bool CaptureDecisions { get; }
+    internal bool HasContinuation => _continuation is not null;
     public IReadOnlyList<AuthorCommand> Commands => Array.AsReadOnly(_commands);
     public int Cursor => _timeline.Position;
     public bool CanBack => _timeline.CanBack;

@@ -182,6 +182,17 @@ public sealed class AuthorScenarioTests
     }
 
     [Fact]
+    public void Continued_sessions_cannot_be_exported_as_portable_scenarios()
+    {
+        var source = Start();
+        source.Choose("c0");
+        var continued = source.Reload(Story(Tale.Replace("-> check", "-> start")), out var historyChanged);
+
+        Assert.True(historyChanged);
+        Assert.Throws<InvalidOperationException>(() => AuthorScenario.Export(continued, Extensions));
+    }
+
+    [Fact]
     public void Compatible_player_save_fork_preserves_original_and_pending_redo()
     {
         var story = Story();

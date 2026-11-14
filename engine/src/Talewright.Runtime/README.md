@@ -117,6 +117,8 @@ For author controls, see the [scenario workflow](../../../docs/guide/testing-you
 timeline, including redo, before restoring the requested cursor. `AuthorScenarioImport` exposes the
 candidate, whether it was adopted to different source, and replay differences. Neither API mutates
 an existing session or does file I/O.
+In-place continued sessions cannot be exported: their event baseline may include history from a
+previous source version and cannot be reconstructed from the current source alone.
 
 The host supplies its trusted compiler/extension compatibility identity (for built-ins,
 `CompilerOptions.Default.CompatibilityId`); compiled stories also need a content fingerprint.
