@@ -322,6 +322,36 @@ public sealed class MapViewTests
         Assert.Equal(["road"], route.Steps.Select(step => step.Scene));
     }
 
+    [Theory]
+    [InlineData("start", false)]
+    [InlineData("alternate", true)]
+    public void Current_run_keeps_original_start_after_history_continuation(string start, bool midStory)
+    {
+        const string tale = """
+            === start
+            * [Go] -> intro
+            === alternate
+            * [Go] -> intro
+            === intro
+            * [Continue] -> current
+            === current
+            * [Finish] -> END
+            """;
+        var original = CompileStory(tale);
+        var session = AuthorSession.Create(original, new SceneId(start), captureDecisions: true, seed: 42);
+        session.Choose("c0");
+        session.Choose("c0");
+        var changed = CompileStory(tale.Replace("intro", "prologue"));
+        var continued = session.Reload(changed, out var historyChanged);
+
+        Assert.True(historyChanged);
+        var route = MapRunView.Build(changed, MapView.Build(changed), continued);
+        Assert.Equal(start, route.StartScene);
+        Assert.Equal(midStory, route.StartedMidStory);
+        Assert.Equal([start, "intro", "current"], route.Steps.Select(step => step.Scene));
+        Assert.Equal("current", route.CurrentScene);
+    }
+
     [Fact]
     public void Scene_preview_renders_story_start_values_and_current_run_state_without_running_effects()
     {

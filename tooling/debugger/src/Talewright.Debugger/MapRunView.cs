@@ -114,9 +114,10 @@ public sealed record MapRunView(
             }
         }
 
+        var startScene = steps.FirstOrDefault()?.Scene ?? session.StartScene.Value;
         return new MapRunView(
-            session.StartScene.Value,
-            session.StartScene != story.Start,
+            startScene,
+            startScene != story.Start.Value,
             session.State.IsEnded,
             steps.LastOrDefault()?.Scene,
             Array.AsReadOnly(steps.ToArray()));

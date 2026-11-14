@@ -115,6 +115,8 @@ public sealed class AuthorSession
                     ?? throw new AuthorReloadException($"previously consumed choice '{choice.Key}' is unavailable at '{scene.Id}'");
                 break;
             case AuthorJump jump:
+                AuthorReloadComparison.Require(Story.Scenes.Any(candidate => candidate.Id == jump.Target),
+                    $"previously jumped-to scene '{jump.Target}' was removed");
                 selected = new ChoiceView($"author-jump:{jump.Target}", []);
                 break;
             case AuthorEdit:
@@ -224,6 +226,8 @@ public sealed class AuthorSession
             AuthorReloadComparison.Schema(Story, candidate);
             AuthorReloadComparison.Require(candidate.Scenes.Any(scene => scene.Id == checkpoint.Scene),
                 $"the current scene '{checkpoint.Scene}' was removed");
+            AuthorReloadComparison.Require(candidate.Scenes.Any(scene => scene.Id == StartScene),
+                $"the replay starting scene '{StartScene}' was removed");
             var result = new AuthorSession(candidate, StartScene, Setup.Validate(candidate), Seed,
                 CharacterSelection.Validate(candidate, Character, Seed), commands, timeline, CaptureDecisions,
                 checkpoint, _continuation);

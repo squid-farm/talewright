@@ -278,6 +278,27 @@ public sealed class AuthorReloadTests : IDisposable
     }
 
     [Fact]
+    public void Deleted_consumed_jump_target_continues_without_restart()
+    {
+        Write(Tale + "\n=== scratch\n* [Go] -> current");
+        using var model = new WorkbenchModel(_root);
+        model.Reload();
+        model.Start();
+        model.Target = "scratch";
+        model.JumpPreservingState();
+        model.Choose("c0");
+        var events = model.Session!.Events;
+
+        Write(Tale);
+        Assert.True(model.ApplySource(Load()));
+        Assert.False(model.RestartRequired);
+        Assert.Equal("History changed; continuing from here with current state.", model.ReloadStatus);
+        Assert.Equal(events, model.Session!.Events);
+        Assert.Equal("current", model.Session.Current.Scene!.Value.Value);
+        Assert.False(model.Session.CanBack);
+    }
+
+    [Fact]
     public void Additive_item_configuration_continues_an_active_run_without_restart()
     {
         var model = new WorkbenchModel(_root);

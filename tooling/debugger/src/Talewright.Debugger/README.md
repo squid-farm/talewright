@@ -33,8 +33,10 @@ How it's built:
 - **Reload.** `StoryReloadWatcher` watches saved changes, creates, deletes and renames, debounces editor
   bursts, and compiles one complete source snapshot at a time off the UI thread. Generation checks
   discard superseded results, including at commit after runtime reconstruction. Play and swaps share the
-  Blazor dispatcher. YAML changes latch an explicit restart; failed compiles or reconstruction keep the
-  last good run. Rescan retries and rearms the watcher. Disposal cancels pending work.
+  Blazor dispatcher. Compatible history changes continue from the current state with a reset timeline;
+  reload after Back discards redo. Compatible additive YAML declarations can continue in place, while
+  other YAML changes latch an explicit restart. Failed compiles or reconstruction keep the last good
+  run. Rescan retries and rearms the watcher. Disposal cancels pending work.
 - **Restart from source** revalidates the retained setup, character and seed before discarding the run.
   Invalidated ids stay visible for correction. Creation forms keep their draft across Talemark reloads and
   initialize from the retained selection on restart, via Player's optional `InitialSelection`.

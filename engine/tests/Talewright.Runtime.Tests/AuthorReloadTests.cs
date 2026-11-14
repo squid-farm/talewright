@@ -368,6 +368,29 @@ public sealed class AuthorReloadTests
         Assert.Equal(new SceneId("next"), candidate.Current.Scene);
     }
 
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void Deleted_prior_scene_continues_at_current_scene(bool jump)
+    {
+        var original = AuthorSession.Create(Compile(Tale + "\n=== scratch\n* [Go] -> current"),
+            new(jump ? "start" : "scratch"), seed: 42);
+        if (jump)
+        {
+            original.Jump(new("scratch"));
+        }
+        original.Choose("c0");
+
+        var candidate = original.Reload(Compile(), out var historyChanged);
+
+        Assert.True(historyChanged);
+        Assert.Equal(new SceneId("current"), candidate.Current.Scene);
+        Assert.Equal(original.Events, candidate.Events);
+        Assert.Equal(original.State.GetVariable(new("count")), candidate.State.GetVariable(new("count")));
+        Assert.False(candidate.CanBack);
+        Assert.False(candidate.CanForward);
+    }
+
     [Fact]
     public void New_items_are_compatible_with_an_in_place_continuation()
     {
