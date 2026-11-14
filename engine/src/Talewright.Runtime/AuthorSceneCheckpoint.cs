@@ -4,6 +4,7 @@ using Talewright.Core.Rulesets;
 using Talewright.Core.State;
 using Talewright.Core.World;
 using Talewright.Narrative.Rendering;
+using Talewright.Rules.Diagnostics;
 using Talewright.Talemark.Model;
 
 namespace Talewright.Runtime;
@@ -23,10 +24,14 @@ public sealed class AuthorSceneCheckpoint
     private readonly IReadOnlyList<string> _triggerEdges;
     private readonly AuthorPlayedChoice[] _playedChoices;
     private readonly AuthorSceneEntryReplay[] _entryReplay;
+    private readonly AuthorContinuation? _continuation;
+    private readonly AuthorCommand[] _entryCommands;
+    private readonly RuleDecision[] _decisions;
 
     internal AuthorSceneCheckpoint(StoryDefinition story, SceneId start, AuthorSetup setup, ulong seed,
         CharacterSelection? character, AuthorCommand[] commands, SceneEntryBoundary boundary, IReadOnlyList<GameEvent> events,
-        bool captureDecisions, AuthorPlayedChoice[] playedChoices, AuthorSceneEntryReplay[] entryReplay)
+        bool captureDecisions, AuthorPlayedChoice[] playedChoices, AuthorSceneEntryReplay[] entryReplay,
+        AuthorContinuation? continuation, AuthorCommand[] entryCommands, RuleDecision[] decisions)
     {
         _story = story;
         _start = start;
@@ -37,6 +42,9 @@ public sealed class AuthorSceneCheckpoint
         _triggerEdges = boundary.TriggerEdges;
         _playedChoices = playedChoices;
         _entryReplay = entryReplay;
+        _continuation = continuation;
+        _entryCommands = entryCommands;
+        _decisions = decisions;
         Scene = boundary.Scene;
         Seed = seed;
         Events = Array.AsReadOnly(events.Take(boundary.EventCount).ToArray());
@@ -54,7 +62,11 @@ public sealed class AuthorSceneCheckpoint
     /// Rebuilds the captured run and enters this scene once, returning an independent candidate.
     /// Requires the same unchanged story and deterministic extensions; this is not cross-source reload.
     /// </summary>
-    public AuthorSession Reenter() => AuthorSession.Replay(_story, _start, _setup, Seed, _character, _commands, _captureDecisions);
+    public AuthorSession Reenter() => AuthorSession.Replay(_story, _start, _setup, Seed, _character,
+        _commands, _captureDecisions, _continuation);
+
+    internal AuthorContinuation ContinueInPlace() => new(Scene, Seed, Events, _triggerEdges, PendingNotes,
+        _setup, _character, _entryCommands, _decisions);
 
     internal void VerifyPlayedChoice(int index, AuthorPlayedChoice choice)
     {
@@ -112,6 +124,10 @@ public sealed class AuthorSceneCheckpoint
             "pre-entry pending consequences diverged");
     }
 }
+
+internal sealed record AuthorContinuation(SceneId Scene, ulong Seed, IReadOnlyList<GameEvent> Events,
+    IReadOnlyList<string> TriggerEdges, IReadOnlyList<RenderedBlock> PendingNotes, AuthorSetup Setup,
+    CharacterSelection? Character, IReadOnlyList<AuthorCommand> EntryCommands, IReadOnlyList<RuleDecision> Decisions);
 
 internal sealed record AuthorEntryReplayStep(string Kind, object? Value);
 internal sealed record AuthorSceneEntryReplay(SceneId Scene, IReadOnlyList<AuthorEntryReplayStep> Steps);

@@ -128,8 +128,9 @@ Temporarily change the check's success target to `missing` and save. Expect comp
 **Source not adopted**, and the last good revised passage/source still displayed. Restore the legal
 target and save; expect recovery.
 
-Do not edit a consumed scene for this check: that deliberately requires a restart. Source highlighting
-marks whole-scene ownership, not the executing expression.
+For this check, keep consumed scenes unchanged so the verified replay path is exercised. If an edit
+changes consumed history, expect continuation at the current scene with a reset timeline instead.
+Source highlighting marks whole-scene ownership, not the executing expression.
 
 ## 5. Export and import in a new process, including redo
 

@@ -277,8 +277,9 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
             {
                 return false;
             }
-            if (yamlChanged || (_acceptedSource is not null && candidate.Source is { } source
-                && !Configuration(source).SequenceEqual(Configuration(_acceptedSource))))
+            var configurationChanged = yamlChanged || (_acceptedSource is not null && candidate.Source is { } source
+                && !Configuration(source).SequenceEqual(Configuration(_acceptedSource)));
+            if (configurationChanged && (restart || Session is null || candidate.Error is not null))
             {
                 if (!Publish(RequireRestart))
                 {
@@ -292,6 +293,10 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
             var compiled = candidate.Compilation!;
             if (compiled.Story is not { } story)
             {
+                if (configurationChanged && !RestartRequired && !Publish(RequireRestart))
+                {
+                    return false;
+                }
                 Publish(() =>
                 {
                     Diagnostics = compiled.Diagnostics;
@@ -332,7 +337,20 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
                 {
                     AuthorSession.ValidateReloadSchema(previous, story);
                 }
-                var session = Session?.Reload(story);
+                var historyChanged = false;
+                var session = Session is { } activeSession
+                    ? activeSession.Reload(story, out historyChanged)
+                    : null;
+                if (configurationChanged && !historyChanged)
+                {
+                    Publish(() =>
+                    {
+                        RequireRestart();
+                        Diagnostics = compiled.Diagnostics;
+                        Error = "Source compiled, but explicit Restart from source is required. The last good run is unchanged.";
+                    });
+                    return false;
+                }
                 var inspection = session?.Inspect();
                 return Publish(() =>
                 {
@@ -344,8 +362,11 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
                     AdoptImages(candidate.Source!);
                     AcceptedSourceMap = compiled.SourceMap;
                     SourceRejected = false;
+                    RestartRequired = false;
                     Error = null;
+                    RequestedSceneNotice = null;
                     ReloadStatus = session is null ? "Talemark source adopted. Ready for scene setup."
+                        : historyChanged ? "History changed; continuing from here with current state."
                         : $"Reload boundary: {session.Current.Scene}. Verified command prefix retained; current passage replaced, decisions rebuilt.";
                     RefreshEdits();
                 });

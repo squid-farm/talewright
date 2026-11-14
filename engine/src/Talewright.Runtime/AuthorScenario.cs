@@ -24,6 +24,10 @@ public static class AuthorScenario
 
     public static byte[] Export(AuthorSession session, string extensionIdentity)
     {
+        if (session.HasContinuation)
+        {
+            throw new InvalidOperationException("Continued author sessions cannot be exported as portable scenarios because their event baseline depends on prior source history.");
+        }
         var identity = Identity(session.Story, extensionIdentity);
         var end = session.CanForward
             ? AuthorSession.RestoreTimeline(session.Story, session.StartScene, session.Setup, session.Seed,

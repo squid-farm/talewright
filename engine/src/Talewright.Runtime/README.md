@@ -117,6 +117,8 @@ For author controls, see the [scenario workflow](../../../docs/guide/testing-you
 timeline, including redo, before restoring the requested cursor. `AuthorScenarioImport` exposes the
 candidate, whether it was adopted to different source, and replay differences. Neither API mutates
 an existing session or does file I/O.
+In-place continued sessions cannot be exported: their event baseline may include history from a
+previous source version and cannot be reconstructed from the current source alone.
 
 The host supplies its trusted compiler/extension compatibility identity (for built-ins,
 `CompilerOptions.Default.CompatibilityId`); compiled stories also need a content fingerprint.
@@ -173,15 +175,17 @@ continuation; use fresh-world setup instead.
 The runtime rejects ended-session edits/jumps rather than clearing `IsEnded`.
 
 `Commands` is a typed author-only sequence of `AuthorChoice`, `AuthorEdit` and `AuthorJump`;
-validated setup/character/seed/start remain its origin. `Cursor`, `Back()` and `Forward()`
-rebuild the applied prefix. Appending after Back drops redo only after successful reconstruction.
-Every edit, jump and navigation uses a separate candidate; failures preserve state, events,
-frame, decisions, cursor and redo. Player undo and saves are not affected.
+in an ordinary session, validated setup/character/seed/start remain its origin. An in-place
+reload makes the displayed scene and its preserved pre-entry state a new command baseline.
+`Cursor`, `Back()` and `Forward()` rebuild the applied prefix. Appending after Back drops redo
+only after successful reconstruction. Every edit, jump and navigation uses a separate candidate;
+failures preserve state, events, frame, decisions, cursor and redo. Player undo and saves are not
+affected.
 
 ### Guarded author reload
 
 `var candidate = author.Reload(newStory)` returns an independent candidate; it
-never mutates `author`. Before entering the displayed scene, it verifies:
+never mutates `author`. It first replays the applied command prefix and verifies:
 
 - Compatible declarations, creation, rules and triggers, including Talemark-inferred
   flags/variables. Custom predicates/rules/modifiers require trusted rebuild/restart.
@@ -196,19 +200,31 @@ Engine data is compared structurally (including polymorphic AST nodes and
 collections); collection order is conservatively significant. The new scene then
 enters **once**. Its effects/check results may change intentionally. Decisions are
 rebuilt; no stale traces are adopted. Applied edits/jumps are replayed explicitly;
-commands are never inferred from folded state. With redo pending, automatic reload
-is postponed without dropping commands: move Forward to the end and Rescan, or
-explicitly start a fresh scene. Missing targets, divergent
-history, schema changes, no entry boundary or runtime/cascade failures throw,
-leaving the active run unchanged. `AuthorReloadException` distinguishes
-reconstruction incompatibility from a candidate runtime failure that can be
-repaired and retried. Fresh-jump recipes are replayed as such.
+commands are never inferred from folded state.
+
+If replay no longer reaches the displayed scene, continuation is allowed only
+when the scene still exists and the active state fits the candidate. Existing
+variables, flags, items, factions, characters, ruleset, creation settings, seed
+and randomness configuration must remain compatible; adding variables, flags
+or items is allowed. The pre-entry event state and trigger memory are retained,
+then the displayed scene is entered once against the candidate. Its current
+passage and choices are rebuilt without duplicating earlier visits, rolls or
+trigger firings. The timeline resets at that scene: Back can undo new choices
+to the continuation point, but cannot go before it.
+
+When positioned back in the timeline, reload uses only the applied prefix and
+drops the redo branch. If continuation is incompatible, there is no entry
+boundary, or candidate execution fails, reload throws and leaves the active run
+unchanged. `AuthorReloadException` distinguishes reconstruction incompatibility
+from a candidate runtime failure that can be repaired and retried. Fresh-jump
+recipes are replayed as such.
 
 `ValidateReloadSchema(oldStory, newStory)` exposes the declaration guard before a
 run exists. `AuthorSetup.Validate(story)` returns a copied/revalidated setup without
-scene entry. Hosts remain responsible for whole-source/YAML restart policy and
-serialized candidate adoption. None of this affects player saves. Checkpoint recipes include applied edit/jump commands
-and retain the original pre-entry evidence even when live edits follow that entry.
+scene entry. Hosts remain responsible for requiring explicit restart for other
+configuration changes and for serialized candidate adoption. None of this affects
+player saves. Checkpoint recipes include applied edit/jump commands and retain the
+original pre-entry evidence even when live edits follow that entry.
 
 Text modifiers in all compiled bodies/choice labels (including hidden/nested
 branches) must be engine-owned built-in instances before reconstruction starts.
@@ -273,7 +289,8 @@ The debugger displays the location without reevaluating any condition.
 Recording follows successful author candidate replay: `Choose`, `JumpFresh`
 and checkpoint `Reenter` preserve the recording setting, with no duplicated
 append-only traces from earlier rebuild attempts. Failed candidates leave the
-previous decisions/state intact and throw their error. This is opt-in in-memory
+previous decisions/state intact and throw their error. Continuation retains decisions made before
+the current entry boundary and records the new entry separately. This is opt-in in-memory
 diagnostic data, not persisted in player saves or scenario files.
 
 Custom hosts can pass an `Action<RuleDecision>` through the five-argument

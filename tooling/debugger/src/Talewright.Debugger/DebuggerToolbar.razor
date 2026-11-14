@@ -52,7 +52,7 @@
                 <h2>Talewright Author Debugger</h2>
                 <p>Story folder: @Model.Root</p>
                 <p>Local synthetic scene playtesting. Player saves are never written; compatible saves are read only when explicitly imported.</p>
-                <p>Saved Talemark changes reload at a verified pre-entry boundary. YAML changes require explicit restart. Restart discards the run, but retains and revalidates enabled setup.</p>
+                <p>Saved changes replay at a verified boundary or continue from the current state when compatible history changes. Reloading after Back discards Forward steps. Incompatible changes and some YAML edits require restart; restart retains and revalidates enabled setup.</p>
                 <p>
                     <button type="button" @onclick="OpenGuide">Open debugger guide</button>
                     <code class="help-url">@DebuggerGuide.Url</code>

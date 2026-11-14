@@ -305,6 +305,70 @@ public sealed class MapViewTests
     }
 
     [Fact]
+    public void Continued_run_preserves_prior_check_divert_outcomes_through_reloads_and_navigation()
+    {
+        const string tale = """
+            === start
+            ~ var:visits += 1
+            * [Choose] skill-check athletics dc 12
+              success: -> road
+              failure: -> road
+            === road
+            * [Continue] -> current
+            === current
+            * [Next] -> next
+            === next
+            * [Return] -> current
+            """;
+        var yaml = Yaml.Replace("randomness: off", "randomness: checks-only", StringComparison.Ordinal);
+        var story = CompileStory(tale, yaml);
+        var outcomes = new HashSet<DecisionReason>();
+        foreach (var seed in Enumerable.Range(1, 200).Select(value => (ulong)value))
+        {
+            var session = AuthorSession.Create(story, new SceneId("start"), captureDecisions: true, seed: seed);
+            session.Choose("c0");
+            session.Choose("c0");
+            var outcome = Assert.Single(session.Decisions, decision => decision.Kind == DecisionKind.CheckOutcome);
+            var name = outcome.Reason == DecisionReason.CheckSucceeded ? "success" : "failure";
+            outcomes.Add(outcome.Reason);
+
+            var changed = CompileStory(tale.Replace("visits += 1", "visits += 2"), yaml);
+            var continued = session.Reload(changed, out var historyChanged);
+            Assert.True(historyChanged);
+
+            void AssertRoute(AuthorSession candidate, StoryDefinition source)
+            {
+                var map = MapView.Build(source);
+                var route = MapRunView.Build(source, map, candidate);
+                var selected = route.Steps[1];
+                Assert.Contains($"on {name}", selected.TakenItemName);
+                Assert.Equal(selected.LineId, Assert.Single(map.Nodes.SelectMany(node => node.Items),
+                    item => item.Id == selected.TakenItemId).Line);
+                Assert.Single(candidate.Decisions, decision => decision.Kind == DecisionKind.CheckOutcome);
+            }
+
+            AssertRoute(continued, changed);
+            continued.Choose("c0");
+            continued.Back();
+            AssertRoute(continued, changed);
+            continued.Forward();
+            AssertRoute(continued, changed);
+
+            var changedAgain = CompileStory(tale.Replace("visits += 1", "visits += 3")
+                .Replace("[Next] -> next", "[Next] -> current"), yaml);
+            continued = continued.Reload(changedAgain, out historyChanged);
+            Assert.True(historyChanged);
+            AssertRoute(continued, changedAgain);
+            AssertRoute(continued.Checkpoint!.Reenter(), changedAgain);
+
+            if (outcomes.Contains(DecisionReason.CheckSucceeded) && outcomes.Contains(DecisionReason.CheckFailed))
+                break;
+        }
+        Assert.Contains(DecisionReason.CheckSucceeded, outcomes);
+        Assert.Contains(DecisionReason.CheckFailed, outcomes);
+    }
+
+    [Fact]
     public void Current_run_marks_a_mid_story_start()
     {
         var story = CompileStory("""
@@ -320,6 +384,36 @@ public sealed class MapViewTests
         Assert.Equal("road", route.StartScene);
         Assert.True(route.StartedMidStory);
         Assert.Equal(["road"], route.Steps.Select(step => step.Scene));
+    }
+
+    [Theory]
+    [InlineData("start", false)]
+    [InlineData("alternate", true)]
+    public void Current_run_keeps_original_start_after_history_continuation(string start, bool midStory)
+    {
+        const string tale = """
+            === start
+            * [Go] -> intro
+            === alternate
+            * [Go] -> intro
+            === intro
+            * [Continue] -> current
+            === current
+            * [Finish] -> END
+            """;
+        var original = CompileStory(tale);
+        var session = AuthorSession.Create(original, new SceneId(start), captureDecisions: true, seed: 42);
+        session.Choose("c0");
+        session.Choose("c0");
+        var changed = CompileStory(tale.Replace("intro", "prologue"));
+        var continued = session.Reload(changed, out var historyChanged);
+
+        Assert.True(historyChanged);
+        var route = MapRunView.Build(changed, MapView.Build(changed), continued);
+        Assert.Equal(start, route.StartScene);
+        Assert.Equal(midStory, route.StartedMidStory);
+        Assert.Equal([start, "intro", "current"], route.Steps.Select(step => step.Scene));
+        Assert.Equal("current", route.CurrentScene);
     }
 
     [Fact]

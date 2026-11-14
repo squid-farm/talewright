@@ -33,6 +33,27 @@ public sealed class StatusLineTests : BunitContext
     }
 
     [Fact]
+    public void Divergent_history_is_adopted_with_one_continuation_status_message()
+    {
+        using var model = ComponentStory.Start();
+        ComponentStory.Choose(model, "Explore");
+        var files = ComponentStory.Files();
+        files["main.tale"] = files["main.tale"]
+            .Replace("* [Explore] -> cave", "* [Explore] -> hall", StringComparison.Ordinal)
+            .Replace("The cave.", "The updated cave.", StringComparison.Ordinal);
+
+        Assert.True(model.ApplySource(Compile(files)));
+
+        var statusLine = Render(model);
+
+        Assert.False(model.RestartRequired);
+        Assert.False(model.SourceRejected);
+        Assert.False(model.Session!.CanBack);
+        Assert.Contains("The updated cave.", model.Session.Current.Document.ToPlainText());
+        AssertSingleMessage(statusLine, "status", "History changed; continuing from here with current state.");
+    }
+
+    [Fact]
     public void Compiler_rejection_keeps_its_error_alert_and_suppresses_the_redundant_scene_notice()
     {
         using var model = Load(requestedScene: "missing");

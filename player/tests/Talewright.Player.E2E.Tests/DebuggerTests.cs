@@ -448,9 +448,12 @@ public sealed class DebuggerTests
             Assert.Contains("42", Assert.Single(snapshot.Descendants(), node => node.Name == "Seed").Text);
             await File.WriteAllTextAsync(tale, updated.Replace("[Go] -> current", "[Go] -> start")
                 .Replace("After reload.", "Incompatible progress."));
-            snapshot = await WaitFor(driver, "previously consumed scene/choice meaning changed", "After YAML restart. Alex.");
-            Assert.Contains("After YAML restart.", snapshot.Content);
-            Assert.DoesNotContain("Incompatible progress.", snapshot.Content);
+            snapshot = await WaitFor(driver, "History changed; continuing from here with current state.", "Incompatible progress. Alex.");
+            await driver.ActivateAsync("Timeline");
+            snapshot = await WaitFor(driver, "Position 0 / 0.", "Incompatible progress. Alex.");
+            await File.WriteAllTextAsync(tale, "=== start\n* [Go] -> start");
+            snapshot = await WaitFor(driver, "the current scene 'current' was removed", "Incompatible progress. Alex.");
+            Assert.Contains("Incompatible progress.", snapshot.Content);
             Assert.Equal(0, await driver.CloseWindowAsync());
         }
         finally
@@ -588,8 +591,11 @@ public sealed class DebuggerTests
             Assert.DoesNotContain("// INVALID DISK SOURCE", snapshot.Content);
             await File.WriteAllTextAsync(firstPath, first.Replace("-> late", "-> other"));
             await File.WriteAllTextAsync(latePath, late.Replace("OLD ACCEPTED SOURCE", "REJECTED DISK SOURCE"));
-            snapshot = await WaitFor(driver, "previously consumed scene/choice meaning changed", "// NEW ACCEPTED SOURCE");
-            Assert.DoesNotContain("// REJECTED DISK SOURCE", snapshot.Content);
+            snapshot = await WaitFor(driver, "History changed; continuing from here with current state.", "// REJECTED DISK SOURCE");
+            Assert.DoesNotContain("// NEW ACCEPTED SOURCE", snapshot.Content);
+            await File.WriteAllTextAsync(latePath, "=== other\n* [Wait] -> other\n");
+            snapshot = await WaitFor(driver, "the current scene 'late' was removed", "// REJECTED DISK SOURCE");
+            Assert.Contains("// REJECTED DISK SOURCE", snapshot.Content);
             Assert.Equal(0, await driver.CloseWindowAsync());
         }
         finally

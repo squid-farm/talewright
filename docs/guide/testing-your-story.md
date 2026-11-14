@@ -145,17 +145,20 @@ Type text values without quotes; clear the field to set empty text.
 Leave the debugger open while you write. When you save a `.tale` file, it reloads the scene you're
 on and keeps the state you built up to reach it.
 
-Some changes can't be applied in place: editing a scene you've already passed through, removing a
-scene you're heading to, or any change to `story.talewright.yaml`, even a comment. Then the debugger
-asks you to click **Restart from source**. You don't have to set everything up again: it keeps your
-selected scene, seed, overrides and character, and tells you about any that no longer exist so you
-can fix them.
+When the earlier route no longer replays, the debugger continues from the current scene and state
+and shows **History changed; continuing from here with current state.** Back and Forward history
+starts over at that scene. Compatible additions to variables, flags and items can also continue this
+way.
+
+Some changes still need **Restart from source**, including removing the current scene, changing or
+removing existing state declarations, changing rules or incompatible configuration, and YAML changes
+that do not trigger continuation (even a comment). The debugger keeps your selected scene, seed,
+overrides and character for restart, and tells you about any that no longer exist so you can fix them.
 
 If a change has errors, the debugger keeps running your last good version and marks it out of date.
-Fix the error and save again, or click **Rescan / retry watcher**. If you went Back and have steps
-to go Forward to, automatic reload waits: go Forward to the end and click
-**Rescan / retry watcher**, or start the scene again. If the debugger can't watch your story folder
-at all, see [Troubleshooting](troubleshooting.md#the-debugger-says-it-cant-watch-your-story-folder).
+Fix the error and save again, or click **Rescan / retry watcher**. If you reload after going Back,
+the Forward steps are discarded. If the debugger can't watch your story folder at all, see
+[Troubleshooting](troubleshooting.md#the-debugger-says-it-cant-watch-your-story-folder).
 
 ### Share and restore a debugging scenario
 
@@ -177,6 +180,7 @@ To start from a player's save, enter its path in **Player save file path (read o
 player saves.
 
 Scenario files are a testing aid. A later version of Talewright may not open older ones.
+Sessions that continued after history changed cannot be exported as scenarios; start a fresh run first.
 
 ### Debugger tabs at a glance
 
