@@ -71,13 +71,11 @@ public class TextDebuggerTests
         Assert.Contains("non-null", model.Error);
         Assert.Same(session, model.Session);
         Assert.Equal(edit.Value, session.State.GetTextVariable(new("weather")));
-        Assert.False(model.ApplySource(Compile(number: true), restart: true));
-        Assert.Contains("Setup IDs changed/removed", model.Error);
-        Assert.Same(session, model.Session);
-        field.Enabled = false;
         Assert.True(model.ApplySource(Compile(number: true), restart: true));
+        Assert.Null(model.Error);
+        Assert.Contains("var:weather", model.ReloadStatus);
         Assert.Empty(model.Texts);
-        Assert.Contains(model.Numbers, number => number.Label == "var:weather");
+        Assert.False(model.Numbers.Single(number => number.Label == "var:weather").Enabled);
         Assert.Null(model.Session);
     }
 

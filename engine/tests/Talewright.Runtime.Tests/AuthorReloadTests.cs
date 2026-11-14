@@ -472,9 +472,6 @@ public sealed class AuthorReloadTests
 
     [Theory]
     [InlineData("deleted-scene")]
-    [InlineData("removed-variable")]
-    [InlineData("variable-type")]
-    [InlineData("removed-flag")]
     [InlineData("changed-ruleset")]
     public void Incompatible_continuations_are_rejected_with_author_reload_exception(string change)
     {
@@ -510,6 +507,138 @@ public sealed class AuthorReloadTests
         var candidate = Compile(candidateTale, candidateManifest);
 
         Assert.Throws<AuthorReloadException>(() => original.Reload(candidate));
+    }
+
+    [Theory]
+    [InlineData("removed-variable")]
+    [InlineData("variable-type")]
+    [InlineData("removed-flag")]
+    [InlineData("removed-item")]
+    public void Removed_or_retyped_setup_declarations_are_pruned_on_continuation(string change)
+    {
+        const string tale = """
+            === start
+            * [Go] -> current
+            === current
+            Current passage.
+            * [Finish] -> END
+            """;
+        string Manifest(bool includeCount, bool includeReady, bool includeItem, bool textCount = false)
+        {
+            var manifest = new ManifestFaker("reload", "Reload", "start") { BaseRuleset = "rpg" };
+            if (includeCount)
+            {
+                if (textCount) manifest.Text("count", "zero");
+                else manifest.Number("count", 0);
+            }
+            if (includeReady) manifest.Flag("ready");
+            if (includeItem) manifest.Item("rope", "Rope");
+            manifest.Character("player", "Tester");
+            return manifest.Build();
+        }
+
+        var original = AuthorSession.Create(Compile(tale, Manifest(true, true, true)), new("start"),
+            setup: new AuthorSetup
+            {
+                Variables = new Dictionary<VarId, int> { [new("count")] = 7 },
+                Flags = new Dictionary<FlagId, bool> { [new("ready")] = true },
+                Inventory = [new(new("player"), new("rope"), 2)],
+            }, seed: 42);
+        original.Choose("c0");
+
+        var (includeCount, includeReady, includeItem, textCount) = change switch
+        {
+            "removed-variable" => (false, true, true, false),
+            "variable-type" => (true, true, true, true),
+            "removed-flag" => (true, false, true, false),
+            _ => (true, true, false, false),
+        };
+        var candidate = original.Reload(Compile(tale,
+            Manifest(includeCount, includeReady, includeItem, textCount)), out var historyChanged);
+
+        Assert.True(historyChanged);
+        Assert.Equal(new SceneId("current"), candidate.Current.Scene);
+        Assert.False(candidate.CanBack);
+        if (change is "removed-variable" or "variable-type")
+            Assert.DoesNotContain(new VarId("count"), candidate.Setup.Variables.Keys);
+        else
+            Assert.Equal(7, candidate.Setup.Variables[new("count")]);
+        if (change == "removed-flag")
+            Assert.DoesNotContain(new FlagId("ready"), candidate.Setup.Flags.Keys);
+        else
+            Assert.True(candidate.Setup.Flags[new("ready")]);
+        if (change == "removed-item")
+            Assert.DoesNotContain(candidate.Setup.Inventory, value => value.Item == new ItemId("rope"));
+        else
+            Assert.Equal(2, candidate.Setup.Inventory.Single(value => value.Item == new ItemId("rope")).Quantity);
+        if (change is "removed-variable" or "variable-type")
+        {
+            Assert.DoesNotContain(candidate.Events, gameEvent => gameEvent is VariableChanged changed
+                && changed.Variable == new VarId("count"));
+            Assert.Contains(candidate.Events, gameEvent => gameEvent is FlagChanged changed
+                && changed.Flag == new FlagId("ready"));
+        }
+        if (change == "removed-flag")
+        {
+            Assert.DoesNotContain(candidate.Events, gameEvent => gameEvent is FlagChanged changed
+                && changed.Flag == new FlagId("ready"));
+            Assert.Contains(candidate.Events, gameEvent => gameEvent is VariableChanged changed
+                && changed.Variable == new VarId("count"));
+        }
+        if (change == "removed-item")
+        {
+            Assert.DoesNotContain(candidate.Events, gameEvent => gameEvent is ItemsGranted changed
+                && changed.Item == new ItemId("rope"));
+        }
+        Assert.Equal(candidate.Events, candidate.Checkpoint!.Reenter().Events);
+        if (change == "variable-type")
+        {
+            Assert.Empty(candidate.Setup.TextVariables);
+            Assert.Contains(new VarId("count"), candidate.Story.World.TextVariables.Keys);
+        }
+    }
+
+    [Fact]
+    public void Removed_character_stat_is_ignored_by_setup_and_continuation_compatibility()
+    {
+        const string tale = """
+            === start
+            * [Go] -> current
+            === current
+            Current passage.
+            * [Finish] -> END
+            """;
+        const string originalManifest = """
+            game: {id: reload, title: Reload, start: start, ruleset: rpg}
+            characters: {player: {first-name: Tester, stats: {hp: 10}}}
+            """;
+        const string candidateManifest = """
+            game:
+              id: reload
+              title: Reload
+              start: start
+              ruleset: {base: rpg, disable: [hp]}
+            characters: {player: {first-name: Tester}}
+            """;
+        var originalStory = Compile(tale, originalManifest);
+        var candidateStory = Compile(tale, candidateManifest);
+
+        AuthorSession.ValidateSetupReloadSchema(originalStory, candidateStory);
+        var original = AuthorSession.Create(originalStory, new("start"),
+            setup: new AuthorSetup
+            {
+                Stats = [new(new("player"), new("hp"), 20)],
+            }, seed: 42);
+        original.Choose("c0");
+
+        var candidate = original.Reload(candidateStory, out var historyChanged);
+
+        Assert.True(historyChanged);
+        Assert.Equal(new SceneId("current"), candidate.Current.Scene);
+        Assert.DoesNotContain(candidate.Setup.Stats, stat => stat.Stat == new StatId("hp"));
+        Assert.DoesNotContain(candidate.Events, gameEvent => gameEvent is StatChanged changed
+            && changed.Stat == new StatId("hp"));
+        Assert.Equal(candidate.Events, candidate.Checkpoint!.Reenter().Events);
     }
 
     [Fact]

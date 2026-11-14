@@ -34,12 +34,15 @@ How it's built:
   bursts, and compiles one complete source snapshot at a time off the UI thread. Generation checks
   discard superseded results, including at commit after runtime reconstruction. Play and swaps share the
   Blazor dispatcher. Compatible history changes continue from the current state with a reset timeline;
-  reload after Back discards redo. Compatible additive YAML declarations can continue in place, while
-  other YAML changes latch an explicit restart. Failed compiles or reconstruction keep the last good
-  run. Rescan retries and rearms the watcher. Disposal cancels pending work.
+  reload after Back discards redo. Additive declarations and removed/retyped state fields can continue
+  in place; removed state is dropped. Other YAML changes latch an explicit restart.
+  Failed compiles or reconstruction keep the last good run. Rescan retries and rearms the watcher.
+  Disposal cancels pending work.
 - **Restart from source** revalidates the retained setup, character and seed before discarding the run.
-  Invalidated ids stay visible for correction. Creation forms keep their draft across Talemark reloads and
-  initialize from the retained selection on restart, via Player's optional `InitialSelection`.
+  Removed or retyped setup overrides are pruned and named in the status message. Setup fields are
+  also reconciled after accepted in-place reloads; new declarations begin disabled. Creation forms
+  keep their draft across Talemark reloads and initialize from the retained selection on restart,
+  via Player's optional `InitialSelection`.
 - **Tests.** The UI-independent model is covered by CLI tests; native interactions run through the Linux
   AT-SPI E2E harness, including export/import across two debugger processes. A CLI launch regression
   test opens a selected scene through `debug`, plays it, and checks the exit code when the window closes,
