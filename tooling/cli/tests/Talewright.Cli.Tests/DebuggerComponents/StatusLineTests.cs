@@ -49,6 +49,25 @@ public sealed class StatusLineTests : BunitContext
     }
 
     [Fact]
+    public void In_place_reload_reports_disabled_overrides_in_the_single_status_message()
+    {
+        using var model = ComponentStory.Load();
+        var weather = model.Texts.Single(field => field.Id.Value == "weather");
+        weather.Enabled = true;
+        weather.Value = "rain";
+        model.Start();
+        var files = ComponentStory.Files();
+        files[StorySource.ManifestFileName] = files[StorySource.ManifestFileName]
+            .Replace("  weather: \"sunny\"\n", "", StringComparison.Ordinal);
+
+        Assert.True(model.ApplySource(Compile(files), yamlChanged: true));
+
+        AssertSingleMessage(Render(model), "status",
+            "History changed; continuing from here with current state. "
+            + "Disabled removed or incompatible setup overrides: var:weather.");
+    }
+
+    [Fact]
     public void Divergent_history_is_adopted_with_one_continuation_status_message()
     {
         using var model = ComponentStory.Start();

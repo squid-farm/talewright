@@ -307,6 +307,52 @@ public sealed class AuthorReloadTests : IDisposable
     }
 
     [Fact]
+    public void In_place_reload_prunes_removed_overrides_and_their_stale_live_state()
+    {
+        const string tale = """
+            === start
+            * [Go] -> current
+            === current
+            Old passage.
+            * [Finish] -> END
+            """;
+        var oldManifest = BuildManifest() + "\nitems:\n  rope: {name: Rope}\n";
+        var newManifest = BuildManifest(includeReady: false, includeCount: false);
+        using var model = new WorkbenchModel(_root);
+        Assert.True(model.ApplySource(Source(tale, oldManifest), restart: true));
+        model.Target = "current";
+        model.Seed = "42";
+        var count = model.Numbers.Single(field => field.Label == "var:count");
+        count.Enabled = true;
+        count.Value = "7";
+        model.Flags.Single(field => field.Id.Value == "ready").Enabled = true;
+        model.Flags.Single(field => field.Id.Value == "ready").Value = true;
+        var rope = model.Numbers.Single(field => field.Label == "player inventory:rope");
+        rope.Enabled = true;
+        rope.Value = "2";
+        model.Start();
+        Assert.Null(model.Error);
+
+        Assert.True(model.ApplySource(Source(tale.Replace("Old passage.", "Updated passage."), newManifest),
+            yamlChanged: true));
+
+        Assert.Null(model.Error);
+        Assert.False(model.RestartRequired);
+        Assert.Equal("current", model.Target);
+        Assert.Equal("42", model.Seed);
+        Assert.DoesNotContain(model.Numbers, field => field.Label is "var:count" or "player inventory:rope");
+        Assert.Empty(model.Flags);
+        Assert.DoesNotContain(model.EditNumbers, field => field.Label is "var:count" or "player inventory:rope");
+        Assert.Empty(model.EditFlags);
+        Assert.DoesNotContain("count", model.Session!.State.World.Variables.Keys.Select(id => id.Value));
+        Assert.DoesNotContain("ready", model.Session.State.World.Flags.Select(id => id.Value));
+        Assert.Contains("Updated passage.", model.Session.Current.Document.ToPlainText());
+        Assert.Contains("var:count", model.ReloadStatus);
+        Assert.Contains("flag:ready", model.ReloadStatus);
+        Assert.Contains("player inventory:rope", model.ReloadStatus);
+    }
+
+    [Fact]
     public void Reload_before_start_prunes_removed_and_retyped_setup_overrides()
     {
         var original = Tale + """
@@ -339,6 +385,102 @@ public sealed class AuthorReloadTests : IDisposable
         Assert.Contains("var:oldnumber", model.ReloadStatus);
         Assert.Contains("flag:oldflag", model.ReloadStatus);
         Assert.Contains("var:changed", model.ReloadStatus);
+    }
+
+    [Fact]
+    public void In_place_reload_revalidates_a_removed_target_scene()
+    {
+        var withTarget = Tale + "\n=== scratch\n* [Go] -> current";
+        using var model = new WorkbenchModel(_root);
+        Assert.True(model.ApplySource(Source(withTarget), restart: true), model.Error ?? model.ReloadStatus);
+        model.Target = "scratch";
+
+        Assert.True(model.ApplySource(Source(Tale.Replace("Old passage.", "Updated passage."))),
+            model.Error ?? model.ReloadStatus);
+
+        Assert.Equal(model.Story!.Start.Value, model.Target);
+        Assert.Contains("Selected scene 'scratch' was not found", model.RequestedSceneNotice);
+    }
+
+    [Fact]
+    public void In_place_yaml_declaration_changes_before_start_reconcile_setup_fields()
+    {
+        const string tale = """
+            === start
+            Ready.
+            * [Finish] -> END
+            """;
+        static string Manifest(bool textCount, bool includeReady)
+        {
+            var manifest = new ManifestFaker("watched", "Watched", "start") { BaseRuleset = "rpg" };
+            if (textCount) manifest.Text("count", "zero");
+            else manifest.Number("count", 0);
+            if (includeReady) manifest.Flag("ready");
+            manifest.Character("player", "Tester");
+            return manifest.Build();
+        }
+
+        using var model = new WorkbenchModel(_root);
+        Assert.True(model.ApplySource(Source(tale, Manifest(false, true)), restart: true));
+        model.Numbers.Single(field => field.Label == "var:count").Enabled = true;
+        model.Numbers.Single(field => field.Label == "var:count").Value = "7";
+        model.Flags.Single(field => field.Id.Value == "ready").Enabled = true;
+        model.Flags.Single(field => field.Id.Value == "ready").Value = true;
+
+        Assert.True(model.ApplySource(Source(tale, Manifest(true, false)), yamlChanged: true),
+            model.Error ?? model.ReloadStatus);
+
+        Assert.False(model.RestartRequired);
+        Assert.Null(model.Error);
+        Assert.DoesNotContain(model.Numbers, field => field.Label == "var:count");
+        Assert.False(model.Texts.Single(field => field.Id.Value == "count").Enabled);
+        Assert.Empty(model.Flags);
+        Assert.Contains("var:count", model.ReloadStatus);
+        Assert.Contains("flag:ready", model.ReloadStatus);
+    }
+
+    [Fact]
+    public void In_place_reload_discovers_new_ruleset_stats_and_factions()
+    {
+        const string tale = """
+            === start
+            * [Go] -> current
+            === current
+            Passage.
+            * [Finish] -> END
+            """;
+        const string originalManifest = """
+            game: {id: watched, title: Watched, start: start, ruleset: rpg}
+            characters: {player: {first-name: Tester}}
+            """;
+        const string candidateManifest = """
+            game:
+              id: watched
+              title: Watched
+              start: start
+              ruleset:
+                base: rpg
+                stats:
+                  - {id: luck, name: Luck, category: attribute, min: 0, max: 20, default: 10}
+            characters: {player: {first-name: Tester}}
+            factions: {guild: {name: Guild, standing: 2}}
+            """;
+        using var model = new WorkbenchModel(_root);
+        Assert.True(model.ApplySource(Source(tale, originalManifest), restart: true));
+        model.Target = "current";
+        model.Start();
+        Assert.Null(model.Error);
+
+        Assert.True(model.ApplySource(Source(tale, candidateManifest), yamlChanged: true));
+
+        Assert.False(model.RestartRequired);
+        Assert.Null(model.Error);
+        Assert.False(model.Numbers.Single(field => field.Label == "player:luck").Enabled);
+        Assert.Equal("10", model.Numbers.Single(field => field.Label == "player:luck").Value);
+        Assert.False(model.Numbers.Single(field => field.Label == "faction:guild").Enabled);
+        Assert.Equal("2", model.Numbers.Single(field => field.Label == "faction:guild").Value);
+        Assert.Equal("10", model.EditNumbers.Single(field => field.Label == "player:luck").Value);
+        Assert.Equal("2", model.EditNumbers.Single(field => field.Label == "faction:guild").Value);
     }
 
     [Fact]

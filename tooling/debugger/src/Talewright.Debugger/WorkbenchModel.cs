@@ -279,7 +279,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
             }
             var configurationChanged = yamlChanged || (_acceptedSource is not null && candidate.Source is { } source
                 && !Configuration(source).SequenceEqual(Configuration(_acceptedSource)));
-            if (configurationChanged && (restart || Session is null || candidate.Error is not null))
+            if (configurationChanged && (restart || candidate.Error is not null))
             {
                 if (!Publish(RequireRestart))
                 {
@@ -333,11 +333,24 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
             }
             if (!restart && Story is not null)
             {
+                var setupSchemaChanged = false;
+                if (Session is null && configurationChanged && Story is { } previous)
+                {
+                    try
+                    {
+                        AuthorSession.ValidateReloadSchema(previous, story);
+                    }
+                    catch (AuthorReloadException)
+                    {
+                        AuthorSession.ValidateSetupReloadSchema(previous, story);
+                        setupSchemaChanged = true;
+                    }
+                }
                 var historyChanged = false;
                 var session = Session is { } activeSession
                     ? activeSession.Reload(story, out historyChanged)
                     : null;
-                if (configurationChanged && !historyChanged)
+                if (configurationChanged && !historyChanged && !setupSchemaChanged)
                 {
                     Publish(() =>
                     {
@@ -349,6 +362,9 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
                 }
                 var (updatedNumbers, updatedFlags, updatedTexts, disabledOverrides) = SynchronizeSetup(story);
                 var updatedSelection = Character is null ? null : RevalidateCharacter(story, ValidatedCreationSeed());
+                var previousTarget = Target;
+                var targetIsValid = story.Scenes.Any(scene => scene.Id.Value == previousTarget);
+                var updatedTarget = targetIsValid ? previousTarget : story.Start.Value;
                 var inspection = session?.Inspect();
                 return Publish(() =>
                 {
@@ -358,6 +374,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
                     Flags = updatedFlags;
                     Texts = updatedTexts;
                     Character = updatedSelection;
+                    Target = updatedTarget;
                     Session = session;
                     Inspection = inspection;
                     _acceptedSource = candidate.Source;
@@ -366,7 +383,8 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
                     SourceRejected = false;
                     RestartRequired = false;
                     Error = null;
-                    RequestedSceneNotice = null;
+                    RequestedSceneNotice = targetIsValid ? null
+                        : $"Selected scene '{previousTarget}' was not found. The configured start scene is selected instead.";
                     ReloadStatus = session is null ? "Talemark source adopted. Ready for scene setup."
                         : historyChanged ? "History changed; continuing from here with current state."
                         : $"Reload boundary: {session.Current.Scene}. Verified command prefix retained; current passage replaced, decisions rebuilt.";

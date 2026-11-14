@@ -147,16 +147,17 @@ on and keeps the state you built up to reach it.
 
 When the earlier route no longer replays, the debugger continues from the current scene and state
 and shows **History changed; continuing from here with current state.** Back and Forward history
-starts over at that scene. Compatible additions to variables, flags and items can also continue this
-way.
+starts over at that scene. Compatible additions to variables, flags, stats, items and factions can
+also continue this way.
 
-Some changes still need **Restart from source**, including removing the current scene, changing or
-removing existing state declarations, changing rules or incompatible configuration, and YAML changes
-that do not trigger continuation (even a comment). The debugger keeps your selected scene, seed,
-compatible overrides and character for restart. Setup fields follow the accepted story on reload;
-new fields start without overrides. On restart, overrides for removed or retyped fields are
-disabled and named in the status message. If an active state declaration was removed or retyped,
-the debugger still requires a restart rather than discarding that state during an in-place reload.
+Some changes still need **Restart from source**, including removing the current scene, changing
+rules or incompatible configuration, and YAML changes that do not trigger continuation (even a
+comment). Removing a variable, flag, stat, item or faction, or changing a variable's type, instead
+continues from the current scene: that declaration's old state and setup override are dropped, and
+the status message names any disabled override. Other compatible state and setup values remain.
+The debugger keeps your selected scene when it still exists, seed and character; a removed target
+falls back to the configured start scene with a notice. Setup fields follow the accepted story on
+reload; new fields start without overrides.
 
 If a change has errors, the debugger keeps running your last good version and marks it out of date.
 Fix the error and save again, or click **Rescan / retry watcher**. If you reload after going Back,

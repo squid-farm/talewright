@@ -241,7 +241,7 @@ public sealed class AuthorSession
         catch (AuthorReloadException)
         {
             AuthorReloadComparison.Continuation(Story, candidate, State, checkpoint.Scene);
-            var continuation = checkpoint.ContinueInPlace();
+            var continuation = checkpoint.ContinueInPlace(candidate);
             var result = new AuthorSession(candidate, continuation.Scene, continuation.Setup.Validate(candidate),
                 continuation.Seed, CharacterSelection.Validate(candidate, continuation.Character, continuation.Seed),
                 [], new ReplayCursor(0, 0), CaptureDecisions, continuation: continuation);
@@ -253,6 +253,10 @@ public sealed class AuthorSession
     /// <summary>Conservative declaration/rule compatibility check, also usable before a run starts.</summary>
     public static void ValidateReloadSchema(StoryDefinition original, StoryDefinition candidate) =>
         AuthorReloadComparison.Schema(original, candidate);
+
+    /// <summary>Validates that only state declarations changed, which is safe before a playtest is active.</summary>
+    public static void ValidateSetupReloadSchema(StoryDefinition original, StoryDefinition candidate) =>
+        AuthorReloadComparison.SetupSchema(original, candidate);
 
     /// <summary>Rebuilds a separate candidate; failed choices leave the active run unchanged.</summary>
     public void Choose(string key)
