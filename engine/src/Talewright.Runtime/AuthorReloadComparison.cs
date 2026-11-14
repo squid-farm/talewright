@@ -139,7 +139,8 @@ internal static class AuthorReloadComparison
                 return false;
             }
             var oldCharacter = pair.Value;
-            var commonStats = original.Ruleset.StatsById.Keys;
+            var commonStats = original.Ruleset.StatsById.Keys
+                .Where(candidate.Ruleset.StatsById.ContainsKey).ToHashSet();
             var oldStats = oldCharacter.Stats.Where(stat => commonStats.Contains(stat.Key)).ToDictionary();
             var newStats = value.Stats.Where(stat => commonStats.Contains(stat.Key)).ToDictionary();
             return Equal(oldCharacter with { Stats = oldStats }, value with { Stats = newStats });

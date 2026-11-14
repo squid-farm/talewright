@@ -599,6 +599,49 @@ public sealed class AuthorReloadTests
     }
 
     [Fact]
+    public void Removed_character_stat_is_ignored_by_setup_and_continuation_compatibility()
+    {
+        const string tale = """
+            === start
+            * [Go] -> current
+            === current
+            Current passage.
+            * [Finish] -> END
+            """;
+        const string originalManifest = """
+            game: {id: reload, title: Reload, start: start, ruleset: rpg}
+            characters: {player: {first-name: Tester, stats: {hp: 10}}}
+            """;
+        const string candidateManifest = """
+            game:
+              id: reload
+              title: Reload
+              start: start
+              ruleset: {base: rpg, disable: [hp]}
+            characters: {player: {first-name: Tester}}
+            """;
+        var originalStory = Compile(tale, originalManifest);
+        var candidateStory = Compile(tale, candidateManifest);
+
+        AuthorSession.ValidateSetupReloadSchema(originalStory, candidateStory);
+        var original = AuthorSession.Create(originalStory, new("start"),
+            setup: new AuthorSetup
+            {
+                Stats = [new(new("player"), new("hp"), 20)],
+            }, seed: 42);
+        original.Choose("c0");
+
+        var candidate = original.Reload(candidateStory, out var historyChanged);
+
+        Assert.True(historyChanged);
+        Assert.Equal(new SceneId("current"), candidate.Current.Scene);
+        Assert.DoesNotContain(candidate.Setup.Stats, stat => stat.Stat == new StatId("hp"));
+        Assert.DoesNotContain(candidate.Events, gameEvent => gameEvent is StatChanged changed
+            && changed.Stat == new StatId("hp"));
+        Assert.Equal(candidate.Events, candidate.Checkpoint!.Reenter().Events);
+    }
+
+    [Fact]
     public void Changed_schema_or_trigger_definitions_are_rejected()
     {
         var original = AuthorSession.Create(Compile(), new("current"), seed: 42);
