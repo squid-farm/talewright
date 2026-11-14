@@ -1,6 +1,7 @@
 # Repository agent guidance
 
-Follow [contributor guidance](CONTRIBUTING.md) and the [issue workflow](docs/developer/issues.md).
+Follow [contributor guidance](CONTRIBUTING.md) and the [issue workflow](docs/developer/issues.md),
+including its [project decision-making policy](docs/developer/issues.md#project-decision-making).
 This file points to project sources of truth; it does not replace them.
 
 ## Talemark changes

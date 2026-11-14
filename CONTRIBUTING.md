@@ -114,7 +114,8 @@ tooling. Shared build settings and Nx orchestration remain at the repository roo
 3. Work on a branch, ideally in its own `git worktree`.
 4. Open a PR with `Closes #N` (or `Refs #N` for partial work) and test evidence.
 
-Agents and multi-worker sessions: follow the full [issue workflow](docs/developer/issues.md).
+Contributors, agents and multi-worker sessions: follow the full [issue workflow](docs/developer/issues.md),
+including its [project decision-making policy](docs/developer/issues.md#project-decision-making).
 
 ## Docs
 
