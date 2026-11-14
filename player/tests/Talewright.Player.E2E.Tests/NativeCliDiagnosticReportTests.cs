@@ -26,6 +26,7 @@ public sealed class NativeCliDiagnosticReportTests
                     "cli-diagnostics", Guid.NewGuid().ToString("N")),
                 cli, windowInChildProcess: true);
             await player.StartAsync("run", directory);
+            await player.ClickAsync("More actions");
             await player.ActivateAsync("Diagnostics");
             var timer = Stopwatch.StartNew();
             while (!(await player.SnapshotAsync()).Content.Contains($"Story ID: {storyId}", StringComparison.Ordinal))

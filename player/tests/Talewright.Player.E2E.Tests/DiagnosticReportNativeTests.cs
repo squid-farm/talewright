@@ -59,11 +59,13 @@ public sealed class DiagnosticReportNativeTests(WebHostFixture host, ITestOutput
         await AssertState(state => Assert.Contains("Couldn't open", state.Library));
 
         var native = Assert.IsType<NativePlayerDriver>(Driver);
+        var startup = await native.SnapshotAsync();
+        var identity = Regex.Match(startup.Content,
+            @"Talewright (?<version>[0-9A-Za-z.+-]+) \u00B7 commit (?<commit>[0-9A-Za-z]+) \u00B7 built [0-9]{4}-[0-9]{2}-[0-9]{2}");
+        Assert.True(identity.Success, $"The player build identity was not displayed: {startup.Content}");
+
         await native.ActivateAsync("Diagnostics");
         var snapshot = await WaitForAsync(native, "Player version:");
-        var identity = Regex.Match(snapshot.Content,
-            @"Talewright (?<version>[0-9A-Za-z.+-]+) \u00B7 commit (?<commit>[0-9A-Za-z]+) \u00B7 built [0-9]{4}-[0-9]{2}-[0-9]{2}");
-        Assert.True(identity.Success, $"The player build identity was not displayed: {snapshot.Content}");
         Assert.Contains($"Player version: {identity.Groups["version"].Value}", snapshot.Content);
         Assert.Contains($"Player commit: {identity.Groups["commit"].Value}", snapshot.Content);
     }
@@ -84,6 +86,7 @@ public sealed class DiagnosticReportNativeTests(WebHostFixture host, ITestOutput
         await native.UploadSaveAsync("PRIVATE_SAVE.twsave", Encoding.UTF8.GetBytes("PRIVATE_SAVE_CONTENT"));
         await WaitForAsync(native, "malformed");
         await Driver.ClickAsync("Close saves");
+        await Driver.ClickAsync("More actions");
         await native.ActivateAsync("Diagnostics");
         var snapshot = await WaitForAsync(native, "Import saved game:");
         Assert.Contains("Load image: invalid data", snapshot.Content);

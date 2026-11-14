@@ -1,17 +1,17 @@
-@implements IDisposable
+@implements IAsyncDisposable
 @inject IServiceProvider Services
+@inject IJSRuntime JS
 @using System.Text
 @using Microsoft.Extensions.DependencyInjection
 @using Talewright.Player.Diagnostics
 
-<details class="tw-diagnostic-report">
-    <summary>Diagnostics</summary>
+<dialog class="tw-diagnostic-report" aria-label="Diagnostics" @ref="_dialog">
     <h2>Diagnostic report</h2>
     <p>Review this report before sharing it. It includes story and scene IDs, but not story text, saved games, paths or exception messages. It is not sent automatically.</p>
-    <pre tabindex="0" aria-label="Diagnostic report">@Diagnostics.CreateReport()</pre>
+    <pre tabindex="0" aria-label="Diagnostic report" @ref="_report">@Diagnostics.CreateReport()</pre>
     @if (Services.GetService<IDiagnosticReportExporter>() is not null)
     {
-        <button type="button" class="tw-choice" @onclick="DownloadAsync">Download diagnostic report</button>
+        <button type="button" class="tw-choice tw-diagnostic-download" @onclick="DownloadAsync">Download diagnostic report</button>
     }
     else
     {
@@ -21,18 +21,35 @@
     {
         <p role="@(_failed ? "alert" : "status")">@_status</p>
     }
-</details>
+    <button type="button" class="tw-choice tw-diagnostic-close" @onclick="CloseAsync">Close diagnostics</button>
+</dialog>
 
 @code {
     [Parameter, EditorRequired]
     public PlayerDiagnostics Diagnostics { get; set; } = default!;
 
+    private ElementReference _dialog;
+    private ElementReference _report;
+    private IJSObjectReference? _module;
     private string? _status;
     private bool _failed;
 
     protected override void OnInitialized() => Diagnostics.Changed += OnChanged;
 
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!firstRender) return;
+        _module = await JS.InvokeAsync<IJSObjectReference>(
+            "import", "./_content/Talewright.Player/Components/DiagnosticReport.razor.js");
+        await _module.InvokeVoidAsync("initialize", _dialog, _report);
+    }
+
     private void OnChanged() => _ = InvokeAsync(StateHasChanged);
+
+    public Task OpenAsync(ElementReference? returnFocus = null) =>
+        _module!.InvokeVoidAsync("open", _dialog, returnFocus).AsTask();
+
+    private Task CloseAsync() => _module!.InvokeVoidAsync("close", _dialog).AsTask();
 
     private async Task DownloadAsync()
     {
@@ -54,5 +71,13 @@
         }
     }
 
-    public void Dispose() => Diagnostics.Changed -= OnChanged;
+    public async ValueTask DisposeAsync()
+    {
+        Diagnostics.Changed -= OnChanged;
+        if (_module is not null)
+        {
+            await _module.InvokeVoidAsync("dispose", _dialog);
+            await _module.DisposeAsync();
+        }
+    }
 }
