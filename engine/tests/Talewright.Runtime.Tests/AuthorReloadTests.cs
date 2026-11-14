@@ -2,6 +2,7 @@ using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Narrative.Rendering;
 using Talewright.Narrative.Templates;
+using Talewright.Rules.Diagnostics;
 using Talewright.Rules.Expressions;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
@@ -389,6 +390,27 @@ public sealed class AuthorReloadTests
         Assert.Equal(original.State.GetVariable(new("count")), candidate.State.GetVariable(new("count")));
         Assert.False(candidate.CanBack);
         Assert.False(candidate.CanForward);
+    }
+
+    [Fact]
+    public void Continued_session_replaces_current_entry_decisions_without_losing_prefix()
+    {
+        var original = AuthorSession.Create(Compile(), new("start"), captureDecisions: true, seed: 42);
+        original.Choose("c0");
+        var oldCheck = Assert.Single(original.Decisions,
+            decision => decision.Kind == DecisionKind.Check && decision.Scene == new SceneId("current"));
+        var tale = Tale.Replace("~ set flag:ready", "~ set flag:ready\n~ var:count += 100")
+            .Replace("dc 10", "dc 30");
+
+        var continued = original.Reload(Compile(tale), out var historyChanged);
+
+        Assert.True(historyChanged);
+        Assert.Contains(continued.Decisions, decision => decision.Kind == DecisionKind.EntryEffect
+            && decision.Scene == new SceneId("start"));
+        var newCheck = Assert.Single(continued.Decisions,
+            decision => decision.Kind == DecisionKind.Check && decision.Scene == new SceneId("current"));
+        Assert.NotEqual(oldCheck, newCheck);
+        Assert.Equal(continued.Decisions, continued.Checkpoint!.Reenter().Decisions);
     }
 
     [Fact]

@@ -289,7 +289,8 @@ The debugger displays the location without reevaluating any condition.
 Recording follows successful author candidate replay: `Choose`, `JumpFresh`
 and checkpoint `Reenter` preserve the recording setting, with no duplicated
 append-only traces from earlier rebuild attempts. Failed candidates leave the
-previous decisions/state intact and throw their error. This is opt-in in-memory
+previous decisions/state intact and throw their error. Continuation retains decisions made before
+the current entry boundary and records the new entry separately. This is opt-in in-memory
 diagnostic data, not persisted in player saves or scenario files.
 
 Custom hosts can pass an `Action<RuleDecision>` through the five-argument

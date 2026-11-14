@@ -4,6 +4,7 @@ using Talewright.Core.Rulesets;
 using Talewright.Core.State;
 using Talewright.Core.World;
 using Talewright.Narrative.Rendering;
+using Talewright.Rules.Diagnostics;
 using Talewright.Talemark.Model;
 
 namespace Talewright.Runtime;
@@ -25,11 +26,12 @@ public sealed class AuthorSceneCheckpoint
     private readonly AuthorSceneEntryReplay[] _entryReplay;
     private readonly AuthorContinuation? _continuation;
     private readonly AuthorCommand[] _entryCommands;
+    private readonly RuleDecision[] _decisions;
 
     internal AuthorSceneCheckpoint(StoryDefinition story, SceneId start, AuthorSetup setup, ulong seed,
         CharacterSelection? character, AuthorCommand[] commands, SceneEntryBoundary boundary, IReadOnlyList<GameEvent> events,
         bool captureDecisions, AuthorPlayedChoice[] playedChoices, AuthorSceneEntryReplay[] entryReplay,
-        AuthorContinuation? continuation, AuthorCommand[] entryCommands)
+        AuthorContinuation? continuation, AuthorCommand[] entryCommands, RuleDecision[] decisions)
     {
         _story = story;
         _start = start;
@@ -42,6 +44,7 @@ public sealed class AuthorSceneCheckpoint
         _entryReplay = entryReplay;
         _continuation = continuation;
         _entryCommands = entryCommands;
+        _decisions = decisions;
         Scene = boundary.Scene;
         Seed = seed;
         Events = Array.AsReadOnly(events.Take(boundary.EventCount).ToArray());
@@ -63,7 +66,7 @@ public sealed class AuthorSceneCheckpoint
         _commands, _captureDecisions, _continuation);
 
     internal AuthorContinuation ContinueInPlace() => new(Scene, Seed, Events, _triggerEdges, PendingNotes,
-        _setup, _character, _entryCommands);
+        _setup, _character, _entryCommands, _decisions);
 
     internal void VerifyPlayedChoice(int index, AuthorPlayedChoice choice)
     {
@@ -124,7 +127,7 @@ public sealed class AuthorSceneCheckpoint
 
 internal sealed record AuthorContinuation(SceneId Scene, ulong Seed, IReadOnlyList<GameEvent> Events,
     IReadOnlyList<string> TriggerEdges, IReadOnlyList<RenderedBlock> PendingNotes, AuthorSetup Setup,
-    CharacterSelection? Character, IReadOnlyList<AuthorCommand> EntryCommands);
+    CharacterSelection? Character, IReadOnlyList<AuthorCommand> EntryCommands, IReadOnlyList<RuleDecision> Decisions);
 
 internal sealed record AuthorEntryReplayStep(string Kind, object? Value);
 internal sealed record AuthorSceneEntryReplay(SceneId Scene, IReadOnlyList<AuthorEntryReplayStep> Steps);

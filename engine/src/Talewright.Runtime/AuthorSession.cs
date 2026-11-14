@@ -36,7 +36,8 @@ public sealed class AuthorSession
         }
         _timeline = timeline;
         CaptureDecisions = captureDecisions;
-        var decisions = new List<RuleDecision>();
+        var decisions = new List<RuleDecision>(continuation?.Decisions ?? []);
+        var boundaryDecisionCount = 0;
         var results = new List<AuthorCommandResult>();
         var entryReplay = new List<AuthorSceneEntryReplay>();
         var appliedCommands = commands.Take(_timeline.Position).ToArray();
@@ -46,6 +47,7 @@ public sealed class AuthorSession
 
         void VerifyEntry(SceneEntryBoundary boundary, IReadOnlyList<GameEvent> events)
         {
+            boundaryDecisionCount = decisions.Count;
             if (verifyNextEntry)
             {
                 verify?.VerifyBoundary(boundary, events);
@@ -61,13 +63,13 @@ public sealed class AuthorSession
         if (continuation is null)
         {
             _session = new StorySession(story, seed, Character, Setup,
-                captureDecisions ? decisions.Add : null, verify is null ? null : VerifyEntry, CaptureEntryReplay);
+                captureDecisions ? decisions.Add : null, VerifyEntry, CaptureEntryReplay);
             _session.StartAt(target);
         }
         else
         {
             _session = StorySession.Continue(story, seed, Character, continuation.Events, continuation.TriggerEdges,
-                captureDecisions ? decisions.Add : null, verify is null ? null : VerifyEntry, CaptureEntryReplay);
+                captureDecisions ? decisions.Add : null, VerifyEntry, CaptureEntryReplay);
             _session.ContinueAt(continuation.Scene, continuation.PendingNotes);
             foreach (var command in continuation.EntryCommands)
             {
@@ -100,7 +102,8 @@ public sealed class AuthorSession
                 : appliedCommands.Skip(lastEntryCommand + 1).ToArray();
             Checkpoint = new AuthorSceneCheckpoint(story, StartScene, Setup, seed, Character,
                 appliedCommands, boundary, Events, captureDecisions, _playedChoices.ToArray(),
-                entryReplay.Take(entryReplay.Count - 1).ToArray(), continuation, entryCommands);
+                entryReplay.Take(entryReplay.Count - 1).ToArray(), continuation, entryCommands,
+                decisions.Take(boundaryDecisionCount).ToArray());
         }
     }
 
