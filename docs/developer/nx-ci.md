@@ -172,8 +172,9 @@ manifest is uploaded once and consumed by the jobs, so there is no parallel work
 | `build` | Existing Release solution build, NuGet packs, clean library consumers, installed CLI and publication checks. |
 | `tests / unit` | One Release solution build, then every test in each affected headless unit project concurrently without rebuilding. The normal `Talewright.Talemark.Tests` suite excludes the editor/compiler contract. One nonempty, passing TRX report is required per selected project; reports are isolated under each area-local test project's `artifacts/unit`. |
 | `tests / unit-net8` | Alongside `unit` when it is selected, build and run all six engine test assemblies on .NET 8. Require every assembly and a nonempty, passing TRX report. |
-| `tests / browser-preparation` | Selected with the browser group from the Nx manifest, independently of the full `build` job. Builds the Release E2E output and publishes the regular web host once, then uploads an immutable compressed tar artifact named for the workflow run and attempt. Its manifest verifies the exact checkout, run identity, SHA-256 and file mode of every payload file; tar preserves Playwright's executable driver permissions. The job summary records the archive size. |
-| `tests / browser` | Complete regular player regression suite in **all three** browsers: Chromium, Firefox, WebKit, each split across two disjoint shard jobs. Every consumer downloads the preparation artifact from the same run and verifies it before discovery; regular regression execution does not restore, build or publish. Shard 1 also runs the focused `Artifact=Standalone` published-game smoke suite under a nested static path through its existing separate publish target. Moving that smoke preparation is a follow-up, not part of this change. |
+| `tests / browser-preparation` | Selected with the browser group from the Nx manifest, independently of the full `build` job. Builds the Release E2E and CLI outputs and publishes the regular web host once, then uploads an immutable compressed tar artifact named for the workflow run and attempt. Its manifest verifies the exact checkout, run identity, SHA-256 and file mode of every payload file; tar preserves Playwright's executable driver permissions. The job summary records the archive size. |
+| `tests / browser` | Complete regular player regression suite in **all three** browsers: Chromium, Firefox, WebKit, each split across two disjoint shard jobs. Every consumer downloads the preparation artifact from the same run and verifies it before discovery; regular regression execution does not restore, build or publish. |
+| `tests / browser-published` | Alongside the browser shards, run the focused `Artifact=Standalone` published-game smoke in each of the three browsers under a nested static path. The prepared CLI publishes the game and the prepared test assembly executes it without rebuilding either project. |
 | `tests / linux-desktop` | Accessibility/chooser probe in each of three shard jobs, which together run the complete regular native regression suite; shard 1 then runs the focused published-desktop smoke. Regression and standalone reports have separate names. |
 | `tests / editor / syntax` | Applicable Node syntax/snippet tests, focused snippet compiler contract, VSIX packaging/content check, and installed-editor smoke. Compiler-only changes need not run all editor checks. |
 | `tests / checks` | Every CI/selection regression test, documentation-link check, performance-report Python test, and bounded performance budget on every PR, plus any affected leaf compilation. |
@@ -262,6 +263,8 @@ python3 .github/scripts/nx_ci.py run unit
 python3 .github/scripts/nx_ci.py run checks
 npm ci --prefix tooling/vscode-talewright
 python3 .github/scripts/nx_ci.py run editor
+export TALEWRIGHT_E2E_SOURCE_SHA="$(git rev-parse HEAD)" GITHUB_RUN_ID=local GITHUB_RUN_ATTEMPT=1
+python3 player/tests/run_e2e.py prepare-web
 for browser in chromium firefox webkit; do
   python3 player/tests/run_e2e.py install-browsers --browser "$browser"
   python3 .github/scripts/nx_ci.py run browser --browser "$browser"
@@ -272,7 +275,8 @@ VERSION=0.0.0-ci.123 python3 .github/scripts/nx_ci.py run build
 
 Run groups only when their manifest entries are nonempty. The adapter intentionally rejects an empty
 group instead of silently reporting successful verification. Do not use inferred `test` on the opt-in
-E2E project as a substitute for the host-aware runners.
+E2E project as a substitute for the host-aware runners. Preparation refuses to overwrite an existing
+`artifacts/browser-e2e-inputs` directory or archive; use a clean output location before preparing again.
 
 ## Regression evidence
 

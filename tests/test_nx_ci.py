@@ -17,7 +17,7 @@ from test_nx_selection import NO_IMPACT_FILES, affected_graph
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / ".github/scripts"))
 from nx_ci import (
-    CHECK_TARGETS, GROUPS, TARGETS, make_plan, nx, verify_results, verify_unit_reports,
+    CHECK_TARGETS, GROUPS, TARGETS, make_plan, nx, selected_jobs, verify_results, verify_unit_reports,
     with_complete_checks,
 )
 
@@ -49,6 +49,17 @@ class UnitReportTests(unittest.TestCase):
 
 
 class CiRoutingTests(unittest.TestCase):
+    def test_browser_job_selection_tracks_each_actual_target(self):
+        for targets in ((), ("e2e-web",), ("e2e-published-web",),
+                        ("e2e-web", "e2e-published-web")):
+            plan = {group: [] for group in GROUPS}
+            plan["browser"] = [{"project": "Talewright.Player.E2E.Tests", "target": target}
+                               for target in targets]
+            selected = selected_jobs(plan)
+            self.assertEqual(bool(targets), selected["browser"])
+            self.assertEqual("e2e-web" in targets, selected["browser-web"])
+            self.assertEqual("e2e-published-web" in targets, selected["browser-published"])
+
     def test_no_impact_plan_has_no_selected_groups(self):
         self.assertEqual(
             {group: [] for group in GROUPS}, make_plan(affected_graph(*NO_IMPACT_FILES)),
