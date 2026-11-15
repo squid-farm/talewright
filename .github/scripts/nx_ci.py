@@ -91,6 +91,8 @@ def runs_in_shard(args, target):
 
 def execution_path(args):
     suffix = f"-{args.browser}" if args.group == "browser" else ""
+    if target := getattr(args, "browser_target", None):
+        suffix += f"-{target}"
     index, count = shard_of(args)
     if count > 1:
         suffix += f"-{index}-of-{count}"
@@ -246,6 +248,8 @@ def execution_summary(args):
         lines.append("**Incomplete:** selection plan unavailable; execution cannot be established.")
     else:
         tasks = json.loads(args.plan.read_text(encoding="utf-8"))[args.group]
+        if target := getattr(args, "browser_target", None):
+            tasks = [task for task in tasks if task["target"] == target]
         path = execution_path(args)
         record = json.loads(path.read_text(encoding="utf-8")) if path.exists() else None
         if record is None:
@@ -346,6 +350,13 @@ def selection_scopes(args):
     return {group: "complete" if group == "checks" else "affected" for group in GROUPS}
 
 
+def selected_jobs(plan):
+    selected = {group: bool(tasks) for group, tasks in plan.items()}
+    for name, target in (("browser-web", "e2e-web"), ("browser-published", "e2e-published-web")):
+        selected[name] = any(task["target"] == target for task in plan["browser"])
+    return selected
+
+
 def with_complete_checks(affected, checks):
     """Merge every workspace check task into an affected graph before routing."""
     merged = json.loads(json.dumps(affected))
@@ -387,7 +398,7 @@ def select(args):
     args.plan.with_name("selection.json").write_text(
         json.dumps({"scopes": scopes}, indent=2) + "\n", encoding="utf-8",
     )
-    selected = {group: bool(tasks) for group, tasks in plan.items()}
+    selected = selected_jobs(plan)
     print(json.dumps({"selected": selected, "scopes": scopes, "tasks": plan}, indent=2))
     if output := os.environ.get("GITHUB_OUTPUT"):
         with open(output, "a", encoding="utf-8") as stream:
@@ -419,6 +430,10 @@ def run_group(args):
     execution_path(args).unlink(missing_ok=True)
     plan = json.loads(args.plan.read_text(encoding="utf-8"))
     tasks = plan[args.group]
+    if target := getattr(args, "browser_target", None):
+        if args.group != "browser":
+            raise ValueError("A browser target can only be selected for the browser group")
+        tasks = [task for task in tasks if task["target"] == target]
     if not tasks:
         raise ValueError(f"Attempted to run unselected group: {args.group}")
     for task in tasks:
@@ -437,6 +452,8 @@ def run_group(args):
         for target in TARGETS
         if runs_in_shard(args, target) and any(task["target"] == target for task in tasks)
     ]}
+    if not record["batches"]:
+        raise ValueError(f"No selected tasks run in this shard: {args.group}")
     save_execution(args, record)
     try:
         for batch in record["batches"]:
@@ -448,10 +465,12 @@ def run_group(args):
             ]
             if args.group == "unit":
                 arguments.append("--excludeTaskDependencies")
+            if target == "e2e-published-web":
+                arguments.append("--excludeTaskDependencies")
             if target == "e2e-web":
                 arguments.append(f"--configuration={args.browser}")
             environment = {"BROWSER": args.browser}
-            if target == "e2e-web":
+            if target in ("e2e-web", "e2e-published-web"):
                 environment["TALEWRIGHT_E2E_PREPARED"] = "1"
             if shard_label(args) and target in SHARDED_TARGETS:
                 environment["TALEWRIGHT_E2E_SHARD"] = shard_label(args)
@@ -523,11 +542,13 @@ def main():
     run.add_argument("group", choices=GROUPS)
     run.add_argument("--plan", type=Path, default=ROOT / "artifacts/ci/plan.json")
     run.add_argument("--browser", choices=("chromium", "firefox", "webkit"), default="chromium")
+    run.add_argument("--browser-target", choices=("e2e-web", "e2e-published-web"))
     run.add_argument("--shard", type=parse_shard, default="1/1", help="E2E shard as INDEX/COUNT")
     summary = commands.add_parser("summary")
     summary.add_argument("group", choices=GROUPS)
     summary.add_argument("--plan", type=Path, default=ROOT / "artifacts/ci/plan.json")
     summary.add_argument("--browser", choices=("chromium", "firefox", "webkit"), default="chromium")
+    summary.add_argument("--browser-target", choices=("e2e-web", "e2e-published-web"))
     summary.add_argument("--shard", type=parse_shard, default="1/1", help="E2E shard as INDEX/COUNT")
     aggregate = commands.add_parser("aggregate")
     aggregate.add_argument("--needs", required=True)

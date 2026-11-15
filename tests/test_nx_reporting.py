@@ -311,7 +311,8 @@ class ReportingTests(unittest.TestCase):
                 self.assertEqual(f"{shard[0]}/2", environments[0]["TALEWRIGHT_E2E_SHARD"])
                 self.assertEqual("1", environments[0]["TALEWRIGHT_E2E_PREPARED"])
                 if len(environments) > 1:
-                    self.assertNotIn("TALEWRIGHT_E2E_PREPARED", environments[1])
+                    self.assertEqual("1", environments[1]["TALEWRIGHT_E2E_PREPARED"])
+                    self.assertIn("--excludeTaskDependencies", run.call_args_list[1].args)
                 self.assertTrue(all("TALEWRIGHT_E2E_SHARD" not in environment
                                     for environment in environments[1:]))
                 self.assertTrue(nx_ci.execution_path(self.args).name.endswith(
@@ -323,6 +324,27 @@ class ReportingTests(unittest.TestCase):
         summary = self.summary.read_text()
         self.assertIn("## Nx execution: browser (chromium, shard 2/2)", summary)
         self.assertIn("| `e2e-published-web` | `Talewright.Player.E2E.Tests` | runs in shard 1 |", summary)
+
+    def test_browser_jobs_run_only_their_selected_target_and_reject_empty_work(self):
+        self.args.group = "browser"
+        plan = {group: [] for group in nx_ci.GROUPS}
+        plan["browser"] = [
+            {"project": "Talewright.Player.E2E.Tests", "target": "e2e-web"},
+            {"project": "Talewright.Player.E2E.Tests", "target": "e2e-published-web"},
+        ]
+        self.args.plan.write_text(json.dumps(plan))
+        for target in ("e2e-web", "e2e-published-web"):
+            self.args.browser_target = target
+            with self.subTest(target=target), patch("nx_ci.nx") as run, \
+                    patch("nx_ci.ROOT", self.root), redirect_stdout(io.StringIO()):
+                nx_ci.run_group(self.args)
+                self.assertEqual(1, run.call_count)
+                self.assertIn(f"--targets={target}", run.call_args.args)
+                self.assertEqual("1", run.call_args.kwargs["environment"]["TALEWRIGHT_E2E_PREPARED"])
+        plan["browser"].pop()
+        self.args.plan.write_text(json.dumps(plan))
+        with self.assertRaisesRegex(ValueError, "unselected"):
+            nx_ci.run_group(self.args)
 
     def test_unsharded_e2e_runs_do_not_request_a_shard(self):
         self.args.group = "linux-desktop"
@@ -428,7 +450,16 @@ class PreparedBrowserInputTests(unittest.TestCase):
     def populate_inputs(self, root):
         self.populate_test_output(root / self.run_e2e.TEST_OUTPUT)
         self.populate_web_output(root / self.run_e2e.WEB_OUTPUT)
+        self.populate_cli_output(root / self.run_e2e.CLI_OUTPUT)
         self.run_e2e.write_prepared_manifest(root, self.identity)
+
+    def populate_cli_output(self, root):
+        root.mkdir(parents=True)
+        for name in ("Talewright.Cli.dll", "Talewright.Cli.deps.json",
+                     "Talewright.Cli.runtimeconfig.json", "publish-assets/standalone/web/App.razor"):
+            file = root / name
+            file.parent.mkdir(parents=True, exist_ok=True)
+            file.write_text(name)
 
     def validate(self, root):
         with patch.dict(os.environ, self.identity_environment), patch.object(
@@ -459,6 +490,13 @@ class PreparedBrowserInputTests(unittest.TestCase):
             self.run_e2e, "git_revision", return_value=self.identity["source_sha"]
         ), self.assertRaisesRegex(RuntimeError, "missing: web/wwwroot/index.html"):
             self.run_e2e.validate_prepared_inputs(root)
+
+    def test_prepared_manifest_rejects_modified_cli(self):
+        root = self.root / "inputs"
+        self.populate_inputs(root)
+        (root / "cli/Talewright.Cli.dll").write_text("modified")
+        with self.assertRaisesRegex(RuntimeError, "checksum mismatch"):
+            self.validate(root)
 
     def test_failed_job_rerun_validates_the_retained_preparation_attempt(self):
         inputs = self.root / "inputs"
@@ -516,8 +554,10 @@ class PreparedBrowserInputTests(unittest.TestCase):
 
         def fake_run(command, **kwargs):
             commands.append(command)
-            if command[:2] == ["dotnet", "build"]:
+            if command[:2] == ["dotnet", "build"] and command[2] == self.run_e2e.PROJECT:
                 self.populate_test_output(binary)
+            elif command[:2] == ["dotnet", "build"]:
+                self.populate_cli_output(self.root / "tooling/cli/src/Talewright.Cli/bin/Release/net10.0")
             else:
                 self.assertEqual(["dotnet", "publish"], command[:2])
                 self.populate_web_output(Path(command[command.index("-o") + 1]))
@@ -530,23 +570,74 @@ class PreparedBrowserInputTests(unittest.TestCase):
             self.run_e2e.prepare_browser_inputs(output)
             self.validate(output)
 
-        self.assertEqual(2, len(commands))
+        self.assertEqual(3, len(commands))
         self.assertEqual(["dotnet", "build"], commands[0][:2])
         self.assertEqual(["dotnet", "publish"], commands[1][:2])
+        self.assertEqual(["dotnet", "build"], commands[2][:2])
         self.assertTrue(output.with_suffix(".tar.gz").is_file())
+
+    def test_published_smoke_uses_prepared_cli_and_tests_and_checks_report(self):
+        inputs = self.root / "inputs"
+        assembly = inputs / "test-output/Talewright.Player.E2E.Tests.dll"
+        results = self.root / "artifacts/test-results"
+        results.mkdir(parents=True)
+        commands, jobs = [], []
+
+        def capture_jobs(work, limit, destination):
+            jobs.extend(work)
+            work[0].report.write_text('<TestRun><Counters executed="16" failed="0" /></TestRun>')
+            return []
+
+        with patch.object(self.run_e2e, "ROOT", self.root), patch.object(
+            self.run_e2e, "PREPARED_INPUTS", inputs
+        ), patch.object(self.run_e2e, "extract_prepared_archive"), patch.object(
+            self.run_e2e, "validate_prepared_inputs", return_value=(assembly, inputs / "web")
+        ), patch.object(self.run_e2e, "run", side_effect=lambda command, **kwargs: commands.append(command)
+        ), patch.object(self.run_e2e, "run_jobs", side_effect=capture_jobs):
+            self.assertEqual(0, self.run_e2e.run_published_web("firefox", results))
+        self.assertEqual(["dotnet", inputs / "cli/Talewright.Cli.dll", "publish"], commands[0][:3])
+        self.assertEqual(["dotnet", "vstest", assembly], jobs[0].command[:3])
+        self.assertIn("--TestCaseFilter:Artifact=Standalone", jobs[0].command)
+        self.assertEqual("/games/published", jobs[0].environment["TALEWRIGHT_WEB_BASE_PATH"])
+        self.assertEqual("firefox", jobs[0].environment["BROWSER"])
+
+    def test_published_smoke_rejects_empty_or_failed_reports(self):
+        inputs = self.root / "inputs"
+        results = self.root / "artifacts/test-results"
+        results.mkdir(parents=True)
+
+        def capture_jobs(work, limit, destination):
+            work[0].report.write_text(report)
+            return []
+
+        for report in ('<TestRun><Counters executed="0" failed="0" /></TestRun>',
+                       '<TestRun><Counters executed="1" failed="1" /></TestRun>'):
+            with self.subTest(report=report), patch.object(self.run_e2e, "ROOT", self.root), \
+                    patch.object(self.run_e2e, "PREPARED_INPUTS", inputs), \
+                    patch.object(self.run_e2e, "extract_prepared_archive"), \
+                    patch.object(self.run_e2e, "validate_prepared_inputs",
+                                 return_value=(inputs / "tests.dll", inputs / "web")), \
+                    patch.object(self.run_e2e, "run"), \
+                    patch.object(self.run_e2e, "run_jobs", side_effect=capture_jobs), \
+                    self.assertRaisesRegex(RuntimeError, "no executed tests or contains failures"):
+                self.run_e2e.run_published_web("chromium", results)
 
     def test_prepared_consumer_runs_the_downloaded_assembly_without_build_or_publish(self):
         captured = {}
-        test_assembly = self.root / "inputs/test-output/Talewright.Player.E2E.Tests.dll"
-        web_root = self.root / "inputs/web/wwwroot"
+        inputs = self.root / "inputs"
+        inputs.mkdir()
+        test_assembly = inputs / "test-output/Talewright.Player.E2E.Tests.dll"
+        web_root = inputs / "web/wwwroot"
 
         def capture_jobs(jobs, limit, results):
             captured["jobs"] = jobs
             return []
 
         with patch.object(self.run_e2e, "ROOT", self.root), patch.object(
-            self.run_e2e, "extract_prepared_archive"
+            self.run_e2e, "PREPARED_INPUTS", inputs
         ), patch.object(
+            self.run_e2e, "extract_prepared_archive"
+        ) as extract, patch.object(
             self.run_e2e, "validate_prepared_inputs", return_value=(test_assembly, web_root)
         ), patch.object(
             self.run_e2e, "test_filters", return_value=["Host!=Linux"]
@@ -557,6 +648,7 @@ class PreparedBrowserInputTests(unittest.TestCase):
         ), patch("sys.argv", ["run_e2e.py", "web", "--prepared", "--browser", "chromium"]):
             self.assertEqual(0, self.run_e2e.main())
 
+        extract.assert_not_called()
         command = captured["jobs"][0].command
         self.assertEqual(["dotnet", "vstest"], command[:2])
         self.assertIn(test_assembly, command)

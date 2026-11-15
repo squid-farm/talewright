@@ -141,7 +141,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Verify prebuilt UI test environment
         run: python3 .github/docker/ui-tests/verify.py
-      - name: Build E2E tests and publish the web host once
+      - name: Prepare E2E tests, CLI and web host once
         run: python3 player/tests/run_e2e.py prepare-web
       - name: Record preparation attempt
         id: identity
@@ -170,7 +170,7 @@ jobs:
 
   browser:
     needs: [plan, browser-preparation]
-    if: fromJSON(needs.plan.outputs.selected).browser
+    if: fromJSON(needs.plan.outputs.selected)['browser-web']
     runs-on: ubuntu-24.04
     timeout-minutes: 20
     env:
@@ -184,7 +184,7 @@ jobs:
       fail-fast: false
       matrix:
         browser: [chromium, firefox, webkit]
-        # Each shard job runs a disjoint share of the regression suite; shard 1 also runs published smokes.
+        # Each shard job runs a disjoint share of the regression suite.
         shard: [1, 2]
     steps:
       - uses: actions/checkout@v4
@@ -219,7 +219,7 @@ jobs:
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
               summary.write(f"Downloaded browser input tar: {size} bytes.\n")
           PY
-      - run: python3 .github/scripts/nx_ci.py run browser --browser ${{ matrix.browser }} --shard ${{ matrix.shard }}/2
+      - run: python3 .github/scripts/nx_ci.py run browser --browser-target e2e-web --browser ${{ matrix.browser }} --shard ${{ matrix.shard }}/2
       - uses: actions/upload-artifact@v4
         id: results
         if: always()
@@ -232,7 +232,60 @@ jobs:
         if: always()
         env:
           NX_CI_ARTIFACT_URL: ${{ steps.results.outcome == 'success' && steps.results.outputs.artifact-url || '' }}
-        run: python3 .github/scripts/nx_ci.py summary browser --browser ${{ matrix.browser }} --shard ${{ matrix.shard }}/2
+        run: python3 .github/scripts/nx_ci.py summary browser --browser-target e2e-web --browser ${{ matrix.browser }} --shard ${{ matrix.shard }}/2
+
+  browser-published:
+    needs: [plan, browser-preparation]
+    if: fromJSON(needs.plan.outputs.selected)['browser-published']
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      TALEWRIGHT_E2E_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      TALEWRIGHT_E2E_PREPARATION_ATTEMPT: ${{ needs.browser-preparation.outputs.run-attempt }}
+    container:
+      image: ghcr.io/squid-farm/talewright-ui-tests:pw1.63.0-r1
+      options: --user 1001:1001 --init --shm-size=1g
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [chromium, firefox, webkit]
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify prebuilt UI test environment
+        run: python3 .github/docker/ui-tests/verify.py
+      - uses: actions/download-artifact@v4
+        with:
+          name: nx-ci-plan
+          path: artifacts/ci
+      - name: Require prepared input reference
+        env:
+          INPUT_ARTIFACT_ID: ${{ needs.browser-preparation.outputs.artifact-id }}
+        run: |
+          if [ -z "$INPUT_ARTIFACT_ID" ] || [ -z "$TALEWRIGHT_E2E_PREPARATION_ATTEMPT" ]; then
+            echo "Browser preparation did not provide its artifact ID and attempt." >&2
+            exit 1
+          fi
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.browser-preparation.outputs.artifact-id }}
+          merge-multiple: true
+          path: artifacts
+      - run: python3 .github/scripts/nx_ci.py run browser --browser-target e2e-published-web --browser ${{ matrix.browser }}
+      - uses: actions/upload-artifact@v4
+        id: results
+        if: always()
+        with:
+          name: player-published-${{ matrix.browser }}
+          path: artifacts/test-results
+          if-no-files-found: error
+          retention-days: 14
+      - name: Summarize Nx execution
+        if: always()
+        env:
+          NX_CI_ARTIFACT_URL: ${{ steps.results.outcome == 'success' && steps.results.outputs.artifact-url || '' }}
+        run: python3 .github/scripts/nx_ci.py summary browser --browser-target e2e-published-web --browser ${{ matrix.browser }}
 
   linux-desktop:
     needs: plan
@@ -305,7 +358,7 @@ jobs:
 
   verification:
     if: always()
-    needs: [plan, browser-preparation, unit, unit-net8, browser, linux-desktop, editor, checks]
+    needs: [plan, browser-preparation, unit, unit-net8, browser, browser-published, linux-desktop, editor, checks]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -325,8 +378,9 @@ jobs:
           if results["plan"]["result"] != "success":
               raise SystemExit("Verification planning failed, was skipped, or was cancelled")
           selected = json.loads(os.environ["SELECTED"])
-          expected = {"browser-preparation": selected["browser"], "unit-net8": selected["unit"]}
+          expected = {"browser-preparation": selected["browser"], "unit-net8": selected["unit"],
+                      "browser": selected["browser-web"], "browser-published": selected["browser-published"]}
           expected.update({job: selected[job] for job in
-                           ("unit", "browser", "linux-desktop", "editor", "checks")})
+                           ("unit", "linux-desktop", "editor", "checks")})
           verify_results(results, {"plan": True, **expected})
           PY

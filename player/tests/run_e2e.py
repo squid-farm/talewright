@@ -25,6 +25,7 @@ PREPARED_INPUTS = ROOT / "artifacts/browser-e2e-inputs"
 PREPARED_ARCHIVE = ROOT / "artifacts/browser-e2e-inputs.tar.gz"
 TEST_OUTPUT = "test-output"
 WEB_OUTPUT = "web"
+CLI_OUTPUT = "cli"
 MANIFEST_NAME = "manifest.json"
 TEST_ASSEMBLY = "Talewright.Player.E2E.Tests.dll"
 MANIFEST_IDENTITY_KEYS = ("source_sha", "run_id", "run_attempt")
@@ -173,6 +174,10 @@ def required_prepared_files(inputs):
         test_output / "xunit.runner.json",
         test_output / "testhost.dll",
         web_root / "index.html",
+        inputs / CLI_OUTPUT / "Talewright.Cli.dll",
+        inputs / CLI_OUTPUT / "Talewright.Cli.deps.json",
+        inputs / CLI_OUTPUT / "Talewright.Cli.runtimeconfig.json",
+        inputs / CLI_OUTPUT / "publish-assets/standalone/web/App.razor",
     ]
     missing = [path.relative_to(inputs).as_posix() for path in required if not path.is_file()]
     if not any(path.name.casefold().endswith("testadapter.dll")
@@ -187,7 +192,7 @@ def required_prepared_files(inputs):
 
 def prepared_file_hashes(inputs):
     hashes = {}
-    for folder in (TEST_OUTPUT, WEB_OUTPUT):
+    for folder in (TEST_OUTPUT, WEB_OUTPUT, CLI_OUTPUT):
         root = inputs / folder
         if not root.is_dir():
             raise RuntimeError(f"Prepared browser inputs are incomplete; missing {folder}/")
@@ -331,6 +336,9 @@ def prepare_browser_inputs(output=PREPARED_INPUTS):
         shutil.copytree(BIN, staged / TEST_OUTPUT)
         run(["dotnet", "publish", ROOT / "apps/web", "-c", "Release",
              "-o", staged / WEB_OUTPUT])
+        run(["dotnet", "build", ROOT / "tooling/cli/src/Talewright.Cli", "-c", "Release"])
+        shutil.copytree(ROOT / "tooling/cli/src/Talewright.Cli/bin/Release/net10.0",
+                        staged / CLI_OUTPUT)
         write_prepared_manifest(staged, identity)
         staged.rename(output)
     create_prepared_archive(output, archive)
@@ -376,6 +384,37 @@ def run_web_tests(args, browsers, results, test_assembly, web_root, prepared):
     if failed:
         print("Failed:", ", ".join(failed), file=sys.stderr)
         return 1
+    return 0
+
+
+def run_published_web(browser, results):
+    if not PREPARED_INPUTS.exists():
+        extract_prepared_archive()
+    test_assembly, _ = validate_prepared_inputs()
+    selection = "Artifact=Standalone"
+    archive = ROOT / "artifacts/standalone-web.zip"
+    web_root = ROOT / "artifacts/standalone-web"
+    archive.unlink(missing_ok=True)
+    if web_root.exists():
+        shutil.rmtree(web_root)
+    run(["dotnet", PREPARED_INPUTS / CLI_OUTPUT / "Talewright.Cli.dll", "publish",
+         "samples/LostRelic", "-a", "--target", "web", "--output", archive])
+    web_root.mkdir(parents=True)
+    run(["unzip", "-oq", archive, "-d", web_root])
+    name = f"standalone-{browser}"
+    report = results / f"{name}.trx"
+    remove_reports(results, name)
+    environment = dict(os.environ, TALEWRIGHT_STANDALONE="1", TALEWRIGHT_STANDALONE_CREATION="1",
+                       TALEWRIGHT_PUBLISHED_CHARACTER="Mara", TALEWRIGHT_WEB_ROOT=str(web_root),
+                       TALEWRIGHT_WEB_BASE_PATH="/games/published", TALEWRIGHT_TEST_RESULTS=str(results),
+                       BROWSER=browser)
+    job = Job(name, web_test_command(selection, name, results, None, test_assembly, True),
+              environment, report)
+    if run_jobs([job], 1, results):
+        return 1
+    counters = ET.parse(report).find(".//{*}Counters")
+    if counters is None or int(counters.attrib["executed"]) == 0 or int(counters.attrib["failed"]) != 0:
+        raise RuntimeError(f"Published browser report has no executed tests or contains failures: {report}")
     return 0
 
 
@@ -472,7 +511,7 @@ def native_environment(temporary, results):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("suite", choices=["prepare-web", "install-browsers", "web", "linux"])
+    parser.add_argument("suite", choices=["prepare-web", "install-browsers", "web", "published-web", "linux"])
     parser.add_argument("--browser", choices=["all", "chromium", "firefox", "webkit"], default="all")
     parser.add_argument("--prepared", action="store_true",
                         default=os.environ.get("TALEWRIGHT_E2E_PREPARED") == "1",
@@ -490,14 +529,18 @@ def main():
     args = parser.parse_args()
     if args.probe and (args.suite != "linux" or args.filter):
         parser.error("--probe is Linux-only and cannot be combined with --filter")
-    if args.prepared and args.suite != "web":
-        parser.error("--prepared is only available for the web suite")
+    if args.prepared and args.suite not in ("web", "published-web"):
+        parser.error("--prepared is only available for web suites")
     jobs = 1 if args.probe else args.jobs
     results = ROOT / "artifacts/test-results"
     results.mkdir(parents=True, exist_ok=True)
     if args.suite == "prepare-web":
         prepare_browser_inputs()
         return 0
+    if args.suite == "published-web":
+        if not args.prepared or args.browser == "all":
+            parser.error("published-web requires --prepared and one browser")
+        return run_published_web(args.browser, results)
     if args.suite in ("web", "install-browsers"):
         browsers = ["chromium", "firefox", "webkit"] if args.browser == "all" else [args.browser]
         if args.suite == "install-browsers":
@@ -506,7 +549,8 @@ def main():
                  BIN / "Microsoft.Playwright.dll", "install", "--with-deps", *browsers])
             return 0
         if args.prepared:
-            extract_prepared_archive()
+            if not PREPARED_INPUTS.exists():
+                extract_prepared_archive()
             test_assembly, web_root = validate_prepared_inputs()
             return run_web_tests(args, browsers, results, test_assembly, web_root, prepared=True)
         run(["dotnet", "build", PROJECT, "-c", "Release"])

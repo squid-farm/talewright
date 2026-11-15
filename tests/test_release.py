@@ -491,7 +491,7 @@ class PublicationSafeguardTests(unittest.TestCase):
 
         prep_steps = preparation["steps"]
         self.assertIn("run_e2e.py prepare-web", next(
-            step["run"] for step in prep_steps if step.get("name") == "Build E2E tests and publish the web host once"
+            step["run"] for step in prep_steps if step.get("name") == "Prepare E2E tests, CLI and web host once"
         ))
         upload = next(step for step in prep_steps if step.get("uses") == "actions/upload-artifact@v4")
         artifact_name = "browser-e2e-inputs-${{ github.run_id }}-${{ github.run_attempt }}"
@@ -535,6 +535,21 @@ class PublicationSafeguardTests(unittest.TestCase):
         self.assertIn('-z "$TALEWRIGHT_E2E_PREPARATION_ATTEMPT"', reference_check["run"])
         self.assertIn("exit 1", reference_check["run"])
         self.assertLess(browser["steps"].index(reference_check), browser["steps"].index(prepared_download))
+
+    def test_published_browser_jobs_are_selected_and_fail_closed(self):
+        jobs = self.workflows["tests.yml"]["jobs"]
+        smoke, browser, verification = jobs["browser-published"], jobs["browser"], jobs["verification"]
+        self.assertEqual(["plan", "browser-preparation"], smoke["needs"])
+        self.assertIn("browser-published", smoke["if"])
+        self.assertIn("browser-web", browser["if"])
+        self.assertEqual(["chromium", "firefox", "webkit"], smoke["strategy"]["matrix"]["browser"])
+        self.assertIn("browser-published", verification["needs"])
+        self.assertIn('"browser-published": selected["browser-published"]', verification["steps"][-1]["run"])
+        commands = [step["run"] for step in smoke["steps"] if "run" in step]
+        self.assertTrue(any("--browser-target e2e-published-web" in command for command in commands))
+        downloads = [step for step in smoke["steps"] if step.get("uses") == "actions/download-artifact@v4"]
+        self.assertTrue(any(step["with"].get("artifact-ids") ==
+                            "${{ needs.browser-preparation.outputs.artifact-id }}" for step in downloads))
 
     def test_publication_waits_for_verification_and_only_runs_for_version_tags(self):
         self.assertTrue(
