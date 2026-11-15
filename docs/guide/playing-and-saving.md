@@ -9,9 +9,9 @@ what your players see and what they can do.
 
 - **Story text** builds up as you play. Earlier scenes stay visible above the current one, and past
   choices are shown as `→ Choice`. A scene marked `@clear` starts a fresh screen, but earlier
-  passages remain available in **History** and saves. Images stay visible for the current scene;
-  pictures from earlier scenes collapse into **Reveal image** controls. A scene marked `@continues`
-  counts as part of the scene it continues.
+  passages remain available in **History** and saves. Earlier pictures stay visible unless a later
+  scene repeats the same image file. Only those older copies collapse into **Reveal image** controls.
+  A scene marked `@continues` counts as part of the scene it continues.
 - **Choices** are the numbered buttons at the bottom. Choices whose requirements aren't met are hidden,
   unless the author chose to show them.
 - **Notes** appear in the story when something happens to the player: skill check rolls, stat and
@@ -54,6 +54,8 @@ shown as text, not buttons, and reading History never changes your game.
 
 To save memory, pictures in History stay hidden until you choose **Reveal image**. If the story's
 image files changed since you played, a revealed picture may look different or fail to load.
+Revealed pictures appear inline at their normal size, fitted to the reading width, without a
+separate scroll box.
 
 Use **Return to play**, or press **History** again, to go back to where you were. You can't choose,
 save, load or restart while History is open.

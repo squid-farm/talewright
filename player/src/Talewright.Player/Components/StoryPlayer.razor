@@ -229,6 +229,8 @@
     {
         _session = session;
         UpdateDiagnosticContext();
+        ImageWarmer.Clear(_warmOwner);
+        Images?.BeginGeneration();
         ReconcileImageWarming(TimeSpan.Zero);
         _generation++;
         _busy = false;

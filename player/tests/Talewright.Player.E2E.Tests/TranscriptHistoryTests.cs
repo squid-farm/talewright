@@ -245,7 +245,7 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
 
     [Fact]
     [Trait("Host", "Browser")]
-    public async Task Play_screen_only_keeps_images_from_the_current_scene_group()
+    public async Task Play_screen_only_collapses_images_repeated_in_a_later_scene_group()
     {
         await Page.EvaluateAsync("""
             () => {
@@ -259,7 +259,7 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
         await File.WriteAllTextAsync(files.TalePath, """
             === start
             {image("photo.jpeg", "First camp")}
-            {image("pixel.png", "First map")}
+            > player: {image("pixel.png", "First map")}
             * [Next] -> second
             === second
             {image("pixel.webp", "Second camp")}
@@ -288,15 +288,15 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
             await LoadedImageUrl("First camp"),
             await LoadedImageUrl("First map"),
         };
+        await Page.GetByAltText("First camp", new() { Exact = true })
+            .EvaluateAsync("image => window.firstCampImage = image");
         await Expect(Latest.Locator("img")).ToHaveCountAsync(2);
         await Choices.First.ClickAsync();
         await Expect(Latest).ToHaveAttributeAsync("data-tw-scene", "second");
         await Expect(Latest.GetByAltText("Second camp", new() { Exact = true })).ToBeVisibleAsync();
-        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: First camp", Exact = true }))
-            .ToBeVisibleAsync();
-        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: First map", Exact = true }))
-            .ToBeVisibleAsync();
-        Assert.Equal(0, await Page.Locator(".tw-past img").CountAsync());
+        await Expect(Page.Locator(".tw-past img")).ToHaveCountAsync(2);
+        Assert.True(await Page.GetByAltText("First camp", new() { Exact = true })
+            .EvaluateAsync<bool>("image => image === window.firstCampImage"));
         Assert.False(await Page.EvaluateAsync<bool>(
             "urls => urls.some(url => window.sceneImageUrls.revoked.includes(url))", firstUrls));
 
@@ -305,6 +305,10 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
         await Expect(Latest).ToHaveAttributeAsync("data-tw-scene", "continued");
         await Expect(Latest.GetByAltText("Second camp", new() { Exact = true })).ToBeVisibleAsync();
         await Expect(Latest.GetByAltText("Conversation camp", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: First camp", Exact = true }))
+            .ToBeVisibleAsync();
+        await Expect(Page.GetByAltText("First map", new() { Exact = true })).ToHaveAttributeAsync("src", firstUrls[1]);
+        await Expect(Page.Locator(".tw-past img")).ToHaveCountAsync(1);
         var conversationUrl = await LoadedImageUrl("Conversation camp");
         await Expect(Latest.Locator("img")).ToHaveCountAsync(2);
         await Driver.ClickAsync("Quick Save");
@@ -313,19 +317,20 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
         await Choices.First.ClickAsync();
         await Expect(Latest).ToHaveAttributeAsync("data-tw-scene", "quiet");
         await Expect(Latest.Locator("img")).ToHaveCountAsync(0);
-        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: Second camp", Exact = true }))
-            .ToBeVisibleAsync();
-        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: Conversation camp", Exact = true }))
-            .ToBeVisibleAsync();
-        await Page.WaitForFunctionAsync("urls => urls.every(url => window.sceneImageUrls.revoked.includes(url))",
-            new[] { firstUrls[1], secondUrl });
-        Assert.False(await Page.EvaluateAsync<bool>(
-            "url => window.sceneImageUrls.revoked.includes(url)", conversationUrl));
-
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: Conversation camp", Exact = true })
-            .ClickAsync();
-        await Expect(Page.GetByAltText("Conversation camp", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByAltText("Second camp", new() { Exact = true })).ToHaveAttributeAsync("src", secondUrl);
         await Expect(Page.GetByAltText("Conversation camp", new() { Exact = true }))
+            .ToHaveAttributeAsync("src", conversationUrl);
+        await Expect(Page.GetByAltText("First map", new() { Exact = true })).ToHaveAttributeAsync("src", firstUrls[1]);
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: First camp", Exact = true }))
+            .ToBeVisibleAsync();
+        Assert.False(await Page.EvaluateAsync<bool>(
+            "urls => urls.some(url => window.sceneImageUrls.revoked.includes(url))",
+            new[] { firstUrls[1], secondUrl, conversationUrl }));
+
+        await Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: First camp", Exact = true })
+            .ClickAsync();
+        await Expect(Page.GetByAltText("First camp", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByAltText("First camp", new() { Exact = true }))
             .ToHaveAttributeAsync("src", conversationUrl);
         await Expect(Latest).ToHaveAttributeAsync("data-tw-scene", "quiet");
         await Expect(Latest).ToContainTextAsync("A quiet scene.");
@@ -337,6 +342,7 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
         await Expect(Latest).ToHaveAttributeAsync("data-tw-scene", "second");
         await Expect(Latest.Locator("img")).ToHaveCountAsync(1);
         await Expect(Latest.GetByAltText("Second camp", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByAltText("First camp", new() { Exact = true })).ToBeVisibleAsync();
         await Driver.ClickAsync("Forward");
         await Expect(Latest).ToHaveAttributeAsync("data-tw-scene", "continued");
         await Expect(Latest.Locator("img")).ToHaveCountAsync(2);
@@ -352,6 +358,60 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
         await Expect(Latest.Locator("img")).ToHaveCountAsync(2);
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: First camp", Exact = true }))
             .ToBeVisibleAsync();
+    }
+
+    [Theory]
+    [InlineData(1100)]
+    [InlineData(390)]
+    public async Task Revealed_images_keep_their_original_layout_without_an_inner_scroll_box(int viewportWidth)
+    {
+        await Page.SetViewportSizeAsync(viewportWidth, 900);
+        using var files = new ImageStoryFiles();
+        await File.WriteAllTextAsync(files.TalePath, """
+            === start
+            **{image("photo.jpeg", "Original camp")}**
+            * [Next] -> next
+            === next
+            {image("photo.jpeg", "Repeated camp")}
+            * [Finish] -> END
+            """);
+        await UploadBytes("reveal-layout.zip", files.Zip());
+        var image = Page.GetByAltText("Original camp", new() { Exact = true });
+        await image.ScrollIntoViewIfNeededAsync();
+        await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0",
+            await image.ElementHandleAsync());
+        var original = (await image.BoundingBoxAsync())!;
+        await Choices.First.ClickAsync();
+        await Expect(image).ToHaveCountAsync(0);
+
+        async Task AssertRevealedLayout(ILocator container)
+        {
+            await container.GetByRole(AriaRole.Button, new() { Name = "Reveal image: Original camp", Exact = true })
+                .ClickAsync();
+            var revealed = container.GetByAltText("Original camp", new() { Exact = true });
+            await revealed.ScrollIntoViewIfNeededAsync();
+            await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0",
+                await revealed.ElementHandleAsync());
+            var bounds = (await revealed.BoundingBoxAsync())!;
+            var expectedWidth = await revealed.EvaluateAsync<double>(
+                "image => Math.min(image.naturalWidth, image.closest('p').clientWidth)");
+            Assert.InRange(Math.Abs(bounds.Width - expectedWidth), 0, 1);
+            Assert.InRange(Math.Abs(bounds.Height - expectedWidth * original.Height / original.Width), 0, 1);
+            Assert.True(await revealed.EvaluateAsync<bool>("""
+                image => {
+                    const box = image.closest('.tw-history-image');
+                    return box.scrollHeight <= box.clientHeight + 1
+                        && box.scrollWidth <= box.clientWidth + 1
+                        && Math.abs(box.getBoundingClientRect().height - image.getBoundingClientRect().height) <= 1
+                        && image.closest('.tw-media-strong') !== null;
+                }
+                """));
+        }
+
+        await AssertRevealedLayout(Page.Locator(".tw-transcript").First);
+        await Expect(Latest).ToHaveAttributeAsync("data-tw-scene", "next");
+        await Driver.ClickAsync("History");
+        await AssertRevealedLayout(History);
     }
 
     [Fact]

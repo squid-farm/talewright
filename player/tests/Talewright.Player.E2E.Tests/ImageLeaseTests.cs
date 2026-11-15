@@ -116,6 +116,28 @@ public sealed class ImageLeaseTests
     }
 
     [Fact]
+    public async Task New_generation_does_not_reuse_a_prior_active_transfer()
+    {
+        using var files = new ImageStoryFiles();
+        var browser = new Browser();
+        await using var owner = StoryImages.FromDirectory(StorySource.FromDirectory(files.Root), files.Root);
+        var previous = owner.Acquire("images/photo.jpeg", browser);
+        Assert.Equal("blob:test-1", await previous.Url);
+
+        owner.BeginGeneration();
+        Assert.Null(owner.TryAcquireExisting("images/photo.jpeg"));
+        Assert.Equal("blob:test-1", await previous.Url);
+
+        File.Delete(files.ImagePath);
+        var current = owner.Acquire("images/photo.jpeg", browser);
+        await Assert.ThrowsAsync<FileNotFoundException>(() => current.Url);
+        await previous.DisposeAsync();
+        await current.DisposeAsync();
+
+        Assert.Equal(["blob:test-1"], browser.Revoked);
+    }
+
+    [Fact]
     public async Task Initiator_unmount_does_not_cancel_transfer_needed_by_another_holder()
     {
         using var files = new ImageStoryFiles();
