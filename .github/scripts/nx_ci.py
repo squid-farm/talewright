@@ -446,6 +446,8 @@ def run_group(args):
                 "run-many", f"--projects={','.join(batch['projects'])}", f"--targets={target}",
                 "--parallel=3", f"--output-style={output_style}",
             ]
+            if args.group == "unit":
+                arguments.append("--excludeTaskDependencies")
             if target == "e2e-web":
                 arguments.append(f"--configuration={args.browser}")
             environment = {"BROWSER": args.browser}

@@ -456,6 +456,22 @@ class PublicationSafeguardTests(unittest.TestCase):
                 for job, body in workflow["jobs"].items():
                     self.assertTrue("steps" in body or "uses" in body, f"{name}:{job}")
 
+    def test_unit_and_net8_are_parallel_selected_and_verified(self):
+        jobs = self.workflows["tests.yml"]["jobs"]
+        unit, net8, verification = jobs["unit"], jobs["unit-net8"], jobs["verification"]
+        for job in (unit, net8):
+            self.assertEqual("plan", job["needs"])
+            self.assertIn("selected).unit", job["if"])
+        self.assertIn("unit-net8", verification["needs"])
+        self.assertIn('"unit-net8": selected["unit"]', verification["steps"][-1]["run"])
+        commands = [step["run"] for step in unit["steps"] if "run" in step]
+        self.assertLess(commands.index("dotnet build Talewright.slnx -c Release"),
+                        commands.index("python3 .github/scripts/nx_ci.py run unit"))
+        net8_run = next(step["run"] for step in net8["steps"]
+                        if step.get("name") == "Run engine tests on .NET 8")
+        for required in ('test -f', 'dotnet vstest', 'executed', 'failed'):
+            self.assertIn(required, net8_run)
+
     def test_browser_preparation_is_selected_and_verified_with_same_run_artifacts(self):
         tests = self.workflows["tests.yml"]["jobs"]
         preparation = tests["browser-preparation"]
