@@ -24,6 +24,14 @@ public sealed class ProsePositionTests
     }
 
     [Fact]
+    public void Indented_speech_maps_substitutions_to_their_source_columns()
+    {
+        var expressions = Expressions("=== start\n  > player:  \t{x}\n\t>  {y}\n-> END");
+
+        Assert.Equal([("x", 2, 16, 2, 17), ("y", 3, 6, 3, 7)], expressions);
+    }
+
+    [Fact]
     public void Columns_count_utf16_code_units_outside_the_basic_multilingual_plane()
     {
         var expressions = Expressions("=== start\n\U0001F600 {x} \U0001F600{y}\n-> END\n");

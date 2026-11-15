@@ -539,6 +539,20 @@ such as an inline conditional whose condition is false, does not leave an empty 
 unpaired backslash reports TW1017; remove it. Disable hard-wrapping for prose and use your
 editor's soft wrapping for display instead.
 
+**Horizontal spacing.** Leading spaces and tabs and runs of spaces in prose and dialogue display as
+written; trailing whitespace is removed. Directives may still be indented, and a whitespace-only line
+is blank. In dialogue, one space immediately after the speaker's `:` or a continuation `>` is a
+delimiter; any additional spaces or tabs are shown. If there is no space, a tab is shown too.
+Text wraps to fit the player, with tabs at four-space stops.
+
+```tale
+=== start
+  This line starts with two spaces.
+> guide:   This line also starts with two spaces.
+>  This continuation starts with one space.
+-> END
+```
+
 ## 3. Substitutions
 
 `{reference#manipulator#manipulator…}`

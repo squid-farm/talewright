@@ -95,6 +95,17 @@ public sealed class StoryStageRenderTests
     }
 
     [Fact]
+    public async Task Prose_and_speech_keep_authored_spacing_in_player_markup()
+    {
+        var story = new StoryFixture("spacing-render", TestStories.DefaultYaml,
+            "=== start\n  Prose  text\n> guide:  Speech   text\n>  More\n-> END").Compile();
+        var html = await RenderStageAsync(story, new StoryHistory(story, 42));
+
+        Assert.Contains("<p class=\"tw-paragraph\">  Prose  text</p>", html);
+        Assert.Contains("<p class=\"tw-line\"> Speech   text<br> More</p>", html);
+    }
+
+    [Fact]
     public void Passage_rerenders_when_speech_paragraphs_change()
     {
         static HistoryFrame Speech(params string[] paragraphs) =>

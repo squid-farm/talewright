@@ -261,7 +261,7 @@ internal sealed partial class TaleBinder
                 return;
         }
 
-        scene.Paragraph.AppendLine(Content(syntax), At(indent));
+        scene.Paragraph.AppendLine(_syntax.ProseText(_sceneSyntax!, syntax).ToString(), At(0));
     }
 
     private string Content(TaleLineSyntax line) => _syntax.Content(_sceneSyntax!, line).ToString();
@@ -404,7 +404,9 @@ internal sealed partial class TaleBinder
         if (inlines.Count > 0)
         {
             var start = scene.Paragraph.Locate(0);
-            scene.CurrentSteps.Add(new ProseStep(StepId(start),
+            var text = scene.Paragraph.Text.AsSpan();
+            var contentStart = scene.Paragraph.Locate(text.Length - text.TrimStart().Length);
+            scene.CurrentSteps.Add(new ProseStep(StepId(contentStart),
                 new SourceRange(start, scene.Paragraph.Locate(scene.Paragraph.Text.Length)), new ParagraphTemplate(inlines)));
         }
 
@@ -474,11 +476,11 @@ internal sealed partial class TaleBinder
         if (id.Length == 0 || !_symbols.World.Characters.ContainsKey(candidate))
             return false;
 
-        var remainder = text[(colon + 1)..];
-        var trimmed = remainder.Trim();
-        speechOffset = colon + 1 + remainder.Length - remainder.TrimStart().Length;
+        var remainder = text.AsSpan(colon + 1);
+        var speechText = TaleSyntaxParser.SpeechText(remainder, out var delimiter);
+        speechOffset = colon + 1 + delimiter;
         speaker = candidate;
-        speech = trimmed;
+        speech = speechText.ToString();
         return true;
     }
 

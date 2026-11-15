@@ -143,6 +143,31 @@ public sealed class PresentationTests(WebHostFixture host, ITestOutputHelper out
         Assert.Equal(stacked, sheet.Y >= transcript.Y + transcript.Height - 1);
     }
 
+    [Fact]
+    public async Task Authored_whitespace_survives_and_text_wraps_at_narrow_widths()
+    {
+        await Page.SetViewportSizeAsync(320, 900);
+        await Upload(new StoryFixture("spacing-browser", TestStories.DefaultYaml,
+            "=== start\n  Prose  \twith several words that need to wrap at this narrow viewport width.\n" +
+            "> guide:  Speech  \twith several words that need to wrap at this narrow viewport width.\n-> END"));
+
+        var prose = Latest.Locator(".tw-paragraph");
+        var speech = Latest.Locator(".tw-speech-body .tw-line");
+        Assert.Equal("  Prose  \twith several words that need to wrap at this narrow viewport width.",
+            await prose.TextContentAsync());
+        Assert.Equal(" Speech  \twith several words that need to wrap at this narrow viewport width.",
+            await speech.TextContentAsync());
+        foreach (var line in new[] { prose, speech })
+        {
+            await Expect(line).ToHaveCSSAsync("white-space", "pre-wrap");
+            await Expect(line).ToHaveCSSAsync("tab-size", "4");
+            Assert.True(await line.EvaluateAsync<bool>(
+                "e => e.getBoundingClientRect().height > parseFloat(getComputedStyle(e).lineHeight) * 1.5"));
+            Assert.True(await line.EvaluateAsync<bool>("e => e.scrollWidth <= e.clientWidth + 1"));
+        }
+        Assert.True(await Page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth <= innerWidth + 1"));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
