@@ -562,6 +562,10 @@ runner for extracted artifacts: it republishes the development host instead.
 
 Additional illustrated-artifact cases use the same opt-in harness:
 
+- `SceneImageRevealTests` routes a published web host's story requests to a test story and holds
+  actual image HTTP responses independently. It covers scene-start alignment and reader control
+  at narrow and wide viewport sizes without disabling image warming. Run it with
+  `--filter FullyQualifiedName~SceneImageRevealTests` in each browser; it is browser-only.
 - Publish a folder matching [ImageStoryFiles](../player/tests/Talewright.Player.E2E.Tests/ImageStoryFiles.cs),
   with its split configuration and JPEG/PNG/WebP files. Set `TALEWRIGHT_PUBLISHED_TITLE="Folder images"`
   and filter `FullyQualifiedName~PublishedImageTests`. The case checks source-fragment text,

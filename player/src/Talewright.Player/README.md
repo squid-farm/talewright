@@ -29,6 +29,9 @@ Story authors don't need it. See [C# extensions and packages](../../../docs/deve
 
 Unavailable choices are native disabled buttons. Assistive technology receives their rendered
 text and “Unavailable” status; Tab skips them, and number keys do not activate choices.
+After navigation, independently arriving images can bring the start of the current passage closer
+to the toolbar when the page grows. Reader scrolling or interaction ends this realignment, without
+moving focus or delaying choices; the first passage retains the title-bar-at-top behavior.
 
 ## Player preferences
 
