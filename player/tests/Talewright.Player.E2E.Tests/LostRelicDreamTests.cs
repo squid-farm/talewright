@@ -80,7 +80,7 @@ public sealed class LostRelicDreamTests(WebHostFixture host, ITestOutputHelper o
                 await image.ElementHandleAsync());
         }
         await Choose("Continue");
-        await Choose("Ask your guide about the temple");
+        await Choose("Ask Tomas about the temple");
         await Choose("Continue");
         if (journal)
         {

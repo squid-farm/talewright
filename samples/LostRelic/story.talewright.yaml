@@ -5,11 +5,18 @@
 game:
   id: lost-relic
   title: The Lost Relic
-  version: 0.5.0
+  version: 0.6.0
   start: camp.arrival
-  randomness: checks-only # dice are rolled only for skill-check directives
+  randomness: checks-only # dice are rolled only for skill checks
   # seed: 1234            # uncomment for the same rolls every playthrough
   undo: true
+  character-sheet:
+    stats:
+      # Lucidity appears once it matters: a Scholar starts with it; an Explorer
+      # discovers it by solving the journal or entering the dream.
+      lucidity: player:lucidity > 0 or player visited dream.arrival
+    inventory: true
+    standing: true
   ruleset:
     base: rpg # d20-style attributes, skills, hp, xp and levels
     disable: [performance] # no stage performances on this expedition
@@ -86,7 +93,12 @@ items:
   relic: { name: Relic of Ysh, modifiers: { cha: 2 } }
   ration: { name: trail ration }
 
-flags: [packing-open]
+# Mapping-form flags set starting values. Tomas starts out doubtful; asking him
+# about the temple changes his mind. (dream/dream.talewright.yaml uses the list
+# form, where every flag starts false.)
+flags:
+  packing-open: false
+  guide-doubtful: true
 vars:
   supplies: 0
   watchword: "quiet river"

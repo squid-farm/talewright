@@ -2,13 +2,13 @@ scene|camp.arrival|Base Camp|tags=|reachable=true
 scene|camp.hub|The Camp|tags=|reachable=true
 scene|camp.supplies|Haggle for supplies|tags=camp|reachable=true
 scene|camp.register|Sign the expedition register|tags=camp,records|reachable=true
-scene|camp.guide|Ask your guide about the temple|tags=camp|reachable=true
+scene|camp.guide|What the Guild Never Wrote Down|tags=camp|reachable=true
 scene|camp.journal|Study your journal|tags=camp|reachable=true
 scene|camp.journal-solved|-|tags=|reachable=true
 scene|camp.journal-failed|-|tags=|reachable=true
 scene|camp.watchword|Agree on a night watchword|tags=camp|reachable=true
-scene|camp.watchword-record|A Note for the Night Watch|tags=|reachable=true
-scene|camp.watchword-readback|Ink Does Not Follow Orders|tags=|reachable=true
+scene|camp.watchword-record|-|tags=|reachable=true
+scene|camp.watchword-readback|-|tags=|reachable=true
 scene|trail.river|The River|tags=|reachable=true
 scene|trail.swept|-|tags=|reachable=true
 scene|trail.far-bank|-|tags=|reachable=true
@@ -45,82 +45,83 @@ scene|dream.sleeper|Approach the Sleeper|tags=dream,keeper|reachable=true
 scene|dream.passage|The Price of Waking|tags=|reachable=true
 scene|dream.wake|The Unopened Door|tags=|reachable=true
 end|END|reachable=true
-divert|camp.arrival/step:16:1|camp.arrival|camp.hub|Scene|-|0||reads=
-divert|camp.hub/step:25:1|camp.hub|trail.river|Choice|-|0||reads=
-divert|camp.supplies/step:47:1|camp.supplies|camp.hub|Choice|-|0||reads=
-divert|camp.register/step:65:1|camp.register|camp.hub|Scene|-|0||reads=
-divert|camp.guide/step:84:1|camp.guide|camp.hub|Scene|-|0||reads=
-divert|camp.journal/step:95:1/success|camp.journal|camp.journal-solved|ChoiceSkillCheck|Success|0||reads=
-divert|camp.journal/step:95:1/failure|camp.journal|camp.journal-failed|ChoiceSkillCheck|Failure|1||reads=
-divert|camp.journal-solved/step:102:1|camp.journal-solved|camp.hub|Scene|-|0||reads=
-divert|camp.journal-failed/step:106:1|camp.journal-failed|camp.hub|Scene|-|0||reads=
-divert|camp.watchword/step:123:1|camp.watchword|camp.watchword-record|Choice|-|0||reads=
-divert|camp.watchword/step:124:1|camp.watchword|camp.watchword-record|Choice|-|1||reads=
-divert|camp.watchword-record/step:134:1|camp.watchword-record|camp.watchword-readback|Choice|-|0|var:watchword == var:watch-note|reads=var:watchword,var:watch-note
-divert|camp.watchword-record/step:135:1|camp.watchword-record|camp.watchword-readback|Choice|-|1|var:watchword == var:watch-note|reads=var:watchword,var:watch-note
-divert|camp.watchword-record/step:136:1|camp.watchword-record|camp.watchword-readback|Choice|-|2||reads=
-divert|camp.watchword-readback/step:152:1|camp.watchword-readback|camp.hub|Choice|-|0||reads=
+divert|camp.arrival/step:17:1|camp.arrival|camp.hub|Scene|-|0||reads=
+divert|camp.hub/step:30:1|camp.hub|trail.river|Choice|-|0||reads=
+divert|camp.supplies/step:52:1|camp.supplies|camp.hub|Choice|-|0||reads=
+divert|camp.register/step:70:1|camp.register|camp.hub|Scene|-|0||reads=
+divert|camp.guide/step:96:1|camp.guide|camp.hub|Scene|-|0||reads=
+divert|camp.journal/step:115:1/success|camp.journal|camp.journal-solved|ChoiceSkillCheck|Success|0||reads=
+divert|camp.journal/step:115:1/failure|camp.journal|camp.journal-failed|ChoiceSkillCheck|Failure|1||reads=
+divert|camp.journal-solved/step:122:1|camp.journal-solved|camp.hub|Scene|-|0||reads=
+divert|camp.journal-failed/step:126:1|camp.journal-failed|camp.hub|Scene|-|0||reads=
+divert|camp.watchword/step:143:1|camp.watchword|camp.watchword-record|Choice|-|0||reads=
+divert|camp.watchword/step:144:1|camp.watchword|camp.watchword-record|Choice|-|1||reads=
+divert|camp.watchword-record/step:155:1|camp.watchword-record|camp.watchword-readback|Choice|-|0|var:watchword == var:watch-note|reads=var:watchword,var:watch-note
+divert|camp.watchword-record/step:156:1|camp.watchword-record|camp.watchword-readback|Choice|-|1|var:watchword == var:watch-note|reads=var:watchword,var:watch-note
+divert|camp.watchword-record/step:157:1|camp.watchword-record|camp.watchword-readback|Choice|-|2||reads=
+divert|camp.watchword-readback/step:172:1|camp.watchword-readback|camp.hub|Choice|-|0||reads=
 divert|trail.river/step:11:1|trail.river|trail.far-bank|Choice|-|0|player has rope|reads=player has rope
 divert|trail.river/step:12:1/success|trail.river|trail.far-bank|ChoiceSkillCheck|Success|1||reads=
 divert|trail.river/step:12:1/failure|trail.river|trail.swept|ChoiceSkillCheck|Failure|2||reads=
 divert|trail.river/step:15:1/success|trail.river|trail.far-bank|ChoiceSkillCheck|Success|3||reads=
 divert|trail.river/step:15:1/failure|trail.river|trail.swept|ChoiceSkillCheck|Failure|4||reads=
-divert|trail.swept/step:25:1|trail.swept|trail.far-bank|Scene|-|0||reads=
-divert|trail.far-bank/step:32:1|trail.far-bank|trail.night|Choice|-|0||reads=
-divert|trail.far-bank/step:33:1|trail.far-bank|temple.door|Choice|-|1||reads=
-divert|trail.night/step:46:1|trail.night|temple.door|Choice|-|0||reads=
-divert|trail.supper/step:57:1|trail.supper|trail.supper-done|Choice|-|0||reads=
-divert|trail.supper-done/step:67:1|trail.supper-done|trail.night|Scene|-|0||reads=
-divert|trail.jaguar/step:90:1|trail.jaguar|trail.night|Choice|-|0||reads=
-divert|trail.signal/step:104:1|trail.signal|trail.found|Scene|-|0|var:watchword != "" and var:watchword == var:watch-note|reads=var:watchword,var:watch-note
-divert|trail.signal/step:106:1|trail.signal|trail.wait|Scene|-|1||reads=
-divert|trail.found/step:114:1|trail.found|trail.night|Scene|-|0||reads=
-divert|trail.wait/step:122:1|trail.wait|trail.night|Scene|-|0||reads=
-divert|trail.bell/step:134:1|trail.bell|trail.bell|Choice|-|0|not flag:bell-ringing|reads=flag:bell-ringing
-divert|trail.bell/step:135:1|trail.bell|trail.bell|Choice|-|1|flag:bell-ringing|reads=flag:bell-ringing
-divert|trail.bell/step:136:1|trail.bell|trail.night|Choice|-|2||reads=
+divert|trail.swept/step:32:1|trail.swept|trail.far-bank|Choice|-|0||reads=
+divert|trail.far-bank/step:45:1|trail.far-bank|trail.night|Choice|-|0||reads=
+divert|trail.far-bank/step:46:1|trail.far-bank|temple.door|Choice|-|1||reads=
+divert|trail.night/step:58:1|trail.night|temple.door|Choice|-|0||reads=
+divert|trail.supper/step:69:1|trail.supper|trail.supper-done|Choice|-|0||reads=
+divert|trail.supper-done/step:79:1|trail.supper-done|trail.night|Scene|-|0||reads=
+divert|trail.jaguar/step:102:1|trail.jaguar|trail.night|Choice|-|0||reads=
+divert|trail.signal/step:116:1|trail.signal|trail.found|Scene|-|0|var:watchword != "" and var:watchword == var:watch-note|reads=var:watchword,var:watch-note
+divert|trail.signal/step:118:1|trail.signal|trail.wait|Scene|-|1||reads=
+divert|trail.found/step:126:1|trail.found|trail.night|Scene|-|0||reads=
+divert|trail.wait/step:134:1|trail.wait|trail.night|Scene|-|0||reads=
+divert|trail.bell/step:147:1|trail.bell|trail.bell|Choice|-|0|not flag:bell-ringing|reads=flag:bell-ringing
+divert|trail.bell/step:148:1|trail.bell|trail.bell|Choice|-|1|flag:bell-ringing|reads=flag:bell-ringing
+divert|trail.bell/step:149:1|trail.bell|trail.night|Choice|-|2||reads=
 divert|temple.door/step:11:1|temple.door|temple.hall|Choice|-|0|flag:knows-glyphs|reads=flag:knows-glyphs
 divert|temple.door/step:12:1|temple.door|dream.arrival|Choice|-|1|not player visited dream.arrival|reads=player visited dream.arrival
 divert|temple.door/step:13:1/success|temple.door|temple.hall|ChoiceSkillCheck|Success|2||reads=
 divert|temple.door/step:13:1/failure|temple.door|temple.side|ChoiceSkillCheck|Failure|3||reads=
 divert|temple.door/step:16:1|temple.door|temple.side|Choice|-|4||reads=
-divert|temple.side/step:22:1|temple.side|temple.hall|Choice|-|0||reads=
-divert|temple.side/step:23:1|temple.side|temple.door|Choice|-|1||reads=
-divert|temple.hall/step:33:1/success|temple.hall|temple.niche|EntryCheck|Success|0||reads=
-divert|temple.hall/step:33:1/failure|temple.hall|temple.altar|EntryCheck|Failure|1||reads=
-divert|temple.niche/step:41:1|temple.niche|temple.altar|Choice|-|0||reads=
-divert|temple.niche/step:42:1|temple.niche|temple.altar|Choice|-|1||reads=
-divert|temple.altar/step:58:1|temple.altar|ending.return|Choice|-|0||reads=
-divert|temple.altar/step:59:1|temple.altar|ending.return|Choice|-|1||reads=
-divert|ending.return/step:10:1|ending.return|ending.empty-handed|Scene|-|0|not player has relic|reads=player has relic
-divert|ending.return/step:13:1|ending.return|ending.guild|Choice|-|1|faction:explorers-guild:tier >= neutral|reads=faction:explorers-guild:tier
-divert|ending.return/step:14:1|ending.return|ending.keep|Choice|-|2||reads=
-divert|ending.guild/step:31:1|ending.guild|END|Scene|-|0||reads=
-divert|ending.keep/step:59:1|ending.keep|END|Scene|-|0||reads=
-divert|ending.empty-handed/step:74:1|ending.empty-handed|END|Scene|-|0||reads=
-divert|dream.arrival/step:11:1|dream.arrival|dream.hub|Scene|-|0||reads=
-divert|dream.hub/step:21:1|dream.hub|dream.wake|Choice|-|0||reads=
-divert|dream.ines/step:43:1|dream.ines|dream.hub|Choice|-|0||reads=
-divert|dream.spiral/step:72:1|dream.spiral|dream.hub|Choice|-|0||reads=
-divert|dream.watcher/step:84:1/success|dream.watcher|dream.watcher-sees|EntryCheck|Success|0||reads=
-divert|dream.watcher/step:84:1/failure|dream.watcher|dream.watcher-missed|EntryCheck|Failure|1||reads=
-divert|dream.watcher-sees/step:94:1|dream.watcher-sees|dream.watcher-choice|Scene|-|0||reads=
-divert|dream.watcher-missed/step:101:1|dream.watcher-missed|dream.watcher-choice|Scene|-|0||reads=
-divert|dream.watcher-choice/step:112:1/success|dream.watcher-choice|dream.eye-mark|ChoiceSkillCheck|Success|0||reads=
-divert|dream.watcher-choice/step:112:1/failure|dream.watcher-choice|dream.watcher-failed|ChoiceSkillCheck|Failure|1||reads=
-divert|dream.watcher-choice/step:115:1/success|dream.watcher-choice|dream.eye-mark|ChoiceSkillCheck|Success|2||reads=
-divert|dream.watcher-choice/step:115:1/failure|dream.watcher-choice|dream.watcher-failed|ChoiceSkillCheck|Failure|3||reads=
-divert|dream.watcher-choice/step:118:1|dream.watcher-choice|dream.eye-mark|Choice|-|4|player:courage >= 6|reads=player:courage
-divert|dream.watcher-choice/step:119:1|dream.watcher-choice|dream.wake|Choice|-|5||reads=
-divert|dream.watcher-failed/step:126:1|dream.watcher-failed|dream.watcher-choice|Scene|-|0||reads=
-divert|dream.eye-mark/step:136:1|dream.eye-mark|dream.hub|Scene|-|0||reads=
-divert|dream.archivist/step:156:1|dream.archivist|dream.hub|Choice|-|0|faction:explorers-guild:tier >= neutral|reads=faction:explorers-guild:tier
-divert|dream.archivist/step:157:1|dream.archivist|dream.hub|Choice|-|1||reads=
-divert|dream.hands/step:171:1|dream.hands|dream.hub|Choice|-|0||reads=
-divert|dream.hands/step:172:1|dream.hands|dream.wake|Choice|-|1||reads=
-divert|dream.sleeper/step:198:1|dream.sleeper|dream.passage|Choice|-|0||reads=
-divert|dream.passage/step:207:1|dream.passage|temple.hall|Scene|-|0||reads=
-divert|dream.wake/step:215:1|dream.wake|temple.door|Scene|-|0||reads=
+divert|temple.side/step:24:1|temple.side|temple.hall|Choice|-|0|skill-check athletics dc 12, hidden|reads=depends on a athletics check
+divert|temple.side/step:25:1|temple.side|temple.hall|Choice|-|1||reads=
+divert|temple.side/step:26:1|temple.side|temple.door|Choice|-|2||reads=
+divert|temple.hall/step:36:1/success|temple.hall|temple.niche|EntryCheck|Success|0||reads=
+divert|temple.hall/step:36:1/failure|temple.hall|temple.altar|EntryCheck|Failure|1||reads=
+divert|temple.niche/step:44:1|temple.niche|temple.altar|Choice|-|0||reads=
+divert|temple.niche/step:45:1|temple.niche|temple.altar|Choice|-|1||reads=
+divert|temple.altar/step:72:1|temple.altar|ending.return|Choice|-|0||reads=
+divert|temple.altar/step:73:1|temple.altar|ending.return|Choice|-|1||reads=
+divert|ending.return/step:12:1|ending.return|ending.empty-handed|Scene|-|0|not player has relic|reads=player has relic
+divert|ending.return/step:15:1|ending.return|ending.guild|Choice|-|1|faction:explorers-guild:tier >= neutral|reads=faction:explorers-guild:tier
+divert|ending.return/step:16:1|ending.return|ending.keep|Choice|-|2||reads=
+divert|ending.guild/step:33:1|ending.guild|END|Scene|-|0||reads=
+divert|ending.keep/step:61:1|ending.keep|END|Scene|-|0||reads=
+divert|ending.empty-handed/step:76:1|ending.empty-handed|END|Scene|-|0||reads=
+divert|dream.arrival/step:13:1|dream.arrival|dream.hub|Scene|-|0||reads=
+divert|dream.hub/step:27:1|dream.hub|dream.wake|Choice|-|0||reads=
+divert|dream.ines/step:49:1|dream.ines|dream.hub|Choice|-|0||reads=
+divert|dream.spiral/step:78:1|dream.spiral|dream.hub|Choice|-|0||reads=
+divert|dream.watcher/step:90:1/success|dream.watcher|dream.watcher-sees|EntryCheck|Success|0||reads=
+divert|dream.watcher/step:90:1/failure|dream.watcher|dream.watcher-missed|EntryCheck|Failure|1||reads=
+divert|dream.watcher-sees/step:100:1|dream.watcher-sees|dream.watcher-choice|Scene|-|0||reads=
+divert|dream.watcher-missed/step:107:1|dream.watcher-missed|dream.watcher-choice|Scene|-|0||reads=
+divert|dream.watcher-choice/step:118:1/success|dream.watcher-choice|dream.eye-mark|ChoiceSkillCheck|Success|0||reads=
+divert|dream.watcher-choice/step:118:1/failure|dream.watcher-choice|dream.watcher-failed|ChoiceSkillCheck|Failure|1||reads=
+divert|dream.watcher-choice/step:121:1/success|dream.watcher-choice|dream.eye-mark|ChoiceSkillCheck|Success|2||reads=
+divert|dream.watcher-choice/step:121:1/failure|dream.watcher-choice|dream.watcher-failed|ChoiceSkillCheck|Failure|3||reads=
+divert|dream.watcher-choice/step:124:1|dream.watcher-choice|dream.eye-mark|Choice|-|4|player:courage >= 6|reads=player:courage
+divert|dream.watcher-choice/step:125:1|dream.watcher-choice|dream.wake|Choice|-|5||reads=
+divert|dream.watcher-failed/step:132:1|dream.watcher-failed|dream.watcher-choice|Scene|-|0||reads=
+divert|dream.eye-mark/step:142:1|dream.eye-mark|dream.hub|Scene|-|0||reads=
+divert|dream.archivist/step:162:1|dream.archivist|dream.hub|Choice|-|0|faction:explorers-guild:tier >= neutral|reads=faction:explorers-guild:tier
+divert|dream.archivist/step:163:1|dream.archivist|dream.hub|Choice|-|1||reads=
+divert|dream.hands/step:177:1|dream.hands|dream.hub|Choice|-|0||reads=
+divert|dream.hands/step:178:1|dream.hands|dream.wake|Choice|-|1||reads=
+divert|dream.sleeper/step:206:1|dream.sleeper|dream.passage|Choice|-|0||reads=
+divert|dream.passage/step:215:1|dream.passage|temple.hall|Scene|-|0||reads=
+divert|dream.wake/step:223:1|dream.wake|temple.door|Scene|-|0||reads=
 hub-offer|camp.hub/hub:camp.supplies|camp.hub|camp.supplies|any(camp)||once=true|reads=
 hub-offer|camp.hub/hub:camp.register|camp.hub|camp.register|any(camp)||once=true|reads=
 hub-offer|camp.hub/hub:camp.guide|camp.hub|camp.guide|any(camp)||once=true|reads=

@@ -16,9 +16,12 @@ eye, a hand.
 * [Look for another way in] -> temple.side
 
 === temple.side
-Around the side of the temple, roots have pried open a gap between the stones. It's tight, dark and smells
-of something old.
+Around the side of the temple, roots have pried open a gap between the stones. It's tight, dark and smells of something old.
+Above it, a strangler fig climbs the wall to a window half-choked with leaves.
 
+// A hidden check in a requirement: no check note, but the roll is still recorded and replayed.
+// Squeezing through always remains available.
+* [Climb the fig roots to the high window] (requires skill-check athletics dc 12, hidden) { player:xp += 15 } -> temple.hall
 * [Squeeze through] { player:xp += 10 } -> temple.hall
 * [Back to the temple door] -> temple.door
 
@@ -50,8 +53,19 @@ One of the eyes is open. Behind it, in a niche no bigger than your fist, sits a 
 The voice beyond the door falls silent as you reach the altar.
 {/if}
 
-At the heart of the temple, on an altar worn smooth by centuries of nothing, lies the **{item:relic}**:
-a disc of pale gold, warm as skin.
+At the heart of the temple, on an altar worn smooth by centuries of nothing, lies the **{item:relic}**: a disc of pale gold, warm as skin.
+
+// One History check stores a single total; each threshold below reads that same result.
+~ var:altar-reading = skill-check history
+{if var:altar-reading >= 15}
+You can read the whole rim: *the latch that holds the door. Turn it, and what sleeps will wake.*
+{else}
+{if var:altar-reading >= 10}
+You make out part of the rim: *the latch… the door…* The rest is worn away.
+{else}
+Script circles the rim, too worn for you to read.
+{/if}
+{/if}
 
 > guide: {player:first-name}. Whatever you do next, the guild will hear about it.
 

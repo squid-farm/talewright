@@ -1,4 +1,5 @@
 // Chapter 1 — the camp. Shows a hub (@hub) whose options are storylets tagged "camp".
+// flag:guide-doubtful starts true (see the mapping-form flags in story.talewright.yaml).
 
 === camp.arrival
 @title Base Camp
@@ -19,8 +20,12 @@ one season to find **{item:relic#the}** before they hand the expedition to someo
 @title The Camp
 @hub camp
 
-The camp hums with insects. {guide:first-name} sharpens a machete by the fire{if var:supplies > 0}, eyeing the supplies
-you bought{/if}.
+The camp hums with insects. {guide:first-name} sharpens a machete by the fire{if var:supplies > 0}, eyeing the supplies you bought{/if}.
+{if flag:guide-doubtful}
+{guide:pronoun#capitalize} hasn't said what {guide:pronoun} thinks of your chances. {guide:pronoun#capitalize} doesn't have to.
+{else}
+{guide:pronoun#capitalize} catches your eye and nods, as if the two of you have already agreed on something.
+{/if}
 
 * [Set out for the temple] -> trail.river
 
@@ -65,14 +70,20 @@ The clerk says {item:idol#this} {item:idol#one-many("belongs", "belong")} to the
 -> camp.hub
 
 === camp.guide
-@title Ask your guide about the temple
+@title What the Guild Never Wrote Down
+@choice-label Ask **{guide:first-name}** about the temple
 @tags camp
 @once
 
-> guide: The old ones built it to keep something *in*, not people out. The guild knows that. They never write it down.
+> guide: The old ones built it to keep something *in*, not people out.
+> The guild knows that. They never write it down.
+>
+> Last spring they sent {ines:name} up that stair. She came back talking only in numbers, and the guild filed her report under *weather*.
+>
+>
+> I took this job expecting you to turn back at the river. You asked me first, though. Nobody from the guild has done that before.
 
-{guide:first-name} tells you about the river crossing, and about {ines:name},
-the explorer who went in last spring and came out talking only in numbers.
+{guide:first-name} spends the rest of the evening on the river crossing: where the current is slack, and where it only looks it.
 
 {if faction:explorers-guild:tier >= friendly}
 > guide: The guild speaks well of you. I'll do what I can.
@@ -81,6 +92,7 @@ the explorer who went in last spring and came out talking only in numbers.
 {/if}
 
 ~ faction:explorers-guild:standing += 5
+~ clear flag:guide-doubtful
 -> camp.hub
 
 === camp.journal
@@ -89,8 +101,16 @@ the explorer who went in last spring and came out talking only in numbers.
 @once
 @priority 5
 
-You spread {player:pronoun:possessive-pronoun:determiner} {item:journal} across your knees. The glyph rubbings from the museum
-are smudged, but a pattern repeats: *a spiral, a closed eye, a hand.*
+You spread {player:pronoun:possessive-pronoun:determiner} {item:journal} across your knees. The glyph rubbings from the museum are smudged, but a pattern repeats: *a spiral, a closed eye, a hand.*
+
+Beneath the last rubbing, the museum's copyist stepped the three signs down the page:
+
+    *the spiral*
+            *the closed eye*
+                    *the hand*
+
+
+Someone has written in the margin, very small: *in that order, and not before.*
 
 * [Puzzle out the glyphs] skill-check history dc 12
   success: { set flag:knows-glyphs; player:xp += 50; player:lucidity += 2 } -> camp.journal-solved
@@ -123,20 +143,21 @@ The watch ledger has no phrase recorded yet.
 * [Keep quiet river] -> camp.watchword-record
 * [Use silver heron instead] { var:watchword = "silver heron" } -> camp.watchword-record
 
+// Reply scenes continue the watchword conversation in the same passage; each is still its own
+// history step. A continued scene has no @title or @clear.
 === camp.watchword-record
-@title A Note for the Night Watch
+@continues
 
 ~ var:watch-note = var:watchword
 
-You write **{var:watch-note}** in the watch ledger. {guide:first-name} asks what should happen
-if a stranger overhears it.
+You write **{var:watch-note}** in the watch ledger. {guide:first-name} asks what should happen if a stranger overhears it.
 
 * [Change the watchword to lantern light] (requires var:watchword == var:watch-note) { var:watchword = "lantern light" } -> camp.watchword-readback
 * [Retire the watchword without a replacement] (requires var:watchword == var:watch-note) { var:watchword = "" } -> camp.watchword-readback
 * [Keep the recorded watchword] -> camp.watchword-readback
 
 === camp.watchword-readback
-@title Ink Does Not Follow Orders
+@continues
 
 {if var:watchword == ""}
 > guide: No watchword tonight, then. Stay within sight of the fire.
@@ -145,8 +166,7 @@ if a stranger overhears it.
 {/if}
 
 {if var:watch-note != var:watchword}
-The ledger still reads **{var:watch-note}**. Changing the spoken watchword did not
-rewrite the ink: the note holds a copy, not a promise to follow later changes.
+The ledger still reads **{var:watch-note}**. Changing the spoken watchword did not rewrite the ink: the note holds a copy, not a promise to follow later changes.
 {/if}
 
 * [Close the watch ledger] -> camp.hub

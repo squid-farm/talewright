@@ -1,7 +1,9 @@
+using Talewright.Core.Events;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
 using Talewright.Core.Identity;
 using Talewright.Narrative.Rendering;
+using Talewright.Narrative.Templates;
 using Talewright.Runtime.Saves;
 
 namespace Talewright.Runtime.Tests;
@@ -78,7 +80,7 @@ public partial class LostRelicTests
             foreach (var line in source.Files["chapters/" + file].Split('\n').Where(line => line.StartsWith("=== ")))
                 Assert.StartsWith(prefix, line[4..].Trim());
         }
-        Assert.Equal("0.5.0", Story().Version);
+        Assert.Equal("0.6.0", Story().Version);
         Assert.Contains(Story().Scenes, scene => scene.Id.Value == "dream.hub");
     }
 
@@ -161,7 +163,7 @@ public partial class LostRelicTests
         Assert.Equal(3, history.State.GetBaseStat(EntityId.Player, new StatId("courage")));
         Choose(history, "Continue");
         Assert.Equal(["Haggle for supplies", "Sign the expedition register", "Study your journal",
-            "Set out for the temple", "Ask your guide about the temple", "Agree on a night watchword"],
+            "Set out for the temple", "Ask Tomas about the temple", "Agree on a night watchword"],
             history.Current.Choices.Select(c => c.Text));
         Choose(history, "Haggle for supplies");
         Assert.Equal(2, history.State.GetItemCount(EntityId.Player, new ItemId("ration")));
@@ -367,7 +369,7 @@ public partial class LostRelicTests
     {
         var source = Source();
         var files = source.Files.ToDictionary();
-        files[StorySource.ManifestFileName] = files[StorySource.ManifestFileName].Replace("version: 0.5.0", "version: 0.3.0");
+        files[StorySource.ManifestFileName] = files[StorySource.ManifestFileName].Replace("version: 0.6.0", "version: 0.3.0");
         var older = StoryCompiler.Compile(new StorySource(files, source.ImagePaths)).Story!;
         var oldHistory = new StoryHistory(older, 42, older.Creation!.Default(older.World.Characters[EntityId.Player]));
         var bytes = oldHistory.Save();
@@ -426,5 +428,272 @@ public partial class LostRelicTests
             Assert.True(history.State.GetFlag(new FlagId("guild-wary")));
         }
         Assert.Equal(history.Events, StoryHistory.Restore(history.Story, history.Save()).Events);
+    }
+
+    private static ChoiceMenuEntry MenuEntry(StoryHistory history, string label) =>
+        Assert.Single(history.Current.Menu, entry => entry.Text == label);
+
+    private static RenderedSpeech Speech(StoryHistory history) =>
+        history.Current.Document.Blocks.OfType<RenderedSpeech>().First();
+
+    [Fact]
+    public void Manifest_starts_the_guide_doubtful_until_the_labelled_offer_changes_his_mind()
+    {
+        var history = History();
+        Assert.True(history.State.GetFlag(new("guide-doubtful")));
+        Assert.False(history.State.GetFlag(new("packing-open")));
+        Assert.DoesNotContain(history.Events, @event => @event is FlagChanged);
+        Choose(history, "Continue");
+        Assert.Contains("hasn't said what he thinks of your chances", history.Current.Document.ToPlainText());
+        var offer = Assert.Single(history.Current.Choices, choice => choice.Text == "Ask Tomas about the temple");
+        Assert.Contains(new RenderedText("Tomas", TextStyle.Strong), offer.Label);
+
+        Choose(history, "Ask Tomas about the temple");
+        Assert.Equal("What the Guild Never Wrote Down", history.Current.Title);
+        var speech = Speech(history);
+        Assert.Equal(4, speech.Paragraphs.Count);
+        Assert.Equal("The old ones built it to keep something in, not people out.\nThe guild knows that. They never write it down.",
+            RenderedInline.ToPlainText(speech.Paragraphs[0]));
+        Assert.Contains("Ines Varga", RenderedInline.ToPlainText(speech.Paragraphs[1]));
+        Assert.Equal(new RenderedBlankLineInline(), Assert.Single(speech.Paragraphs[2]));
+        Assert.StartsWith("I took this job", RenderedInline.ToPlainText(speech.Paragraphs[3]));
+        Assert.False(history.State.GetFlag(new("guide-doubtful")));
+
+        Choose(history, "Continue");
+        Assert.Contains("nods, as if the two of you have already agreed", history.Current.Document.ToPlainText());
+        Choose(history, "Set out for the temple");
+        Choose(history, "Let Tomas find a ford");
+        if (history.Current.Scene == new SceneId("trail.far-bank"))
+            Assert.DoesNotContain("didn't think you'd get this far", history.Current.Document.ToPlainText());
+        history.Back();
+        history.Back();
+        history.Back();
+        Assert.False(history.State.GetFlag(new("guide-doubtful")));
+        Assert.Equal(speech.ToPlainText(), Speech(history).ToPlainText());
+        Assert.Equal(history.Current.Document.ToPlainText(), StoryHistory.Restore(history.Story, history.Save()).Current.Document.ToPlainText());
+        history.Back();
+        Assert.True(history.State.GetFlag(new("guide-doubtful")));
+        Assert.True(StoryHistory.Restore(history.Story, history.Save()).State.GetFlag(new("guide-doubtful")));
+    }
+
+    [Fact]
+    public void Journal_keeps_authored_indentation_and_extra_vertical_space()
+    {
+        var history = History();
+        Choose(history, "Continue");
+        Choose(history, "Study your journal");
+        var blocks = history.Current.Document.Blocks;
+        var layout = Assert.Single(blocks.OfType<RenderedParagraph>(), block => block.ToPlainText().Contains("the spiral"));
+        Assert.Equal("    the spiral\n            the closed eye\n                    the hand", layout.ToPlainText());
+        Assert.IsType<RenderedBlankLine>(blocks[blocks.ToList().IndexOf(layout) + 1]);
+        Assert.Contains("in that order, and not before", blocks[blocks.ToList().IndexOf(layout) + 2].ToPlainText());
+    }
+
+    [Theory]
+    [InlineData(false, "Keep the recorded watchword")]
+    [InlineData(true, "Change the watchword to lantern light")]
+    public void Watchword_replies_continue_one_passage_as_separate_history_steps(bool alternate, string reply)
+    {
+        var history = History();
+        Choose(history, "Continue");
+        Choose(history, "Agree on a night watchword");
+        Assert.False(history.Current.ContinuesPrevious);
+        Assert.Equal("Agree on a night watchword", history.Current.Title);
+        Choose(history, alternate ? "Use silver heron instead" : "Keep quiet river");
+        Assert.True(history.Current.ContinuesPrevious);
+        Assert.Null(history.Current.Title);
+        var recordCursor = history.Cursor;
+        Choose(history, reply);
+        Assert.Equal(recordCursor + 1, history.Cursor);
+        Assert.Equal("camp.watchword-readback", history.Current.Scene!.Value.Value);
+        Assert.True(history.Current.ContinuesPrevious);
+        Assert.Null(history.Current.Title);
+
+        history.Back();
+        Assert.Equal("camp.watchword-record", history.Current.Scene!.Value.Value);
+        Assert.True(history.Current.ContinuesPrevious);
+        var restored = StoryHistory.Restore(history.Story, history.Save());
+        Assert.True(restored.Current.ContinuesPrevious);
+        restored.Forward();
+        history.Forward();
+        Assert.True(restored.Current.ContinuesPrevious);
+        Assert.Equal(history.Current.Document.ToPlainText(), restored.Current.Document.ToPlainText());
+        Choose(restored, "Close the watch ledger");
+        Assert.False(restored.Current.ContinuesPrevious);
+        Assert.Equal("The Camp", restored.Current.Title);
+    }
+
+    [Fact]
+    public void Tripwire_bell_choices_stay_visible_while_unavailable_and_unlock_in_turn()
+    {
+        var history = History();
+        Choose(history, "Continue");
+        BuySupplies(history);
+        Choose(history, "Set out for the temple");
+        Choose(history, "Tie off the rope and cross carefully");
+        Choose(history, "Make camp before the climb");
+        Choose(history, "Eat a ration");
+        Choose(history, "Share supper by the fire");
+        Choose(history, "Continue");
+        Choose(history, "Stand your ground");
+        Choose(history, "Catch your breath");
+        Choose(history, "Follow the signal");
+        Choose(history, "Continue");
+        Choose(history, "Continue");
+        Choose(history, "Check the tripwire bell");
+        Assert.Contains("The watch bell has sounded 0 times.", history.Current.Document.ToPlainText());
+        Assert.Equal(["Ring the bell", "Silence the bell — it is already still", "Return to the fire"],
+            history.Current.Menu.Select(entry => entry.Text));
+        Assert.Equal([true, false, true], history.Current.Menu.Select(entry => entry.IsAvailable));
+        Assert.Equal(new RenderedText("it is already still", TextStyle.Emphasis),
+            MenuEntry(history, "Silence the bell — it is already still").Label[^1]);
+        Assert.DoesNotContain(history.Current.Choices, choice => choice.Text.StartsWith("Silence"));
+        var locked = MenuEntry(history, "Silence the bell — it is already still").Key;
+        var cursor = history.Cursor;
+        Assert.ThrowsAny<Exception>(() => history.Choose(locked));
+        Assert.Equal(cursor, history.Cursor);
+        Assert.Equal(0, history.State.GetVariable(new VarId("bell-count")));
+
+        Choose(history, "Ring the bell");
+        Assert.Contains("The watch bell has sounded 1 time.", history.Current.Document.ToPlainText());
+        Assert.Equal(["Ring the bell", "Silence the bell", "Return to the fire"],
+            history.Current.Menu.Select(entry => entry.Text));
+        Assert.Equal([false, true, true], history.Current.Menu.Select(entry => entry.IsAvailable));
+        var restored = StoryHistory.Restore(history.Story, history.Save());
+        Assert.Equal(history.Current.Menu.Select(entry => (entry.Text, entry.IsAvailable)),
+            restored.Current.Menu.Select(entry => (entry.Text, entry.IsAvailable)));
+        Choose(history, "Silence the bell");
+        Assert.Contains("The watch bell has sounded 1 time.", history.Current.Document.ToPlainText());
+        Assert.False(MenuEntry(history, "Silence the bell — it is already still").IsAvailable);
+        history.Back();
+        Assert.True(MenuEntry(history, "Silence the bell").IsAvailable);
+    }
+
+    [Fact]
+    public void River_shows_why_the_rope_crossing_is_unavailable_without_supplies()
+    {
+        var history = History();
+        Choose(history, "Continue");
+        Choose(history, "Set out for the temple");
+        var rope = MenuEntry(history, "Tie off a rope and cross carefully — you never bought a coil of rope");
+        Assert.False(rope.IsAvailable);
+        Assert.Equal(1, rope.Number);
+        Assert.Equal(["Swim for it", "Let Tomas find a ford"], history.Current.Choices.Select(choice => choice.Text));
+    }
+
+    [Theory]
+    [InlineData(true, "marked the bank with a strip of red cloth")]
+    [InlineData(false, "There is no sign of Tomas")]
+    public void Swept_prose_uses_the_guides_check_then_a_labelled_bare_choice(bool success, string prose)
+    {
+        for (ulong seed = 1; seed <= 128; seed++)
+        {
+            var history = History(seed: seed);
+            Choose(history, "Continue");
+            Choose(history, "Set out for the temple");
+            Choose(history, "Swim for it");
+            if (history.Current.Scene != new SceneId("trail.swept")) continue;
+            var check = Assert.Single(history.Events.OfType<SkillCheckResolved>(), check => check.Actor == new EntityId("guide"));
+            if (check.Success != success) continue;
+            Assert.Equal(new StatId("survival"), check.Skill);
+            Assert.False(check.IsHidden);
+            Assert.Contains(prose, history.Current.Document.ToPlainText());
+            Assert.Contains(history.Current.Document.Blocks, block => block is RenderedNote { Kind: NoteKind.Check });
+            var follow = Assert.Single(history.Current.Choices);
+            Assert.Equal("Follow Tomas's voice back upstream", follow.Text);
+            var events = history.Events.ToArray();
+            var restored = StoryHistory.Restore(history.Story, history.Save());
+            Assert.Equal(history.Current.Document.ToPlainText(), restored.Current.Document.ToPlainText());
+            Choose(history, "Follow Tomas's voice back upstream");
+            Assert.Equal("trail.far-bank", history.Current.Scene!.Value.Value);
+            Assert.Null(history.Current.Title);
+            Assert.Contains("I'll admit I didn't think you'd get this far", history.Current.Document.ToPlainText());
+            history.Back();
+            Assert.Equal(events, history.Events);
+            return;
+        }
+        Assert.Fail($"No seed exercised the guide's swept check with success={success}.");
+    }
+
+    [Theory]
+    [InlineData("explorer", true)]
+    [InlineData("scholar", false)]
+    public void Hidden_root_climb_check_reveals_a_route_without_a_note_and_squeezing_remains(string preset, bool climbs)
+    {
+        var history = History(preset, fixedRoll: true);
+        Choose(history, "Continue");
+        BuySupplies(history);
+        Choose(history, "Set out for the temple");
+        Choose(history, "Tie off the rope and cross carefully");
+        Choose(history, "Climb straight to the temple");
+        Choose(history, "Look for another way in");
+        var check = Assert.Single(history.Events.OfType<SkillCheckResolved>());
+        Assert.True(check.IsHidden);
+        Assert.Equal(new StatId("athletics"), check.Skill);
+        Assert.Equal(climbs, check.Success);
+        Assert.DoesNotContain(history.Current.Document.Blocks, block => block is RenderedNote { Kind: NoteKind.Check });
+        Assert.Equal(climbs, history.Current.Choices.Any(choice => choice.Text == "Climb the fig roots to the high window"));
+        Assert.Contains(history.Current.Choices, choice => choice.Text == "Squeeze through");
+        var restored = StoryHistory.Restore(history.Story, history.Save());
+        Assert.Equal(history.Events, restored.Events);
+        Assert.Equal(history.Current.Choices.Select(choice => choice.Text), restored.Current.Choices.Select(choice => choice.Text));
+        Choose(history, climbs ? "Climb the fig roots to the high window" : "Squeeze through");
+        Assert.Equal("temple.hall", history.Current.Scene!.Value.Value);
+    }
+
+    [Theory]
+    [InlineData("explorer", "You make out part of the rim", "You can read the whole rim")]
+    [InlineData("scholar", "You can read the whole rim", "You make out part of the rim")]
+    public void Altar_stores_one_history_total_for_every_threshold(string preset, string expected, string absent)
+    {
+        var history = History(preset, fixedRoll: true);
+        Choose(history, "Continue");
+        BuySupplies(history);
+        Choose(history, "Set out for the temple");
+        Choose(history, "Tie off the rope and cross carefully");
+        Choose(history, "Climb straight to the temple");
+        Choose(history, "Look for another way in");
+        Choose(history, "Squeeze through");
+        Choose(history, "Continue");
+        if (history.Current.Scene == new SceneId("temple.niche")) Choose(history, "Leave it be");
+        Assert.Equal("temple.altar", history.Current.Scene!.Value.Value);
+        var check = Assert.Single(history.Events.OfType<SkillCheckResolved>(), check => check.Skill == new StatId("history"));
+        Assert.Null(check.Difficulty);
+        Assert.Null(check.Success);
+        Assert.Equal(check.Total, history.State.GetVariable(new VarId("altar-reading")));
+        var text = history.Current.Document.ToPlainText();
+        Assert.Contains(expected, text);
+        Assert.DoesNotContain(absent, text);
+        Assert.DoesNotContain("too worn for you to read", text);
+        var restored = StoryHistory.Restore(history.Story, history.Save());
+        Assert.Equal(history.Events, restored.Events);
+        Assert.Equal(history.Current.Document.ToPlainText(), restored.Current.Document.ToPlainText());
+        Choose(history, "Take the relic");
+        Assert.True(history.Current.ClearsPrevious);
+        Assert.Equal("The Return", history.Current.Title);
+        history.Back();
+        Assert.False(history.Current.ClearsPrevious);
+        history.Forward();
+        Assert.True(history.Current.ClearsPrevious);
+        Assert.True(StoryHistory.Restore(history.Story, history.Save()).Current.ClearsPrevious);
+    }
+
+    [Theory]
+    [InlineData("explorer", false)]
+    [InlineData("scholar", true)]
+    public void Lucidity_joins_the_sheet_when_discovered_without_hiding_creation_options(string preset, bool visibleAtStart)
+    {
+        var history = History(preset, fixedRoll: true);
+        var lucidity = new StatId("lucidity");
+        Assert.Equal(visibleAtStart, history.Story.IsStatVisible(lucidity, history.State));
+        Assert.True(history.Story.IsStatVisible(new("courage"), history.State));
+        Assert.Equal(["courage", "str"], history.Story.GetCreationOptions(42)!.Stats.Keys.Select(stat => stat.Value).Order());
+        Choose(history, "Continue");
+        Choose(history, "Study your journal");
+        Assert.Equal(visibleAtStart, history.Story.IsStatVisible(lucidity, history.State));
+        Choose(history, "Puzzle out the glyphs");
+        Assert.True(history.Story.IsStatVisible(lucidity, history.State));
+        history.Back();
+        Assert.Equal(visibleAtStart, history.Story.IsStatVisible(lucidity, history.State));
     }
 }

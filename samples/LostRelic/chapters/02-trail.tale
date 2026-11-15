@@ -8,7 +8,7 @@
 The trail ends at a brown river, swollen with last night's rain. On the far bank, through the trees, you
 can make out a stair of green stone.
 
-* [Tie off the rope and cross carefully] (requires player has rope) { player:xp += 25 } -> trail.far-bank
+* [Tie off the rope and cross carefully] (requires player has rope, shown "Tie off a rope and cross carefully — *you never bought {player:inventory:rope#a}*") { player:xp += 25 } -> trail.far-bank
 * [Swim for it] skill-check athletics dc 12
   success: -> trail.far-bank
   failure: { player:hp -= 3 } -> trail.swept
@@ -17,17 +17,30 @@ can make out a stair of green stone.
   failure: { player:hp -= 1 } -> trail.swept
 
 === trail.swept
-The current takes your legs out from under you. You claw your way onto the far bank a long way downstream,
-coughing up river and dignity in equal measure.
+The current takes your legs out from under you. You claw your way onto the far bank a long way downstream, coughing up river and dignity in equal measure.
 {if player:hp < 8}
 You are bleeding from a gash along your arm.
 {/if}
--> trail.far-bank
+
+// An NPC skill-check expression: Tomas's Survival decides only which prose appears.
+{if skill-check guide survival dc 12}
+{guide:first-name} has already marked the bank with a strip of red cloth and is shouting directions from upstream.
+{else}
+There is no sign of {guide:first-name}. You hear {guide:pronoun:object} at last, faint and well upstream, calling your name.
+{/if}
+
+* -> trail.far-bank
 
 === trail.far-bank
+@choice-label Follow {guide:first-name#possessive} voice back upstream
+
 {guide:first-name} squelches up the bank behind you and stares up at the stair.
 
+{if flag:guide-doubtful}
+> guide: Well, {player:first-name}. It's real. I'll admit I didn't think you'd get this far.
+{else}
 > guide: Well, {player:first-name}. It's real.
+{/if}
 
 * [Make camp before the climb] -> trail.night
 * [Climb straight to the temple] -> temple.door
@@ -39,8 +52,7 @@ You are bleeding from a gash along your arm.
 
 {image("night-watch.jpeg", "A low fire lights an expedition awning and a brass tripwire bell at the foot of a jungle stair.")}
 
-You shelter beneath a canvas awning at the foot of the stair. {guide:first-name}
-hangs a bell on a tripwire and spreads the expedition records across a rough table.
+You shelter beneath a canvas awning at the foot of the stair. {guide:first-name} hangs a bell on a tripwire and spreads the expedition records across a rough table.
 Beyond the firelight, the jungle never quite falls silent.
 
 * [Press on at dawn] -> temple.door
@@ -128,9 +140,10 @@ returns, and agree not to follow a voice you cannot place.
 @priority -1
 @once
 
-The watch bell has sounded **{var:bell-count}** times. A low branch is caught
-in the tripwire. You can lift it clear, then check whether the line still holds.
+The watch bell has sounded **{var:bell-count}** {var:bell-count#one-many("time", "times")}. A low branch is caught in the tripwire. You can lift it clear, then check whether the line still holds.
 
-* [Ring the bell] (requires not flag:bell-ringing) { set flag:bell-ringing } -> trail.bell
-* [Silence the bell] (requires flag:bell-ringing) { clear flag:bell-ringing } -> trail.bell
+// Shown-but-unavailable choices stay visible and disabled: bare `shown` keeps the label, and
+// quoted text replaces it while the requirement is false.
+* [Ring the bell] (requires not flag:bell-ringing, shown) { set flag:bell-ringing } -> trail.bell
+* [Silence the bell] (requires flag:bell-ringing, shown "Silence the bell — *it is already still*") { clear flag:bell-ringing } -> trail.bell
 * [Return to the fire] { clear flag:bell-ringing } -> trail.night

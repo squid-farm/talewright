@@ -17,7 +17,7 @@ public partial class LostRelicTests
         stats["courage"] = 6;
         var history = new StoryHistory(story, seed, selection with { Stats = stats, Pronouns = pronouns });
         Choose(history, "Continue");
-        Choose(history, "Ask your guide about the temple");
+        Choose(history, "Ask Tomas about the temple");
         Choose(history, "Continue");
         if (journal)
         {
@@ -362,5 +362,60 @@ public partial class LostRelicTests
         }, history.Current.Document.ToPlainText());
         AssertMarks(history, 2);
         Assert.Equal(history.Events, StoryHistory.Restore(history.Story, history.Save()).Events);
+    }
+
+    [Fact]
+    public void Sleeper_offer_is_shown_locked_with_the_mark_count_until_the_hands_give_the_third_mark()
+    {
+        var history = Dream(journal: true);
+        Assert.False(history.Current.ClearsPrevious);
+        history.Back();
+        Assert.Equal("dream.arrival", history.Current.Scene!.Value.Value);
+        Assert.True(history.Current.ClearsPrevious);
+        history.Back();
+        Assert.False(history.Current.ClearsPrevious);
+        history.Forward();
+        Assert.True(StoryHistory.Restore(history.Story, history.Save()).Current.ClearsPrevious);
+        history.Forward();
+        Assert.Contains("Glyph marks held: 0.", history.Current.Document.ToPlainText());
+        Assert.Contains("3 more marks will let you approach", history.Current.Document.ToPlainText());
+        Assert.True(history.Story.IsStatVisible(new("lucidity"), history.State));
+        Assert.DoesNotContain(history.Current.Menu, entry => !entry.IsAvailable);
+        Choose(history, "Speak to the lost explorer");
+        Choose(history, "Promise to carry her message");
+        Choose(history, "Answer the Spiral");
+        Assert.Contains("A glyph mark glows there.", history.Current.Document.ToPlainText());
+        Choose(history, "Accept the spiral mark");
+        Assert.Contains("2 more marks will let you approach", history.Current.Document.ToPlainText());
+        Choose(history, "Face the Watcher");
+        Choose(history, "Continue");
+        Choose(history, "Continue");
+        Choose(history, "Remember that you are dreaming");
+        Assert.Contains("A second glyph mark rests in your palm", history.Current.Document.ToPlainText());
+        Choose(history, "Continue");
+        Assert.Contains("1 more mark will let you approach", history.Current.Document.ToPlainText());
+        Choose(history, "Hear the guild ghost");
+        Choose(history, "Promise the guild an honest account");
+        Assert.Equal(["Wake before going further", "Ask the Hands for passage", "Approach the Sleeper — 2 of 3 marks"],
+            history.Current.Menu.Select(entry => entry.Text));
+        Assert.Equal([true, true, false], history.Current.Menu.Select(entry => entry.IsAvailable));
+        Assert.Equal(["Wake before going further", "Ask the Hands for passage"], history.Current.Choices.Select(choice => choice.Text));
+        var restored = StoryHistory.Restore(history.Story, history.Save());
+        Assert.Equal(history.Current.Menu.Select(entry => (entry.Text, entry.IsAvailable)),
+            restored.Current.Menu.Select(entry => (entry.Text, entry.IsAvailable)));
+        Choose(history, "Ask the Hands for passage");
+        Choose(history, "Accept the hand mark and the price");
+        Assert.Contains("Glyph marks held: 3.", history.Current.Document.ToPlainText());
+        Assert.Contains("Three marks. The shape sleeping beneath the table is waiting.", history.Current.Document.ToPlainText());
+        var sleeper = Assert.Single(history.Current.Menu, entry => entry.Text == "Approach the Sleeper");
+        Assert.True(sleeper.IsAvailable);
+        Choose(history, "Approach the Sleeper");
+        Choose(history, "Pay the Hands and return to the temple");
+        Assert.Contains("You keep 2 marks", history.Current.Document.ToPlainText());
+        history.Back();
+        history.Back();
+        history.Back();
+        history.Back();
+        Assert.False(Assert.Single(history.Current.Menu, entry => entry.Text.StartsWith("Approach the Sleeper")).IsAvailable);
     }
 }
