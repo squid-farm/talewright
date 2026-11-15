@@ -349,6 +349,17 @@ class AggregateTests(unittest.TestCase):
             with self.subTest(status=status), self.assertRaises(ValueError):
                 verify_results({"job": {"result": status}}, {"job": False})
 
+    def test_selected_browser_preparation_failure_cannot_be_masked_by_skipped_shards(self):
+        verify_results(
+            {"browser-preparation": {"result": "success"}, "browser": {"result": "success"}},
+            {"browser-preparation": True, "browser": True},
+        )
+        with self.assertRaisesRegex(ValueError, "browser-preparation"):
+            verify_results(
+                {"browser-preparation": {"result": "failure"}, "browser": {"result": "skipped"}},
+                {"browser-preparation": True, "browser": True},
+            )
+
     def test_missing_or_invalid_results_fail(self):
         for needs, expected in [
             ({}, {"job": True}),

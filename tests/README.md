@@ -373,11 +373,29 @@ remove controls between a presence check and a text read. A driver regression ex
 
 The Build workflow calls the reusable Tests workflow once per run. Tests retains
 unit, Chromium, Firefox, WebKit, and real Linux Photino jobs on Ubuntu 24.04.
-Each browser's regression suite is split across two shard jobs and the Linux suite across three;
+When the Nx selection includes browser verification, one focused preparation job builds the Release
+E2E test output and publishes the regular web host. It uploads those products as an immutable
+same-run artifact named with the workflow run and attempt. A manifest binds every payload file's
+SHA-256 and file mode to the checked-out commit and run identity; a compressed tar archive retains Playwright's
+executable driver permissions. Each browser consumer verifies the manifest before test discovery or
+execution. Browser consumers share these files, not a server: each test process still starts its own
+local web server and isolated browser contexts.
+
+Consumers download the exact artifact ID and validate the attempt reported by the preparation job.
+Rerunning only failed jobs can therefore reuse successful preparation from an earlier attempt of
+the same run; artifacts from another run or commit remain invalid.
+
+The three browsers each keep their existing two disjoint regression shards, and the Linux suite
+keeps its three shards;
 `run_e2e.py --shard INDEX/COUNT` (or `TALEWRIGHT_E2E_SHARD`) deals the sorted test methods round-robin
 so every test runs in exactly one shard, and shard 1 also runs the published-artifact smoke tests.
-Each job uploads its reports even on success, and evidence for failed cases, for 14 days. Both Build (including
-package verification) and Tests must pass before any publishing job.
+Regular browser shards consume the downloaded E2E assembly and web host without building, restoring
+or publishing them. The convenient local command, `python3 player/tests/run_e2e.py web`, still builds
+the test project and publishes the host before running. The shard-1 published-game smoke remains a
+separate target with its existing publish path; moving that preparation is a follow-up.
+
+Each browser or Linux test job uploads reports even on success and keeps failed-case evidence for
+14 days. Both Build (including package verification) and Tests must pass before any publishing job.
 
 Test projects retain their original project references and suite boundaries.
 The `packaging/Talewright/Talewright.csproj` packaging shell bundles the seven headless

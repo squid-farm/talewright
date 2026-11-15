@@ -3,11 +3,17 @@
 
 import argparse
 from dataclasses import dataclass
+import hashlib
+import json
 import os
 from pathlib import Path
+from pathlib import PurePosixPath
+import shutil
 import signal
+import stat
 import subprocess
 import sys
+import tarfile
 import tempfile
 import time
 import xml.etree.ElementTree as ET
@@ -15,6 +21,13 @@ import xml.etree.ElementTree as ET
 ROOT = Path(__file__).resolve().parents[2]
 PROJECT = ROOT / "player/tests/Talewright.Player.E2E.Tests"
 BIN = PROJECT / "bin/Release/net10.0"
+PREPARED_INPUTS = ROOT / "artifacts/browser-e2e-inputs"
+PREPARED_ARCHIVE = ROOT / "artifacts/browser-e2e-inputs.tar.gz"
+TEST_OUTPUT = "test-output"
+WEB_OUTPUT = "web"
+MANIFEST_NAME = "manifest.json"
+TEST_ASSEMBLY = "Talewright.Player.E2E.Tests.dll"
+MANIFEST_IDENTITY_KEYS = ("source_sha", "run_id", "run_attempt")
 
 
 @dataclass
@@ -86,20 +99,22 @@ def shard_filter(names, shard):
     return name_filter(shard_names(names, shard))
 
 
-def list_tests(selection):
+def list_tests(selection, test_assembly=None):
     with tempfile.TemporaryDirectory(prefix="talewright-tests-") as temporary:
         listing = Path(temporary) / "tests.txt"
-        run(["dotnet", "vstest", BIN / "Talewright.Player.E2E.Tests.dll", "--ListFullyQualifiedTests",
+        run(["dotnet", "vstest", test_assembly or BIN / TEST_ASSEMBLY, "--ListFullyQualifiedTests",
              f"--TestCaseFilter:{selection}", f"--ListTestsTargetPath:{listing}"], stdout=subprocess.DEVNULL)
         return [line.strip() for line in listing.read_text().splitlines() if line.strip()]
 
 
-def test_filters(host, selected, shard, jobs):
+def test_filters(host, selected, shard, jobs, test_assembly=None, require_tests=False):
     """Return one dotnet test filter per concurrent test process."""
     selection = host_filter(host, selected)
     if not shard and jobs == 1:
+        if require_tests and not list_tests(selection, test_assembly):
+            raise RuntimeError("Prepared browser selection contains no tests; check --filter")
         return [selection]
-    names = sorted(set(list_tests(selection)))
+    names = sorted(set(list_tests(selection, test_assembly)))
     if shard:
         names = shard_names(names, shard)
     if not names:
@@ -122,6 +137,246 @@ def remove_reports(results, prefix):
 
 def run_settings(threads):
     return ["--", f"xUnit.MaxParallelThreads={threads}"] if threads else []
+
+
+def workflow_identity():
+    identity = {
+        "source_sha": os.environ.get("TALEWRIGHT_E2E_SOURCE_SHA") or os.environ.get("GITHUB_SHA"),
+        "run_id": os.environ.get("GITHUB_RUN_ID"),
+        "run_attempt": (os.environ.get("TALEWRIGHT_E2E_PREPARATION_ATTEMPT")
+                        or os.environ.get("GITHUB_RUN_ATTEMPT")),
+    }
+    missing = [key for key, value in identity.items() if not value]
+    if missing:
+        raise RuntimeError(
+            "Prepared browser inputs require GitHub run identity; missing "
+            + ", ".join(missing)
+        )
+    return identity
+
+
+def git_revision():
+    result = subprocess.run(
+        ["git", "rev-parse", "HEAD"], cwd=ROOT, check=True, text=True, capture_output=True,
+    )
+    return result.stdout.strip()
+
+
+def required_prepared_files(inputs):
+    test_output = inputs / TEST_OUTPUT
+    web_root = inputs / WEB_OUTPUT / "wwwroot"
+    required = [
+        test_output / TEST_ASSEMBLY,
+        test_output / "Talewright.Player.E2E.Tests.deps.json",
+        test_output / "Talewright.Player.E2E.Tests.runtimeconfig.json",
+        test_output / "Microsoft.Playwright.dll",
+        test_output / "xunit.runner.json",
+        test_output / "testhost.dll",
+        web_root / "index.html",
+    ]
+    missing = [path.relative_to(inputs).as_posix() for path in required if not path.is_file()]
+    if not any(path.name.casefold().endswith("testadapter.dll")
+               for path in test_output.glob("*.dll")):
+        missing.append(f"{TEST_OUTPUT}/*testadapter.dll")
+    if not (web_root / "_framework").is_dir():
+        missing.append(f"{WEB_OUTPUT}/wwwroot/_framework/")
+    if missing:
+        raise RuntimeError("Prepared browser inputs are incomplete; missing " + ", ".join(missing))
+    return test_output / TEST_ASSEMBLY, web_root
+
+
+def prepared_file_hashes(inputs):
+    hashes = {}
+    for folder in (TEST_OUTPUT, WEB_OUTPUT):
+        root = inputs / folder
+        if not root.is_dir():
+            raise RuntimeError(f"Prepared browser inputs are incomplete; missing {folder}/")
+        for path in root.rglob("*"):
+            if path.is_symlink():
+                raise RuntimeError(f"Prepared browser input must not be a symbolic link: {path}")
+            if not path.is_file():
+                continue
+            digest = hashlib.sha256()
+            with path.open("rb") as stream:
+                for block in iter(lambda: stream.read(1024 * 1024), b""):
+                    digest.update(block)
+            hashes[path.relative_to(inputs).as_posix()] = {
+                "sha256": digest.hexdigest(),
+                "mode": stat.S_IMODE(path.stat().st_mode),
+            }
+    if not hashes:
+        raise RuntimeError("Prepared browser inputs contain no files")
+    return hashes
+
+
+def write_prepared_manifest(inputs, identity):
+    required_prepared_files(inputs)
+    manifest = {
+        "schema_version": 1,
+        **identity,
+        "files": prepared_file_hashes(inputs),
+    }
+    (inputs / MANIFEST_NAME).write_text(json.dumps(manifest, indent=2) + "\n", encoding="utf-8")
+
+
+def validate_prepared_inputs(inputs=PREPARED_INPUTS):
+    expected_identity = workflow_identity()
+    actual_revision = git_revision()
+    if actual_revision != expected_identity["source_sha"]:
+        raise RuntimeError(
+            f"Prepared browser checkout mismatch: expected {expected_identity['source_sha']}, "
+            f"but checked out HEAD is {actual_revision}"
+        )
+    manifest_path = inputs / MANIFEST_NAME
+    try:
+        manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
+    except FileNotFoundError as error:
+        raise RuntimeError(f"Prepared browser input manifest is missing: {manifest_path}") from error
+    except json.JSONDecodeError as error:
+        raise RuntimeError(f"Prepared browser input manifest is invalid: {error}") from error
+    if not isinstance(manifest, dict) or manifest.get("schema_version") != 1:
+        raise RuntimeError("Prepared browser input manifest has an unsupported schema")
+    for key in MANIFEST_IDENTITY_KEYS:
+        if manifest.get(key) != expected_identity[key]:
+            raise RuntimeError(
+                f"Prepared browser inputs do not match this workflow's {key}: "
+                f"expected {expected_identity[key]!r}, found {manifest.get(key)!r}"
+            )
+    expected_files = manifest.get("files")
+    if not isinstance(expected_files, dict) or not all(
+        isinstance(path, str)
+        and isinstance(details, dict)
+        and isinstance(details.get("sha256"), str)
+        and isinstance(details.get("mode"), int)
+        and not isinstance(details.get("mode"), bool)
+        and 0 <= details["mode"] <= 0o777
+        for path, details in expected_files.items()
+    ):
+        raise RuntimeError("Prepared browser input manifest has an invalid file inventory")
+    actual_files = prepared_file_hashes(inputs)
+    if expected_files != actual_files:
+        missing = sorted(expected_files.keys() - actual_files.keys())
+        extra = sorted(actual_files.keys() - expected_files.keys())
+        changed = sorted(
+            path for path in expected_files.keys() & actual_files.keys()
+            if expected_files[path]["sha256"] != actual_files[path]["sha256"]
+        )
+        mode_changed = sorted(
+            path for path in expected_files.keys() & actual_files.keys()
+            if expected_files[path]["mode"] != actual_files[path]["mode"]
+        )
+        details = []
+        if missing:
+            details.append("missing: " + ", ".join(missing[:5]))
+        if extra:
+            details.append("unexpected: " + ", ".join(extra[:5]))
+        if changed:
+            details.append("checksum mismatch: " + ", ".join(changed[:5]))
+        if mode_changed:
+            details.append("file mode mismatch: " + ", ".join(mode_changed[:5]))
+        raise RuntimeError("Prepared browser inputs failed verification (" + "; ".join(details) + ")")
+    return required_prepared_files(inputs)
+
+
+def create_prepared_archive(inputs, archive=PREPARED_ARCHIVE):
+    if archive.exists():
+        raise RuntimeError(f"Refusing to overwrite existing prepared browser archive: {archive}")
+    with tarfile.open(archive, "w:gz", compresslevel=1) as output:
+        output.add(inputs, arcname=inputs.name)
+
+
+def extract_prepared_archive(archive=PREPARED_ARCHIVE, inputs=PREPARED_INPUTS):
+    if not archive.is_file():
+        raise RuntimeError(f"Prepared browser input archive is missing: {archive}")
+    if inputs.exists():
+        raise RuntimeError(f"Refusing to overwrite existing prepared browser inputs: {inputs}")
+    inputs.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        with tarfile.open(archive, "r:*") as source, tempfile.TemporaryDirectory(
+            prefix="browser-e2e-extract-", dir=inputs.parent
+        ) as temporary:
+            members = source.getmembers()
+            for member in members:
+                relative = PurePosixPath(member.name)
+                if (relative.is_absolute() or ".." in relative.parts or not relative.parts
+                        or relative.parts[0] != inputs.name):
+                    raise RuntimeError(f"Prepared browser archive has an unsafe path: {member.name}")
+                if not (member.isdir() or member.isfile()):
+                    raise RuntimeError(f"Prepared browser archive has an unsupported entry: {member.name}")
+                if member.mode & ~0o777:
+                    raise RuntimeError(f"Prepared browser archive has an unsafe mode: {member.name}")
+            # Entry paths, types, and modes were restricted above; preserve Playwright's exact file modes.
+            filters = {"filter": "fully_trusted"} if hasattr(tarfile, "fully_trusted_filter") else {}
+            source.extractall(temporary, members=members, **filters)
+            staged = Path(temporary) / inputs.name
+            if not staged.is_dir():
+                raise RuntimeError("Prepared browser archive does not contain its input directory")
+            staged.rename(inputs)
+    except tarfile.TarError as error:
+        raise RuntimeError(f"Prepared browser input archive is invalid: {error}") from error
+
+
+def prepare_browser_inputs(output=PREPARED_INPUTS):
+    identity = workflow_identity()
+    if git_revision() != identity["source_sha"]:
+        raise RuntimeError("Prepared browser build checkout does not match the selected source SHA")
+    archive = output.with_suffix(".tar.gz")
+    if output.exists() or archive.exists():
+        raise RuntimeError(f"Refusing to overwrite existing prepared browser inputs: {output}")
+    output.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix="browser-e2e-", dir=output.parent) as temporary:
+        staged = Path(temporary) / "inputs"
+        staged.mkdir()
+        run(["dotnet", "build", PROJECT, "-c", "Release"])
+        shutil.copytree(BIN, staged / TEST_OUTPUT)
+        run(["dotnet", "publish", ROOT / "apps/web", "-c", "Release",
+             "-o", staged / WEB_OUTPUT])
+        write_prepared_manifest(staged, identity)
+        staged.rename(output)
+    create_prepared_archive(output, archive)
+    print(f"Prepared browser inputs at {output}", flush=True)
+
+
+def web_test_command(selection, name, results, threads, test_assembly, prepared):
+    if prepared:
+        return [
+            "dotnet", "vstest", test_assembly, f"--TestCaseFilter:{selection}",
+            f"--logger:trx;LogFileName={name}.trx", f"--ResultsDirectory:{results}",
+            *run_settings(threads),
+        ]
+    return [
+        "dotnet", "test", PROJECT, "-c", "Release", "--no-build",
+        "--logger", f"trx;LogFileName={name}.trx", "--results-directory", results,
+        "--filter", selection, *run_settings(threads),
+    ]
+
+
+def run_web_tests(args, browsers, results, test_assembly, web_root, prepared):
+    selections = test_filters(
+        "web", args.filter, args.shard, args.jobs, test_assembly,
+        require_tests=prepared,
+    )
+    work = []
+    for browser in browsers:
+        remove_reports(results, browser)
+        environment = dict(os.environ, TALEWRIGHT_TARGET="web", BROWSER=browser,
+                           TALEWRIGHT_WEB_ROOT=str(web_root),
+                           TALEWRIGHT_TEST_RESULTS=str(results))
+        for index, selection in enumerate(selections, 1):
+            name = report_name(browser, index, len(selections))
+            work.append(Job(
+                name,
+                web_test_command(
+                    selection, name, results, args.threads, test_assembly, prepared,
+                ),
+                environment,
+                results / f"{name}.trx",
+            ))
+    failed = run_jobs(work, args.jobs, results)
+    if failed:
+        print("Failed:", ", ".join(failed), file=sys.stderr)
+        return 1
+    return 0
 
 
 def stop(process):
@@ -217,8 +472,11 @@ def native_environment(temporary, results):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("suite", choices=["install-browsers", "web", "linux"])
+    parser.add_argument("suite", choices=["prepare-web", "install-browsers", "web", "linux"])
     parser.add_argument("--browser", choices=["all", "chromium", "firefox", "webkit"], default="all")
+    parser.add_argument("--prepared", action="store_true",
+                        default=os.environ.get("TALEWRIGHT_E2E_PREPARED") == "1",
+                        help="consume verified prepared browser inputs without build or publish")
     parser.add_argument("--probe", action="store_true", help="Linux accessibility feasibility gate only")
     parser.add_argument("--filter", help="dotnet test filter (both hosts)")
     parser.add_argument("--shard", type=parse_shard, default=os.environ.get("TALEWRIGHT_E2E_SHARD") or None,
@@ -232,36 +490,32 @@ def main():
     args = parser.parse_args()
     if args.probe and (args.suite != "linux" or args.filter):
         parser.error("--probe is Linux-only and cannot be combined with --filter")
+    if args.prepared and args.suite != "web":
+        parser.error("--prepared is only available for the web suite")
     jobs = 1 if args.probe else args.jobs
     results = ROOT / "artifacts/test-results"
     results.mkdir(parents=True, exist_ok=True)
+    if args.suite == "prepare-web":
+        prepare_browser_inputs()
+        return 0
     if args.suite in ("web", "install-browsers"):
-        run(["dotnet", "build", PROJECT, "-c", "Release"])
         browsers = ["chromium", "firefox", "webkit"] if args.browser == "all" else [args.browser]
         if args.suite == "install-browsers":
+            run(["dotnet", "build", PROJECT, "-c", "Release"])
             run(["dotnet", "exec", "--runtimeconfig", BIN / "Talewright.Player.E2E.Tests.runtimeconfig.json",
                  BIN / "Microsoft.Playwright.dll", "install", "--with-deps", *browsers])
             return 0
+        if args.prepared:
+            extract_prepared_archive()
+            test_assembly, web_root = validate_prepared_inputs()
+            return run_web_tests(args, browsers, results, test_assembly, web_root, prepared=True)
+        run(["dotnet", "build", PROJECT, "-c", "Release"])
         with tempfile.TemporaryDirectory(prefix="talewright-web-") as temporary:
             run(["dotnet", "publish", "apps/web", "-c", "Release", "-o", temporary])
-            selections = test_filters("web", args.filter, args.shard, jobs)
-            work = []
-            for browser in browsers:
-                remove_reports(results, browser)
-                environment = dict(os.environ, TALEWRIGHT_TARGET="web", BROWSER=browser,
-                                   TALEWRIGHT_WEB_ROOT=str(Path(temporary) / "wwwroot"),
-                                   TALEWRIGHT_TEST_RESULTS=str(results))
-                for index, selection in enumerate(selections, 1):
-                    name = report_name(browser, index, len(selections))
-                    work.append(Job(name, ["dotnet", "test", PROJECT, "-c", "Release", "--no-build",
-                                           "--logger", f"trx;LogFileName={name}.trx", "--results-directory", results,
-                                           "--filter", selection, *run_settings(args.threads)],
-                                    environment, results / f"{name}.trx"))
-            failed = run_jobs(work, jobs, results)
-            if failed:
-                print("Failed:", ", ".join(failed), file=sys.stderr)
-                return 1
-        return 0
+            return run_web_tests(
+                args, browsers, results, BIN / TEST_ASSEMBLY,
+                Path(temporary) / "wwwroot", prepared=False,
+            )
 
     if sys.platform != "linux":
         parser.error("The native suite requires Linux, WebKitGTK, Xvfb, D-Bus, and system Python AT-SPI bindings.")
@@ -303,3 +557,6 @@ if __name__ == "__main__":
     except subprocess.CalledProcessError as error:
         print(f"Command failed with status {error.returncode}: {error.cmd}", file=sys.stderr)
         sys.exit(error.returncode)
+    except RuntimeError as error:
+        print(error, file=sys.stderr)
+        sys.exit(1)

@@ -90,11 +90,60 @@ jobs:
           NX_CI_ARTIFACT_URL: ${{ steps.results.outcome == 'success' && steps.results.outputs.artifact-url || '' }}
         run: python3 .github/scripts/nx_ci.py summary unit
 
-  browser:
+  browser-preparation:
     needs: plan
     if: fromJSON(needs.plan.outputs.selected).browser
     runs-on: ubuntu-24.04
     timeout-minutes: 20
+    outputs:
+      artifact-id: ${{ steps.inputs.outputs.artifact-id }}
+      run-attempt: ${{ steps.identity.outputs.run-attempt }}
+    env:
+      TALEWRIGHT_E2E_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+    container:
+      image: ghcr.io/squid-farm/talewright-ui-tests:pw1.63.0-r1
+      options: --user 1001:1001 --init --shm-size=1g
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - name: Verify prebuilt UI test environment
+        run: python3 .github/docker/ui-tests/verify.py
+      - name: Build E2E tests and publish the web host once
+        run: python3 player/tests/run_e2e.py prepare-web
+      - name: Record preparation attempt
+        id: identity
+        run: echo "run-attempt=$GITHUB_RUN_ATTEMPT" >> "$GITHUB_OUTPUT"
+      - name: Summarize prepared browser input size
+        if: always()
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          archive = Path("artifacts/browser-e2e-inputs.tar.gz")
+          if not archive.is_file():
+              line = "Prepared browser input archive was not produced."
+          else:
+              line = f"Prepared browser input tar: {archive.stat().st_size} bytes."
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write(line + "\n")
+          PY
+      - uses: actions/upload-artifact@v4
+        id: inputs
+        with:
+          name: browser-e2e-inputs-${{ github.run_id }}-${{ github.run_attempt }}
+          path: artifacts/browser-e2e-inputs.tar.gz
+          if-no-files-found: error
+          compression-level: 0
+
+  browser:
+    needs: [plan, browser-preparation]
+    if: fromJSON(needs.plan.outputs.selected).browser
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      TALEWRIGHT_E2E_SOURCE_SHA: ${{ github.event.pull_request.head.sha || github.sha }}
+      TALEWRIGHT_E2E_PREPARATION_ATTEMPT: ${{ needs.browser-preparation.outputs.run-attempt }}
     container:
       # r2 updates checkout paths only; keep the published r1 environment until r2 is published.
       image: ghcr.io/squid-farm/talewright-ui-tests:pw1.63.0-r1
@@ -115,6 +164,29 @@ jobs:
         with:
           name: nx-ci-plan
           path: artifacts/ci
+      - name: Require prepared input reference
+        env:
+          INPUT_ARTIFACT_ID: ${{ needs.browser-preparation.outputs.artifact-id }}
+        run: |
+          if [ -z "$INPUT_ARTIFACT_ID" ] || [ -z "$TALEWRIGHT_E2E_PREPARATION_ATTEMPT" ]; then
+            echo "Browser preparation did not provide its artifact ID and attempt." >&2
+            exit 1
+          fi
+      - uses: actions/download-artifact@v4
+        with:
+          artifact-ids: ${{ needs.browser-preparation.outputs.artifact-id }}
+          merge-multiple: true
+          path: artifacts
+      - name: Record downloaded browser input size
+        run: |
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          archive = Path("artifacts/browser-e2e-inputs.tar.gz")
+          size = archive.stat().st_size
+          with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
+              summary.write(f"Downloaded browser input tar: {size} bytes.\n")
+          PY
       - run: python3 .github/scripts/nx_ci.py run browser --browser ${{ matrix.browser }} --shard ${{ matrix.shard }}/2
       - uses: actions/upload-artifact@v4
         id: results
@@ -201,7 +273,7 @@ jobs:
 
   verification:
     if: always()
-    needs: [plan, unit, browser, linux-desktop, editor, checks]
+    needs: [plan, browser-preparation, unit, browser, linux-desktop, editor, checks]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -221,6 +293,8 @@ jobs:
           if results["plan"]["result"] != "success":
               raise SystemExit("Verification planning failed, was skipped, or was cancelled")
           selected = json.loads(os.environ["SELECTED"])
-          expected = {job: selected[job] for job in ("unit", "browser", "linux-desktop", "editor", "checks")}
+          expected = {"browser-preparation": selected["browser"]}
+          expected.update({job: selected[job] for job in
+                           ("unit", "browser", "linux-desktop", "editor", "checks")})
           verify_results(results, {"plan": True, **expected})
           PY
