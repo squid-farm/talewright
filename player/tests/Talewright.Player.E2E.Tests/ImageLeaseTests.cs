@@ -31,11 +31,14 @@ public sealed class ImageLeaseTests
         private int _transfers;
         public int Transfers => Volatile.Read(ref _transfers);
         private int _requests;
+        private int _imports;
         public List<string> Revoked { get; } = [];
         public TaskCompletionSource? Gate { get; set; }
         public TaskCompletionSource? BeforeRead { get; set; }
         public TaskCompletionSource Reading { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
         public bool Fail { get; set; }
+        public int FailedImports { get; set; }
+        public int Imports => Volatile.Read(ref _imports);
         public int ModulesDisposed { get; private set; }
         public ValueTask<TValue> InvokeAsync<TValue>(string identifier, params object?[]? args) =>
             InvokeAsync<TValue>(identifier, CancellationToken.None, args);
@@ -45,7 +48,11 @@ public sealed class ImageLeaseTests
             object? result = null;
             switch (identifier)
             {
-                case "import": result = this; break;
+                case "import":
+                    if (Interlocked.Increment(ref _imports) <= FailedImports)
+                        throw new JSException("Module import failed");
+                    result = this;
+                    break;
                 case "createUrl":
                     var number = Interlocked.Increment(ref _requests);
                     var reference = Assert.IsType<DotNetStreamReference>(args![0]);
@@ -201,6 +208,24 @@ public sealed class ImageLeaseTests
         Assert.Equal("blob:test-2", await retry.Url);
         await retry.DisposeAsync();
         Assert.Equal(["blob:test-2"], browser.Revoked);
+    }
+
+    [Fact]
+    public async Task Failed_module_import_is_retried_for_a_later_image_acquisition()
+    {
+        using var files = new ImageStoryFiles();
+        var browser = new Browser { FailedImports = 1 };
+        await using var owner = StoryImages.FromDirectory(StorySource.FromDirectory(files.Root), files.Root);
+
+        var first = owner.Acquire("images/photo.jpeg", browser);
+        await Assert.ThrowsAsync<JSException>(() => first.Url);
+        await first.DisposeAsync();
+
+        var retry = owner.Acquire("images/pixel.png", browser);
+        Assert.Equal("blob:test-1", await retry.Url);
+        await retry.DisposeAsync();
+
+        Assert.Equal(2, browser.Imports);
     }
 
     [Fact]

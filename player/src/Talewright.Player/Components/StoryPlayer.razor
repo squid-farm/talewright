@@ -2,6 +2,7 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 @using Talewright.Player.Diagnostics
+@using Talewright.Player.Library
 @using Talewright.Player.Saves
 @using Talewright.Runtime.Saves
 
@@ -91,6 +92,12 @@
     [CascadingParameter]
     public PlayerDiagnostics? Report { get; set; }
 
+    [CascadingParameter]
+    public StoryImages? Images { get; set; }
+
+    [CascadingParameter]
+    public StoryImageWarmer? SharedImageWarmer { get; set; }
+
     /// <summary>The compiled story to play.</summary>
     [Parameter, EditorRequired]
     public StoryDefinition Story { get; set; } = default!;
@@ -179,6 +186,11 @@
     private int _autosaveSequence;
     private Task _autosaveTail = Task.CompletedTask;
     private int _autosaveCheckStartedGeneration = -1;
+    private StoryImageWarmer? _ownedImageWarmer;
+    private StoryImages? _warmingImages;
+    private readonly object _warmOwner = new();
+    private bool _imageHandoffPending;
+    private StoryImageWarmer ImageWarmer => SharedImageWarmer ?? (_ownedImageWarmer ??= new StoryImageWarmer(JS));
 
     protected override void OnParametersSet()
     {
@@ -198,6 +210,10 @@
                 : null;
             _recoveredAutosaveSlot = null;
         }
+        else if (!ReferenceEquals(_warmingImages, Images))
+        {
+            ReconcileImageWarming(TimeSpan.Zero);
+        }
 
         if (Visible && !_wasVisible)
         {
@@ -213,6 +229,7 @@
     {
         _session = session;
         UpdateDiagnosticContext();
+        ReconcileImageWarming(TimeSpan.Zero);
         _generation++;
         _busy = false;
         _showSaves = false;
@@ -245,6 +262,12 @@
 
     private void UpdateDiagnosticContext() =>
         Report?.SetContext(Story.Id, _session.Current?.Scene?.Value);
+
+    private void ReconcileImageWarming(TimeSpan delay)
+    {
+        _warmingImages = Images;
+        _imageHandoffPending = ImageWarmer.Navigate(_warmOwner, Story, Images, _session.Current.Scene, delay);
+    }
 
     private async Task Restart()
     {
@@ -530,6 +553,7 @@
         }
         _session.Choose(choice.Key);
         UpdateDiagnosticContext();
+        ReconcileImageWarming(TimeSpan.Zero);
         RequestReveal();
         await QueueTriggerSaveAsync();
         await QueueAutosaveAsync();
@@ -540,6 +564,7 @@
         CloseHistory();
         _session.Back();
         UpdateDiagnosticContext();
+        ReconcileImageWarming(StoryImageWarmer.HistorySettlingDelay);
         RequestReveal();
     }
 
@@ -548,6 +573,7 @@
         CloseHistory();
         _session.Forward();
         UpdateDiagnosticContext();
+        ReconcileImageWarming(StoryImageWarmer.HistorySettlingDelay);
         RequestReveal();
     }
 
@@ -676,6 +702,7 @@
             _triggerSaveError = null;
             _session = candidate;
             UpdateDiagnosticContext();
+            ReconcileImageWarming(TimeSpan.Zero);
             _showHistory = false;
             _historyFrames = [];
             _restoreReadingPosition = false;
@@ -843,6 +870,12 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
+        if (_imageHandoffPending)
+        {
+            ImageWarmer.CompleteHandoff();
+            _imageHandoffPending = false;
+        }
+
         if (SaveStore is not null && !AutosaveResumeChecked && !_autosaveCheckComplete
             && _autosaveCheckStartedGeneration != _generation)
         {
@@ -935,6 +968,14 @@
         _disposed = true;
         _autosaveSequence++;
         _triggerSaveSequence++;
+        if (SharedImageWarmer is null)
+        {
+            if (_ownedImageWarmer is not null) await _ownedImageWarmer.DisposeAsync();
+        }
+        else
+        {
+            SharedImageWarmer.Clear(_warmOwner);
+        }
         if (_module is not null)
         {
             try

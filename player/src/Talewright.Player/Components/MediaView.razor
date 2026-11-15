@@ -24,9 +24,15 @@
     private DotNetObjectReference<MediaView>? _reference;
     private CancellationTokenSource? _loading;
     private StoryImages.Lease? _lease;
+    private StoryImages? _boundImages;
+    private string? _boundMediaId;
+    private Task _activeLoad = Task.CompletedTask;
+    private int _sourceGeneration;
     private int _handle;
     private bool _disposed;
+    private bool _observationStarted;
     private bool _started;
+    private bool _reloadAfterRender;
     private string? _error;
     private Task _initializing = Task.CompletedTask;
     private string StyleClass => string.Join(" ", new[]
@@ -36,20 +42,47 @@
         Media.Style.HasFlag(TextStyle.Code) ? "tw-media-code" : "",
     }.Where(value => value.Length > 0));
 
-    protected override void OnParametersSet()
+    protected override async Task OnParametersSetAsync()
     {
+        if (ReferenceEquals(_boundImages, Images) && _boundMediaId == Media.MediaId) return;
+
+        var reload = _started;
+        _boundImages = Images;
+        _boundMediaId = Media.MediaId;
+        ++_sourceGeneration;
+        _started = false;
+        _reloadAfterRender = reload;
+        var loading = _loading;
+        _loading = null;
+        loading?.Cancel();
+        await _activeLoad;
+        var previousLease = _lease;
+        _lease = null;
+        if (previousLease is not null) await previousLease.DisposeAsync();
+
         if (Images is null)
         {
             var wasUnavailable = _error == "Images are unavailable for this story source.";
             _error = "Images are unavailable for this story source.";
             if (!wasUnavailable) Report?.Record(PlayerDiagnosticOperation.ImageLoad, PlayerDiagnosticCause.Unavailable);
+            return;
         }
+
+        _error = null;
+        _lease = Images.TryAcquireExisting(Media.MediaId);
     }
 
-    protected override Task OnAfterRenderAsync(bool firstRender)
+    protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!firstRender || Images is null) return Task.CompletedTask;
-        return _initializing = ObserveAsync();
+        if (!_observationStarted && Images is not null)
+        {
+            _observationStarted = true;
+            _initializing = ObserveAsync();
+        }
+        if (!_reloadAfterRender) return;
+        _reloadAfterRender = false;
+        await _initializing;
+        if (!_disposed && Images is not null) await LoadAsync();
     }
 
     private async Task ObserveAsync()
@@ -74,40 +107,83 @@
     }
 
     [JSInvokable]
-    public async Task LoadAsync()
+    public Task LoadAsync()
     {
-        if (_disposed || _started || Images is null || Images.Lifetime.IsCancellationRequested || _module is null) return;
+        var module = _module;
+        if (_disposed || _started || Images is null || Images.Lifetime.IsCancellationRequested || module is null)
+            return Task.CompletedTask;
         _started = true;
-        _loading = CancellationTokenSource.CreateLinkedTokenSource(Images.Lifetime);
-        var token = _loading.Token;
+        var images = Images;
+        var generation = _sourceGeneration;
+        var loading = CancellationTokenSource.CreateLinkedTokenSource(images.Lifetime);
+        _loading = loading;
+        return _activeLoad = LoadAsync(images, generation, loading, module);
+    }
+
+    private async Task LoadAsync(StoryImages images, int generation, CancellationTokenSource loading,
+        IJSObjectReference module)
+    {
+        var token = loading.Token;
+        var lease = _lease;
         try
         {
-            _lease = Images.Acquire(Media.MediaId, JS);
-            var url = await _lease.Url.WaitAsync(token);
-            if (_disposed || token.IsCancellationRequested) return;
-            var loaded = await _module.InvokeAsync<bool>("display", token, _handle, url);
-            if (!loaded && !_disposed)
+            string url;
+            if (lease is { } claimed)
+            {
+                try
+                {
+                    url = await claimed.Url.WaitAsync(token);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or JSException or OperationCanceledException
+                    && !_disposed && !token.IsCancellationRequested)
+                {
+                    Console.Error.WriteLine($"Image '{Media.MediaId}' warmed transfer failed: {ex.Message}");
+                    Report?.Record(PlayerDiagnosticOperation.ImageLoad, ex, warning: true);
+                    await claimed.DisposeAsync();
+                    if (!IsCurrent(images, generation)) return;
+                    lease = images.Acquire(Media.MediaId, JS);
+                    _lease = lease;
+                    url = await lease.Url.WaitAsync(token);
+                }
+            }
+            else
+            {
+                lease = images.Acquire(Media.MediaId, JS);
+                _lease = lease;
+                url = await lease.Url.WaitAsync(token);
+            }
+            if (!IsCurrent(images, generation) || token.IsCancellationRequested) return;
+            var loaded = await module.InvokeAsync<bool>("display", token, _handle, url);
+            if (!loaded && IsCurrent(images, generation))
             {
                 _error = "This image could not be displayed.";
                 Report?.Record(PlayerDiagnosticOperation.ImageLoad, PlayerDiagnosticCause.InvalidData);
             }
         }
         catch (Exception ex) when (ex is OperationCanceledException or ObjectDisposedException
-            && (_disposed || Images.Lifetime.IsCancellationRequested))
+            && (_disposed || token.IsCancellationRequested || images.Lifetime.IsCancellationRequested))
         {
             return;
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or JSException)
         {
-            if (!_disposed)
+            if (IsCurrent(images, generation))
             {
                 _error = "This image could not be loaded.";
                 Console.Error.WriteLine($"Image '{Media.MediaId}' failed: {ex.Message}");
                 Report?.Record(PlayerDiagnosticOperation.ImageLoad, ex);
             }
         }
-        if (!_disposed) await InvokeAsync(StateHasChanged);
+        finally
+        {
+            if (ReferenceEquals(_loading, loading)) _loading = null;
+            loading.Dispose();
+        }
+        if (IsCurrent(images, generation)) await InvokeAsync(StateHasChanged);
     }
+
+    private bool IsCurrent(StoryImages images, int generation) =>
+        !_disposed && generation == _sourceGeneration && ReferenceEquals(images, Images);
 
     public async ValueTask DisposeAsync()
     {
@@ -115,6 +191,7 @@
         _disposed = true;
         _loading?.Cancel();
         await _initializing;
+        await _activeLoad;
         if (_module is not null)
         {
             try
@@ -129,6 +206,5 @@
         }
         _reference?.Dispose();
         if (_lease is not null) await _lease.DisposeAsync();
-        _loading?.Dispose();
     }
 }

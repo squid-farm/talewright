@@ -43,6 +43,71 @@ See the [performance scorecard](performance-scorecard.md) for a cross-host view
 of browser observations, fixed-byte file-layout measurements, end-cursor versus
 redo-prefix restore, metric limitations, and the status of proposed budgets.
 
+## Player image warming
+
+The browser regression and measurement test is opt-in with the player E2E suite:
+
+```bash
+python3 player/tests/run_e2e.py web --browser chromium --filter FullyQualifiedName~Destination_image_warming_is_reused_and_offscreen_images_remain_lazy
+```
+
+One local observation used Linux Mint 22.3 x64, AMD Ryzen 9 7940HS (16 logical CPUs),
+.NET 10.0.15 and Chromium 153.0.8010.12. The fixture used a 53,477,376-byte JPEG
+(the real image followed by zero padding) in a local uploaded ZIP. Image bytes came
+from the archive on the loopback test host; there were no HTTP image requests or
+HTTP-cache reuse. Each case used a distinct story owner and Blob URL. The settled
+case allowed a 500 ms reading interval after warming; the immediate case navigated
+with warming incomplete. Timings stop after scrolling the image into view and
+observing a decoded `naturalWidth`.
+
+| Case | Image visible | `Finish` choice displacement |
+|---|---:|---:|
+| Cold named-save restore into the current scene | 1,544 ms | 473.2 px |
+| Immediate navigation with the image transfer held pending until viewport entry | 861 ms | 473.2 px |
+| Settled direct-neighbor warming (500 ms reading interval) | 450 ms | 473.2 px |
+
+On the same Linux Mint host, a Linux Photino run used a local folder story and the
+899,911-byte source image. With a 500 ms reading interval, choice-to-decoded-image
+after scrolling measured **678 ms**. Its method and source differ from the browser
+cases, so it is a local-host observation, not a direct cross-host comparison.
+
+The immediate case uses a test-only gate on the browser stream read to make the
+in-flight handoff deterministic; it is not a natural-network timing sample. The cold
+and warmed cases enter the image through different actions (save restore versus a
+choice), so these single observations are diagnostic, not a causal before/after
+claim or a performance target. Choice displacement is the document-Y difference
+before and after image decode; the identical values show that warming does not reserve
+image layout space. The 53 MiB image exercises a large expanded image, but browser
+peak/retained memory were not measured.
+
+### Image transfer concurrency observation
+
+A separate Chromium 153 / .NET 10.0.15 local probe used the published WebAssembly
+player, an uploaded ZIP containing 10 direct neighbors with two distinct paths each,
+and the same 899,911-byte JPEG at each path. The ZIP was about 17.95 MB. The
+one-transfer-per-neighbor scheduler issued the work; a test-only JavaScript semaphore
+then limited concurrent stream reads to 1, 3, 5 or 10. Each setting ran three times.
+Elapsed time starts at the first stream call and ends at Blob creation; it does not
+include image decoding or measure navigation latency.
+
+| Artificial delay per read | Read limit | First 10 requests, median (range) | All 20 requests, median (range) |
+|---|---:|---:|---:|
+| 0 ms | 1 | 456 ms (337–515) | 501 ms (380–565) |
+| 0 ms | 3 | 348 ms (319–366) | 392 ms (361–410) |
+| 0 ms | 5 | 320 ms (298–368) | 370 ms (343–424) |
+| 0 ms | 10 | 298 ms (281–300) | 331 ms (314–342) |
+| 50 ms | 1 | 603 ms (597–605) | 1,134 ms (1,128–1,134) |
+| 50 ms | 3 | 291 ms (287–301) | 469 ms (462–476) |
+| 50 ms | 5 | 278 ms (272–300) | 385 ms (378–406) |
+| 50 ms | 10 | 321 ms (252–332) | 375 ms (306–389) |
+
+This compares a semaphore inside the browser stream bridge, not different scheduler
+implementations: all ten first-neighbor calls are already issued in every case. The
+50 ms delay is synthetic, and the local ZIP does not exercise browser HTTP connection
+limits. The higher limit helped the undelayed local workload, while the delayed
+5-versus-10 results overlap; three samples do not establish an ideal concurrency.
+Peak browser memory and other devices or network conditions were not measured.
+
 ## File syntax reuse and edit diagnostics
 
 This measurement uses the deterministic 20-chapter realistic corpus:

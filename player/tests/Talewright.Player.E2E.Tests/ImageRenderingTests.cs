@@ -1,4 +1,7 @@
+using System.Diagnostics;
 using Microsoft.Playwright;
+using Talewright.Runtime;
+using Talewright.Talemark.Compilation;
 using Talewright.Testing;
 using Xunit.Abstractions;
 using static Microsoft.Playwright.Assertions;
@@ -6,8 +9,211 @@ using static Microsoft.Playwright.Assertions;
 namespace Talewright.Player.E2E.Tests;
 
 [Trait("Host", "Browser")]
-public sealed class ImageRenderingTests(WebHostFixture host, ITestOutputHelper output) : PlayerTest(host, output)
+public sealed class ImageRenderingTests : PlayerTest
 {
+    private readonly WebHostFixture _host;
+    private readonly ITestOutputHelper _output;
+
+    public ImageRenderingTests(WebHostFixture host, ITestOutputHelper output) : base(host, output)
+    {
+        _host = host;
+        _output = output;
+    }
+
+    [Fact]
+    public async Task Destination_image_warming_is_reused_and_offscreen_images_remain_lazy()
+    {
+        using var files = new ImageStoryFiles();
+        files.EnlargeIllustrationAboveFormerArchiveLimit();
+        var paragraphs = string.Join("\n\n", Enumerable.Repeat(
+            "A reader studies the marked route and considers what might wait beyond the next ridge. " +
+            "The path winds through old growth, following the river until the stones turn east.", 60));
+        var destinationTale = $$"""
+            === start
+            Read this passage before choosing where to go.
+            * [Continue to the destination] -> destination
+            === destination
+            {{paragraphs}}
+
+            {image("photo.jpeg", "Destination map")}
+            * [Finish] -> END
+            """;
+        var coldTale = $$"""
+            === start
+            Read this passage before loading the image.
+            {{paragraphs}}
+
+            {image("photo.jpeg", "Cold control map")}
+            * [Finish] -> END
+            """;
+        var baseManifest = File.ReadAllText(Path.Combine(files.Root, "story.talewright.yaml"));
+
+        await Page.RouteAsync("**/MediaView.razor.js", async route =>
+        {
+            var response = await route.FetchAsync();
+            var script = await response.TextAsync();
+            const string point = "const bytes = await stream.arrayBuffer();";
+            Assert.Contains(point, script);
+            script = script.Replace(point, """
+                if (window.pauseWarmingTransport)
+                    await new Promise(resolve => window.resumeWarmingTransport.push(resolve));
+                const bytes = await stream.arrayBuffer();
+                """, StringComparison.Ordinal);
+            await route.FulfillAsync(new() { Response = response, Body = script });
+        });
+
+        await Page.EvaluateAsync("""
+            () => {
+                window.imageUrls = [];
+                window.pauseWarmingTransport = false;
+                window.resumeWarmingTransport = [];
+                const create = URL.createObjectURL.bind(URL);
+                URL.createObjectURL = blob => {
+                    const url = create(blob);
+                    if (blob.type.startsWith("image/")) window.imageUrls.push(url);
+                    return url;
+                };
+            }
+            """);
+
+        File.WriteAllText(files.TalePath, coldTale);
+        var coldStoryId = "warm-cold-baseline";
+        File.WriteAllText(Path.Combine(files.Root, "story.talewright.yaml"),
+            baseManifest.Replace("id: image-test", $"id: {coldStoryId}", StringComparison.Ordinal));
+        var coldCompilation = StoryCompiler.Compile(StorySource.FromDirectory(files.Root));
+        Assert.True(coldCompilation.Success, string.Join("\n", coldCompilation.Diagnostics));
+        var coldHistory = new StoryHistory(coldCompilation.Story!, 42);
+        await WriteBrowserSaveAsync(coldStoryId, "Cold baseline", coldHistory.Save());
+        await UploadBytes(coldStoryId + ".zip", files.Zip());
+        await Expect(Latest).ToContainTextAsync("Read this passage before loading the image.");
+        await Driver.ClickAsync("Saves");
+        await Driver.ClickAsync("Load Cold baseline");
+        var coldTimer = Stopwatch.StartNew();
+        await Driver.ClickAsync("Load save");
+        await Expect(SaveStatus).ToHaveTextAsync("Loaded 'Cold baseline'.");
+        var coldImage = Page.GetByRole(AriaRole.Img, new() { Name = "Cold control map", Exact = true });
+        var coldChoice = Choices.Last;
+        Assert.Equal(0, await Page.EvaluateAsync<int>("window.imageUrls.length"));
+        var coldChoiceTopBefore = await Page.EvaluateAsync<double>(
+            "element => element.getBoundingClientRect().top + window.scrollY", await coldChoice.ElementHandleAsync());
+        await coldImage.ScrollIntoViewIfNeededAsync();
+        await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0",
+            await coldImage.ElementHandleAsync(), new() { Timeout = 30_000 });
+        coldTimer.Stop();
+        var coldChoiceTopAfter = await Page.EvaluateAsync<double>(
+            "element => element.getBoundingClientRect().top + window.scrollY", await coldChoice.ElementHandleAsync());
+        Assert.Equal(1, await Page.EvaluateAsync<int>("window.imageUrls.length"));
+        var coldChoiceDisplacement = coldChoiceTopAfter - coldChoiceTopBefore;
+
+        await Library();
+        await Page.EvaluateAsync("() => { window.imageUrls = []; }");
+
+        async Task<(long NavigationMilliseconds, long PassageMilliseconds, int WarmUrlsAtNavigation, double ChoiceDisplacement)> PlayAsync(
+            string storyId, bool waitForWarm)
+        {
+            try
+            {
+                if (!waitForWarm)
+                {
+                    await Page.EvaluateAsync("""
+                        () => {
+                            window.pauseWarmingTransport = true;
+                            window.resumeWarmingTransport = [];
+                        }
+                        """);
+                }
+                File.WriteAllText(files.TalePath, destinationTale);
+                var manifestPath = Path.Combine(files.Root, "story.talewright.yaml");
+                File.WriteAllText(manifestPath,
+                    baseManifest.Replace("id: image-test", $"id: {storyId}", StringComparison.Ordinal));
+                await UploadBytes(storyId + ".zip", files.Zip());
+                await Expect(Latest).ToContainTextAsync("Read this passage before choosing where to go.");
+
+                var warmTimer = Stopwatch.StartNew();
+                if (waitForWarm)
+                {
+                    await Page.WaitForFunctionAsync("window.imageUrls.length === 1", null,
+                        new() { Timeout = 30_000 });
+                    await Task.Delay(500);
+                }
+                else
+                {
+                    await Page.WaitForFunctionAsync("window.resumeWarmingTransport.length === 1", null,
+                        new() { Timeout = 30_000 });
+                }
+                var warmMilliseconds = warmTimer.ElapsedMilliseconds;
+                var warmUrlsAtNavigation = await Page.EvaluateAsync<int>("window.imageUrls.length");
+                if (!waitForWarm)
+                    Assert.Equal(0, warmUrlsAtNavigation);
+
+                var navigationTimer = Stopwatch.StartNew();
+                await Choose("Continue to the destination");
+                var image = Page.GetByRole(AriaRole.Img, new() { Name = "Destination map", Exact = true });
+                await image.WaitForAsync(new() { State = WaitForSelectorState.Attached });
+                Assert.True(await image.EvaluateAsync<bool>("element => element.getBoundingClientRect().top > innerHeight"));
+                Assert.Null(await image.GetAttributeAsync("src"));
+                var finish = Choices.Last;
+                var finishTopBefore = await Page.EvaluateAsync<double>(
+                    "element => element.getBoundingClientRect().top + window.scrollY", await finish.ElementHandleAsync());
+                await image.ScrollIntoViewIfNeededAsync();
+                if (!waitForWarm)
+                {
+                    await Expect(image).ToBeInViewportAsync();
+                    await Task.Delay(100);
+                    Assert.Equal(0, await Page.EvaluateAsync<int>("window.imageUrls.length"));
+                    await Page.EvaluateAsync("""
+                        () => {
+                            const resume = window.resumeWarmingTransport.shift();
+                            if (!resume) throw new Error("No pending image transfer to resume.");
+                            resume();
+                            window.pauseWarmingTransport = false;
+                        }
+                        """);
+                }
+                await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0",
+                    await image.ElementHandleAsync(), new() { Timeout = 30_000 });
+                navigationTimer.Stop();
+                var finishTopAfter = await Page.EvaluateAsync<double>(
+                    "element => element.getBoundingClientRect().top + window.scrollY", await finish.ElementHandleAsync());
+                Assert.Equal(1, await Page.EvaluateAsync<int>("window.imageUrls.length"));
+                Assert.Equal(await Page.EvaluateAsync<string>("window.imageUrls[0]"), await image.GetAttributeAsync("src"));
+                return (navigationTimer.ElapsedMilliseconds, warmMilliseconds, warmUrlsAtNavigation, finishTopAfter - finishTopBefore);
+            }
+            finally
+            {
+                if (!waitForWarm)
+                {
+                    await Page.EvaluateAsync("""
+                        () => {
+                            window.pauseWarmingTransport = false;
+                            for (const resume of window.resumeWarmingTransport.splice(0)) resume();
+                        }
+                        """);
+                }
+            }
+        }
+
+        var immediate = await PlayAsync("warm-immediate", waitForWarm: false);
+        await Library();
+        await Page.EvaluateAsync("() => { window.imageUrls = []; }");
+        var settled = await PlayAsync("warm-settled", waitForWarm: true);
+
+        _output.WriteLine(
+            $"Image warming measurement: story=local uploaded ZIP; host=published WebAssembly/{_host.BrowserName}; " +
+            $"imageBytes={new FileInfo(files.ImagePath).Length}; HTTP image cache=not used; each trial used a new story owner/Blob URL; " +
+            $"image transport=local archive uploads to loopback host; readingInterval=0ms immediate and 500ms settled; " +
+            $"timing=cold save-load-to-decoded versus navigation-to-decoded; " +
+            $"choice displacement=Finish button document-Y change before versus after image decode.");
+        _output.WriteLine(
+            $"Cold save restore: load-to-image-visible={coldTimer.ElapsedMilliseconds}ms, choice displacement={coldChoiceDisplacement:F1}px.");
+        _output.WriteLine(
+            $"Immediate: warmed URLs at navigation={immediate.WarmUrlsAtNavigation}, passage-visible-to-choice={immediate.PassageMilliseconds}ms, " +
+            $"navigation-to-image-visible={immediate.NavigationMilliseconds}ms, choice displacement={immediate.ChoiceDisplacement:F1}px.");
+        _output.WriteLine(
+            $"Settled: warmed URLs at navigation={settled.WarmUrlsAtNavigation}, passage-visible-to-choice={settled.PassageMilliseconds}ms, " +
+            $"navigation-to-image-visible={settled.NavigationMilliseconds}ms, choice displacement={settled.ChoiceDisplacement:F1}px.");
+    }
+
     [Fact]
     public async Task Embedded_images_collapse_on_departure_and_survive_rejected_replacement()
     {
@@ -39,12 +245,12 @@ public sealed class ImageRenderingTests(WebHostFixture host, ITestOutputHelper o
         await Choices.First.FocusAsync();
         await Page.Keyboard.PressAsync("Enter");
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: A riverside expedition camp with canvas tents and supplies at the edge of dense jungle.", Exact = true })).ToBeVisibleAsync();
-        await Page.WaitForFunctionAsync("url => window.imageRevocations.includes(url)", url);
+        Assert.False(await Page.EvaluateAsync<bool>("url => window.imageRevocations.includes(url)", url));
         await Driver.ClickAsync("Back");
         await image.ScrollIntoViewIfNeededAsync();
         await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0", await image.ElementHandleAsync());
         var restoredUrl = await image.GetAttributeAsync("src");
-        Assert.StartsWith("blob:", restoredUrl);
+        Assert.Equal(url, restoredUrl);
         await Library();
         Assert.False(await Page.EvaluateAsync<bool>("url => window.imageRevocations.includes(url)", restoredUrl));
         var invalid = new StoryFixture("bad-images", "game:\n  id: bad\n  title: Bad\n  start: missing\n", "=== start\n-> END");
@@ -160,11 +366,12 @@ public sealed class ImageRenderingTests(WebHostFixture host, ITestOutputHelper o
         await Choices.First.FocusAsync();
         await Page.Keyboard.PressAsync("Enter");
         await Expect(Latest).ToContainTextAsync("Next passage.");
-        await Page.WaitForFunctionAsync("url => window.archiveRevoked.includes(url)", url);
+        Assert.False(await Page.EvaluateAsync<bool>("url => window.archiveRevoked.includes(url)", url));
         var next = Page.GetByAltText("Next camp", new() { Exact = true });
         await next.ScrollIntoViewIfNeededAsync();
         await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0", await next.ElementHandleAsync());
         var nextUrl = await next.GetAttributeAsync("src");
+        Assert.Equal(url, nextUrl);
         await Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: A camp", Exact = true }).ClickAsync();
         await image.ScrollIntoViewIfNeededAsync();
         await Expect(image).ToHaveAttributeAsync("src", nextUrl!);

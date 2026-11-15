@@ -297,7 +297,8 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: First map", Exact = true }))
             .ToBeVisibleAsync();
         Assert.Equal(0, await Page.Locator(".tw-past img").CountAsync());
-        await Page.WaitForFunctionAsync("urls => urls.every(url => window.sceneImageUrls.revoked.includes(url))", firstUrls);
+        Assert.False(await Page.EvaluateAsync<bool>(
+            "urls => urls.some(url => window.sceneImageUrls.revoked.includes(url))", firstUrls));
 
         var secondUrl = await LoadedImageUrl("Second camp");
         await Choices.First.ClickAsync();
@@ -317,11 +318,15 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: Conversation camp", Exact = true }))
             .ToBeVisibleAsync();
         await Page.WaitForFunctionAsync("urls => urls.every(url => window.sceneImageUrls.revoked.includes(url))",
-            new[] { secondUrl, conversationUrl });
+            new[] { firstUrls[1], secondUrl });
+        Assert.False(await Page.EvaluateAsync<bool>(
+            "url => window.sceneImageUrls.revoked.includes(url)", conversationUrl));
 
         await Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: Conversation camp", Exact = true })
             .ClickAsync();
         await Expect(Page.GetByAltText("Conversation camp", new() { Exact = true })).ToBeVisibleAsync();
+        await Expect(Page.GetByAltText("Conversation camp", new() { Exact = true }))
+            .ToHaveAttributeAsync("src", conversationUrl);
         await Expect(Latest).ToHaveAttributeAsync("data-tw-scene", "quiet");
         await Expect(Latest).ToContainTextAsync("A quiet scene.");
 

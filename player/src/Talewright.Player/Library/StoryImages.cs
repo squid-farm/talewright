@@ -14,6 +14,7 @@ public sealed record LoadedStory(StorySource Source, StoryImages? Images = null)
 /// <summary>Lazy access to one accepted source's local images. Identity also defines a UI source generation.</summary>
 public sealed class StoryImages : IDisposable, IAsyncDisposable
 {
+    private readonly object _sync = new();
     private readonly Dictionary<string, Entry> _entries = new(StringComparer.Ordinal);
     private readonly List<Task> _retired = [];
     private readonly IStoryImageSource _source;
@@ -22,6 +23,7 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
     private sealed class Entry
     {
         public int Holders;
+        public bool Retired;
         public CancellationTokenSource Cancellation { get; } = new();
         public Task<string> Url { get; set; } = null!;
     }
@@ -36,18 +38,39 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
 
     public Lease Acquire(string path, IJSRuntime js)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        if (!_paths.Contains(path)) throw new InvalidDataException($"Image '{path}' is not in this story's safe image catalogue.");
-        _module ??= js.InvokeAsync<IJSObjectReference>("import",
-            "./_content/Talewright.Player/Components/MediaView.razor.js").AsTask();
-        if (!_entries.TryGetValue(path, out var entry))
+        lock (_sync)
         {
-            entry = new Entry();
-            _entries.Add(path, entry);
-            entry.Url = TransferAsync(path, entry);
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (!_paths.Contains(path)) throw new InvalidDataException($"Image '{path}' is not in this story's safe image catalogue.");
+            if (_module is { IsCompleted: true, IsCompletedSuccessfully: false })
+                _module = null;
+            _module ??= js.InvokeAsync<IJSObjectReference>("import",
+                "./_content/Talewright.Player/Components/MediaView.razor.js").AsTask();
+            if (_entries.TryGetValue(path, out var failed) && !failed.Url.IsCompletedSuccessfully && failed.Url.IsCompleted)
+            {
+                _entries.Remove(path);
+                RetireLocked(failed);
+            }
+            if (!_entries.TryGetValue(path, out var entry))
+            {
+                entry = new Entry();
+                _entries.Add(path, entry);
+                entry.Url = TransferAsync(path, entry);
+            }
+            ++entry.Holders;
+            return new(entry.Url, () => ReleaseAsync(path, entry));
         }
-        ++entry.Holders;
-        return new(entry.Url, () => ReleaseAsync(path, entry));
+    }
+
+    internal Lease? TryAcquireExisting(string path)
+    {
+        lock (_sync)
+        {
+            if (_disposed || !_paths.Contains(path) || !_entries.TryGetValue(path, out var entry) ||
+                entry.Url.IsCompleted && !entry.Url.IsCompletedSuccessfully) return null;
+            ++entry.Holders;
+            return new(entry.Url, () => ReleaseAsync(path, entry));
+        }
     }
 
     private async Task<string> TransferAsync(string path, Entry entry)
@@ -68,13 +91,23 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
 
     private ValueTask ReleaseAsync(string path, Entry entry)
     {
-        if (--entry.Holders != 0 || !_entries.TryGetValue(path, out var current) || !ReferenceEquals(entry, current))
-            return ValueTask.CompletedTask;
-        _entries.Remove(path);
+        lock (_sync)
+        {
+            if (--entry.Holders != 0) return ValueTask.CompletedTask;
+            if (_entries.TryGetValue(path, out var current) && ReferenceEquals(entry, current))
+                _entries.Remove(path);
+            return new(RetireLocked(entry));
+        }
+    }
+
+    private Task RetireLocked(Entry entry)
+    {
+        if (entry.Retired) return Task.CompletedTask;
+        entry.Retired = true;
         var task = RetireAsync(entry);
         _retired.RemoveAll(retired => retired.IsCompletedSuccessfully);
         _retired.Add(task);
-        return new(task);
+        return task;
     }
 
     private async Task RetireAsync(Entry entry)
@@ -84,7 +117,7 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
             string url;
             // Blazor may still be reading the stream after its final view unmounts.
             try { url = await entry.Url; }
-            catch (OperationCanceledException) when (entry.Cancellation.IsCancellationRequested)
+            catch (OperationCanceledException)
             {
                 return;
             }
@@ -118,10 +151,14 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
 
     public async ValueTask<Stream> OpenAsync(string path, CancellationToken cancellationToken = default)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
-        if (!_paths.Contains(path))
-            throw new InvalidDataException($"Image '{path}' is not in this story's safe image catalogue.");
-        var cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, Lifetime);
+        CancellationTokenSource cancellation;
+        lock (_sync)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (!_paths.Contains(path))
+                throw new InvalidDataException($"Image '{path}' is not in this story's safe image catalogue.");
+            cancellation = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, Lifetime);
+        }
         try
         {
             var stream = await _source.OpenAsync(path, cancellation.Token);
@@ -239,12 +276,15 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
 
     public void Dispose()
     {
-        if (_disposed) return;
-        _disposed = true;
-        _lifetime.Cancel();
-        foreach (var entry in _entries.Values) _retired.Add(RetireAsync(entry));
-        _entries.Clear();
-        _cleanup = CleanupAsync();
+        lock (_sync)
+        {
+            if (_disposed) return;
+            _disposed = true;
+            _lifetime.Cancel();
+            foreach (var entry in _entries.Values) RetireLocked(entry);
+            _entries.Clear();
+            _cleanup = CleanupAsync();
+        }
     }
 
     private async Task CleanupAsync()

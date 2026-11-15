@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Xunit.Abstractions;
 
 namespace Talewright.Player.E2E.Tests;
 
@@ -6,6 +7,10 @@ namespace Talewright.Player.E2E.Tests;
 [Collection(SerialCollection.Name)]
 public sealed class NativeImageTests
 {
+    private readonly ITestOutputHelper _output;
+
+    public NativeImageTests(ITestOutputHelper output) => _output = output;
+
     [Fact]
     public async Task Native_built_in_sample_opens_real_embedded_image_bytes()
     {
@@ -41,6 +46,44 @@ public sealed class NativeImageTests
             node.Role == "push button" && node.Name == "Reveal image: A camp");
         Assert.DoesNotContain(history.Descendants(), node => node.Role == "image" && node.Name == "A camp");
         Assert.DoesNotContain("unavailable", history.Content);
+    }
+
+    [Fact]
+    public async Task Folder_player_warms_a_direct_destination_image()
+    {
+        using var files = new ImageStoryFiles();
+        var paragraphs = string.Join("\n\n", Enumerable.Repeat(
+            "A reader studies the marked route and considers what might wait beyond the next ridge. " +
+            "The path winds through old growth, following the river until the stones turn east.", 60));
+        await File.WriteAllTextAsync(files.TalePath, $$"""
+            === start
+            Read this passage before choosing where to go.
+            * [Continue to the destination] -> destination
+            === destination
+            {{paragraphs}}
+
+            {image("photo.jpeg", "Destination map")}
+            * [Finish] -> END
+            """);
+
+        await using var driver = new NativePlayerDriver(Artifacts("image-warming"));
+        await driver.StartAsync(files.Root);
+        await WaitFor(driver, snapshot => snapshot.Content.Contains("Read this passage before choosing where to go."));
+        await Task.Delay(500);
+
+        var timer = Stopwatch.StartNew();
+        await driver.ChooseAsync("Continue to the destination");
+        await driver.ScrollToImageAsync("Destination map");
+        var snapshot = await WaitFor(driver, state => state.Descendants().Any(node =>
+            node.Role == "image" && node.Name == "Destination map" && node.Bounds.Height > 100));
+        timer.Stop();
+        _output.WriteLine(
+            $"Image warming measurement: host=Linux Photino; source=local story folder; " +
+            $"imageBytes={new FileInfo(files.ImagePath).Length}; HTTP/cache=not applicable; " +
+            $"readingInterval=500ms; method=choice click through decoded accessible image after scroll; " +
+            $"navigation-to-image-visible={timer.ElapsedMilliseconds}ms.");
+        Assert.Contains(snapshot.Descendants(), node =>
+            node.Role == "image" && node.Name == "Destination map" && node.Bounds.Height > 100);
     }
 
     [Fact]
@@ -105,7 +148,7 @@ public sealed class NativeImageTests
     }
 
     [Fact]
-    public async Task Actual_folder_player_releases_an_earlier_scene_image_and_reports_deleted_file()
+    public async Task Folder_player_reuses_a_connected_image_then_reports_its_deletion_after_release()
     {
         using var files = new ImageStoryFiles();
         await File.WriteAllTextAsync(files.TalePath, """
@@ -114,6 +157,12 @@ public sealed class NativeImageTests
             * [Next] -> next
             === next
             {image("photo.jpeg", "Later camp")}
+            * [Next] -> quiet
+            === quiet
+            A quiet passage.
+            * [Next] -> distant
+            === distant
+            A distant passage.
             * [Finish] -> END
             """);
         await using var driver = new NativePlayerDriver(Artifacts("folder-image-failure"));
@@ -122,15 +171,19 @@ public sealed class NativeImageTests
             node.Role == "image" && node.Name == "Mounted camp" && node.Bounds.Height > 100));
         File.Delete(files.ImagePath);
         await ActivateChoice(driver);
-        var snapshot = await WaitFor(driver, snapshot =>
-            snapshot.Content.Contains("This image could not be loaded.", StringComparison.Ordinal));
+        var snapshot = await WaitFor(driver, snapshot => snapshot.Descendants().Any(node =>
+            node.Role == "image" && node.Name == "Later camp" && node.Bounds.Height > 100));
         Assert.Contains(snapshot.Descendants(), node =>
             node.Role == "push button" && node.Name == "Reveal image: Mounted camp");
         Assert.DoesNotContain(snapshot.Descendants(), node =>
             node.Role == "image" && node.Name == "Mounted camp" && node.Bounds.Height > 100);
         Assert.Contains(snapshot.Descendants(), node => node.Role == "image" && node.Name == "Later camp");
-        Assert.Contains("This image could not be loaded.", snapshot.Content);
+        Assert.DoesNotContain("This image could not be loaded.", snapshot.Content);
         Assert.DoesNotContain("An unhandled error", snapshot.Content);
+        await ActivateChoice(driver);
+        await WaitFor(driver, state => state.Content.Contains("A quiet passage."));
+        await ActivateChoice(driver);
+        await WaitFor(driver, state => state.Content.Contains("A distant passage."));
         await driver.ClickAsync("More actions");
         await driver.ClickAsync("Restart");
         await driver.ClickAsync("Restart story");
