@@ -456,6 +456,70 @@ class PublicationSafeguardTests(unittest.TestCase):
                 for job, body in workflow["jobs"].items():
                     self.assertTrue("steps" in body or "uses" in body, f"{name}:{job}")
 
+    def test_browser_preparation_is_selected_and_verified_with_same_run_artifacts(self):
+        tests = self.workflows["tests.yml"]["jobs"]
+        preparation = tests["browser-preparation"]
+        browser = tests["browser"]
+        verification = tests["verification"]
+
+        self.assertEqual("plan", preparation["needs"])
+        self.assertIn("selected).browser", preparation["if"])
+        self.assertIn("pull_request.head.sha", preparation["env"]["TALEWRIGHT_E2E_SOURCE_SHA"])
+        self.assertEqual(["plan", "browser-preparation"], browser["needs"])
+        self.assertEqual(
+            preparation["env"]["TALEWRIGHT_E2E_SOURCE_SHA"],
+            browser["env"]["TALEWRIGHT_E2E_SOURCE_SHA"],
+        )
+        self.assertIn("browser-preparation", verification["needs"])
+        self.assertIn('"browser-preparation": selected["browser"]', verification["steps"][-1]["run"])
+
+        prep_steps = preparation["steps"]
+        self.assertIn("run_e2e.py prepare-web", next(
+            step["run"] for step in prep_steps if step.get("name") == "Build E2E tests and publish the web host once"
+        ))
+        upload = next(step for step in prep_steps if step.get("uses") == "actions/upload-artifact@v4")
+        artifact_name = "browser-e2e-inputs-${{ github.run_id }}-${{ github.run_attempt }}"
+        self.assertEqual(artifact_name, upload["with"]["name"])
+        self.assertEqual("inputs", upload["id"])
+        self.assertEqual("${{ steps.inputs.outputs.artifact-id }}", preparation["outputs"]["artifact-id"])
+        self.assertEqual("${{ steps.identity.outputs.run-attempt }}", preparation["outputs"]["run-attempt"])
+        identity = next(step for step in prep_steps if step.get("id") == "identity")
+        self.assertIn('run-attempt=$GITHUB_RUN_ATTEMPT', identity["run"])
+        self.assertEqual(
+            "${{ needs.browser-preparation.outputs.run-attempt }}",
+            browser["env"]["TALEWRIGHT_E2E_PREPARATION_ATTEMPT"],
+        )
+        self.assertEqual("artifacts/browser-e2e-inputs.tar.gz", upload["with"]["path"])
+        self.assertEqual("error", upload["with"]["if-no-files-found"])
+        self.assertEqual("0", upload["with"]["compression-level"])
+
+        downloads = [
+            step for step in browser["steps"]
+            if step.get("uses") == "actions/download-artifact@v4"
+        ]
+        prepared_download = next(
+            step for step in downloads if "artifact-ids" in step["with"]
+        )
+        self.assertEqual(
+            "${{ needs.browser-preparation.outputs.artifact-id }}",
+            prepared_download["with"]["artifact-ids"],
+        )
+        self.assertTrue(prepared_download["with"]["merge-multiple"])
+        self.assertNotIn("name", prepared_download["with"])
+        self.assertEqual("artifacts", prepared_download["with"]["path"])
+        self.assertNotIn("run-id", prepared_download["with"])
+        self.assertNotIn("repository", prepared_download["with"])
+        reference_check = next(
+            step for step in browser["steps"] if step.get("name") == "Require prepared input reference"
+        )
+        self.assertEqual(
+            prepared_download["with"]["artifact-ids"], reference_check["env"]["INPUT_ARTIFACT_ID"],
+        )
+        self.assertIn('-z "$INPUT_ARTIFACT_ID"', reference_check["run"])
+        self.assertIn('-z "$TALEWRIGHT_E2E_PREPARATION_ATTEMPT"', reference_check["run"])
+        self.assertIn("exit 1", reference_check["run"])
+        self.assertLess(browser["steps"].index(reference_check), browser["steps"].index(prepared_download))
+
     def test_publication_waits_for_verification_and_only_runs_for_version_tags(self):
         self.assertTrue(
             {"build", "tests", "verification", "cli-archives", "provisional-vsix"}

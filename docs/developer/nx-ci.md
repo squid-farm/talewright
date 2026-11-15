@@ -171,7 +171,8 @@ manifest is uploaded once and consumed by the jobs, so there is no parallel work
 |---|---|
 | `build` | Existing Release solution build, NuGet packs, clean library consumers, installed CLI and publication checks. |
 | `tests / unit` | Every test in each affected headless unit project, in Release. The normal `Talewright.Talemark.Tests` suite excludes the editor/compiler contract. One nonempty, passing TRX report is required per selected project; reports are isolated under each area-local test project's `artifacts/unit`. |
-| `tests / browser` | Complete regular player regression suite in **all three** browsers: Chromium, Firefox, WebKit, each split across two disjoint shard jobs. Shard 1 also runs the focused `Artifact=Standalone` published-game smoke suite under a nested static path. |
+| `tests / browser-preparation` | Selected with the browser group from the Nx manifest, independently of the full `build` job. Builds the Release E2E output and publishes the regular web host once, then uploads an immutable compressed tar artifact named for the workflow run and attempt. Its manifest verifies the exact checkout, run identity, SHA-256 and file mode of every payload file; tar preserves Playwright's executable driver permissions. The job summary records the archive size. |
+| `tests / browser` | Complete regular player regression suite in **all three** browsers: Chromium, Firefox, WebKit, each split across two disjoint shard jobs. Every consumer downloads the preparation artifact from the same run and verifies it before discovery; regular regression execution does not restore, build or publish. Shard 1 also runs the focused `Artifact=Standalone` published-game smoke suite under a nested static path through its existing separate publish target. Moving that smoke preparation is a follow-up, not part of this change. |
 | `tests / linux-desktop` | Accessibility/chooser probe in each of three shard jobs, which together run the complete regular native regression suite; shard 1 then runs the focused published-desktop smoke. Regression and standalone reports have separate names. |
 | `tests / editor / syntax` | Applicable Node syntax/snippet tests, focused snippet compiler contract, VSIX packaging/content check, and installed-editor smoke. Compiler-only changes need not run all editor checks. |
 | `tests / checks` | Every CI/selection regression test, documentation-link check, performance-report Python test, and bounded performance budget on every PR, plus any affected leaf compilation. |
@@ -183,11 +184,27 @@ and its own schedule.
 
 Both reusable Tests verification and the Build **CI verification** aggregate run with `if: always()`.
 They require successful selection, success for every selected job, and `skipped` only for explicitly
-unselected jobs. Failures, cancellations, missing results, unexpected execution/skips, and selection
-errors fail closed. E2E matrix fail-fast remains disabled, so every browser and shard produces evidence.
+unselected jobs. Browser preparation is included in this aggregate, so its failure cannot be hidden
+by consumers skipped because their prerequisite failed. Failures, cancellations, missing results,
+unexpected execution/skips, and selection errors fail closed. E2E matrix fail-fast remains disabled,
+so every browser and shard produces evidence.
 After each E2E job, the router deletes evidence directories of passing cases named by the TRX reports;
 uploads keep every report plus failed-case traces, screenshots and DOM for 14 days.
 NuGet/sample publication additionally requires the aggregate.
+
+Browser preparation exposes its uploaded artifact ID and preparation attempt as job outputs.
+Consumers use those outputs rather than their own current attempt number: a failed-jobs rerun
+retains the successful preparation job and its immutable same-run artifact. The manifest still
+requires the same workflow run, checkout and producer attempt, as well as matching file hashes
+and modes. A full rerun produces a new artifact and corresponding outputs.
+
+The preparation job summary records the tar artifact's file size; GitHub's step timings
+separate preparation, upload, download, and final verification, while Nx execution summaries record
+the browser test batches. Compare several baseline and changed hosted runs using the complete
+preparation, transfer, execution and verification wall time, queue time, artifact size, and summed
+runner minutes. Use the job timestamps for queueing and the workflow run for end-to-end wall time;
+consumer duration alone is not evidence of a faster workflow. The hosted comparison remains distinct
+from local tests and should be made from complete workflow runs.
 
 For a no-impact PR, `build` and all Tests work jobs except `checks` skip. A failed `checks` job fails
 **CI verification**; the skipped groups remain valid because they were not selected. Mixed metadata/source changes retain
