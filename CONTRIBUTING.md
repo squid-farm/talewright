@@ -57,7 +57,7 @@ dotnet vstest engine/tests/*.Tests/bin/Release/net8.0/*.Tests.dll
 ```
 
 Install the .NET 8 runtime for this check; SDK 10 alone does not include it.
-CI runs this check after the normal unit suite.
+CI runs this check in parallel with the normal unit suite.
 `TalewrightTestTargetFrameworks` can also select another engine test target, such as `net9.0`.
 Running those tests requires the selected runtime, not just SDK 10.
 

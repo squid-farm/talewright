@@ -64,16 +64,13 @@ jobs:
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-          dotnet-version: '8.0.x'
       - uses: actions/download-artifact@v4
         with:
           name: nx-ci-plan
           path: artifacts/ci
+      - name: Build solution in Release
+        run: dotnet build Talewright.slnx -c Release
       - run: python3 .github/scripts/nx_ci.py run unit
-      - name: Build oldest-runtime engine tests with the current SDK
-        run: dotnet build Talewright.slnx -c Release -p:TalewrightTestTargetFrameworks=net8.0
-      - name: Run engine tests on .NET 8
-        run: dotnet vstest engine/tests/*.Tests/bin/Release/net8.0/*.Tests.dll
       - uses: actions/upload-artifact@v4
         id: results
         if: always()
@@ -89,6 +86,41 @@ jobs:
         env:
           NX_CI_ARTIFACT_URL: ${{ steps.results.outcome == 'success' && steps.results.outputs.artifact-url || '' }}
         run: python3 .github/scripts/nx_ci.py summary unit
+
+  unit-net8:
+    needs: plan
+    if: fromJSON(needs.plan.outputs.selected).unit
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+          dotnet-version: '8.0.x'
+      - name: Build oldest-runtime engine tests with the current SDK
+        run: dotnet build Talewright.slnx -c Release -p:TalewrightTestTargetFrameworks=net8.0
+      - name: Run engine tests on .NET 8
+        run: |
+          for project in engine/tests/*.Tests; do
+            test -f "$project/bin/Release/net8.0/$(basename "$project").dll"
+          done
+          dotnet vstest engine/tests/*.Tests/bin/Release/net8.0/*.Tests.dll \
+            --logger:"trx;LogFileName=net8.trx" --ResultsDirectory:artifacts/net8
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+          counters = ET.parse("artifacts/net8/net8.trx").find(".//{*}Counters")
+          if counters is None or int(counters.attrib["executed"]) == 0 or int(counters.attrib["failed"]) != 0:
+              raise SystemExit(".NET 8 report has no executed tests or contains failures")
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: unit-net8-results
+          path: artifacts/net8
+          if-no-files-found: error
 
   browser-preparation:
     needs: plan
@@ -273,7 +305,7 @@ jobs:
 
   verification:
     if: always()
-    needs: [plan, browser-preparation, unit, browser, linux-desktop, editor, checks]
+    needs: [plan, browser-preparation, unit, unit-net8, browser, linux-desktop, editor, checks]
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
@@ -293,7 +325,7 @@ jobs:
           if results["plan"]["result"] != "success":
               raise SystemExit("Verification planning failed, was skipped, or was cancelled")
           selected = json.loads(os.environ["SELECTED"])
-          expected = {"browser-preparation": selected["browser"]}
+          expected = {"browser-preparation": selected["browser"], "unit-net8": selected["unit"]}
           expected.update({job: selected[job] for job in
                            ("unit", "browser", "linux-desktop", "editor", "checks")})
           verify_results(results, {"plan": True, **expected})
