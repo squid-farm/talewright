@@ -43,7 +43,7 @@ export function revealLatest(transcript, isFirst, preserveExistingFocus = false)
     element.focus({ preventScroll: true });
 
     const abort = new AbortController();
-    const state = { abort, frame: 0, adjusting: true, height: document.documentElement.scrollHeight, target };
+    const state = { abort, frame: 0, adjusting: true, pendingImage: false, imageScroll: 0, height: document.documentElement.scrollHeight, target };
     reveals.set(transcript, state);
     const options = { signal: abort.signal, capture: true };
     const stop = () => stopReveal(transcript);
@@ -56,7 +56,13 @@ export function revealLatest(transcript, isFirst, preserveExistingFocus = false)
     document.addEventListener("focusin", event => {
         if (event.target !== element) stop();
     }, options);
-    window.addEventListener("scrollend", () => { state.adjusting = false; }, options);
+    window.addEventListener("scrollend", () => {
+        // Image layout can trigger scroll anchoring before the queued realignment.
+        if (Math.abs(window.scrollY - state.target) > 1
+            && !(state.pendingImage && document.documentElement.scrollHeight !== state.height
+                && Math.abs(window.scrollY - state.imageScroll) <= 1)) stop();
+        else state.adjusting = false;
+    }, options);
     window.addEventListener("scroll", () => {
         if (!state.adjusting && document.documentElement.scrollHeight === state.height
             && Math.abs(window.scrollY - state.target) > 1) stop();
@@ -65,8 +71,11 @@ export function revealLatest(transcript, isFirst, preserveExistingFocus = false)
         if (!(event.target instanceof HTMLImageElement) || !element.isConnected ||
             transcript.querySelector(".tw-latest") !== element) return;
         state.adjusting = true;
+        state.pendingImage = true;
+        state.imageScroll = window.scrollY;
         cancelAnimationFrame(state.frame);
         state.frame = requestAnimationFrame(() => {
+            state.pendingImage = false;
             const top = sceneScrollTop(transcript, element, isFirst);
             state.height = document.documentElement.scrollHeight;
             state.target = top;

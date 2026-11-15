@@ -86,6 +86,53 @@ test("Fractional scroll positions keep the passage below the toolbar", () => {
     assert.deepEqual(calls[0], ["scrollTo", { top: 340, behavior: "auto" }]);
 });
 
+for (const timing of ["unchanged layout", "layout changed", "image loaded"]) {
+    test(`A scrollbar drag interrupting the initial smooth scroll prevents later image realignment (${timing})`, () => {
+        const { calls, latest, transcript } = setup();
+        const listeners = new Map();
+        const frames = new Map();
+        let frameId = 0;
+        let sceneTop = 400;
+        const listen = (target, type, listener, options) => listeners.set(`${target}:${type}`, { listener, signal: options.signal });
+        const dispatch = (target, type, event = {}) => {
+            const entry = listeners.get(`${target}:${type}`);
+            if (entry && !entry.signal.aborted) entry.listener(event);
+        };
+        window.addEventListener = (type, listener, options) => listen("window", type, listener, options);
+        document.addEventListener = (type, listener, options) => listen("document", type, listener, options);
+        transcript.addEventListener = (type, listener, options) => listen("transcript", type, listener, options);
+        window.matchMedia = () => ({ matches: false });
+        latest.getBoundingClientRect = () => ({ top: sceneTop - window.scrollY });
+        globalThis.requestAnimationFrame = callback => { frames.set(++frameId, callback); return frameId; };
+        globalThis.cancelAnimationFrame = id => frames.delete(id);
+        globalThis.HTMLImageElement = class {};
+
+        revealLatest(transcript, false);
+        if (timing !== "unchanged layout") document.documentElement.scrollHeight += 100;
+        if (timing === "image loaded") {
+            window.scrollY = 80;
+            dispatch("transcript", "load", { target: new HTMLImageElement() });
+        }
+        window.scrollY = 120;
+        dispatch("window", "scroll");
+        dispatch("window", "scrollend");
+        sceneTop += 100;
+        document.documentElement.scrollHeight += 100;
+        dispatch("transcript", "load", { target: new HTMLImageElement() });
+        while (frames.size) {
+            const [id, callback] = frames.entries().next().value;
+            frames.delete(id);
+            callback();
+        }
+
+        assert.deepEqual(calls.filter(([name]) => name === "scrollTo"), [
+            ["scrollTo", { top: 340, behavior: "smooth" }],
+        ]);
+        assert.equal(window.scrollY, 120);
+        assert.equal(document.activeElement, latest);
+    });
+}
+
 test("A delayed adjustment scroll does not cancel later image realignment", () => {
     const { calls, latest, transcript } = setup();
     const listeners = new Map();
