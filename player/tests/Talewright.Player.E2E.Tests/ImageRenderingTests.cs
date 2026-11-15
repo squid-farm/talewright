@@ -215,7 +215,7 @@ public sealed class ImageRenderingTests : PlayerTest
     }
 
     [Fact]
-    public async Task Embedded_images_collapse_on_departure_and_survive_rejected_replacement()
+    public async Task Distinct_embedded_images_stay_mounted_on_departure_and_survive_rejected_replacement()
     {
         await Page.EvaluateAsync("""
             () => {
@@ -244,7 +244,7 @@ public sealed class ImageRenderingTests : PlayerTest
         Assert.StartsWith("blob:", url);
         await Choices.First.FocusAsync();
         await Page.Keyboard.PressAsync("Enter");
-        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: A riverside expedition camp with canvas tents and supplies at the edge of dense jungle.", Exact = true })).ToBeVisibleAsync();
+        await Expect(image).ToHaveAttributeAsync("src", url!);
         Assert.False(await Page.EvaluateAsync<bool>("url => window.imageRevocations.includes(url)", url));
         await Driver.ClickAsync("Back");
         await image.ScrollIntoViewIfNeededAsync();
@@ -293,13 +293,12 @@ public sealed class ImageRenderingTests : PlayerTest
         await images.First.ScrollIntoViewIfNeededAsync();
         await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0", await images.First.ElementHandleAsync());
         await Choose("Eat a ration");
-        await Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: " + alt, Exact = true }).ClickAsync();
         await images.First.ScrollIntoViewIfNeededAsync();
         await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0", await images.First.ElementHandleAsync());
         var url = await images.First.GetAttributeAsync("src");
         await Choose("Share supper by the fire");
         await Choose("Continue");
-        await Expect(images).ToHaveCountAsync(2);
+        await Expect(images).ToHaveCountAsync(1);
         await images.Last.ScrollIntoViewIfNeededAsync();
         await Expect(images.Last).ToHaveAttributeAsync("src", url!);
         Assert.Equal(1, await Page.EvaluateAsync<int>("url => window.createdImages.filter(value => value === url).length", url));
@@ -307,7 +306,7 @@ public sealed class ImageRenderingTests : PlayerTest
         await Expect(images).ToHaveCountAsync(1);
         Assert.False(await Page.EvaluateAsync<bool>("url => window.revokedImages.includes(url)", url));
         await Driver.ClickAsync("Forward");
-        await Expect(images).ToHaveCountAsync(2);
+        await Expect(images).ToHaveCountAsync(1);
         await images.Last.ScrollIntoViewIfNeededAsync();
         await Expect(images.Last).ToHaveAttributeAsync("src", url!);
         await Library();

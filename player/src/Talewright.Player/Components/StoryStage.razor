@@ -11,13 +11,15 @@
             <section @key="(Identity, group.StartIndex)" class="tw-frame @(isLatest ? "tw-latest" : "tw-past")"
                      data-tw-scene="@latest.Entry.Frame.Scene?.Value" data-tw-passage-index="@latest.Index"
                      aria-label="@(isLatest ? "Current passage" : null)" tabindex="@(isLatest ? "-1" : null)">
-                @foreach (var passage in group.Passages)
-                {
-                    <CascadingValue @key="(Identity, passage.Index, isLatest)"
-                                    Name="HistoryReading" Value="@(!isLatest)">
-                        <StoryPassage Entry="passage.Entry" />
-                    </CascadingValue>
-                }
+                <CascadingValue Name="CollapsedImages" Value="@group.SupersededImages">
+                    @foreach (var passage in group.Passages)
+                    {
+                        <CascadingValue @key="(Identity, passage.Index)"
+                                        Name="HistoryReading" Value="@(!isLatest)">
+                            <StoryPassage Entry="passage.Entry" />
+                        </CascadingValue>
+                    }
+                </CascadingValue>
             </section>
         }
 

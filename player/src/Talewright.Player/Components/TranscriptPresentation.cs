@@ -1,3 +1,4 @@
+using Talewright.Narrative.Rendering;
 using Talewright.Runtime;
 
 namespace Talewright.Player.Components;
@@ -22,10 +23,32 @@ internal static class TranscriptPresentation
                 groups.Add([passage]);
         }
 
-        return groups.Select(group => new PassageGroup(group[0].Index, group)).ToArray();
+        var result = new PassageGroup[groups.Count];
+        var laterImages = new HashSet<string>(StringComparer.Ordinal);
+        for (var index = groups.Count - 1; index >= 0; index--)
+        {
+            var group = groups[index];
+            result[index] = new PassageGroup(group[0].Index, group,
+                new HashSet<string>(laterImages, StringComparer.Ordinal));
+            foreach (var passage in group)
+            {
+                var inlines = passage.Entry.Frame.Document.Blocks.SelectMany(block => block switch
+                {
+                    RenderedParagraph paragraph => paragraph.Inlines,
+                    RenderedSpeech speech => speech.Paragraphs.SelectMany(paragraph => paragraph),
+                    _ => Enumerable.Empty<RenderedInline>(),
+                }).Concat(passage.Entry.Chosen ?? []);
+                foreach (var media in inlines.OfType<RenderedMedia>())
+                    laterImages.Add(media.MediaId);
+            }
+        }
+        return result;
     }
 }
 
 internal sealed record PresentedPassage(int Index, HistoryFrame Entry);
 
-internal sealed record PassageGroup(int StartIndex, IReadOnlyList<PresentedPassage> Passages);
+internal sealed record PassageGroup(
+    int StartIndex,
+    IReadOnlyList<PresentedPassage> Passages,
+    IReadOnlySet<string> SupersededImages);
