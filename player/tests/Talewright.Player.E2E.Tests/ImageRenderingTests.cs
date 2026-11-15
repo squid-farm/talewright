@@ -245,12 +245,12 @@ public sealed class ImageRenderingTests : PlayerTest
         await Choices.First.FocusAsync();
         await Page.Keyboard.PressAsync("Enter");
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: A riverside expedition camp with canvas tents and supplies at the edge of dense jungle.", Exact = true })).ToBeVisibleAsync();
-        await Page.WaitForFunctionAsync("url => window.imageRevocations.includes(url)", url);
+        Assert.False(await Page.EvaluateAsync<bool>("url => window.imageRevocations.includes(url)", url));
         await Driver.ClickAsync("Back");
         await image.ScrollIntoViewIfNeededAsync();
         await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0", await image.ElementHandleAsync());
         var restoredUrl = await image.GetAttributeAsync("src");
-        Assert.StartsWith("blob:", restoredUrl);
+        Assert.Equal(url, restoredUrl);
         await Library();
         Assert.False(await Page.EvaluateAsync<bool>("url => window.imageRevocations.includes(url)", restoredUrl));
         var invalid = new StoryFixture("bad-images", "game:\n  id: bad\n  title: Bad\n  start: missing\n", "=== start\n-> END");
@@ -366,11 +366,12 @@ public sealed class ImageRenderingTests : PlayerTest
         await Choices.First.FocusAsync();
         await Page.Keyboard.PressAsync("Enter");
         await Expect(Latest).ToContainTextAsync("Next passage.");
-        await Page.WaitForFunctionAsync("url => window.archiveRevoked.includes(url)", url);
+        Assert.False(await Page.EvaluateAsync<bool>("url => window.archiveRevoked.includes(url)", url));
         var next = Page.GetByAltText("Next camp", new() { Exact = true });
         await next.ScrollIntoViewIfNeededAsync();
         await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0", await next.ElementHandleAsync());
         var nextUrl = await next.GetAttributeAsync("src");
+        Assert.Equal(url, nextUrl);
         await Page.GetByRole(AriaRole.Button, new() { Name = "Reveal image: A camp", Exact = true }).ClickAsync();
         await image.ScrollIntoViewIfNeededAsync();
         await Expect(image).ToHaveAttributeAsync("src", nextUrl!);

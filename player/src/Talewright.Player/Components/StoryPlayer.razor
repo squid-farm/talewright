@@ -187,6 +187,7 @@
     private Task _autosaveTail = Task.CompletedTask;
     private int _autosaveCheckStartedGeneration = -1;
     private StoryImageWarmer? _ownedImageWarmer;
+    private StoryImages? _warmingImages;
     private readonly object _warmOwner = new();
     private bool _imageHandoffPending;
     private StoryImageWarmer ImageWarmer => SharedImageWarmer ?? (_ownedImageWarmer ??= new StoryImageWarmer(JS));
@@ -208,6 +209,10 @@
                 ? new AutosaveRecovery(store, Story.Id, RejectedAutosaveData)
                 : null;
             _recoveredAutosaveSlot = null;
+        }
+        else if (!ReferenceEquals(_warmingImages, Images))
+        {
+            ReconcileImageWarming(TimeSpan.Zero);
         }
 
         if (Visible && !_wasVisible)
@@ -258,8 +263,11 @@
     private void UpdateDiagnosticContext() =>
         Report?.SetContext(Story.Id, _session.Current?.Scene?.Value);
 
-    private void ReconcileImageWarming(TimeSpan delay) =>
+    private void ReconcileImageWarming(TimeSpan delay)
+    {
+        _warmingImages = Images;
         _imageHandoffPending = ImageWarmer.Navigate(_warmOwner, Story, Images, _session.Current.Scene, delay);
+    }
 
     private async Task Restart()
     {

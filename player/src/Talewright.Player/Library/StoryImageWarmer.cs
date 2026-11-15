@@ -6,7 +6,6 @@ namespace Talewright.Player.Library;
 
 public sealed class StoryImageWarmer : IAsyncDisposable
 {
-    internal const int MaxConcurrentTransfers = 3;
     internal static readonly TimeSpan HistorySettlingDelay = TimeSpan.FromMilliseconds(500);
 
     private sealed class Plan(IReadOnlyList<SceneImageGroup> groups)
@@ -14,7 +13,7 @@ public sealed class StoryImageWarmer : IAsyncDisposable
         private readonly int[] _positions = new int[groups.Count];
         private int _nextScene;
 
-        public string? NextPath(Func<string, bool> alreadyOwned)
+        public string? NextPath(Func<string, bool> alreadyOwned, HashSet<string> runningPaths)
         {
             if (groups.Count == 0) return null;
             var remainingScenes = groups.Count;
@@ -23,6 +22,7 @@ public sealed class StoryImageWarmer : IAsyncDisposable
                 var scene = _nextScene;
                 _nextScene = (_nextScene + 1) % groups.Count;
                 var paths = groups[scene].Paths;
+                if (paths.Any(runningPaths.Contains)) continue;
                 while (_positions[scene] < paths.Count)
                 {
                     var path = paths[_positions[scene]++];
@@ -44,7 +44,6 @@ public sealed class StoryImageWarmer : IAsyncDisposable
 
     private readonly object _gate = new();
     private readonly IJSRuntime _js;
-    private readonly int _maxConcurrentTransfers;
     private readonly Func<TimeSpan, CancellationToken, Task> _delay;
     private readonly Dictionary<string, Entry> _owned = new(StringComparer.Ordinal);
     private readonly HashSet<Entry> _running = [];
@@ -62,13 +61,10 @@ public sealed class StoryImageWarmer : IAsyncDisposable
     private bool _startsAllowed;
     private bool _disposed;
 
-    internal StoryImageWarmer(IJSRuntime js, int maxConcurrentTransfers = MaxConcurrentTransfers,
-        Func<TimeSpan, CancellationToken, Task>? delay = null)
+    internal StoryImageWarmer(IJSRuntime js, Func<TimeSpan, CancellationToken, Task>? delay = null)
     {
         ArgumentNullException.ThrowIfNull(js);
-        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxConcurrentTransfers);
         _js = js;
-        _maxConcurrentTransfers = maxConcurrentTransfers;
         _delay = delay ?? Task.Delay;
     }
 
@@ -92,7 +88,9 @@ public sealed class StoryImageWarmer : IAsyncDisposable
             var transition = sameGeneration
                 ? _owned.Values.Where(entry => arriving.Contains(entry.Path)).ToHashSet()
                 : [];
-            var retained = transition.Concat(_owned.Values.Where(entry => desired.Contains(entry.Path))).ToHashSet();
+            var retained = sameGeneration
+                ? transition.Concat(_owned.Values.Where(entry => desired.Contains(entry.Path))).ToHashSet()
+                : [];
             foreach (var entry in _owned.Values.ToArray())
             {
                 if (!retained.Contains(entry)) ReleaseLocked(entry);
@@ -101,6 +99,19 @@ public sealed class StoryImageWarmer : IAsyncDisposable
             _owner = owner;
             _story = story;
             _images = images;
+            if (images is not null)
+            {
+                foreach (var running in _running.ToArray())
+                {
+                    if (!ReferenceEquals(running.Images, images) || !desired.Contains(running.Path) ||
+                        _owned.ContainsKey(running.Path)) continue;
+                    if (images.TryAcquireExisting(running.Path) is not { } lease) continue;
+                    var entry = new Entry(running.Path, images, lease);
+                    _owned.Add(entry.Path, entry);
+                    _running.Add(entry);
+                    entry.Transfer = CompleteTransferAsync(entry);
+                }
+            }
             _plan = new Plan(groups);
             _desiredPaths = desired;
             _transition = transition;
@@ -203,8 +214,10 @@ public sealed class StoryImageWarmer : IAsyncDisposable
     private void PumpLocked()
     {
         if (_disposed || !_startsAllowed || _plan is null || _images is null) return;
-        while (_running.Count < _maxConcurrentTransfers &&
-               _plan.NextPath(_owned.ContainsKey) is { } path)
+        var runningPaths = _running
+            .Where(entry => ReferenceEquals(entry.Images, _images) && !entry.Lease.Url.IsCompleted)
+            .Select(entry => entry.Path).ToHashSet(StringComparer.Ordinal);
+        while (_plan.NextPath(_owned.ContainsKey, runningPaths) is { } path)
         {
             Entry entry;
             try
@@ -220,6 +233,7 @@ public sealed class StoryImageWarmer : IAsyncDisposable
             _owned.Add(path, entry);
             _running.Add(entry);
             entry.Transfer = CompleteTransferAsync(entry);
+            if (!entry.Lease.Url.IsCompleted) runningPaths.Add(path);
         }
     }
 
@@ -314,6 +328,10 @@ public sealed class StoryImageWarmer : IAsyncDisposable
             catch (Exception ex)
             {
                 Console.Error.WriteLine($"Image warming shutdown failed: {ex.Message}");
+            }
+            finally
+            {
+                lock (_gate) _releases.RemoveWhere(release => release.IsCompleted);
             }
         }
     }

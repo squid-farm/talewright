@@ -133,13 +133,14 @@ filesystem browser URLs or fetched from remote addresses.
 
 The app's `StoryImageWarmer` discovers media in the current scene's direct incoming/outgoing
 connections and hub offers, excluding the current scene. It walks compiled content, including
-both conditional branches, without evaluating conditions or changing story state. A round-robin
-scheduler permits at most three speculative transfers at once. Back/Forward waits 500 ms before
-starting the replacement plan; work already in flight remains accounted for across story
-replacement and transfers its existing lease to arriving media occurrences. Warming never delays
-navigation or bypasses viewport-lazy presentation. Failed speculative transfers release their
-leases so normal lazy acquisition can retry. The concurrency cap does not limit the number of
-completed neighboring images retained while the current plan needs them.
+choice and hub-offer shown text and both conditional branches, without evaluating conditions or
+changing story state. A round-robin scheduler starts at most one transfer per connected scene at a
+time, without a separate global cap. It selects later images only as each scene's transfer finishes.
+Back/Forward waits 500 ms before starting the replacement plan. Transfers already in flight remain
+tracked across navigation and source replacement; within a generation, arriving media can claim an
+existing lease. Warming never delays navigation or bypasses viewport-lazy presentation. Failed
+speculative transfers release their leases so normal lazy acquisition can retry. Completed
+neighboring images remain retained while the current plan needs them.
 
 ZIP opens use `ArchiveStoryImages.Open`, which takes ownership of the compressed input even
 when loading fails. A loaded story retains one parsed archive, not expanded image copies.

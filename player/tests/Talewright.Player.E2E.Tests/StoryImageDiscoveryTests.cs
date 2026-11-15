@@ -74,7 +74,7 @@ public sealed class StoryImageDiscoveryTests
         Assert.Equal(["images/hub-only.png"], groups[2].Paths);
         Assert.DoesNotContain(groups.SelectMany(group => group.Paths), path => path == "images/deep.png");
         Assert.DoesNotContain(groups.SelectMany(group => group.Paths), path =>
-            path == "images/start.png");
+            path == "images/current.png");
     }
 
     [Fact]
@@ -104,5 +104,33 @@ public sealed class StoryImageDiscoveryTests
         Assert.Equal(["first", "second"], groups.Select(group => group.Scene.Value));
         Assert.Equal(["images/shared.png"], groups[0].Paths);
         Assert.Empty(groups[1].Paths);
+    }
+
+    [Fact]
+    public void Finds_images_in_shown_text_for_choices_and_hub_offers()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = TestStories.DefaultYaml,
+            ["main.tale"] = """
+                === start
+                * [Visit] -> hub
+                === hub
+                @hub route
+                * [Continue] (requires false, shown "Need {image(\"choice.png\", \"Choice\")}") -> END
+                === offered
+                @tags route
+                @requires false, shown "Need {image(\"offer.png\", \"Offer\")}"
+                -> END
+                """,
+        }, ["images/choice.png", "images/offer.png"]);
+        var compilation = StoryCompiler.Compile(source);
+        Assert.True(compilation.Success, string.Join("\n", compilation.Diagnostics));
+
+        var groups = StoryImageDiscovery.ConnectedScenes(compilation.Story!, compilation.Story!.Start);
+
+        Assert.Equal(["images/choice.png"], Assert.Single(groups).Paths);
+        Assert.Equal(["images/offer.png"],
+            StoryImageDiscovery.SceneImages(compilation.Story!, new("offered")));
     }
 }

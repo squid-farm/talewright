@@ -80,6 +80,34 @@ before and after image decode; the identical values show that warming does not r
 image layout space. The 53 MiB image exercises a large expanded image, but browser
 peak/retained memory were not measured.
 
+### Image transfer concurrency observation
+
+A separate Chromium 153 / .NET 10.0.15 local probe used the published WebAssembly
+player, an uploaded ZIP containing 10 direct neighbors with two distinct paths each,
+and the same 899,911-byte JPEG at each path. The ZIP was about 17.95 MB. The
+one-transfer-per-neighbor scheduler issued the work; a test-only JavaScript semaphore
+then limited concurrent stream reads to 1, 3, 5 or 10. Each setting ran three times.
+Elapsed time starts at the first stream call and ends at Blob creation; it does not
+include image decoding or measure navigation latency.
+
+| Artificial delay per read | Read limit | First 10 requests, median (range) | All 20 requests, median (range) |
+|---|---:|---:|---:|
+| 0 ms | 1 | 456 ms (337–515) | 501 ms (380–565) |
+| 0 ms | 3 | 348 ms (319–366) | 392 ms (361–410) |
+| 0 ms | 5 | 320 ms (298–368) | 370 ms (343–424) |
+| 0 ms | 10 | 298 ms (281–300) | 331 ms (314–342) |
+| 50 ms | 1 | 603 ms (597–605) | 1,134 ms (1,128–1,134) |
+| 50 ms | 3 | 291 ms (287–301) | 469 ms (462–476) |
+| 50 ms | 5 | 278 ms (272–300) | 385 ms (378–406) |
+| 50 ms | 10 | 321 ms (252–332) | 375 ms (306–389) |
+
+This compares a semaphore inside the browser stream bridge, not different scheduler
+implementations: all ten first-neighbor calls are already issued in every case. The
+50 ms delay is synthetic, and the local ZIP does not exercise browser HTTP connection
+limits. The higher limit helped the undelayed local workload, while the delayed
+5-versus-10 results overlap; three samples do not establish an ideal concurrency.
+Peak browser memory and other devices or network conditions were not measured.
+
 ## File syntax reuse and edit diagnostics
 
 This measurement uses the deterministic 20-chapter realistic corpus:

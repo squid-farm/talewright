@@ -16,9 +16,9 @@
     @if (_story is not null)
     {
         @* Kept mounted while the library is open so the playthrough survives a trip to the library. *@
-        <CascadingValue Value="_loaded!.Images">
+        <CascadingValue Value="_loaded!.Images" @key="_loaded">
         <CascadingValue Value="_imageWarmer">
-        <div hidden="@_showLibrary" @key="_loaded">
+        <div hidden="@_showLibrary">
             @if (!_resumeCheckComplete)
             {
                 <section class="tw-resume-prompt" aria-label="Checking saved progress" aria-busy="true">

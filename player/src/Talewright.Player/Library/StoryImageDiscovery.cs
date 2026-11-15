@@ -77,6 +77,10 @@ internal static class StoryImageDiscovery
         {
             foreach (var path in Images(choiceLabel, seenPaths)) yield return path;
         }
+        if (scene.Shown?.Text is { } shown)
+        {
+            foreach (var path in Images(shown, seenPaths)) yield return path;
+        }
 
         foreach (var step in SceneSteps.Walk(scene.Steps))
         {
@@ -85,8 +89,11 @@ internal static class StoryImageDiscovery
                 case ProseStep prose:
                     foreach (var path in Images(prose.Block, seenPaths)) yield return path;
                     break;
-                case ChoiceStep { Choice.Label: { } label }:
-                    foreach (var path in Images(label, seenPaths)) yield return path;
+                case ChoiceStep choice:
+                    if (choice.Choice.Label is { } label)
+                        foreach (var path in Images(label, seenPaths)) yield return path;
+                    if (choice.Choice.Shown?.Text is { } choiceShown)
+                        foreach (var path in Images(choiceShown, seenPaths)) yield return path;
                     break;
             }
         }
