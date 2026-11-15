@@ -42,6 +42,8 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
             if (!_paths.Contains(path)) throw new InvalidDataException($"Image '{path}' is not in this story's safe image catalogue.");
+            if (_module is { IsCompleted: true, IsCompletedSuccessfully: false })
+                _module = null;
             _module ??= js.InvokeAsync<IJSObjectReference>("import",
                 "./_content/Talewright.Player/Components/MediaView.razor.js").AsTask();
             if (_entries.TryGetValue(path, out var failed) && !failed.Url.IsCompletedSuccessfully && failed.Url.IsCompleted)
