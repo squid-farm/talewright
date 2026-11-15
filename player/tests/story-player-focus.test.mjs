@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const source = await readFile(new URL("../src/Talewright.Player/Components/StoryPlayer.razor.js", import.meta.url));
-const { revealLatest } = await import(`data:text/javascript;base64,${source.toString("base64")}`);
+const { revealLatest, dispose } = await import(`data:text/javascript;base64,${source.toString("base64")}`);
 
 function setup() {
     const calls = [];
@@ -19,6 +19,12 @@ function setup() {
         querySelector: () => toolbar,
     };
     const transcript = {
+        classList: {
+            values: new Set(),
+            add(value) { this.values.add(value); },
+            remove(value) { this.values.delete(value); },
+            contains(value) { return this.values.has(value); },
+        },
         querySelector: selector => selector === ".tw-latest" ? latest : null,
         closest: selector => selector === ".tw-player" ? player : null,
         addEventListener() {},
@@ -84,6 +90,26 @@ test("Fractional scroll positions keep the passage below the toolbar", () => {
     revealLatest(transcript, false);
 
     assert.deepEqual(calls[0], ["scrollTo", { top: 340, behavior: "auto" }]);
+});
+
+test("Automatic reveal suppresses anchoring only until the reader takes control", () => {
+    const { calls, transcript } = setup();
+    const listeners = new Map();
+    window.addEventListener = (type, listener) => listeners.set(type, listener);
+    window.scrollTo = options => {
+        assert.equal(transcript.classList.contains("tw-transcript--revealing"), true);
+        calls.push(["scrollTo", options]);
+    };
+
+    revealLatest(transcript, false);
+    assert.equal(transcript.classList.contains("tw-transcript--revealing"), true);
+
+    listeners.get("wheel")();
+    assert.equal(transcript.classList.contains("tw-transcript--revealing"), false);
+
+    revealLatest(transcript, false);
+    dispose(transcript);
+    assert.equal(transcript.classList.contains("tw-transcript--revealing"), false);
 });
 
 for (const timing of ["unchanged layout", "layout changed", "image loaded"]) {
