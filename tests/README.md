@@ -513,6 +513,9 @@ locally; they can contain story text and should not be uploaded to public trace-
 
 Console errors, uncaught JavaScript exceptions, failed requests, HTTP error responses, and the Blazor error
 banner fail a test. Expected bad-story errors must appear in the player UI, not in an ignored console log.
+Evidence capture restores the harness's normal action timeout, independently of shortened deadlines
+used by negative tests. Automatic passage reveal temporarily disables browser scroll anchoring in
+the transcript so image layout cannot compete with its alignment; reader input restores anchoring.
 
 ### Standalone publisher artifacts
 

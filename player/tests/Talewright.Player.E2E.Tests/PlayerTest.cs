@@ -345,6 +345,8 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
 
         try
         {
+            // Negative tests can shorten action deadlines; evidence capture uses the normal budget.
+            Context.SetDefaultTimeout(10_000);
             if (Page is not null && !Page.IsClosed)
             {
                 await Page.ScreenshotAsync(new() { Path = Path.Combine(_artifacts, "page.png"), FullPage = false });
