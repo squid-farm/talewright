@@ -192,6 +192,12 @@ After each E2E job, the router deletes evidence directories of passing cases nam
 uploads keep every report plus failed-case traces, screenshots and DOM for 14 days.
 NuGet/sample publication additionally requires the aggregate.
 
+Browser preparation exposes its uploaded artifact ID and preparation attempt as job outputs.
+Consumers use those outputs rather than their own current attempt number: a failed-jobs rerun
+retains the successful preparation job and its immutable same-run artifact. The manifest still
+requires the same workflow run, checkout and producer attempt, as well as matching file hashes
+and modes. A full rerun produces a new artifact and corresponding outputs.
+
 The preparation job summary records the tar artifact's file size; GitHub's step timings
 separate preparation, upload, download, and final verification, while Nx execution summaries record
 the browser test batches. Compare several baseline and changed hosted runs using the complete

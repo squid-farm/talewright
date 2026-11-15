@@ -445,6 +445,30 @@ class PreparedBrowserInputTests(unittest.TestCase):
         ), self.assertRaisesRegex(RuntimeError, "missing: web/wwwroot/index.html"):
             self.run_e2e.validate_prepared_inputs(root)
 
+    def test_failed_job_rerun_validates_the_retained_preparation_attempt(self):
+        inputs = self.root / "inputs"
+        self.populate_inputs(inputs)
+        environment = {
+            **self.identity_environment,
+            "GITHUB_RUN_ATTEMPT": "3",
+            "TALEWRIGHT_E2E_PREPARATION_ATTEMPT": self.identity["run_attempt"],
+        }
+        with patch.dict(os.environ, environment), patch.object(
+            self.run_e2e, "git_revision", return_value=self.identity["source_sha"]
+        ):
+            self.run_e2e.validate_prepared_inputs(inputs)
+
+        for change, field in (
+            ({"TALEWRIGHT_E2E_PREPARATION_ATTEMPT": "3"}, "run_attempt"),
+            ({"GITHUB_RUN_ID": "43"}, "run_id"),
+            ({"TALEWRIGHT_E2E_SOURCE_SHA": "other-head"}, "source_sha"),
+        ):
+            with self.subTest(field=field), patch.dict(os.environ, {**environment, **change}), patch.object(
+                self.run_e2e, "git_revision",
+                return_value=change.get("TALEWRIGHT_E2E_SOURCE_SHA", self.identity["source_sha"]),
+            ), self.assertRaisesRegex(RuntimeError, field):
+                self.run_e2e.validate_prepared_inputs(inputs)
+
     def test_prepared_archive_preserves_executable_playwright_driver_mode(self):
         inputs = self.root / "browser-e2e-inputs"
         archive = self.root / "browser-e2e-inputs.tar.gz"

@@ -143,7 +143,8 @@ def workflow_identity():
     identity = {
         "source_sha": os.environ.get("TALEWRIGHT_E2E_SOURCE_SHA") or os.environ.get("GITHUB_SHA"),
         "run_id": os.environ.get("GITHUB_RUN_ID"),
-        "run_attempt": os.environ.get("GITHUB_RUN_ATTEMPT"),
+        "run_attempt": (os.environ.get("TALEWRIGHT_E2E_PREPARATION_ATTEMPT")
+                        or os.environ.get("GITHUB_RUN_ATTEMPT")),
     }
     missing = [key for key, value in identity.items() if not value]
     if missing:
