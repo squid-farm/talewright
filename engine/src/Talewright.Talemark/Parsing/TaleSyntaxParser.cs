@@ -206,4 +206,10 @@ internal static partial class TaleSyntaxParser
     }
 
     private static int Lead(ReadOnlySpan<char> text) => text.Length - text.TrimStart().Length;
+
+    internal static ReadOnlySpan<char> SpeechText(ReadOnlySpan<char> text, out int delimiterLength)
+    {
+        delimiterLength = text.Length > 0 && text[0] == ' ' ? 1 : 0;
+        return text[delimiterLength..].TrimEnd();
+    }
 }

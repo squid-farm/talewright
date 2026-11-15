@@ -116,8 +116,8 @@ internal readonly record struct TaleLineSyntax(
 /// <param name="HeadStart">Column of the leading part: the metadata keyword, speaker or block keyword.</param>
 /// <param name="HeadLength">Length of the leading part.</param>
 /// <param name="ValueStart">
-/// Column of the trimmed value: the metadata value, speech text, effects or divert target. For <c>{if}</c> it is the
-/// text after the <c>if </c> prefix, untrimmed so expression offsets match the source.
+/// Column of the value: speech text retains indentation after its delimiter; metadata, effects and divert values are
+/// trimmed. For <c>{if}</c> it is the text after the <c>if </c> prefix, untrimmed so expression offsets match the source.
 /// </param>
 /// <param name="ValueLength">Length of the value.</param>
 internal readonly record struct TaleLinePart(int HeadStart, int HeadLength, int ValueStart, int ValueLength)
@@ -308,6 +308,10 @@ internal sealed class TaleFileSyntax
     public ReadOnlySpan<char> RawText(TaleSceneSyntax scene, TaleLineSyntax line) =>
         Text.AsSpan(scene.FileOffset(line.Start), line.Length);
 
+    /// <summary>Prose including leading indentation but excluding trailing whitespace.</summary>
+    public ReadOnlySpan<char> ProseText(TaleSceneSyntax scene, TaleLineSyntax line) =>
+        RawText(scene, line).TrimEnd();
+
     /// <summary>The trimmed text of a scene line.</summary>
     public ReadOnlySpan<char> Content(TaleSceneSyntax scene, TaleLineSyntax line) =>
         Text.AsSpan(scene.FileOffset(line.Start + line.Indent), line.ContentLength);
@@ -319,7 +323,7 @@ internal sealed class TaleFileSyntax
         return Text.AsSpan(scene.FileOffset(line.Start + part.HeadStart), part.HeadLength);
     }
 
-    /// <summary>The trimmed value of a scene line; see <see cref="TaleLinePart.ValueStart"/>.</summary>
+    /// <summary>The value of a scene line; see <see cref="TaleLinePart.ValueStart"/>.</summary>
     public ReadOnlySpan<char> Value(TaleSceneSyntax scene, TaleLineSyntax line)
     {
         var part = scene.Part(line);

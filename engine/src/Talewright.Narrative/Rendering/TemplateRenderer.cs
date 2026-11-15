@@ -38,7 +38,7 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
     {
         var output = new List<RenderedInline>();
         RenderInlines(inlines, TextStyle.None, context, output);
-        return Normalize(output);
+        return Normalize(output, preserveWhitespace: false);
     }
 
     private void RenderBlocks(IEnumerable<TemplateBlock> blocks, EvaluationContext context, List<RenderedBlock> output)
@@ -73,7 +73,7 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
     {
         var output = new List<RenderedInline>();
         RenderInlines(inlines, TextStyle.None, context, output);
-        return Normalize(output);
+        return Normalize(output, preserveWhitespace: true);
     }
 
     private void RenderInlines(IEnumerable<TemplateInline> inlines, TextStyle style, EvaluationContext context, List<RenderedInline> output)
@@ -119,7 +119,7 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
 
         var rendered = new List<RenderedInline>();
         RenderInlines(alt, TextStyle.None, context, rendered);
-        return RenderedInline.ToPlainText(Normalize(rendered));
+        return RenderedInline.ToPlainText(Normalize(rendered, preserveWhitespace: false));
     }
 
     private string Substitute(SubstitutionTemplate substitution, EvaluationContext context)
@@ -145,10 +145,10 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
     }
 
     /// <summary>
-    /// Merges adjacent runs with the same style, collapses whitespace left behind by false conditionals and
-    /// trims the edges. Returns an empty list if nothing visible remains.
+    /// Merges adjacent runs with the same style and removes lines with no visible content. For non-narrative
+    /// inline text, also collapses spaces and trims the edges.
     /// </summary>
-    private static IReadOnlyList<RenderedInline> Normalize(List<RenderedInline> inlines)
+    private static IReadOnlyList<RenderedInline> Normalize(List<RenderedInline> inlines, bool preserveWhitespace)
     {
         var merged = new List<RenderedInline>();
         var buffer = new StringBuilder();
@@ -214,7 +214,7 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
             merged.RemoveAt(merged.Count - 1);
         }
 
-        for (var i = 0; i < merged.Count; i++)
+        for (var i = 0; !preserveWhitespace && i < merged.Count; i++)
         {
             if (merged[i] is RenderedText t)
             {
