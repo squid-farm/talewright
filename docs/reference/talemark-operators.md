@@ -337,14 +337,18 @@ Talemark owns this grammar.
 Reader text is parsed one *text unit* at a time:
 
 - **Paragraph**: consecutive prose lines, ended by a blank line or a line directive. A `//`
-  comment line is skipped without ending the paragraph. Each line is trimmed, and each authored
-  line break renders as a line break.
-- **Speech text**: the rest of a `>` line after the speaker's `:`.
+  comment line is skipped without ending the paragraph. Leading spaces and tabs are preserved,
+  trailing whitespace is trimmed, and each authored line break renders as a line break.
+- **Speech text**: the rest of a `>` line after the speaker's `:`, or after `>` on a continuation.
+  One space immediately after the marker is a delimiter; any further spaces or tabs are preserved.
+  Trailing whitespace is trimmed.
 - **Choice label**: the contents of the label brackets.
 - **Image alt text**: the second quoted argument of `image(...)`.
 
 Formatting and inline conditions never cross a text unit's boundary. An inline construct may span
 lines only inside a paragraph. Block directives, including block `{if}` lines, are single lines.
+Directives may be indented, and whitespace-only lines remain blank. Prose and speech wrap to fit
+the player; tabs use four-space stops.
 
 ### Order of recognition
 

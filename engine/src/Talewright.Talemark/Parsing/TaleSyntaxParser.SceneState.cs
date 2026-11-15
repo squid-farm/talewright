@@ -116,8 +116,9 @@ internal static partial class TaleSyntaxParser
             var body = content[1..];
             if (_speechOpen)
             {
-                var valueStart = line.Indent + 1 + Lead(body);
-                return WithPart(line, new(0, 0, valueStart, body.Trim().Length));
+                var speech = SpeechText(body, out var delimiterLength);
+                var valueStart = line.Indent + 1 + delimiterLength;
+                return WithPart(line, new(0, 0, valueStart, speech.Length));
             }
 
             var colon = body.IndexOf(ExpressionVocabulary.Separator);
@@ -133,8 +134,9 @@ internal static partial class TaleSyntaxParser
             }
 
             var text = body[(colon + 1)..];
+            var speechText = SpeechText(text, out var delimiter);
             _speechOpen = true;
-            return WithPart(line, new(headStart, speaker.Length, line.Indent + colon + 2 + Lead(text), text.Trim().Length));
+            return WithPart(line, new(headStart, speaker.Length, line.Indent + colon + 2 + delimiter, speechText.Length));
         }
 
         private TaleLineSyntax Divert(TaleLineSyntax line, ReadOnlySpan<char> content)

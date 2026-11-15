@@ -58,6 +58,38 @@ public sealed class SpeechBlockTests
         Assert.Equal(4, diagnostic.Location.Line);
     }
 
+    [Fact]
+    public void Speech_keeps_indentation_after_one_optional_space_and_trims_line_ends()
+    {
+        var story = Compile("=== start\n  > guide:  \tHello  there \t\n" +
+                            "\t> \tNext   line  \n>no delimiter\n>\tTab without space\n>   \n" +
+                            ">   Another paragraph\n\n> guide:\tTab after colon\n  -> END");
+        var blocks = new TemplateRenderer().Render(CompilerTests.Templates(story.GetScene(new("start"))),
+            GameState.CreateInitial(story.World, 1)).Blocks;
+
+        var speech = Assert.IsType<RenderedSpeech>(blocks[0]);
+        Assert.Equal([" \tHello  there\n\tNext   line\nno delimiter\n\tTab without space", "  Another paragraph"],
+            speech.Paragraphs.Select(RenderedInline.ToPlainText));
+        var next = Assert.IsType<RenderedSpeech>(blocks[1]);
+        Assert.Equal("\tTab after colon", RenderedInline.ToPlainText(Assert.Single(next.Paragraphs)));
+        Assert.Equal(2, blocks.Count);
+    }
+
+    [Fact]
+    public void Different_speaker_recovery_keeps_delimiter_indentation_and_reports_marker()
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = Manifest,
+            ["main.tale"] = "=== start\n> player: Hello\n  > guide:  \t{unknown}\n-> END",
+        }));
+
+        var separator = Assert.Single(result.Errors, error => error.Code == "TW1018");
+        Assert.Equal((3, 3), (separator.Location.Line, separator.Location.Column));
+        var unknown = Assert.Single(result.Errors, error => error.Code == "TW2001");
+        Assert.Equal((3, 15), (unknown.Location.Line, unknown.Location.Column));
+    }
+
     private static Talewright.Talemark.Model.StoryDefinition Compile(string tale)
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>

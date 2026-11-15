@@ -196,8 +196,7 @@ public static class TalemarkClassifier
                         FlushParagraph();
                         continue;
                     case TaleLineKind.Prose:
-                        paragraph.AppendLine(syntax.Content(scene, line).ToString(),
-                            At(scene, line, line.Indent));
+                        paragraph.AppendLine(syntax.ProseText(scene, line).ToString(), At(scene, line, 0));
                         continue;
                     case TaleLineKind.Metadata:
                     case TaleLineKind.MisplacedMetadata:

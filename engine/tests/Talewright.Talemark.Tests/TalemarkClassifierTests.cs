@@ -8,6 +8,22 @@ namespace Talewright.Talemark.Tests;
 public sealed class TalemarkClassifierTests
 {
     [Fact]
+    public void Indented_prose_and_speech_keep_inline_token_source_ranges()
+    {
+        const string tale = "=== start\n  **Bold** {player:first-name}\n\t> guide:  \t{player:first-name}\n  -> END";
+        var classifications = TalemarkClassifier.Classify("main.tale", tale);
+        var properties = classifications
+            .Where(item => item.Kind == TalemarkClassificationKind.Property && TextOf(tale, item) == "first-name")
+            .Select(item => (item.Range.Start.Line, item.Range.Start.Column))
+            .ToArray();
+
+        Assert.Equal([(2, 20), (3, 21)], properties);
+        var formatting = classifications.Where(item => item.Kind == TalemarkClassificationKind.Formatting)
+            .Select(item => (item.Range.Start.Line, item.Range.Start.Column)).ToArray();
+        Assert.Equal([(2, 3), (2, 9)], formatting);
+    }
+
+    [Fact]
     public void Classifies_documented_file_constructs_without_binding_story_symbols()
     {
         const string tale = """

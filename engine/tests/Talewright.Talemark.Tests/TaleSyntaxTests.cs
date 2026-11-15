@@ -182,11 +182,28 @@ public sealed class TaleSyntaxTests
 
         Assert.Equal(
         [
-            ("title", "The  Hall"), ("once", ""), ("guard", "Halt!"), ("", "var:x = 1"), ("", "b"),
+            ("title", "The  Hall"), ("once", ""), ("guard", " Halt!"), ("", "var:x = 1"), ("", "b"),
             ("if", " x > 0"), ("else", ""), ("/if", ""),
         ], parts);
         Assert.Empty(scene.Diagnostics);
         Assert.All(scene.Lines, line => Assert.False(line.IsInvalid || line.IsSuppressed));
+    }
+
+    [Fact]
+    public void Indented_lines_are_classified_and_speech_parts_keep_authored_whitespace()
+    {
+        var syntax = TaleSyntaxParser.Parse(
+            "  === start\n\t@title Start\n  Prose  \t\n \t \n\t> guide:  \tHello  \n  > \tAgain \t\n  >   \n\t-> END");
+        var scene = Assert.Single(syntax.Scenes);
+
+        Assert.Equal(
+            [TaleLineKind.Metadata, TaleLineKind.Prose, TaleLineKind.Blank, TaleLineKind.Speech,
+                TaleLineKind.Speech, TaleLineKind.Speech, TaleLineKind.Divert],
+            scene.Lines.Select(line => line.Kind));
+        var speech = scene.Lines.Where(line => line.Kind == TaleLineKind.Speech).ToArray();
+        Assert.Equal([" \tHello", "\tAgain", ""], speech.Select(line => syntax.Value(scene, line).ToString()));
+        Assert.Equal([10, 4, 3], speech.Select(line => scene.Part(line).ValueStart));
+        Assert.Empty(scene.Diagnostics);
     }
 
     [Theory]
