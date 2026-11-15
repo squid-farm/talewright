@@ -40,5 +40,9 @@ a player-facing migration note; regenerate only the affected Lost Relic fixtures
 The 0.5.0 update intentionally makes 0.4.0 Lost Relic saves incompatible because
 the dream now reads glyph-mark inventory counts instead of the separately stored
 `marks` variable. There is no automatic migration.
+The 0.6.0 update intentionally makes 0.5.0 Lost Relic saves incompatible because
+the story now starts with the initially true `guide-doubtful` flag and stores the
+altar's `altar-reading` check total. The four Lost Relic fixtures were regenerated
+on the same route, seed and summaries. There is no automatic migration.
 
 If a golden-save test fails after an engine change, assume the engine change is wrong. Do not update the fixture to make it pass.
