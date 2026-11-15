@@ -10,10 +10,7 @@ function stopReveal(transcript) {
 
 function sceneScrollTop(transcript, element, isFirst) {
     if (isFirst) return 0;
-    const toolbar = transcript.closest(".tw-player")?.querySelector(".tw-bar");
-    const top = toolbar
-        ? toolbar.getBoundingClientRect().height + (parseFloat(getComputedStyle(toolbar).top) || 0)
-        : 0;
+    const top = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
     const desired = window.scrollY + element.getBoundingClientRect().top - top;
     const maximum = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
     return Math.max(0, Math.min(desired, maximum));
