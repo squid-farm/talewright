@@ -7,13 +7,23 @@
         case RenderedParagraph paragraph:
             <p class="tw-paragraph"><InlineView Inlines="paragraph.Inlines" /></p>
             break;
+        case RenderedBlankLine:
+            <p class="tw-blank-line" aria-hidden="true">&nbsp;</p>
+            break;
         case RenderedSpeech speech:
             <div class="tw-speech">
                 <span class="tw-speaker">@speech.SpeakerName</span>
                 <div class="tw-speech-body">
                     @foreach (var paragraph in speech.Paragraphs)
                     {
-                        <p class="tw-line"><InlineView Inlines="paragraph" /></p>
+                        if (paragraph.Count == 1 && paragraph[0] is RenderedBlankLineInline)
+                        {
+                            <p class="tw-blank-line" aria-hidden="true">&nbsp;</p>
+                        }
+                        else
+                        {
+                            <p class="tw-line"><InlineView Inlines="paragraph" /></p>
+                        }
                     }
                 </div>
             </div>

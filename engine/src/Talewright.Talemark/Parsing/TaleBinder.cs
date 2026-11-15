@@ -42,6 +42,7 @@ internal sealed partial class TaleBinder
         public SourceLocation End { get; set; } = end;
         public SourceText Paragraph { get; set; } = paragraph;
         public List<IReadOnlyList<TemplateInline>> Paragraphs { get; } = [];
+        public int BareLines { get; set; }
     }
 
     private readonly string _file;
@@ -104,7 +105,10 @@ internal sealed partial class TaleBinder
                 if (line.Kind != TaleLineKind.Comment)
                     ParseSceneLine(line);
                 else
+                {
                     FlushSpeech();
+                    _scene!.ConsecutiveBlankLines = 0;
+                }
                 CountLine();
             }
         }
@@ -164,6 +168,8 @@ internal sealed partial class TaleBinder
         while (_scene.Frames.Count > 0)
             CloseFrame();
 
+        if (_scene.HasBlankLines)
+            PruneBlankLines(_scene.Steps);
         _scenes.Add(new ParsedScene(_scene.Build(), _scene.Location)
         {
             EndLine = _sceneSyntax!.Line + _sceneSyntax.LineCount,
@@ -186,9 +192,17 @@ internal sealed partial class TaleBinder
         if (syntax.Kind == TaleLineKind.Blank)
         {
             FlushParagraph();
+            if (++scene.ConsecutiveBlankLines > 1)
+            {
+                var location = At(0);
+                scene.HasBlankLines = true;
+                scene.CurrentSteps.Add(new ProseStep(StepId(location),
+                    new SourceRange(location, location), new BlankLineTemplate()));
+            }
             return;
         }
 
+        scene.ConsecutiveBlankLines = 0;
         var indent = syntax.Indent;
         if (syntax.Kind == TaleLineKind.Metadata && TryParseMetadata(syntax))
         {
@@ -262,6 +276,85 @@ internal sealed partial class TaleBinder
         }
 
         scene.Paragraph.AppendLine(_syntax.ProseText(_sceneSyntax!, syntax).ToString(), At(0));
+    }
+
+    // Keep only spacers that can lie between narrative blocks on a scene path.
+    private void PruneBlankLines(List<SceneStep> steps)
+    {
+        var followed = new HashSet<string>(StringComparer.Ordinal);
+        var kept = new HashSet<string>(StringComparer.Ordinal);
+
+        bool Backward(IReadOnlyList<SceneStep> list, bool hasContent)
+        {
+            for (var i = list.Count - 1; i >= 0; i--)
+            {
+                CountLine();
+                switch (list[i])
+                {
+                    case ProseStep { Block: BlankLineTemplate } blank:
+                        if (hasContent) followed.Add(blank.Id);
+                        break;
+                    case ProseStep:
+                        hasContent = true;
+                        break;
+                    case ConditionalStep branch:
+                        var thenContent = Backward(branch.Then, hasContent);
+                        var elseContent = Backward(branch.Else, hasContent);
+                        hasContent = thenContent || elseContent;
+                        break;
+                    case ChoiceStep or DivertStep:
+                        hasContent = false;
+                        break;
+                }
+            }
+            return hasContent;
+        }
+
+        bool Forward(IReadOnlyList<SceneStep> list, bool hasContent)
+        {
+            foreach (var step in list)
+            {
+                CountLine();
+                switch (step)
+                {
+                    case ProseStep { Block: BlankLineTemplate } blank:
+                        if (hasContent && followed.Contains(blank.Id)) kept.Add(blank.Id);
+                        break;
+                    case ProseStep:
+                        hasContent = true;
+                        break;
+                    case ConditionalStep branch:
+                        var thenContent = Forward(branch.Then, hasContent);
+                        var elseContent = Forward(branch.Else, hasContent);
+                        hasContent = thenContent || elseContent;
+                        break;
+                    case ChoiceStep or DivertStep:
+                        hasContent = false;
+                        break;
+                }
+            }
+            return hasContent;
+        }
+
+        static void Remove(List<SceneStep> list, HashSet<string> kept)
+        {
+            list.RemoveAll(step => step is ProseStep { Block: BlankLineTemplate } blank && !kept.Contains(blank.Id));
+            for (var i = list.Count - 1; i >= 0; i--)
+            {
+                if (list[i] is ConditionalStep branch)
+                {
+                    var then = branch.Then.ToList();
+                    var otherwise = branch.Else.ToList();
+                    Remove(then, kept);
+                    Remove(otherwise, kept);
+                    list[i] = branch with { Then = then, Else = otherwise };
+                }
+            }
+        }
+
+        Backward(steps, false);
+        Forward(steps, false);
+        Remove(steps, kept);
     }
 
     private string Content(TaleLineSyntax line) => _syntax.Content(_sceneSyntax!, line).ToString();
@@ -437,9 +530,14 @@ internal sealed partial class TaleBinder
             if (text.Length == 0)
             {
                 FlushSpeechParagraph();
+                _speech.BareLines++;
             }
             else
             {
+                if (_speech.Paragraphs.Count > 0)
+                    for (var i = 1; i < _speech.BareLines; i++)
+                        _speech.Paragraphs.Add([new BlankLineInlineTemplate()]);
+                _speech.BareLines = 0;
                 _speech.Paragraph.AppendLine(text, At(continuationPart.ValueStart));
             }
             _speech.End = At(_lineLength);
@@ -993,6 +1091,8 @@ internal sealed partial class TaleBinder
         public List<SceneStep> Steps { get; } = [];
         public int ChoiceCount { get; set; }
         public bool DroppedMalformedChoice { get; set; }
+        public bool HasBlankLines { get; set; }
+        public int ConsecutiveBlankLines { get; set; }
         public Stack<Frame> Frames { get; } = new();
         public SourceText Paragraph { get; set; } = new();
 

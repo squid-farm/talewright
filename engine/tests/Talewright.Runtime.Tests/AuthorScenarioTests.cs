@@ -182,6 +182,18 @@ public sealed class AuthorScenarioTests
     }
 
     [Fact]
+    public void Scenario_replay_preserves_prose_and_speech_spacers()
+    {
+        var story = Story("=== start\nFirst.\n\n\n> guide: Hello.\n>\n>\n> Goodbye.\n* [Continue] -> END");
+        var source = Start(story);
+        var bytes = AuthorScenario.Export(source, Extensions);
+        var restored = AuthorScenario.Import(story, bytes, Extensions).Session;
+
+        Assert.Equal("First.\n\n\nGuide: Hello.\n\n\nGoodbye.", restored.Current.Document.ToPlainText());
+        Assert.Equal(bytes, AuthorScenario.Export(restored, Extensions));
+    }
+
+    [Fact]
     public void Continued_sessions_cannot_be_exported_as_portable_scenarios()
     {
         var source = Start();

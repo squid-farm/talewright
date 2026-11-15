@@ -55,6 +55,9 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
                     }
 
                     break;
+                case BlankLineTemplate:
+                    output.Add(new RenderedBlankLine());
+                    break;
                 case SpeechTemplate s:
                     var speaker = context.State.GetCharacterDefinition(s.Speaker);
                     output.Add(new RenderedSpeech(s.Speaker, speaker.FirstName,
@@ -71,6 +74,10 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
 
     private IReadOnlyList<RenderedInline> Render(IEnumerable<TemplateInline> inlines, EvaluationContext context)
     {
+        if (inlines is IReadOnlyList<TemplateInline> { Count: 1 } paragraph &&
+            paragraph[0] is BlankLineInlineTemplate)
+            return [new RenderedBlankLineInline()];
+
         var output = new List<RenderedInline>();
         RenderInlines(inlines, TextStyle.None, context, output);
         return Normalize(output, preserveWhitespace: true);

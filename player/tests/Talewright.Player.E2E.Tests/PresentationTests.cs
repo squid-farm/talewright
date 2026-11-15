@@ -8,6 +8,35 @@ namespace Talewright.Player.E2E.Tests;
 [Trait("Host", "Browser")]
 public sealed class PresentationTests(WebHostFixture host, ITestOutputHelper output) : PlayerTest(host, output)
 {
+    [Fact]
+    public async Task Extra_vertical_spacing_is_visible_but_absent_from_the_accessibility_tree()
+    {
+        await Upload(new StoryFixture("vertical-spacing-browser", TestStories.DefaultYaml,
+            "=== start\nFirst.\n\nSecond.\n\nThird.\n\n\n\nFourth.\n" +
+            "> guide: Hello.\n>\n>\n>\n> Goodbye.\n* [Finish] -> END"));
+        var spacers = Latest.Locator("p.tw-blank-line");
+        await Expect(spacers).ToHaveCountAsync(4);
+        for (var index = 0; index < 4; index++)
+        {
+            await Expect(spacers.Nth(index)).ToHaveAttributeAsync("aria-hidden", "true");
+            Assert.True((await spacers.Nth(index).BoundingBoxAsync())!.Height > 0);
+        }
+        var paragraphs = Latest.Locator(".tw-paragraph");
+        var first = (await paragraphs.Nth(0).BoundingBoxAsync())!;
+        var second = (await paragraphs.Nth(1).BoundingBoxAsync())!;
+        var third = (await paragraphs.Nth(2).BoundingBoxAsync())!;
+        var fourth = (await paragraphs.Nth(3).BoundingBoxAsync())!;
+        Assert.True(fourth.Y - (third.Y + third.Height) > second.Y - (first.Y + first.Height));
+        var speech = Latest.Locator(".tw-speech-body .tw-line");
+        var hello = (await speech.Nth(0).BoundingBoxAsync())!;
+        var goodbye = (await speech.Nth(1).BoundingBoxAsync())!;
+        Assert.True(goodbye.Y - (hello.Y + hello.Height) >= hello.Height * 2);
+        var accessible = await Latest.AriaSnapshotAsync();
+        Assert.Contains("First.", accessible);
+        Assert.Contains("Goodbye.", accessible);
+        Assert.DoesNotContain('\u00a0', accessible);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

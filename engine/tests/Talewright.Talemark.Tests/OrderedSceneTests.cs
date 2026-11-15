@@ -1,4 +1,7 @@
 using Talewright.Rules.Expressions;
+using Talewright.Core.State;
+using Talewright.Narrative.Rendering;
+using Talewright.Narrative.Templates;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
 
@@ -70,6 +73,45 @@ public sealed class OrderedSceneTests
         });
         Assert.Equal(flattened.Select(step => step.Id),
             SceneSteps.Walk(Compile(tale).Story!.Scenes[0].Steps).Select(step => step.Id));
+    }
+
+    [Fact]
+    public void Extra_blank_lines_between_prose_and_speech_become_ordered_spacers()
+    {
+        var result = Compile("=== start\n\n\n@title Start\n\n\nFirst.\n\n\n\n> player: Hello.\n\n\nLast.\n\n\n* [End] -> END\n\n\n* [Finish] -> END\n\n");
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var scene = result.Story!.Scenes[0];
+        var prose = scene.Steps.OfType<ProseStep>().ToArray();
+        Assert.Collection(prose,
+            step => Assert.IsType<ParagraphTemplate>(step.Block),
+            step => Assert.IsType<BlankLineTemplate>(step.Block),
+            step => Assert.IsType<BlankLineTemplate>(step.Block),
+            step => Assert.IsType<SpeechTemplate>(step.Block),
+            step => Assert.IsType<BlankLineTemplate>(step.Block),
+            step => Assert.IsType<ParagraphTemplate>(step.Block));
+        Assert.Equal([9, 10, 13], prose.Where(step => step.Block is BlankLineTemplate)
+            .Select(step => step.Source.Start.Line));
+        var rendered = new TemplateRenderer().Render(prose.Select(step => step.Block),
+            GameState.CreateInitial(result.Story.World, 1));
+        Assert.Equal("First.\n\n\n\nAda: Hello.\n\n\nLast.", rendered.ToPlainText());
+    }
+
+    [Fact]
+    public void Directive_padding_and_trailing_blank_lines_do_not_create_spacers()
+    {
+        var result = Compile("=== start\nFirst.\n\n~ var:gold += 1\n\n// comment\n\nSecond.\n\n\n-> END\n\n\n=== other\n\n\nOther.\n\n\n-> END\n\n\n");
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        Assert.DoesNotContain(result.Story!.Scenes.SelectMany(scene => SceneSteps.Walk(scene.Steps))
+            .OfType<ProseStep>(), step => step.Block is BlankLineTemplate);
+    }
+
+    [Fact]
+    public void Spacer_count_is_not_capped()
+    {
+        var result = Compile("=== start\nFirst.\n" + new string('\n', 101) + "Second.\n-> END");
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        Assert.Equal(100, result.Story!.Scenes[0].Steps.OfType<ProseStep>()
+            .Count(step => step.Block is BlankLineTemplate));
     }
 
     [Theory]

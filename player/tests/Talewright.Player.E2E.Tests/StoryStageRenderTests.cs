@@ -106,6 +106,47 @@ public sealed class StoryStageRenderTests
     }
 
     [Fact]
+    public async Task Extra_blank_lines_render_as_hidden_spacers_in_prose_and_speech()
+    {
+        var story = new StoryFixture("vertical-spacing-render", TestStories.DefaultYaml,
+            "=== start\nFirst.\n\n\n\nSecond.\n> guide: Hello.\n>\n>\n> Goodbye.\n-> END").Compile();
+        var html = await RenderStageAsync(story, new StoryHistory(story, 42));
+
+        Assert.Equal(3, Regex.Matches(html, "<p class=\"tw-blank-line\" aria-hidden=\"true\">").Count);
+        Assert.Contains("<p class=\"tw-paragraph\">First.</p>", html);
+        Assert.Contains("<p class=\"tw-line\">Goodbye.</p>", html);
+    }
+
+    [Fact]
+    public void Passage_rerenders_when_blank_line_presentation_changes()
+    {
+        static HistoryFrame Frame(params RenderedBlock[] blocks) =>
+            new(new StoryFrame(null, null, new RenderedDocument(blocks), [], IsEnded: false));
+        static RenderedParagraph Text(string text) => new([new RenderedText(text, TextStyle.None)]);
+
+        var passage = new PassageRenderProbe();
+        passage.SetEntry(Frame(Text("First"), new RenderedBlankLine(), Text("Second")));
+        Assert.True(passage.NeedsRender());
+        passage.MarkRendered();
+        passage.SetEntry(Frame(Text("First"), new RenderedBlankLine(), Text("Second")));
+        Assert.False(passage.NeedsRender());
+        passage.SetEntry(Frame(Text("First"), new RenderedBlankLine(), new RenderedBlankLine(), Text("Second")));
+        Assert.True(passage.NeedsRender());
+        passage.MarkRendered();
+        passage.SetEntry(Frame(Text("First"), new RenderedBlankLine(), Text("Second")));
+        Assert.True(passage.NeedsRender());
+
+        static RenderedSpeech Speech(RenderedInline middle) => new(EntityId.Player, "Ada",
+            [[new RenderedText("First", TextStyle.None)], [middle], [new RenderedText("Second", TextStyle.None)]]);
+        passage.SetEntry(Frame(Speech(new RenderedBlankLineInline())));
+        passage.MarkRendered();
+        passage.SetEntry(Frame(Speech(new RenderedBlankLineInline())));
+        Assert.False(passage.NeedsRender());
+        passage.SetEntry(Frame(Speech(new RenderedText("Changed", TextStyle.None))));
+        Assert.True(passage.NeedsRender());
+    }
+
+    [Fact]
     public void Passage_rerenders_when_speech_paragraphs_change()
     {
         static HistoryFrame Speech(params string[] paragraphs) =>

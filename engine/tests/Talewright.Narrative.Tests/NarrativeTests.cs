@@ -120,6 +120,23 @@ public class NarrativeTests
     }
 
     [Fact]
+    public void Blank_line_blocks_contribute_one_newline_each_to_plain_text()
+    {
+        var renderer = new TemplateRenderer();
+        var document = renderer.Render([
+            new BlankLineTemplate(),
+            new ParagraphTemplate([new TextTemplate("First")]),
+            new BlankLineTemplate(),
+            new BlankLineTemplate(),
+            new ParagraphTemplate([new TextTemplate("Second")]),
+            new BlankLineTemplate(),
+        ], State());
+
+        Assert.Equal("\nFirst\n\n\n\nSecond\n", document.ToPlainText());
+        Assert.Equal("First\n\n\n\nSecond", document.TrimUnboundedBlankLines().ToPlainText());
+    }
+
+    [Fact]
     public void Speech_paragraphs_render_as_one_speaker_block()
     {
         var document = new TemplateRenderer().Render(

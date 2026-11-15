@@ -44,6 +44,37 @@ public sealed class OrderedSceneTests
 
     private static string Text(StoryFrame frame) => frame.Document.ToPlainText();
 
+    [Theory]
+    [InlineData(true, "Before.\n\n\nInside.")]
+    [InlineData(false, "Before.")]
+    public void Conditional_spacing_follows_the_executed_path_without_trailing_spacers(bool ready, string expected)
+    {
+        var setup = ready ? "~ set flag:ready\n" : "";
+        var story = Compile("=== start\n" + setup +
+            "Before.\n\n\n{if flag:ready}\nInside.\n{/if}\n\n\n* [Finish] -> END");
+        var session = new StorySession(story);
+        var frame = session.Start();
+        Assert.Equal(expected, Text(frame));
+        Assert.Equal(ready ? 1 : 0, frame.Document.Blocks.OfType<RenderedBlankLine>().Count());
+        var preview = ScenePreview.Build(story, new("start"), session.State);
+        Assert.Equal(expected, Text(preview));
+        Assert.Equal(ready ? 1 : 0, preview.Document.Blocks.OfType<RenderedBlankLine>().Count());
+    }
+
+    [Theory]
+    [InlineData(true, "Inside.\n\n\nAfter.")]
+    [InlineData(false, "After.")]
+    public void Conditional_spacing_does_not_leave_leading_spacers(bool ready, string expected)
+    {
+        var setup = ready ? "~ set flag:ready\n" : "";
+        var story = Compile("=== start\n" + setup +
+            "{if flag:ready}\nInside.\n{/if}\n\n\nAfter.\n* [Finish] -> END");
+        var session = new StorySession(story);
+        var frame = session.Start();
+        Assert.Equal(expected, Text(frame));
+        Assert.Equal(ready ? 1 : 0, frame.Document.Blocks.OfType<RenderedBlankLine>().Count());
+    }
+
     [Fact]
     public void Every_prose_line_sees_only_earlier_effects_and_trigger_results()
     {

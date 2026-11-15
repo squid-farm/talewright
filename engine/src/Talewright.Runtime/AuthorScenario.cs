@@ -231,6 +231,7 @@ public static class AuthorScenario
                 switch (block)
                 {
                     case RenderedParagraph paragraph: WriteInlines(writer, paragraph.Inlines); break;
+                    case RenderedBlankLine: break;
                     case RenderedSpeech speech:
                         writer.WriteStringValue(speech.Speaker.Value);
                         writer.WriteStringValue(speech.SpeakerName);
@@ -443,6 +444,7 @@ internal sealed class ScenarioCommand
 [JsonSerializable(typeof(ScenarioState))]
 [JsonSerializable(typeof(RenderedText))]
 [JsonSerializable(typeof(RenderedLineBreak))]
+[JsonSerializable(typeof(RenderedBlankLineInline))]
 [JsonSerializable(typeof(RenderedMedia))]
 [JsonSerializable(typeof(CharacterIdentityChanged))]
 [JsonSerializable(typeof(StatChanged))]

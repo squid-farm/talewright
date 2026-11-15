@@ -9,6 +9,29 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
     private readonly string _fixtures = Path.Combine(Path.GetTempPath(), "talewright-native-" + Guid.NewGuid().ToString("N"));
     protected override bool AutoStartDesktop => false;
 
+    [Fact]
+    public async Task Extra_vertical_spacing_is_visible_but_absent_from_desktop_accessibility()
+    {
+        await Driver.StartAsync();
+        await Upload(new StoryFixture("vertical-spacing-native", TestStories.DefaultYaml,
+            "=== start\nFirst.\n\nSecond.\n\nThird.\n\n\n\nFourth.\n" +
+            "> guide: Hello.\n>\n>\n>\n> Goodbye.\n* [Finish] -> END"));
+        var native = Assert.IsType<NativePlayerDriver>(Driver);
+        var passage = Assert.Single((await native.SnapshotAsync()).Descendants(),
+            node => node.Name == "Current passage");
+        var paragraphs = passage.Descendants().Where(node => node.Role == "paragraph").ToArray();
+        var first = Assert.Single(paragraphs, node => node.Text.Trim() == "First.");
+        var second = Assert.Single(paragraphs, node => node.Text.Trim() == "Second.");
+        var third = Assert.Single(paragraphs, node => node.Text.Trim() == "Third.");
+        var fourth = Assert.Single(paragraphs, node => node.Text.Trim() == "Fourth.");
+        Assert.True(fourth.Bounds.Y - (third.Bounds.Y + third.Bounds.Height) >
+                    second.Bounds.Y - (first.Bounds.Y + first.Bounds.Height));
+        var hello = Assert.Single(paragraphs, node => node.Text.Trim() == "Hello.");
+        var goodbye = Assert.Single(paragraphs, node => node.Text.Trim() == "Goodbye.");
+        Assert.True(goodbye.Bounds.Y - (hello.Bounds.Y + hello.Bounds.Height) >= hello.Bounds.Height * 2);
+        Assert.DoesNotContain(paragraphs, node => string.IsNullOrWhiteSpace(node.Text));
+    }
+
     public static IEnumerable<object[]> InvalidPaths =>
         TestArchives.Errors.Where(pair => pair.Key is "zip" or "manifest" or "yaml" or "tale")
             .Select(pair => new object[] { pair.Key, pair.Key == "zip" ? "Couldn't open" : pair.Value });

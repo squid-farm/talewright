@@ -12,7 +12,49 @@ public sealed record RenderedDocument(IReadOnlyList<RenderedBlock> Blocks)
     public static RenderedDocument Empty { get; } = new([]);
 
     /// <summary>Plain-text form (styles dropped), handy for tests, logs and accessibility.</summary>
-    public string ToPlainText() => string.Join("\n\n", Blocks.Select(b => b.ToPlainText()));
+    public string ToPlainText() => JoinBlocks(Blocks.Select(block =>
+        (block is RenderedBlankLine, block.ToPlainText())));
+
+    /// <summary>Discard spacers without narrative content on both sides of the executed path.</summary>
+    public RenderedDocument TrimUnboundedBlankLines()
+    {
+        var first = -1;
+        var last = -1;
+        var hasBlankLine = false;
+        for (var i = 0; i < Blocks.Count; i++)
+        {
+            hasBlankLine |= Blocks[i] is RenderedBlankLine;
+            if (Blocks[i] is RenderedParagraph or RenderedSpeech)
+            {
+                if (first < 0) first = i;
+                last = i;
+            }
+        }
+        if (!hasBlankLine) return this;
+        return new RenderedDocument(Blocks.Where((block, index) =>
+            block is not RenderedBlankLine || (index > first && index < last)).ToArray());
+    }
+
+    internal static string JoinBlocks(IEnumerable<(bool IsBlankLine, string Text)> blocks)
+    {
+        var result = new System.Text.StringBuilder();
+        var hasContent = false;
+        foreach (var (isBlankLine, text) in blocks)
+        {
+            if (isBlankLine)
+            {
+                result.Append('\n');
+                continue;
+            }
+            if (hasContent)
+            {
+                result.Append("\n\n");
+            }
+            result.Append(text);
+            hasContent = true;
+        }
+        return result.ToString();
+    }
 }
 
 public abstract record RenderedBlock
@@ -25,10 +67,16 @@ public sealed record RenderedParagraph(IReadOnlyList<RenderedInline> Inlines) : 
     public override string ToPlainText() => RenderedInline.ToPlainText(Inlines);
 }
 
+public sealed record RenderedBlankLine : RenderedBlock
+{
+    public override string ToPlainText() => "\n";
+}
+
 public sealed record RenderedSpeech(EntityId Speaker, string SpeakerName, IReadOnlyList<IReadOnlyList<RenderedInline>> Paragraphs) : RenderedBlock
 {
     public override string ToPlainText() =>
-        $"{SpeakerName}: {string.Join("\n\n", Paragraphs.Select(RenderedInline.ToPlainText))}";
+        $"{SpeakerName}: {RenderedDocument.JoinBlocks(Paragraphs.Select(paragraph =>
+            (paragraph.Count == 1 && paragraph[0] is RenderedBlankLineInline, RenderedInline.ToPlainText(paragraph))))}";
 }
 
 public enum NoteKind
@@ -62,6 +110,8 @@ public abstract record RenderedInline
 public sealed record RenderedText(string Text, TextStyle Style) : RenderedInline;
 
 public sealed record RenderedLineBreak : RenderedInline;
+
+public sealed record RenderedBlankLineInline : RenderedInline;
 
 /// <summary>Resolved image identity, rendered alt text and inherited presentation style; no asset I/O.</summary>
 public sealed record RenderedMedia(string MediaId, string AltText) : RenderedInline
