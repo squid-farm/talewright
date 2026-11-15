@@ -297,7 +297,12 @@ class ReportingTests(unittest.TestCase):
             {"project": "Talewright.Player.E2E.Tests", "target": "e2e-published-web"},
         ]
         self.args.plan.write_text(json.dumps(plan))
-        for shard, targets in (((1, 2), ["e2e-web", "e2e-published-web"]), ((2, 2), ["e2e-web"])):
+        for shard, targets in (
+            ((1, 4), ["e2e-web", "e2e-published-web"]),
+            ((2, 4), ["e2e-web"]),
+            ((3, 4), ["e2e-web"]),
+            ((4, 4), ["e2e-web"]),
+        ):
             with self.subTest(shard=shard):
                 self.args.shard = shard
                 with patch("nx_ci.nx") as run, patch("nx_ci.ROOT", self.root), \
@@ -308,7 +313,7 @@ class ReportingTests(unittest.TestCase):
                     [call.args[2] for call in run.call_args_list],
                 )
                 environments = [call.kwargs["environment"] for call in run.call_args_list]
-                self.assertEqual(f"{shard[0]}/2", environments[0]["TALEWRIGHT_E2E_SHARD"])
+                self.assertEqual(f"{shard[0]}/4", environments[0]["TALEWRIGHT_E2E_SHARD"])
                 self.assertEqual("1", environments[0]["TALEWRIGHT_E2E_PREPARED"])
                 if len(environments) > 1:
                     self.assertEqual("1", environments[1]["TALEWRIGHT_E2E_PREPARED"])
@@ -316,13 +321,13 @@ class ReportingTests(unittest.TestCase):
                 self.assertTrue(all("TALEWRIGHT_E2E_SHARD" not in environment
                                     for environment in environments[1:]))
                 self.assertTrue(nx_ci.execution_path(self.args).name.endswith(
-                    f"-chromium-{shard[0]}-of-2.json"))
+                    f"-chromium-{shard[0]}-of-4.json"))
                 self.assertEqual("success", self.record()["outcome"])
 
         self.summary.write_text("")
         nx_ci.execution_summary(self.args)
         summary = self.summary.read_text()
-        self.assertIn("## Nx execution: browser (chromium, shard 2/2)", summary)
+        self.assertIn("## Nx execution: browser (chromium, shard 4/4)", summary)
         self.assertIn("| `e2e-published-web` | `Talewright.Player.E2E.Tests` | runs in shard 1 |", summary)
 
     def test_browser_jobs_run_only_their_selected_target_and_reject_empty_work(self):

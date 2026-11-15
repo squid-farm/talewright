@@ -185,7 +185,7 @@ jobs:
       matrix:
         browser: [chromium, firefox, webkit]
         # Each shard job runs a disjoint share of the regression suite.
-        shard: [1, 2]
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -219,12 +219,12 @@ jobs:
           with open(os.environ["GITHUB_STEP_SUMMARY"], "a", encoding="utf-8") as summary:
               summary.write(f"Downloaded browser input tar: {size} bytes.\n")
           PY
-      - run: python3 .github/scripts/nx_ci.py run browser --browser-target e2e-web --browser ${{ matrix.browser }} --shard ${{ matrix.shard }}/2
+      - run: python3 .github/scripts/nx_ci.py run browser --browser-target e2e-web --browser ${{ matrix.browser }} --shard ${{ matrix.shard }}/4
       - uses: actions/upload-artifact@v4
         id: results
         if: always()
         with:
-          name: player-${{ matrix.browser }}-${{ matrix.shard }}-of-2
+          name: player-${{ matrix.browser }}-${{ matrix.shard }}-of-4
           path: artifacts/test-results
           if-no-files-found: error
           retention-days: 14
@@ -232,7 +232,7 @@ jobs:
         if: always()
         env:
           NX_CI_ARTIFACT_URL: ${{ steps.results.outcome == 'success' && steps.results.outputs.artifact-url || '' }}
-        run: python3 .github/scripts/nx_ci.py summary browser --browser-target e2e-web --browser ${{ matrix.browser }} --shard ${{ matrix.shard }}/2
+        run: python3 .github/scripts/nx_ci.py summary browser --browser-target e2e-web --browser ${{ matrix.browser }} --shard ${{ matrix.shard }}/4
 
   browser-published:
     needs: [plan, browser-preparation]
@@ -298,7 +298,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: [1, 2, 3]
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -309,12 +309,12 @@ jobs:
         with:
           name: nx-ci-plan
           path: artifacts/ci
-      - run: python3 .github/scripts/nx_ci.py run linux-desktop --shard ${{ matrix.shard }}/3
+      - run: python3 .github/scripts/nx_ci.py run linux-desktop --shard ${{ matrix.shard }}/4
       - uses: actions/upload-artifact@v4
         id: results
         if: always()
         with:
-          name: player-linux-desktop-${{ matrix.shard }}-of-3
+          name: player-linux-desktop-${{ matrix.shard }}-of-4
           path: artifacts/test-results
           if-no-files-found: error
           retention-days: 14
@@ -322,7 +322,7 @@ jobs:
         if: always()
         env:
           NX_CI_ARTIFACT_URL: ${{ steps.results.outcome == 'success' && steps.results.outputs.artifact-url || '' }}
-        run: python3 .github/scripts/nx_ci.py summary linux-desktop --shard ${{ matrix.shard }}/3
+        run: python3 .github/scripts/nx_ci.py summary linux-desktop --shard ${{ matrix.shard }}/4
 
   editor:
     needs: plan
