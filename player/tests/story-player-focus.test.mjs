@@ -76,6 +76,59 @@ test("Explicit navigation still reveals and focuses a passage from the toolbar",
     ]);
 });
 
+test("Fractional scroll positions keep the passage below the toolbar", () => {
+    const { calls, latest, toolbar, transcript } = setup();
+    latest.getBoundingClientRect = () => ({ top: 400.7 });
+    toolbar.getBoundingClientRect = () => ({ bottom: 60.1, height: 60.1 });
+
+    revealLatest(transcript, false);
+
+    assert.deepEqual(calls[0], ["scrollTo", { top: 340, behavior: "auto" }]);
+});
+
+test("A delayed adjustment scroll does not cancel later image realignment", () => {
+    const { calls, latest, transcript } = setup();
+    const listeners = new Map();
+    const frames = new Map();
+    let frameId = 0;
+    let sceneTop = 400;
+    const listen = (target, type, listener, options) => listeners.set(`${target}:${type}`, { listener, signal: options.signal });
+    const dispatch = (target, type, event = {}) => {
+        const entry = listeners.get(`${target}:${type}`);
+        if (entry && !entry.signal.aborted) entry.listener(event);
+    };
+    const runFrame = () => {
+        const [id, callback] = frames.entries().next().value;
+        frames.delete(id);
+        callback();
+    };
+    window.addEventListener = (type, listener, options) => listen("window", type, listener, options);
+    document.addEventListener = (type, listener, options) => listen("document", type, listener, options);
+    transcript.addEventListener = (type, listener, options) => listen("transcript", type, listener, options);
+    window.scrollTo = options => { calls.push(["scrollTo", options]); window.scrollY = options.top; };
+    latest.getBoundingClientRect = () => ({ top: sceneTop - window.scrollY });
+    globalThis.requestAnimationFrame = callback => { frames.set(++frameId, callback); return frameId; };
+    globalThis.cancelAnimationFrame = id => frames.delete(id);
+    globalThis.HTMLImageElement = class {};
+
+    revealLatest(transcript, false);
+    runFrame();
+    sceneTop += 100;
+    document.documentElement.scrollHeight += 100;
+    dispatch("transcript", "load", { target: new HTMLImageElement() });
+    runFrame();
+    dispatch("window", "scrollend");
+    runFrame();
+    dispatch("window", "scroll");
+    sceneTop += 100;
+    document.documentElement.scrollHeight += 100;
+    dispatch("transcript", "load", { target: new HTMLImageElement() });
+    assert.equal(frames.size, 1);
+    runFrame();
+
+    assert.deepEqual(calls.filter(([name]) => name === "scrollTo").map(([, options]) => options.top), [340, 440, 540]);
+});
+
 test("Restart still focuses the first passage from the toolbar", () => {
     const { calls, latest, toolbar, transcript } = setup();
     document.activeElement = toolbar;

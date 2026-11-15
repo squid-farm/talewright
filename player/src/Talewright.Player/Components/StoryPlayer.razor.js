@@ -10,8 +10,11 @@ function stopReveal(transcript) {
 
 function sceneScrollTop(transcript, element, isFirst) {
     if (isFirst) return 0;
-    const top = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
-    const desired = window.scrollY + element.getBoundingClientRect().top - top;
+    const toolbar = transcript.closest(".tw-player")?.querySelector(".tw-bar");
+    const top = toolbar
+        ? toolbar.getBoundingClientRect().height + (parseFloat(getComputedStyle(toolbar).top) || 0)
+        : 0;
+    const desired = Math.floor(window.scrollY + element.getBoundingClientRect().top - top);
     const maximum = Math.max(0, document.documentElement.scrollHeight - window.innerHeight);
     return Math.max(0, Math.min(desired, maximum));
 }
@@ -35,11 +38,12 @@ export function revealLatest(transcript, isFirst, preserveExistingFocus = false)
     const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches
         || document.documentElement.dataset.twReducedMotion === "reduce";
     const behavior = reduceMotion ? "auto" : "smooth";
-    window.scrollTo({ top: sceneScrollTop(transcript, element, isFirst), behavior });
+    const target = sceneScrollTop(transcript, element, isFirst);
+    window.scrollTo({ top: target, behavior });
     element.focus({ preventScroll: true });
 
     const abort = new AbortController();
-    const state = { abort, frame: 0, adjusting: true, height: document.documentElement.scrollHeight };
+    const state = { abort, frame: 0, adjusting: true, height: document.documentElement.scrollHeight, target };
     reveals.set(transcript, state);
     const options = { signal: abort.signal, capture: true };
     const stop = () => stopReveal(transcript);
@@ -54,7 +58,8 @@ export function revealLatest(transcript, isFirst, preserveExistingFocus = false)
     }, options);
     window.addEventListener("scrollend", () => { state.adjusting = false; }, options);
     window.addEventListener("scroll", () => {
-        if (!state.adjusting && document.documentElement.scrollHeight === state.height) stop();
+        if (!state.adjusting && document.documentElement.scrollHeight === state.height
+            && Math.abs(window.scrollY - state.target) > 1) stop();
     }, options);
     transcript.addEventListener("load", event => {
         if (!(event.target instanceof HTMLImageElement) || !element.isConnected ||
@@ -64,6 +69,7 @@ export function revealLatest(transcript, isFirst, preserveExistingFocus = false)
         state.frame = requestAnimationFrame(() => {
             const top = sceneScrollTop(transcript, element, isFirst);
             state.height = document.documentElement.scrollHeight;
+            state.target = top;
             if (Math.abs(window.scrollY - top) > 1) {
                 window.scrollTo({ top, behavior: "instant" });
             }
