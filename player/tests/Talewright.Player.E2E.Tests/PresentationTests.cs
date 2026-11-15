@@ -1,3 +1,4 @@
+using System.Globalization;
 using Microsoft.Playwright;
 using Talewright.Testing;
 using Xunit.Abstractions;
@@ -194,6 +195,139 @@ public sealed class PresentationTests(WebHostFixture host, ITestOutputHelper out
                 "e => e.getBoundingClientRect().height > parseFloat(getComputedStyle(e).lineHeight) * 1.5"));
             Assert.True(await line.EvaluateAsync<bool>("e => e.scrollWidth <= e.clientWidth + 1"));
         }
+        Assert.True(await Page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth <= innerWidth + 1"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Speech_turns_render_as_distinct_theme_aware_panels_at_narrow_width(bool dark)
+    {
+        await Page.SetViewportSizeAsync(320, 900);
+        await Page.EmulateMediaAsync(new() { ColorScheme = dark ? ColorScheme.Dark : ColorScheme.Light });
+        await Upload(new StoryFixture("speech-panels-browser", TestStories.DefaultYaml, """
+            === start
+            Narration before the speech.
+            > guide: First  paragraph.
+            >
+            >
+            >
+            > Second paragraph.
+
+            > player: A verylongunbrokenwordthatmustwrapwithoutcausinghorizontalscrolling followed by more dialogue.
+            Narration after the speech.
+            -> END
+            """));
+
+        var panels = Latest.Locator(".tw-speech");
+        await Expect(panels).ToHaveCountAsync(2);
+        await Expect(panels.Nth(0).Locator(".tw-speaker")).ToHaveTextAsync("Tomas");
+        await Expect(panels.Nth(0).Locator(".tw-line")).ToHaveCountAsync(2);
+        await Expect(panels.Nth(0).Locator(".tw-blank-line")).ToHaveCountAsync(2);
+        Assert.Equal("First  paragraph.", await panels.Nth(0).Locator(".tw-line").Nth(0).TextContentAsync());
+        await Expect(panels.Nth(1).Locator(".tw-speaker")).ToHaveTextAsync("Mara");
+        await Expect(panels.Nth(1).Locator(".tw-line")).ToHaveCountAsync(1);
+        await Expect(Latest.Locator(".tw-paragraph")).ToHaveCountAsync(2);
+        Assert.Equal("Narration before the speech.",
+            await Latest.Locator(".tw-paragraph").Nth(0).TextContentAsync());
+        Assert.Equal("Narration after the speech.",
+            await Latest.Locator(".tw-paragraph").Nth(1).TextContentAsync());
+
+        var panelStyle = await panels.First.EvaluateAsync<string[]>("""
+            e => {
+                const style = getComputedStyle(e);
+                return [
+                    style.boxSizing,
+                    style.padding,
+                    style.marginTop,
+                    style.marginBottom,
+                    style.borderLeftWidth,
+                    style.borderTopWidth,
+                    style.borderRightWidth,
+                    style.borderBottomWidth,
+                    style.borderRadius,
+                    style.backgroundColor,
+                    style.borderLeftColor,
+                    String(e.scrollWidth),
+                    String(e.clientWidth),
+                    String(e.getBoundingClientRect().width),
+                    String(e.parentElement.clientWidth),
+                    style.boxShadow,
+                ];
+            }
+            """);
+        Assert.Equal("border-box", panelStyle[0]);
+        Assert.Equal("18px", panelStyle[1]);
+        Assert.Equal("18px", panelStyle[2]);
+        Assert.Equal("18px", panelStyle[3]);
+        Assert.Equal("3px", panelStyle[4]);
+        Assert.Equal("0px", panelStyle[5]);
+        Assert.Equal("0px", panelStyle[6]);
+        Assert.Equal("0px", panelStyle[7]);
+        Assert.Equal("0px", panelStyle[8]);
+        Assert.NotEqual(panelStyle[9],
+            await Page.Locator("body").EvaluateAsync<string>("e => getComputedStyle(e).backgroundColor"));
+        Assert.NotEqual(panelStyle[9], panelStyle[10]);
+        Assert.Equal(panelStyle[12], panelStyle[11]);
+        Assert.InRange(
+            Math.Abs(double.Parse(panelStyle[13], CultureInfo.InvariantCulture) -
+                double.Parse(panelStyle[14], CultureInfo.InvariantCulture)),
+            0,
+            1);
+        Assert.Equal("none", panelStyle[15]);
+        var foreground = await Page.Locator("body").EvaluateAsync<string>("e => getComputedStyle(e).color");
+        Assert.Equal(foreground,
+            await panels.First.Locator(".tw-line").First.EvaluateAsync<string>("e => getComputedStyle(e).color"));
+        Assert.NotEqual(panelStyle[9], foreground);
+
+        var labelStyle = await panels.First.Locator(".tw-speaker").EvaluateAsync<string[]>("""
+            e => {
+                const style = getComputedStyle(e);
+                return [
+                    style.display,
+                    style.fontSize,
+                    getComputedStyle(document.documentElement).fontSize,
+                    style.fontFamily,
+                    style.fontVariant,
+                    style.fontWeight,
+                    style.letterSpacing,
+                    style.color,
+                    style.marginTop,
+                    style.marginBottom,
+                ];
+            }
+            """);
+        Assert.Equal("block", labelStyle[0]);
+        Assert.Contains("system-ui", labelStyle[3]);
+        Assert.Equal("small-caps", labelStyle[4]);
+        Assert.Equal("700", labelStyle[5]);
+        Assert.Equal("0px", labelStyle[8]);
+        Assert.Equal("9px", labelStyle[9]);
+        Assert.Equal(panelStyle[10], labelStyle[7]);
+        Assert.InRange(
+            Math.Abs(double.Parse(labelStyle[1].Replace("px", ""), CultureInfo.InvariantCulture) /
+                double.Parse(labelStyle[2].Replace("px", ""), CultureInfo.InvariantCulture) - 0.7),
+            0,
+            0.001);
+        Assert.InRange(
+            Math.Abs(double.Parse(labelStyle[6].Replace("px", ""), CultureInfo.InvariantCulture) /
+                double.Parse(labelStyle[1].Replace("px", ""), CultureInfo.InvariantCulture) - 0.08),
+            0,
+            0.001);
+
+        foreach (var panel in await panels.AllAsync())
+        {
+            Assert.True(await panel.EvaluateAsync<bool>("e => e.scrollWidth <= e.clientWidth + 1"));
+            foreach (var line in await panel.Locator(".tw-line").AllAsync())
+            {
+                Assert.True(await line.EvaluateAsync<bool>("e => e.scrollWidth <= e.clientWidth + 1"));
+            }
+        }
+        var firstPanel = await panels.Nth(0).BoundingBoxAsync();
+        var secondPanel = await panels.Nth(1).BoundingBoxAsync();
+        Assert.NotNull(firstPanel);
+        Assert.NotNull(secondPanel);
+        Assert.True(secondPanel.Y - (firstPanel.Y + firstPanel.Height) >= 16);
         Assert.True(await Page.EvaluateAsync<bool>("() => document.documentElement.scrollWidth <= innerWidth + 1"));
     }
 

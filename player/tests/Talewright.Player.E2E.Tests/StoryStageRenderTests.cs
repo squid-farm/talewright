@@ -67,7 +67,7 @@ public sealed class StoryStageRenderTests
     }
 
     [Fact]
-    public async Task Speech_paragraphs_render_inside_one_speaker_card()
+    public async Task Speech_paragraphs_and_spacers_render_inside_one_panel_per_turn()
     {
         var yaml = """
             game: {id: speech-render, title: Speech Render, start: start}
@@ -79,18 +79,31 @@ public sealed class StoryStageRenderTests
             === start
             > guide: First paragraph.
             >
+            >
+            >
             > Second paragraph.
+
+            > player: A reply from the player.
+            Narration after the speech.
             -> END
             """).Compile();
         var history = new StoryHistory(story, 42);
 
         var html = await RenderStageAsync(story, history);
 
-        Assert.Contains("<div class=\"tw-speech\">", html);
-        Assert.Contains("<span class=\"tw-speaker\">Bea</span>", html);
-        Assert.Contains("<div class=\"tw-speech-body\">", html);
-        Assert.Contains("<p class=\"tw-line\">First paragraph.</p>", html);
-        Assert.Contains("<p class=\"tw-line\">Second paragraph.</p>", html);
+        var panels = Regex.Matches(html,
+            "<div class=\"tw-speech\">(?<contents>.*?)</div>\\s*</div>", RegexOptions.Singleline);
+        Assert.Equal(2, panels.Count);
+        Assert.Contains("<span class=\"tw-speaker\">Bea</span>", panels[0].Groups["contents"].Value);
+        Assert.Contains("<div class=\"tw-speech-body\">", panels[0].Groups["contents"].Value);
+        Assert.Contains("<p class=\"tw-line\">First paragraph.</p>", panels[0].Groups["contents"].Value);
+        Assert.Equal(2, Regex.Matches(panels[0].Groups["contents"].Value,
+            "<p class=\"tw-blank-line\" aria-hidden=\"true\">&nbsp;</p>").Count);
+        Assert.Contains("<p class=\"tw-line\">Second paragraph.</p>", panels[0].Groups["contents"].Value);
+        Assert.Contains("<span class=\"tw-speaker\">Ada</span>", panels[1].Groups["contents"].Value);
+        Assert.Contains("<p class=\"tw-line\">A reply from the player.</p>", panels[1].Groups["contents"].Value);
+        Assert.Contains("<p class=\"tw-paragraph\">Narration after the speech.</p>", html);
+        Assert.DoesNotContain("Narration after the speech.", panels[1].Groups["contents"].Value);
         Assert.DoesNotContain("<p class=\"tw-speech\">", html);
     }
 
