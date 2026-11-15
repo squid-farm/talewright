@@ -1,13 +1,10 @@
 @implements IAsyncDisposable
 @inject IJSRuntime JS
 @using Talewright.Player.Diagnostics
-@using Talewright.Player.Library
 @using Talewright.Narrative.Templates
 
 <span class="tw-media @StyleClass" aria-hidden="@(Media.Accessibility == MediaAccessibility.Decorative ? "true" : null)">
-    <img @ref="_image" alt="@(Media.Accessibility == MediaAccessibility.Decorative ? "" : Media.AltText)"
-         width="@IntrinsicDimensions?.Width" height="@IntrinsicDimensions?.Height" style="@IntrinsicStyle"
-         hidden="@(_error is not null)" />
+    <img @ref="_image" alt="@(Media.Accessibility == MediaAccessibility.Decorative ? "" : Media.AltText)" hidden="@(_error is not null)" />
     @if (_error is not null)
     {
         <span class="tw-media-error">
@@ -21,10 +18,6 @@
     [Parameter, EditorRequired] public RenderedMedia Media { get; set; } = default!;
     [Parameter] public StoryImages? Images { get; set; }
     [CascadingParameter] public PlayerDiagnostics? Report { get; set; }
-    [CascadingParameter(Name = "ImageDimensions")]
-    private IReadOnlyDictionary<string, ImageDimensions>? ImageDimensionsByPath { get; set; }
-    [CascadingParameter(Name = "ImageLayoutReady")]
-    public bool ImageLayoutReady { get; set; } = true;
 
     private ElementReference _image;
     private IJSObjectReference? _module;
@@ -42,22 +35,6 @@
     private bool _reloadAfterRender;
     private string? _error;
     private Task _initializing = Task.CompletedTask;
-    private ImageDimensions? IntrinsicDimensions
-    {
-        get
-        {
-            if (ImageDimensionsByPath is not null &&
-                ImageDimensionsByPath.TryGetValue(Media.MediaId, out var dimensions))
-            {
-                return dimensions;
-            }
-
-            return null;
-        }
-    }
-    private string? IntrinsicStyle => IntrinsicDimensions is { } dimensions
-        ? $"width: {dimensions.Width}px; aspect-ratio: {dimensions.Width} / {dimensions.Height};"
-        : null;
     private string StyleClass => string.Join(" ", new[]
     {
         Media.Style.HasFlag(TextStyle.Strong) ? "tw-media-strong" : "",
@@ -97,7 +74,7 @@
 
     protected override async Task OnAfterRenderAsync(bool firstRender)
     {
-        if (!_observationStarted && Images is not null && ImageLayoutReady)
+        if (!_observationStarted && Images is not null)
         {
             _observationStarted = true;
             _initializing = ObserveAsync();

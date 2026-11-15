@@ -6,23 +6,6 @@ namespace Talewright.Player.E2E.Tests;
 public sealed class StoryImagesTests
 {
     [Fact]
-    public async Task Supported_image_dimensions_are_read_from_headers_without_consuming_the_image_body()
-    {
-        using var files = new ImageStoryFiles();
-        foreach (var (name, expected) in new[]
-        {
-            ("photo.jpeg", new ImageDimensions(1376, 768)),
-            ("pixel.png", new ImageDimensions(1, 1)),
-            ("pixel.webp", new ImageDimensions(1, 1)),
-        })
-        {
-            await using var stream = File.OpenRead(Path.Combine(files.Root, "images", name));
-            Assert.Equal(expected, await ImageDimensions.ReadAsync(stream, name, CancellationToken.None));
-            Assert.True(stream.Position < stream.Length, $"{name} dimensions should be available before reading its body.");
-        }
-    }
-
-    [Fact]
     public async Task Actual_folder_load_compile_and_lazy_open_preserve_bytes_and_live_edits()
     {
         using var files = new ImageStoryFiles();

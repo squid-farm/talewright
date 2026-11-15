@@ -7,23 +7,37 @@ const { revealLatest } = await import(`data:text/javascript;base64,${source.toSt
 
 function setup() {
     const calls = [];
-    const toolbar = {};
+    const toolbar = { getBoundingClientRect: () => ({ bottom: 60, height: 60 }) };
     const outside = {};
     const latest = {
         isConnected: true,
         focus(options) { calls.push(["focus", options]); document.activeElement = this; },
-        scrollIntoView(options) { calls.push(["scrollIntoView", options]); },
+        getBoundingClientRect: () => ({ top: 400 }),
     };
-    const player = { contains: element => element === toolbar || element === latest };
+    const player = {
+        contains: element => element === toolbar || element === latest,
+        querySelector: () => toolbar,
+    };
     const transcript = {
         querySelector: selector => selector === ".tw-latest" ? latest : null,
         closest: selector => selector === ".tw-player" ? player : null,
+        addEventListener() {},
     };
-    globalThis.document = { activeElement: outside };
+    globalThis.document = {
+        activeElement: outside,
+        documentElement: { dataset: {}, scrollHeight: 2000 },
+        addEventListener() {},
+    };
     globalThis.window = {
         matchMedia: () => ({ matches: true }),
+        innerHeight: 800,
+        scrollY: 0,
         scrollTo: options => calls.push(["scrollTo", options]),
+        addEventListener() {},
     };
+    globalThis.requestAnimationFrame = () => 1;
+    globalThis.cancelAnimationFrame = () => {};
+    globalThis.getComputedStyle = () => ({ top: "0px" });
     return { calls, latest, outside, toolbar, transcript };
 }
 
@@ -57,7 +71,7 @@ test("Explicit navigation still reveals and focuses a passage from the toolbar",
 
     assert.equal(document.activeElement, latest);
     assert.deepEqual(calls, [
-        ["scrollIntoView", { block: "start", behavior: "auto" }],
+        ["scrollTo", { top: 340, behavior: "auto" }],
         ["focus", { preventScroll: true }],
     ]);
 });
@@ -84,7 +98,7 @@ for (const { preference, systemReducesMotion, behavior } of [
     for (const isFirst of [true, false]) {
         test(`${preference} preference with OS reduction ${systemReducesMotion} uses ${behavior} for ${isFirst ? "first" : "later"} passages`, () => {
             const { calls, latest, transcript } = setup();
-            document.documentElement = { dataset: { twReducedMotion: preference } };
+            document.documentElement.dataset.twReducedMotion = preference;
             window.matchMedia = query => {
                 assert.equal(query, "(prefers-reduced-motion: reduce)");
                 return { matches: systemReducesMotion };
@@ -96,7 +110,7 @@ for (const { preference, systemReducesMotion, behavior } of [
             assert.deepEqual(calls, [
                 isFirst
                     ? ["scrollTo", { top: 0, behavior }]
-                    : ["scrollIntoView", { block: "start", behavior }],
+                    : ["scrollTo", { top: 340, behavior }],
                 ["focus", { preventScroll: true }],
             ]);
         });

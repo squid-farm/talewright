@@ -982,6 +982,7 @@
         {
             try
             {
+                await _module.InvokeVoidAsync("dispose", TranscriptElement);
                 await _module.DisposeAsync();
             }
             catch (JSDisconnectedException)

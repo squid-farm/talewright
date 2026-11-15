@@ -169,12 +169,10 @@ public sealed class PlayerPreferencesTests(WebHostFixture host, ITestOutputHelpe
         await Page.EvaluateAsync("""
             () => {
                 window.__twRevealBehavior = null;
-                const scrollIntoView = Element.prototype.scrollIntoView;
-                Element.prototype.scrollIntoView = function (options) {
-                    if (this.classList.contains('tw-latest')) {
-                        window.__twRevealBehavior = options?.behavior;
-                    }
-                    return scrollIntoView.call(this, options);
+                const scrollTo = window.scrollTo;
+                window.scrollTo = function (options) {
+                    window.__twRevealBehavior = options?.behavior;
+                    return scrollTo.call(this, options);
                 };
             }
             """);
