@@ -317,9 +317,9 @@ TW4004 and recover with `rpg` so stat references keep resolving.
 ### 3.4 `Talewright.Narrative` — the template renderer
 
 - **`Templates/Template.cs`**: the input AST.
-  - Blocks: `ParagraphTemplate`, `SpeechTemplate` (speaker + paragraphs), `ConditionalBlockTemplate`.
+  - Blocks: `ParagraphTemplate`, `BlankLineTemplate`, `SpeechTemplate` (speaker + paragraphs), `ConditionalBlockTemplate`.
   - Inlines: `TextTemplate`, `StyledTemplate` (emphasis/strong/code, nested via `TextStyle` flags),
-    `LineBreakTemplate`, `MediaTemplate` (resolved images), `SubstitutionTemplate` (an `Expr` plus a list of
+    `LineBreakTemplate`, `BlankLineInlineTemplate` (speech spacing), `MediaTemplate` (resolved images), `SubstitutionTemplate` (an `Expr` plus a list of
     text modifiers), `ConditionalInlineTemplate`.
   - Note: this is what "strongly typed, not string parsing" means in practice. `{player:first-name#possessive}`
     compiles to `SubstitutionTemplate(NameRef(player, First), [possessive])`.
@@ -331,7 +331,7 @@ TW4004 and recover with `rpg` so stat references keep resolving.
 - **`Grammar/EnglishGrammar.cs`**: `IGrammar` with Chicago-style possessives (`Burns's`, `the guards'`),
   a/an, capitalisation. Swap the grammar to localise or change style.
 - **`Rendering/`**: `TemplateRenderer.Render(blocks, state)` → `RenderedDocument`. Output types:
-  `RenderedParagraph`, `RenderedSpeech` (speaker + rendered paragraphs), `RenderedNote` (system messages like "Gained: rope", with a
+  `RenderedParagraph`, `RenderedBlankLine`, `RenderedSpeech` (speaker + rendered paragraphs), `RenderedNote` (system messages like "Gained: rope", with a
   `NoteKind`), and inlines `RenderedText(Text, Style)`, `RenderedLineBreak`, `RenderedMedia(MediaId, AltText)`.
 
 ### 3.5 `Talewright.Talemark` — the compiler

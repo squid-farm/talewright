@@ -76,6 +76,20 @@ public sealed class SpeechBlockTests
     }
 
     [Fact]
+    public void Consecutive_bare_continuations_preserve_extra_spacing_only_between_paragraphs()
+    {
+        var story = Compile("=== start\n> player: First.\n>\n>\n>\n> Second.\n>\n>\n-> END");
+        var block = Assert.Single(new TemplateRenderer().Render(
+            CompilerTests.Templates(story.GetScene(new("start"))),
+            GameState.CreateInitial(story.World, 1)).Blocks);
+        var speech = Assert.IsType<RenderedSpeech>(block);
+        Assert.Equal(4, speech.Paragraphs.Count);
+        Assert.All(speech.Paragraphs.Skip(1).Take(2),
+            paragraph => Assert.IsType<RenderedBlankLineInline>(Assert.Single(paragraph)));
+        Assert.Equal("Ada: First.\n\n\n\nSecond.", speech.ToPlainText());
+    }
+
+    [Fact]
     public void Different_speaker_recovery_keeps_delimiter_indentation_and_reports_marker()
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>

@@ -21,6 +21,9 @@ public abstract record TemplateBlock;
 
 public sealed record ParagraphTemplate(IReadOnlyList<TemplateInline> Inlines) : TemplateBlock;
 
+/// <summary>One authored vertical spacer between narrative blocks.</summary>
+public sealed record BlankLineTemplate : TemplateBlock;
+
 /// <summary>A character's speech, containing one or more paragraphs.</summary>
 public sealed record SpeechTemplate(EntityId Speaker, IReadOnlyList<IReadOnlyList<TemplateInline>> Paragraphs) : TemplateBlock;
 
@@ -34,6 +37,9 @@ public sealed record TextTemplate(string Text) : TemplateInline;
 public sealed record StyledTemplate(TextStyle Style, IReadOnlyList<TemplateInline> Children) : TemplateInline;
 
 public sealed record LineBreakTemplate : TemplateInline;
+
+/// <summary>One authored vertical spacer between speech paragraphs.</summary>
+public sealed record BlankLineInlineTemplate : TemplateInline;
 
 /// <summary>Whether image media is described to assistive technology or intentionally hidden from it.</summary>
 public enum MediaAccessibility

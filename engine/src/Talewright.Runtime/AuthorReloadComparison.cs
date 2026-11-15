@@ -149,6 +149,7 @@ internal static class AuthorReloadComparison
     private static bool BuiltInBlocks(IEnumerable<TemplateBlock> blocks) => blocks.All(block => block switch
     {
         ParagraphTemplate paragraph => BuiltInInlines(paragraph.Inlines),
+        BlankLineTemplate => true,
         SpeechTemplate speech => speech.Paragraphs.All(BuiltInInlines),
         ConditionalBlockTemplate conditional => BuiltInBlocks(conditional.Then) && BuiltInBlocks(conditional.Else),
         _ => false,
@@ -159,7 +160,7 @@ internal static class AuthorReloadComparison
         SubstitutionTemplate substitution => substitution.Modifiers.All(TextModifierRegistry.IsBuiltIn),
         StyledTemplate styled => BuiltInInlines(styled.Children),
         ConditionalInlineTemplate conditional => BuiltInInlines(conditional.Then) && BuiltInInlines(conditional.Else),
-        TextTemplate or LineBreakTemplate or MediaTemplate => true,
+        TextTemplate or LineBreakTemplate or BlankLineInlineTemplate or MediaTemplate => true,
         _ => false,
     });
 

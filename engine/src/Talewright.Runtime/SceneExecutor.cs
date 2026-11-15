@@ -62,7 +62,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
             var lastBatch = _visits.FindLastIndex(id => _notes.ContainsKey(id));
             _settled.UnionWith(_visits.Take(lastBatch + 1));
         }
-        return new(blocks, choices, target);
+        return new(new RenderedDocument(blocks).TrimUnboundedBlankLines().Blocks, choices, target);
     }
 
     private DivertTarget? Execute(SceneDefinition scene, IReadOnlyList<SceneStep> steps, List<RenderedBlock> blocks,

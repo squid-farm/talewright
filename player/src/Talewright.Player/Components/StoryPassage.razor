@@ -54,6 +54,7 @@
                     left.Speaker == right.Speaker && left.SpeakerName == right.SpeakerName &&
                     SameParagraphs(left.Paragraphs, right.Paragraphs),
                 (RenderedNote left, RenderedNote right) => left == right,
+                (RenderedBlankLine, RenderedBlankLine) => true,
                 _ => false,
             };
             if (!same)

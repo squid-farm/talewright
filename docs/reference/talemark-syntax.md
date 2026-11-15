@@ -539,6 +539,27 @@ such as an inline conditional whose condition is false, does not leave an empty 
 unpaired backslash reports TW1017; remove it. Disable hard-wrapping for prose and use your
 editor's soft wrapping for display instead.
 
+**Vertical spacing.** One blank line separates paragraphs or speech blocks. Each additional
+consecutive blank line adds a visible line of space:
+
+```tale
+The door creaks open.
+
+
+Nobody is there.
+
+> guide: Did you hear that?
+>
+>
+> We should leave.
+```
+
+In dialogue, the first bare `>` separates speech paragraphs; each additional consecutive bare
+`>` adds a line of space. Spacers are hidden from assistive technology. Blank lines after a scene
+header or metadata, at the end of a scene, before a choice or divert, and between choices do not
+add space. Comments and effects do not count as text blocks; a single blank line around either
+does not add space.
+
 **Horizontal spacing.** Leading spaces and tabs and runs of spaces in prose and dialogue display as
 written; trailing whitespace is removed. Directives may still be indented, and a whitespace-only line
 is blank. In dialogue, one space immediately after the speaker's `:` or a continuation `>` is a

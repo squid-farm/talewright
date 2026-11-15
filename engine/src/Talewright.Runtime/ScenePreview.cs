@@ -92,7 +92,7 @@ public static class ScenePreview
         var menu = StoryMenuBuilder.Build(story, definition, choices, context,
             storylet => CreateHubCandidate(story, definition, storylet, renderer, state),
             observer: null, eventIndex: 0, previewSkillChecks: true);
-        return new StoryFrame(definition.Id, definition.Title, renderer.Render(blocks, state),
+        return new StoryFrame(definition.Id, definition.Title, renderer.Render(blocks, state).TrimUnboundedBlankLines(),
             menu.AvailableChoices, IsEnded: false)
         {
             ContinuesPrevious = definition.ContinuesPrevious,
@@ -170,6 +170,7 @@ internal static class SkillCheckPreview
     public static TemplateBlock Sanitize(TemplateBlock block) => block switch
     {
         ParagraphTemplate paragraph => paragraph with { Inlines = Sanitize(paragraph.Inlines) },
+        BlankLineTemplate => block,
         SpeechTemplate speech => speech with { Paragraphs = speech.Paragraphs.Select(Sanitize).ToArray() },
         ConditionalBlockTemplate conditional when TryDescribe(conditional.Condition, out var description) =>
             Marker(description),
