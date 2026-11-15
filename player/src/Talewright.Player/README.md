@@ -23,7 +23,7 @@ Story authors don't need it. See [C# extensions and packages](../../../docs/deve
 | `StoryChoices` | Numbered menu, with unavailable choices disabled and visibly marked; end/replay controls and visible history-limit notice. |
 | `DocumentView` | `RenderedDocument` → `<p>` paragraphs, speech (`.tw-speaker` + line) and notes (`.tw-note-check/-change/-info`). |
 | `InlineView` | Styled runs → `<strong>`/`<em>`/`<code>` (nested for combined styles), `<br>`, and `MediaView` for resolved images on every narrative surface. |
-| `MediaView` | Claims an already-warmed image lease when available; cold images retain viewport-lazy acquisition and all images decode/present independently. Responsive image, effective alt and accessible visible failures; releases its lease when unmounted. |
+| `MediaView` | Claims an already-warmed image lease when available; cold image bodies retain viewport-lazy acquisition. Active passage and choice images receive intrinsic dimensions from supported-format headers before choices are exposed, so late decoding reserves their responsive aspect ratio. Effective alt, accessible visible failures, and lease release remain per occurrence. |
 | `CharacterSheet` | Built from story declarations: stats grouped by `StatCategory` (skills at 0 hidden), effective value with the modifier shown when items change it, inventory with counts (including “Nothing.” when declared items are not held), and player faction standings with tier names. `Visibility` (from `StoryDefinition.CharacterSheet`) removes sections the author hid; `HasSections` tells hosts whether any section remains. A dating-sim ruleset gets a dating-sim sheet automatically. |
 | `DiagnosticList` | Errors first, then warnings, each with `file:line:col`, code and message. |
 
@@ -95,8 +95,9 @@ the adjacent `story/` directory (one directory shared above the universal runtim
 The standalone web overlay registers `PublishedStoryLibrary` with a page-base-relative
 `story/` HTTP client. Its `index.json` lists staged paths and individual SHA-256 versions,
 so static hosts need no directory listing. Discovery is refreshed per page load; text is
-loaded before compilation, while image HTTP streams open only when an occurrence acquires
-its existing viewport-lazy lease. Every content URL carries its own hash: a text-only update
+loaded before compilation. Active transcript/menu references may open a separate bounded
+header read for layout; image bodies still wait for the occurrence's viewport-lazy lease.
+Every content URL carries its own hash: a text-only update
 leaves image URLs unchanged, and changed images have new URLs. Failed text/index requests
 surface as story-open errors; failed image requests preserve narrative and effective alt.
 Host-owned HTTP clients outlive individual loaded stories. Development hosts embed the samples
@@ -109,6 +110,15 @@ text, as used by the extracted-artifact test host.
 Published Windows, macOS and ARM image playback remain unverified; Linux x64 and three browser
 engines have extracted-artifact coverage.
 
+Before exposing the active choice list, `StoryStage` reads only the headers for images referenced
+by its rendered transcript and menu. Their intrinsic width and height reserve the browser's
+responsive aspect ratio before image transfer or decode; image bodies remain lazy, and correctness
+does not depend on the warmer. Header reads are cached for the accepted image owner and are not a
+whole-story image preload. The existing warming measurements continue to report cold and settled
+navigation-to-visible timing and choice movement; delayed-transfer browser tests additionally
+record story, host, viewport, image size, cache state, decode timing, and every choice's maximum
+document-space displacement.
+
 `TalewrightApp` cascades the accepted `StoryImages`. Direct `StoryPlayer`/`DocumentView`
 consumers can supply a `CascadingValue<StoryImages>` with `StoryImages.FromDirectory` or
 `FromResources`, and must await `DisposeAsync` when replacing the accepted story or closing the host.
@@ -117,9 +127,10 @@ preserves the previous capability/playthrough. Opening the library merely hides 
 story, retaining its history URLs. A capability's identity is a source generation: refresh it
 even when presentation text is unchanged so retained components cannot show stale assets.
 
-The catalogue/resolver policy is reused without reading image bytes. Folder open rechecks
-catalogue membership and rejects symbolic links in the path. Files remain live: later reads
-may see changed bytes or fail. Each mounted occurrence acquires a lease only near the viewport.
+The catalogue/resolver policy itself does not read image bytes. Folder open rechecks catalogue
+membership and rejects symbolic links in the path. Files remain live: later metadata or body reads
+may see changed bytes or fail. Only active transcript/menu references have their headers inspected;
+each mounted occurrence still acquires a body lease only near the viewport.
 Within one accepted owner generation, identical resolved paths share one read/transfer and
 Blob URL. Alt, style and decode remain per occurrence. Removing one holder cannot cancel a
 transfer needed by another. Final release retires the entry and revokes its URL exactly once;

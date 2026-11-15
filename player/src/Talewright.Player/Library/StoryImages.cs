@@ -16,6 +16,7 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
 {
     private readonly object _sync = new();
     private readonly Dictionary<string, Entry> _entries = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, Task<ImageDimensions>> _dimensions = new(StringComparer.Ordinal);
     private readonly HashSet<Entry> _detached = [];
     private readonly List<Task> _retired = [];
     private readonly IStoryImageSource _source;
@@ -72,6 +73,31 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
             ++entry.Holders;
             return new(entry.Url, () => ReleaseAsync(path, entry));
         }
+    }
+
+    internal Task<ImageDimensions> GetImageDimensionsAsync(string path)
+    {
+        lock (_sync)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (!_paths.Contains(path))
+                throw new InvalidDataException($"Image '{path}' is not in this story's safe image catalogue.");
+            if (_dimensions.TryGetValue(path, out var existing))
+            {
+                if (!existing.IsFaulted && !existing.IsCanceled) return existing;
+                _dimensions.Remove(path);
+            }
+
+            var read = ReadImageDimensionsAsync(path);
+            _dimensions.Add(path, read);
+            return read;
+        }
+    }
+
+    private async Task<ImageDimensions> ReadImageDimensionsAsync(string path)
+    {
+        await using var stream = await OpenAsync(path, Lifetime);
+        return await ImageDimensions.ReadAsync(stream, path, Lifetime);
     }
 
     internal void BeginGeneration()
@@ -297,15 +323,18 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
             foreach (var entry in _entries.Values.Concat(_detached)) RetireLocked(entry);
             _entries.Clear();
             _detached.Clear();
-            _cleanup = CleanupAsync();
+            var dimensions = _dimensions.Values.ToArray();
+            _dimensions.Clear();
+            _cleanup = CleanupAsync(dimensions);
         }
     }
 
-    private async Task CleanupAsync()
+    private async Task CleanupAsync(Task<ImageDimensions>[] dimensions)
     {
         try
         {
             await Task.WhenAll(_retired);
+            await Task.WhenAll(dimensions.Select(DrainDimensionReadAsync));
             if (_module is not null) await (await _module).DisposeAsync();
         }
         catch (JSDisconnectedException) { /* The document and its URLs are already gone. */ }
@@ -313,6 +342,18 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
         {
             try { await _source.DisposeAsync(); }
             finally { _lifetime.Dispose(); }
+        }
+    }
+
+    private static async Task DrainDimensionReadAsync(Task<ImageDimensions> read)
+    {
+        try
+        {
+            await read;
+        }
+        catch (Exception ex) when (ex is OperationCanceledException or IOException or UnauthorizedAccessException
+            or InvalidDataException or ObjectDisposedException)
+        {
         }
     }
 

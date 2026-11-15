@@ -1,40 +1,47 @@
 @using Talewright.Core.State
+@using Talewright.Narrative.Rendering
+@using Talewright.Player.Diagnostics
+@using Talewright.Player.Library
 
-<div class="@(HasCharacterSheet ? "tw-columns" : "tw-columns tw-columns--full")" hidden="@Hidden">
-    <main class="tw-transcript" aria-label="Story transcript" aria-live="polite" tabindex="-1" @ref="TranscriptElement">
-        @{ var groups = TranscriptPresentation.Group(Passages, PassageWindow); }
-        @for (var i = 0; i < groups.Count; i++)
-        {
-            var group = groups[i];
-            var latest = group.Passages[^1];
-            var isLatest = i == groups.Count - 1;
-            <section @key="(Identity, group.StartIndex)" class="tw-frame @(isLatest ? "tw-latest" : "tw-past")"
-                     data-tw-scene="@latest.Entry.Frame.Scene?.Value" data-tw-passage-index="@latest.Index"
-                     aria-label="@(isLatest ? "Current passage" : null)" tabindex="@(isLatest ? "-1" : null)">
-                <CascadingValue Name="CollapsedImages" Value="@group.SupersededImages">
-                    @foreach (var passage in group.Passages)
-                    {
-                        <CascadingValue @key="(Identity, passage.Index)"
-                                        Name="HistoryReading" Value="@(!isLatest)">
-                            <StoryPassage Entry="passage.Entry" />
+<CascadingValue Name="ImageDimensions" Value="_imageDimensions">
+    <CascadingValue Name="ImageLayoutReady" Value="_layoutReady">
+        <div class="@(HasCharacterSheet ? "tw-columns" : "tw-columns tw-columns--full")" hidden="@Hidden">
+            <main class="tw-transcript" aria-label="Story transcript" aria-live="polite" tabindex="-1" @ref="TranscriptElement">
+                @{ var groups = TranscriptPresentation.Group(Passages, PassageWindow); }
+                @for (var i = 0; i < groups.Count; i++)
+                {
+                    var group = groups[i];
+                    var latest = group.Passages[^1];
+                    var isLatest = i == groups.Count - 1;
+                    <section @key="(Identity, group.StartIndex)" class="tw-frame @(isLatest ? "tw-latest" : "tw-past")"
+                             data-tw-scene="@latest.Entry.Frame.Scene?.Value" data-tw-passage-index="@latest.Index"
+                             aria-label="@(isLatest ? "Current passage" : null)" tabindex="@(isLatest ? "-1" : null)">
+                        <CascadingValue Name="CollapsedImages" Value="@group.SupersededImages">
+                            @foreach (var passage in group.Passages)
+                            {
+                                <CascadingValue @key="(Identity, passage.Index)"
+                                                Name="HistoryReading" Value="@(!isLatest)">
+                                    <StoryPassage Entry="passage.Entry" />
+                                </CascadingValue>
+                            }
                         </CascadingValue>
-                    }
-                </CascadingValue>
-            </section>
-        }
+                    </section>
+                }
 
-        @if (Current is { } current)
-        {
-            <StoryChoices Current="current" Busy="Busy" AtChoiceLimit="AtChoiceLimit"
-                          OnChoose="OnChoose" OnRestart="OnRestart" />
-        }
-    </main>
+                @if (_layoutReady && Current is { } current)
+                {
+                    <StoryChoices Current="current" Busy="Busy" AtChoiceLimit="AtChoiceLimit"
+                                  OnChoose="OnChoose" OnRestart="OnRestart" />
+                }
+            </main>
 
-    @if (HasCharacterSheet)
-    {
-        <CharacterSheet State="State" Story="Story" />
-    }
-</div>
+            @if (HasCharacterSheet)
+            {
+                <CharacterSheet State="State" Story="Story" />
+            }
+        </div>
+    </CascadingValue>
+</CascadingValue>
 
 @code {
     [Parameter, EditorRequired] public StoryDefinition Story { get; set; } = default!;
@@ -49,9 +56,90 @@
     [Parameter] public bool ShowCharacterSheet { get; set; } = true;
     [Parameter] public EventCallback<ChoiceView> OnChoose { get; set; }
     [Parameter] public EventCallback OnRestart { get; set; }
+    [CascadingParameter] public StoryImages? Images { get; set; }
+    [CascadingParameter] public PlayerDiagnostics? Report { get; set; }
 
     public ElementReference TranscriptElement { get; private set; }
 
+    private IReadOnlyDictionary<string, ImageDimensions> _imageDimensions =
+        new Dictionary<string, ImageDimensions>(StringComparer.Ordinal);
+    private StoryImages? _layoutImages;
+    private string[] _layoutPaths = [];
+    private bool _layoutReady = true;
+    private int _layoutGeneration;
+
     private bool HasCharacterSheet =>
         ShowCharacterSheet && CharacterSheet.HasSections(Story, State, EntityId.Player);
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var paths = MediaPaths().Distinct(StringComparer.Ordinal).ToArray();
+        if (ReferenceEquals(_layoutImages, Images) && _layoutPaths.SequenceEqual(paths, StringComparer.Ordinal))
+            return;
+
+        _layoutImages = Images;
+        _layoutPaths = paths;
+        var generation = ++_layoutGeneration;
+        _layoutReady = false;
+        if (Images is null || paths.Length == 0)
+        {
+            _imageDimensions = new Dictionary<string, ImageDimensions>(StringComparer.Ordinal);
+            _layoutReady = true;
+            return;
+        }
+
+        var images = Images;
+        var dimensions = await Task.WhenAll(paths.Select(async path =>
+            (Path: path, Dimensions: await ReadDimensionsAsync(images, path))));
+        if (generation != _layoutGeneration) return;
+        _imageDimensions = dimensions
+            .Where(item => item.Dimensions is not null)
+            .ToDictionary(item => item.Path, item => item.Dimensions!.Value, StringComparer.Ordinal);
+        _layoutReady = true;
+    }
+
+    private async Task<ImageDimensions?> ReadDimensionsAsync(StoryImages images, string path)
+    {
+        try
+        {
+            return await images.GetImageDimensionsAsync(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException
+            or ObjectDisposedException or OperationCanceledException)
+        {
+            if (!images.Lifetime.IsCancellationRequested)
+                Report?.Record(PlayerDiagnosticOperation.ImageLoad, ex, warning: true);
+            return null;
+        }
+    }
+
+    private IEnumerable<string> MediaPaths()
+    {
+        foreach (var passage in Passages)
+        {
+            foreach (var block in passage.Frame.Document.Blocks)
+            {
+                switch (block)
+                {
+                    case RenderedParagraph paragraph:
+                        foreach (var image in Inlines(paragraph.Inlines)) yield return image.MediaId;
+                        break;
+                    case RenderedSpeech speech:
+                        foreach (var images in speech.Paragraphs)
+                            foreach (var image in Inlines(images)) yield return image.MediaId;
+                        break;
+                }
+            }
+
+            if (passage.Chosen is not null)
+                foreach (var image in Inlines(passage.Chosen)) yield return image.MediaId;
+        }
+
+        if (Current is not null)
+            foreach (var entry in Current.Menu)
+                foreach (var image in Inlines(entry.Label)) yield return image.MediaId;
+    }
+
+    private static IEnumerable<RenderedMedia> Inlines(IEnumerable<RenderedInline> inlines) =>
+        inlines.OfType<RenderedMedia>();
 }
