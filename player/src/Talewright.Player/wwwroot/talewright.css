@@ -143,6 +143,8 @@ button { font: inherit; color: inherit; }
 .tw-columns { display: grid; grid-template-columns: minmax(0, 1fr) 16rem; gap: 2rem; align-items: start; }
 .tw-columns[hidden] { display: none; }
 .tw-transcript { min-width: 0; width: 100%; max-width: var(--tw-transcript-max-width); margin-inline: auto; line-height: var(--tw-transcript-line-height); }
+/* Automatic reveal owns alignment until the reader takes control. */
+.tw-transcript--revealing { overflow-anchor: none; }
 .tw-history-heading { outline: none; }
 .tw-history-frame { border-top: 1px solid var(--tw-border); margin-top: 1rem; padding-top: 1rem; }
 .tw-history-media { display: inline-block; max-width: 100%; vertical-align: middle; }

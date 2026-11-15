@@ -5,6 +5,7 @@ function stopReveal(transcript) {
     if (!reveal) return;
     reveal.abort.abort();
     cancelAnimationFrame(reveal.frame);
+    transcript.classList.remove("tw-transcript--revealing");
     reveals.delete(transcript);
 }
 
@@ -39,6 +40,7 @@ export function revealLatest(transcript, isFirst, preserveExistingFocus = false)
         || document.documentElement.dataset.twReducedMotion === "reduce";
     const behavior = reduceMotion ? "auto" : "smooth";
     const target = sceneScrollTop(transcript, element, isFirst);
+    transcript.classList.add("tw-transcript--revealing");
     window.scrollTo({ top: target, behavior });
     element.focus({ preventScroll: true });
 
