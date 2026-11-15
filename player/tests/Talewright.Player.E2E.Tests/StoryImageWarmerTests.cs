@@ -55,6 +55,7 @@ public sealed class StoryImageWarmerTests
         private readonly ConcurrentDictionary<string, string> _pathsByContent = new(StringComparer.Ordinal);
         private readonly ConcurrentDictionary<string, int> _startedPaths = new(StringComparer.Ordinal);
         private readonly ConcurrentQueue<string> _revoked = new();
+        private readonly ConcurrentQueue<string> _displayed = new();
         private int _active;
         private int _maximumActive;
         private int _nextUrl;
@@ -65,6 +66,7 @@ public sealed class StoryImageWarmerTests
         public int StartedCount => Volatile.Read(ref _startedCount);
         public int StartedFor(string path) => _startedPaths.GetValueOrDefault(path);
         public IReadOnlyList<string> Revoked => _revoked.ToArray();
+        public IReadOnlyList<string> Displayed => _displayed.ToArray();
         public int Displays { get; private set; }
 
         public TaskCompletionSource Block(string path) =>
@@ -139,6 +141,7 @@ public sealed class StoryImageWarmerTests
                     break;
                 case "display":
                     Displays++;
+                    _displayed.Enqueue(Assert.IsType<string>(args![1]));
                     result = true;
                     break;
                 case "release":
@@ -251,22 +254,68 @@ public sealed class StoryImageWarmerTests
     private sealed class MediaRenderer(IServiceProvider services, ILoggerFactory loggerFactory) : Renderer(services, loggerFactory)
     {
         public override Dispatcher Dispatcher { get; } = Dispatcher.CreateDefault();
+        private int _rootId;
 
         public async Task<MediaView> MountAsync(StoryImages images, PlayerDiagnostics diagnostics)
         {
             var component = (MediaView)InstantiateComponent(typeof(MediaView));
             component.Report = diagnostics;
-            var id = AssignRootComponentId(component);
-            await RenderRootComponentAsync(id, ParameterView.FromDictionary(new Dictionary<string, object?>
-            {
-                [nameof(MediaView.Media)] = new RenderedMedia("images/1a.png", "First"),
-                [nameof(MediaView.Images)] = images,
-            }));
+            _rootId = AssignRootComponentId(component);
+            await RenderRootComponentAsync(_rootId, Parameters(images));
             return component;
         }
 
+        public Task UpdateAsync(StoryImages images) =>
+            RenderRootComponentAsync(_rootId, Parameters(images));
+
+        private static ParameterView Parameters(StoryImages images) =>
+            ParameterView.FromDictionary(new Dictionary<string, object?>
+            {
+                [nameof(MediaView.Media)] = new RenderedMedia("images/1a.png", "First"),
+                [nameof(MediaView.Images)] = images,
+            });
+
         protected override Task UpdateDisplayAsync(in RenderBatch renderBatch) => Task.CompletedTask;
         protected override void HandleException(Exception exception) => throw exception;
+    }
+
+    [Fact]
+    public async Task Changing_image_source_releases_old_lease_and_displays_replacement_source()
+    {
+        var first = new Fixture(1, 1);
+        var second = new Fixture(1, 1);
+        var browser = new Browser();
+        var firstWarm = first.Images.Acquire("images/1a.png", browser);
+        var secondWarm = second.Images.Acquire("images/1a.png", browser);
+        var urls = await Task.WhenAll(firstWarm.Url, secondWarm.Url);
+        await using var services = new ServiceCollection()
+            .AddLogging()
+            .AddSingleton<IJSRuntime>(browser)
+            .BuildServiceProvider();
+        await using var renderer = new MediaRenderer(services, services.GetRequiredService<ILoggerFactory>());
+        try
+        {
+            var diagnostics = new PlayerDiagnostics();
+            var component = await renderer.Dispatcher.InvokeAsync(() => renderer.MountAsync(first.Images, diagnostics));
+            await renderer.Dispatcher.InvokeAsync(component.LoadAsync);
+            Assert.Equal([urls[0]], browser.Displayed);
+
+            await renderer.Dispatcher.InvokeAsync(() => renderer.UpdateAsync(second.Images));
+
+            Assert.Equal([urls[0], urls[1]], browser.Displayed);
+            Assert.Equal(2, browser.StartedCount);
+            await firstWarm.DisposeAsync();
+            Assert.Contains(urls[0], browser.Revoked);
+            Assert.DoesNotContain(urls[1], browser.Revoked);
+        }
+        finally
+        {
+            await renderer.DisposeAsync();
+            await firstWarm.DisposeAsync();
+            await secondWarm.DisposeAsync();
+            await first.Images.DisposeAsync();
+            await second.Images.DisposeAsync();
+        }
     }
 
     [Theory]
