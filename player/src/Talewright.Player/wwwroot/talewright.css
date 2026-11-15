@@ -163,9 +163,9 @@ button { font: inherit; color: inherit; }
 .tw-scene-title { font-size: 1.25rem; margin: var(--tw-scene-title-margin-top, 1.5rem) 0 0.5rem; }
 .tw-paragraph, .tw-speech-body .tw-line { white-space: pre-wrap; tab-size: 4; }
 .tw-blank-line { margin: 0; }
-.tw-speech { margin-left: 1rem; }
-.tw-speech-body .tw-line { margin: 0.25em 0; }
-.tw-speaker { font-variant: small-caps; font-weight: bold; margin-right: 0.5rem; }
+.tw-speech { box-sizing: border-box; width: 100%; margin: 1rem 0; padding: 1rem; background: var(--tw-panel); border-left: 3px solid var(--tw-accent); }
+.tw-speech-body .tw-line { margin: 0.25em 0; overflow-wrap: anywhere; }
+.tw-speaker { display: block; margin: 0 0 0.5rem; color: var(--tw-accent); font-family: var(--tw-ui-font); font-size: 0.7rem; font-variant: small-caps; font-weight: bold; letter-spacing: 0.08em; }
 .tw-note { font-family: var(--tw-ui-font); font-size: 0.85rem; color: var(--tw-muted); border-left: 3px solid var(--tw-border); padding-left: 0.75rem; margin: 0.25rem 0; }
 :root[data-tw-hide-mechanical-notes="true"] .tw-note { display: none; }
 .tw-chosen { color: var(--tw-accent); font-style: italic; }
