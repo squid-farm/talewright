@@ -265,6 +265,7 @@ public sealed class PlayerPreferencesTests(WebHostFixture host, ITestOutputHelpe
         Assert.Equal("rgb(38, 35, 31)", await saves.EvaluateAsync<string>("element => getComputedStyle(element).backgroundColor"));
         Assert.Equal("rgb(232, 226, 214)", await saves.EvaluateAsync<string>("element => getComputedStyle(element).color"));
         await Page.Keyboard.PressAsync("Escape");
+        await Expect(saves).ToBeHiddenAsync();
 
         await Library();
         var fixture = TestStories.Linear with

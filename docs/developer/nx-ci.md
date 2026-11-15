@@ -84,8 +84,8 @@ summary is written only in Actions.
 ## Execution and selection
 
 Selection invokes `nx affected --dry-run --graph=stdout`. The small CI adapter groups actual graph
-tasks by required execution environment, not by changed paths. Nx still executes each selected target
-and its prerequisites. Independent verification tasks run with `--parallel=3`; target phases are ordered to avoid
+tasks by required execution environment, not by changed paths. Nx still executes each selected target and its prerequisites, except that unit tests use one prior
+Release solution build and skip Nx build dependencies. Independent verification tasks run with `--parallel=3`; target phases are ordered to avoid
 packaging/editor and native report-output races. `editor-smoke` also explicitly depends on packaging,
 and native regressions depend on the accessibility probe.
 Editor compiler contracts share the `Talewright.Talemark.Tests` project's Release build prerequisite and execute with
@@ -170,7 +170,8 @@ manifest is uploaded once and consumed by the jobs, so there is no parallel work
 | Job | PR coverage when selected |
 |---|---|
 | `build` | Existing Release solution build, NuGet packs, clean library consumers, installed CLI and publication checks. |
-| `tests / unit` | Every test in each affected headless unit project, in Release. The normal `Talewright.Talemark.Tests` suite excludes the editor/compiler contract. One nonempty, passing TRX report is required per selected project; reports are isolated under each area-local test project's `artifacts/unit`. |
+| `tests / unit` | One Release solution build, then every test in each affected headless unit project concurrently without rebuilding. The normal `Talewright.Talemark.Tests` suite excludes the editor/compiler contract. One nonempty, passing TRX report is required per selected project; reports are isolated under each area-local test project's `artifacts/unit`. |
+| `tests / unit-net8` | Alongside `unit` when it is selected, build and run all six engine test assemblies on .NET 8. Require every assembly and a nonempty, passing TRX report. |
 | `tests / browser-preparation` | Selected with the browser group from the Nx manifest, independently of the full `build` job. Builds the Release E2E output and publishes the regular web host once, then uploads an immutable compressed tar artifact named for the workflow run and attempt. Its manifest verifies the exact checkout, run identity, SHA-256 and file mode of every payload file; tar preserves Playwright's executable driver permissions. The job summary records the archive size. |
 | `tests / browser` | Complete regular player regression suite in **all three** browsers: Chromium, Firefox, WebKit, each split across two disjoint shard jobs. Every consumer downloads the preparation artifact from the same run and verifies it before discovery; regular regression execution does not restore, build or publish. Shard 1 also runs the focused `Artifact=Standalone` published-game smoke suite under a nested static path through its existing separate publish target. Moving that smoke preparation is a follow-up, not part of this change. |
 | `tests / linux-desktop` | Accessibility/chooser probe in each of three shard jobs, which together run the complete regular native regression suite; shard 1 then runs the focused published-desktop smoke. Regression and standalone reports have separate names. |
@@ -256,6 +257,7 @@ To reproduce the full regular suite locally, retain the same browser/native prer
 
 ```sh
 python3 .github/scripts/nx_ci.py select --full
+dotnet build Talewright.slnx -c Release
 python3 .github/scripts/nx_ci.py run unit
 python3 .github/scripts/nx_ci.py run checks
 npm ci --prefix tooling/vscode-talewright

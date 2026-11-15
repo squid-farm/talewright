@@ -96,6 +96,21 @@ class ReportingTests(unittest.TestCase):
         self.assertEqual("failure", self.record()["outcome"])
         self.assertEqual("success", self.record()["batches"][0]["outcome"])
 
+    def test_unit_execution_skips_dependencies_but_keeps_selected_projects(self):
+        self.args.group = "unit"
+        plan = {g: [] for g in nx_ci.GROUPS}
+        plan["unit"] = [{"project": "First.Tests", "target": "test"},
+                        {"project": "Second.Tests", "target": "test"}]
+        self.args.plan.write_text(json.dumps(plan))
+        with patch("nx_ci.nx") as run, patch("nx_ci.unit_reports", return_value=[]), patch(
+            "nx_ci.verify_unit_reports"
+        ) as verify:
+            nx_ci.run_group(self.args)
+        self.assertIn("--projects=First.Tests,Second.Tests", run.call_args.args)
+        self.assertIn("--excludeTaskDependencies", run.call_args.args)
+        self.assertIn("--parallel=3", run.call_args.args)
+        verify.assert_called_once_with(2)
+
     def test_rerun_clears_stale_success_before_validation(self):
         nx_ci.execution_path(self.args).write_text('{"outcome": "success", "batches": []}')
         self.plan([])
