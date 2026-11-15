@@ -4,6 +4,12 @@ Follow [contributor guidance](CONTRIBUTING.md) and the [issue workflow](docs/dev
 including its [project decision-making policy](docs/developer/issues.md#project-decision-making).
 This file points to project sources of truth; it does not replace them.
 
+## Keep tool output concise
+
+- Prefer targeted commands and quiet or summary options when they provide the information needed.
+- Inspect only relevant portions of output, and summarize results instead of reproducing full logs.
+- Keep failures and useful diagnostic context visible; expand output when needed to investigate or verify a result.
+
 ## Talemark changes
 
 When proposing or changing Talemark syntax, or changing how existing syntax is parsed, diagnosed,
