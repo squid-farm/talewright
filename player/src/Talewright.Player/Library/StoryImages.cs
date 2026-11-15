@@ -16,6 +16,7 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
 {
     private readonly object _sync = new();
     private readonly Dictionary<string, Entry> _entries = new(StringComparer.Ordinal);
+    private readonly HashSet<Entry> _detached = [];
     private readonly List<Task> _retired = [];
     private readonly IStoryImageSource _source;
     private Task<IJSObjectReference>? _module;
@@ -73,6 +74,17 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
         }
     }
 
+    internal void BeginGeneration()
+    {
+        lock (_sync)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            foreach (var entry in _entries.Values)
+                _detached.Add(entry);
+            _entries.Clear();
+        }
+    }
+
     private async Task<string> TransferAsync(string path, Entry entry)
     {
         var module = await _module!;
@@ -96,6 +108,7 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
             if (--entry.Holders != 0) return ValueTask.CompletedTask;
             if (_entries.TryGetValue(path, out var current) && ReferenceEquals(entry, current))
                 _entries.Remove(path);
+            _detached.Remove(entry);
             return new(RetireLocked(entry));
         }
     }
@@ -281,8 +294,9 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
             if (_disposed) return;
             _disposed = true;
             _lifetime.Cancel();
-            foreach (var entry in _entries.Values) RetireLocked(entry);
+            foreach (var entry in _entries.Values.Concat(_detached)) RetireLocked(entry);
             _entries.Clear();
+            _detached.Clear();
             _cleanup = CleanupAsync();
         }
     }
