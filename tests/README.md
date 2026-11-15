@@ -385,8 +385,8 @@ Consumers download the exact artifact ID and validate the attempt reported by th
 Rerunning only failed jobs can therefore reuse successful preparation from an earlier attempt of
 the same run; artifacts from another run or commit remain invalid.
 
-The three browsers each keep their existing two disjoint regression shards, and the Linux suite
-keeps its three shards;
+The three browsers each run four disjoint regression shards, and the Linux suite also runs four
+shards;
 `run_e2e.py --shard INDEX/COUNT` (or `TALEWRIGHT_E2E_SHARD`) deals the sorted test methods round-robin
 so every test runs in exactly one shard, and shard 1 also runs the published-artifact smoke tests.
 Regular browser shards consume the downloaded E2E assembly and web host without building, restoring
