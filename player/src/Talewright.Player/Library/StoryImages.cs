@@ -23,6 +23,7 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
     private sealed class Entry
     {
         public int Holders;
+        public bool Retired;
         public CancellationTokenSource Cancellation { get; } = new();
         public Task<string> Url { get; set; } = null!;
     }
@@ -43,6 +44,11 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
             if (!_paths.Contains(path)) throw new InvalidDataException($"Image '{path}' is not in this story's safe image catalogue.");
             _module ??= js.InvokeAsync<IJSObjectReference>("import",
                 "./_content/Talewright.Player/Components/MediaView.razor.js").AsTask();
+            if (_entries.TryGetValue(path, out var failed) && !failed.Url.IsCompletedSuccessfully && failed.Url.IsCompleted)
+            {
+                _entries.Remove(path);
+                RetireLocked(failed);
+            }
             if (!_entries.TryGetValue(path, out var entry))
             {
                 entry = new Entry();
@@ -58,7 +64,8 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
     {
         lock (_sync)
         {
-            if (_disposed || !_paths.Contains(path) || !_entries.TryGetValue(path, out var entry)) return null;
+            if (_disposed || !_paths.Contains(path) || !_entries.TryGetValue(path, out var entry) ||
+                entry.Url.IsCompleted && !entry.Url.IsCompletedSuccessfully) return null;
             ++entry.Holders;
             return new(entry.Url, () => ReleaseAsync(path, entry));
         }
@@ -84,14 +91,21 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
     {
         lock (_sync)
         {
-            if (--entry.Holders != 0 || !_entries.TryGetValue(path, out var current) || !ReferenceEquals(entry, current))
-                return ValueTask.CompletedTask;
-            _entries.Remove(path);
-            var task = RetireAsync(entry);
-            _retired.RemoveAll(retired => retired.IsCompletedSuccessfully);
-            _retired.Add(task);
-            return new(task);
+            if (--entry.Holders != 0) return ValueTask.CompletedTask;
+            if (_entries.TryGetValue(path, out var current) && ReferenceEquals(entry, current))
+                _entries.Remove(path);
+            return new(RetireLocked(entry));
         }
+    }
+
+    private Task RetireLocked(Entry entry)
+    {
+        if (entry.Retired) return Task.CompletedTask;
+        entry.Retired = true;
+        var task = RetireAsync(entry);
+        _retired.RemoveAll(retired => retired.IsCompletedSuccessfully);
+        _retired.Add(task);
+        return task;
     }
 
     private async Task RetireAsync(Entry entry)
@@ -265,7 +279,7 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
             if (_disposed) return;
             _disposed = true;
             _lifetime.Cancel();
-            foreach (var entry in _entries.Values) _retired.Add(RetireAsync(entry));
+            foreach (var entry in _entries.Values) RetireLocked(entry);
             _entries.Clear();
             _cleanup = CleanupAsync();
         }

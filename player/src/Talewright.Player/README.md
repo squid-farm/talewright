@@ -139,7 +139,8 @@ time, without a separate global cap. It selects later images only as each scene'
 Back/Forward waits 500 ms before starting the replacement plan. Transfers already in flight remain
 tracked across navigation and source replacement; within a generation, arriving media can claim an
 existing lease. Warming never delays navigation or bypasses viewport-lazy presentation. Failed
-speculative transfers release their leases so normal lazy acquisition can retry. Completed
+speculative transfers can be retried at viewport entry even when a media occurrence already claimed
+the failed lease. Completed
 neighboring images remain retained while the current plan needs them.
 
 ZIP opens use `ArchiveStoryImages.Open`, which takes ownership of the compressed input even

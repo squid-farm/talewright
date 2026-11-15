@@ -4,14 +4,17 @@ using System.Text;
 using System.Threading.Channels;
 using Microsoft.AspNetCore.Components;
 using Microsoft.AspNetCore.Components.Rendering;
+using Microsoft.AspNetCore.Components.RenderTree;
 using Microsoft.AspNetCore.Components.Web;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.JSInterop;
 using Talewright.Player.Components;
+using Talewright.Player.Diagnostics;
 using Talewright.Player.Library;
 using Talewright.Player.Preferences;
 using Talewright.Core.Identity;
+using Talewright.Narrative.Rendering;
 using Talewright.Runtime;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
@@ -62,6 +65,7 @@ public sealed class StoryImageWarmerTests
         public int StartedCount => Volatile.Read(ref _startedCount);
         public int StartedFor(string path) => _startedPaths.GetValueOrDefault(path);
         public IReadOnlyList<string> Revoked => _revoked.ToArray();
+        public int Displays { get; private set; }
 
         public TaskCompletionSource Block(string path) =>
             _gates.GetOrAdd(path, _ => new(TaskCreationOptions.RunContinuationsAsynchronously));
@@ -129,6 +133,15 @@ public sealed class StoryImageWarmerTests
                 }
                 case "revokeUrl":
                     _revoked.Enqueue(Assert.IsType<string>(args![0]));
+                    break;
+                case "observe":
+                    result = 1;
+                    break;
+                case "display":
+                    Displays++;
+                    result = true;
+                    break;
+                case "release":
                     break;
                 default:
                     throw new InvalidOperationException(identifier);
@@ -233,6 +246,117 @@ public sealed class StoryImageWarmerTests
             builder.CloseComponent();
         }
     }
+
+#pragma warning disable BL0006
+    private sealed class MediaRenderer(IServiceProvider services, ILoggerFactory loggerFactory) : Renderer(services, loggerFactory)
+    {
+        public override Dispatcher Dispatcher { get; } = Dispatcher.CreateDefault();
+
+        public async Task<MediaView> MountAsync(StoryImages images, PlayerDiagnostics diagnostics)
+        {
+            var component = (MediaView)InstantiateComponent(typeof(MediaView));
+            component.Report = diagnostics;
+            var id = AssignRootComponentId(component);
+            await RenderRootComponentAsync(id, ParameterView.FromDictionary(new Dictionary<string, object?>
+            {
+                [nameof(MediaView.Media)] = new RenderedMedia("images/1a.png", "First"),
+                [nameof(MediaView.Images)] = images,
+            }));
+            return component;
+        }
+
+        protected override Task UpdateDisplayAsync(in RenderBatch renderBatch) => Task.CompletedTask;
+        protected override void HandleException(Exception exception) => throw exception;
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task Failed_preclaimed_transfer_retries_at_viewport_even_with_other_claims(bool failBeforeViewport)
+    {
+        var fixture = new Fixture(1, 1);
+        var browser = new Browser();
+        var gate = browser.Block("images/1a.png");
+        browser.FailNext("images/1a.png");
+        var warmer = new StoryImageWarmer(browser);
+        var diagnostics = new PlayerDiagnostics();
+        await using var services = new ServiceCollection()
+            .AddLogging()
+            .AddSingleton<IJSRuntime>(browser)
+            .BuildServiceProvider();
+        await using var renderer = new MediaRenderer(services, services.GetRequiredService<ILoggerFactory>());
+        try
+        {
+            warmer.Navigate(Owner, fixture.Story, fixture.Images, fixture.Story.Start, TimeSpan.Zero);
+            await browser.ReadStartsAsync(1);
+            var first = await renderer.Dispatcher.InvokeAsync(() => renderer.MountAsync(fixture.Images, diagnostics));
+            var second = await renderer.Dispatcher.InvokeAsync(() => renderer.MountAsync(fixture.Images, diagnostics));
+            Assert.True(warmer.Navigate(Owner, fixture.Story, fixture.Images, new SceneId("scene-1"), TimeSpan.Zero));
+            warmer.CompleteHandoff();
+
+            Task? loading = null;
+            if (!failBeforeViewport)
+                loading = renderer.Dispatcher.InvokeAsync(first.LoadAsync);
+            gate.TrySetResult();
+            await browser.ReadFailureAsync();
+            if (failBeforeViewport)
+                loading = renderer.Dispatcher.InvokeAsync(first.LoadAsync);
+            await loading!.WaitAsync(TimeSpan.FromSeconds(5));
+            await renderer.Dispatcher.InvokeAsync(second.LoadAsync);
+
+            Assert.Equal(2, browser.StartedFor("images/1a.png"));
+            Assert.Equal(2, browser.Displays);
+            Assert.Contains("Warning  Load image: host operation failed", diagnostics.CreateReport());
+        }
+        finally
+        {
+            gate.TrySetResult();
+            await renderer.DisposeAsync();
+            await warmer.DisposeAsync();
+            await fixture.Images.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task Failed_viewport_retry_reports_the_error_after_a_failed_preclaim()
+    {
+        var fixture = new Fixture(1, 1);
+        var browser = new Browser();
+        var gate = browser.Block("images/1a.png");
+        browser.FailNext("images/1a.png");
+        var warmer = new StoryImageWarmer(browser);
+        var diagnostics = new PlayerDiagnostics();
+        await using var services = new ServiceCollection()
+            .AddLogging()
+            .AddSingleton<IJSRuntime>(browser)
+            .BuildServiceProvider();
+        await using var renderer = new MediaRenderer(services, services.GetRequiredService<ILoggerFactory>());
+        try
+        {
+            warmer.Navigate(Owner, fixture.Story, fixture.Images, fixture.Story.Start, TimeSpan.Zero);
+            await browser.ReadStartsAsync(1);
+            var media = await renderer.Dispatcher.InvokeAsync(() => renderer.MountAsync(fixture.Images, diagnostics));
+            gate.TrySetResult();
+            await browser.ReadFailureAsync();
+            browser.FailNext("images/1a.png");
+            await renderer.Dispatcher.InvokeAsync(media.LoadAsync);
+
+            Assert.Equal(2, browser.StartedFor("images/1a.png"));
+            Assert.Equal(0, browser.Displays);
+            var report = diagnostics.CreateReport();
+            Assert.Contains("Warning  Load image: host operation failed", report);
+            Assert.Contains("Error  Load image: host operation failed", report);
+        }
+        finally
+        {
+            gate.TrySetResult();
+            await renderer.DisposeAsync();
+            await warmer.DisposeAsync();
+            await fixture.Images.DisposeAsync();
+        }
+    }
+
+#pragma warning restore BL0006
 
     [Fact]
     public async Task Direct_player_reconciles_image_source_changes_without_resetting_history()

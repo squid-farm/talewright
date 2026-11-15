@@ -85,8 +85,28 @@
         var token = _loading.Token;
         try
         {
-            _lease ??= Images.Acquire(Media.MediaId, JS);
-            var url = await _lease.Url.WaitAsync(token);
+            string url;
+            if (_lease is { } claimed)
+            {
+                try
+                {
+                    url = await claimed.Url.WaitAsync(token);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or JSException or OperationCanceledException
+                    && !_disposed && !token.IsCancellationRequested)
+                {
+                    Console.Error.WriteLine($"Image '{Media.MediaId}' warmed transfer failed: {ex.Message}");
+                    Report?.Record(PlayerDiagnosticOperation.ImageLoad, ex, warning: true);
+                    await claimed.DisposeAsync();
+                    _lease = Images.Acquire(Media.MediaId, JS);
+                    url = await _lease.Url.WaitAsync(token);
+                }
+            }
+            else
+            {
+                _lease = Images.Acquire(Media.MediaId, JS);
+                url = await _lease.Url.WaitAsync(token);
+            }
             if (_disposed || token.IsCancellationRequested) return;
             var loaded = await _module.InvokeAsync<bool>("display", token, _handle, url);
             if (!loaded && !_disposed)
