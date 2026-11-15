@@ -294,6 +294,9 @@ class ReportingTests(unittest.TestCase):
                 )
                 environments = [call.kwargs["environment"] for call in run.call_args_list]
                 self.assertEqual(f"{shard[0]}/2", environments[0]["TALEWRIGHT_E2E_SHARD"])
+                self.assertEqual("1", environments[0]["TALEWRIGHT_E2E_PREPARED"])
+                if len(environments) > 1:
+                    self.assertNotIn("TALEWRIGHT_E2E_PREPARED", environments[1])
                 self.assertTrue(all("TALEWRIGHT_E2E_SHARD" not in environment
                                     for environment in environments[1:]))
                 self.assertTrue(nx_ci.execution_path(self.args).name.endswith(
@@ -364,6 +367,169 @@ class E2EShardTests(unittest.TestCase):
                 for parse in (self.run_e2e.parse_shard, nx_ci.parse_shard):
                     with self.assertRaises(Exception):
                         parse(value)
+
+
+class PreparedBrowserInputTests(unittest.TestCase):
+    @classmethod
+    def setUpClass(cls):
+        sys.path.insert(0, str(ROOT / "player/tests"))
+        import run_e2e
+        cls.run_e2e = run_e2e
+
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name)
+        self.identity = {"source_sha": "abc123", "run_id": "42", "run_attempt": "2"}
+        self.identity_environment = {
+            "TALEWRIGHT_E2E_SOURCE_SHA": self.identity["source_sha"],
+            "GITHUB_RUN_ID": self.identity["run_id"],
+            "GITHUB_RUN_ATTEMPT": self.identity["run_attempt"],
+        }
+
+    def populate_test_output(self, root):
+        root.mkdir(parents=True)
+        for name in (
+            "Talewright.Player.E2E.Tests.dll",
+            "Talewright.Player.E2E.Tests.deps.json",
+            "Talewright.Player.E2E.Tests.runtimeconfig.json",
+            "Microsoft.Playwright.dll",
+            "xunit.runner.json",
+            "testhost.dll",
+            "xunit.runner.visualstudio.testadapter.dll",
+        ):
+            (root / name).write_text(name)
+        node = root / ".playwright/node/linux-x64/node"
+        node.parent.mkdir(parents=True)
+        node.write_text("playwright node")
+        node.chmod(0o775)
+
+    def populate_web_output(self, root):
+        web_root = root / "wwwroot"
+        (web_root / "_framework").mkdir(parents=True)
+        (web_root / "index.html").write_text("<html></html>")
+        (web_root / "_framework" / "app.js").write_text("app")
+
+    def populate_inputs(self, root):
+        self.populate_test_output(root / self.run_e2e.TEST_OUTPUT)
+        self.populate_web_output(root / self.run_e2e.WEB_OUTPUT)
+        self.run_e2e.write_prepared_manifest(root, self.identity)
+
+    def validate(self, root):
+        with patch.dict(os.environ, self.identity_environment), patch.object(
+            self.run_e2e, "git_revision", return_value=self.identity["source_sha"]
+        ):
+            return self.run_e2e.validate_prepared_inputs(root)
+
+    def test_prepared_manifest_binds_run_head_and_every_payload_file(self):
+        root = self.root / "inputs"
+        self.populate_inputs(root)
+        assembly, web_root = self.validate(root)
+        self.assertEqual(root / "test-output/Talewright.Player.E2E.Tests.dll", assembly)
+        self.assertEqual(root / "web/wwwroot", web_root)
+
+        with patch.dict(os.environ, {**self.identity_environment, "GITHUB_RUN_ID": "43"}), patch.object(
+            self.run_e2e, "git_revision", return_value=self.identity["source_sha"]
+        ), self.assertRaisesRegex(RuntimeError, "run_id"):
+            self.run_e2e.validate_prepared_inputs(root)
+
+        (root / "web/wwwroot/index.html").write_text("changed")
+        with patch.dict(os.environ, self.identity_environment), patch.object(
+            self.run_e2e, "git_revision", return_value=self.identity["source_sha"]
+        ), self.assertRaisesRegex(RuntimeError, "checksum mismatch"):
+            self.run_e2e.validate_prepared_inputs(root)
+
+        (root / "web/wwwroot/index.html").unlink()
+        with patch.dict(os.environ, self.identity_environment), patch.object(
+            self.run_e2e, "git_revision", return_value=self.identity["source_sha"]
+        ), self.assertRaisesRegex(RuntimeError, "missing: web/wwwroot/index.html"):
+            self.run_e2e.validate_prepared_inputs(root)
+
+    def test_prepared_archive_preserves_executable_playwright_driver_mode(self):
+        inputs = self.root / "browser-e2e-inputs"
+        archive = self.root / "browser-e2e-inputs.tar.gz"
+        extracted = self.root / "extracted/browser-e2e-inputs"
+        self.populate_inputs(inputs)
+        self.run_e2e.create_prepared_archive(inputs, archive)
+        self.run_e2e.extract_prepared_archive(archive, extracted)
+
+        node = extracted / "test-output/.playwright/node/linux-x64/node"
+        self.assertEqual(0o775, node.stat().st_mode & 0o777)
+        assembly, _ = self.validate(extracted)
+        self.assertEqual(extracted / "test-output/Talewright.Player.E2E.Tests.dll", assembly)
+        node.chmod(0o644)
+        with patch.dict(os.environ, self.identity_environment), patch.object(
+            self.run_e2e, "git_revision", return_value=self.identity["source_sha"]
+        ), self.assertRaisesRegex(RuntimeError, "file mode mismatch"):
+            self.run_e2e.validate_prepared_inputs(extracted)
+
+    def test_preparation_fails_when_release_outputs_are_incomplete(self):
+        root = self.root / "inputs"
+        self.populate_test_output(root / self.run_e2e.TEST_OUTPUT)
+        (root / self.run_e2e.WEB_OUTPUT / "wwwroot").mkdir(parents=True)
+        with self.assertRaisesRegex(RuntimeError, "incomplete"):
+            self.run_e2e.write_prepared_manifest(root, self.identity)
+
+    def test_preparation_builds_tests_and_publishes_once_with_run_identity(self):
+        output = self.root / "artifacts/browser-e2e-inputs"
+        binary = self.root / "bin/Release/net10.0"
+        commands = []
+
+        def fake_run(command, **kwargs):
+            commands.append(command)
+            if command[:2] == ["dotnet", "build"]:
+                self.populate_test_output(binary)
+            else:
+                self.assertEqual(["dotnet", "publish"], command[:2])
+                self.populate_web_output(Path(command[command.index("-o") + 1]))
+
+        with patch.dict(os.environ, self.identity_environment), patch.object(
+            self.run_e2e, "ROOT", self.root
+        ), patch.object(self.run_e2e, "BIN", binary), patch.object(
+            self.run_e2e, "git_revision", return_value=self.identity["source_sha"]
+        ), patch.object(self.run_e2e, "run", side_effect=fake_run):
+            self.run_e2e.prepare_browser_inputs(output)
+            self.validate(output)
+
+        self.assertEqual(2, len(commands))
+        self.assertEqual(["dotnet", "build"], commands[0][:2])
+        self.assertEqual(["dotnet", "publish"], commands[1][:2])
+        self.assertTrue(output.with_suffix(".tar.gz").is_file())
+
+    def test_prepared_consumer_runs_the_downloaded_assembly_without_build_or_publish(self):
+        captured = {}
+        test_assembly = self.root / "inputs/test-output/Talewright.Player.E2E.Tests.dll"
+        web_root = self.root / "inputs/web/wwwroot"
+
+        def capture_jobs(jobs, limit, results):
+            captured["jobs"] = jobs
+            return []
+
+        with patch.object(self.run_e2e, "ROOT", self.root), patch.object(
+            self.run_e2e, "extract_prepared_archive"
+        ), patch.object(
+            self.run_e2e, "validate_prepared_inputs", return_value=(test_assembly, web_root)
+        ), patch.object(
+            self.run_e2e, "test_filters", return_value=["Host!=Linux"]
+        ), patch.object(
+            self.run_e2e, "run_jobs", side_effect=capture_jobs
+        ), patch.object(
+            self.run_e2e, "run", side_effect=AssertionError("prepared mode must not build or publish")
+        ), patch("sys.argv", ["run_e2e.py", "web", "--prepared", "--browser", "chromium"]):
+            self.assertEqual(0, self.run_e2e.main())
+
+        command = captured["jobs"][0].command
+        self.assertEqual(["dotnet", "vstest"], command[:2])
+        self.assertIn(test_assembly, command)
+        self.assertEqual(str(web_root), captured["jobs"][0].environment["TALEWRIGHT_WEB_ROOT"])
+        self.assertTrue(any(str(argument).startswith("--ResultsDirectory:") for argument in command))
+
+    def test_prepared_runner_rejects_an_empty_selection(self):
+        with patch.object(self.run_e2e, "list_tests", return_value=[]), self.assertRaisesRegex(
+            RuntimeError, "contains no tests"
+        ):
+            self.run_e2e.test_filters("web", "FullyQualifiedName~Missing", None, 1,
+                                      self.root / "tests.dll", require_tests=True)
 
 
 if __name__ == "__main__":

@@ -449,6 +449,8 @@ def run_group(args):
             if target == "e2e-web":
                 arguments.append(f"--configuration={args.browser}")
             environment = {"BROWSER": args.browser}
+            if target == "e2e-web":
+                environment["TALEWRIGHT_E2E_PREPARED"] = "1"
             if shard_label(args) and target in SHARDED_TARGETS:
                 environment["TALEWRIGHT_E2E_SHARD"] = shard_label(args)
             batch["outcome"] = "running"
