@@ -148,7 +148,7 @@ public sealed class NativeImageTests
     }
 
     [Fact]
-    public async Task Actual_folder_player_releases_an_earlier_scene_image_and_reports_deleted_file()
+    public async Task Folder_player_reuses_a_connected_image_then_reports_its_deletion_after_release()
     {
         using var files = new ImageStoryFiles();
         await File.WriteAllTextAsync(files.TalePath, """
@@ -157,6 +157,12 @@ public sealed class NativeImageTests
             * [Next] -> next
             === next
             {image("photo.jpeg", "Later camp")}
+            * [Next] -> quiet
+            === quiet
+            A quiet passage.
+            * [Next] -> distant
+            === distant
+            A distant passage.
             * [Finish] -> END
             """);
         await using var driver = new NativePlayerDriver(Artifacts("folder-image-failure"));
@@ -165,15 +171,19 @@ public sealed class NativeImageTests
             node.Role == "image" && node.Name == "Mounted camp" && node.Bounds.Height > 100));
         File.Delete(files.ImagePath);
         await ActivateChoice(driver);
-        var snapshot = await WaitFor(driver, snapshot =>
-            snapshot.Content.Contains("This image could not be loaded.", StringComparison.Ordinal));
+        var snapshot = await WaitFor(driver, snapshot => snapshot.Descendants().Any(node =>
+            node.Role == "image" && node.Name == "Later camp" && node.Bounds.Height > 100));
         Assert.Contains(snapshot.Descendants(), node =>
             node.Role == "push button" && node.Name == "Reveal image: Mounted camp");
         Assert.DoesNotContain(snapshot.Descendants(), node =>
             node.Role == "image" && node.Name == "Mounted camp" && node.Bounds.Height > 100);
         Assert.Contains(snapshot.Descendants(), node => node.Role == "image" && node.Name == "Later camp");
-        Assert.Contains("This image could not be loaded.", snapshot.Content);
+        Assert.DoesNotContain("This image could not be loaded.", snapshot.Content);
         Assert.DoesNotContain("An unhandled error", snapshot.Content);
+        await ActivateChoice(driver);
+        await WaitFor(driver, state => state.Content.Contains("A quiet passage."));
+        await ActivateChoice(driver);
+        await WaitFor(driver, state => state.Content.Contains("A distant passage."));
         await driver.ClickAsync("More actions");
         await driver.ClickAsync("Restart");
         await driver.ClickAsync("Restart story");
