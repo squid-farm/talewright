@@ -540,7 +540,7 @@ async function testLiveDiagnostics() {
     assert.equal(await vscode.workspace.applyEdit(flagManifestEdit), true);
     assert.equal(manifestBuffer.isDirty, true, 'Exercise an unsaved root-manifest overlay');
 
-    const skillCheckStory = '=== start\n::: skill-check guide dc 10\nsuccess: -> END\nfailure: -> END\n:::\n';
+    const skillCheckStory = '=== start\n::: skill-check guide\nsuccess: -> END\nfailure: -> END\n:::\n';
     const skillCheckEdit = new vscode.WorkspaceEdit();
     skillCheckEdit.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
       skillCheckStory);
@@ -550,15 +550,11 @@ async function testLiveDiagnostics() {
     const actorEnd = '::: skill-check guide'.length;
     editor.selection = new vscode.Selection(1, actorEnd, 1, actorEnd);
     await vscode.commands.executeCommand('type', { text: ' ' });
-    assert.equal(document.lineAt(1).text, '::: skill-check guide  dc 10');
-    const emptySlotCompletions = await vscode.commands.executeCommand(
-      'vscode.executeCompletionItemProvider', document.uri, editor.selection.active);
-    assert.ok(emptySlotCompletions.items.some(item => item.label === 'acrobatics'),
-      'The installed language server must offer stats in the empty slot before dc 10');
-    for (const character of 'arc') await vscode.commands.executeCommand('type', { text: character });
+    assert.equal(document.lineAt(1).text, '::: skill-check guide ');
+    await new Promise(resolve => setTimeout(resolve, 300));
     await vscode.commands.executeCommand('acceptSelectedSuggestion');
-    assert.equal(document.lineAt(1).text, '::: skill-check guide  arcana dc 10',
-      'Typing a stat prefix after an explicit actor must automatically offer and accept a stat without Ctrl+Space');
+    assert.equal(document.lineAt(1).text, '::: skill-check guide acrobatics',
+      'Typing whitespace after an explicit actor must automatically offer and accept a stat without Ctrl+Space');
 
     const undeclaredFlag = new vscode.WorkspaceEdit();
     undeclaredFlag.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),

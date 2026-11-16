@@ -89,6 +89,50 @@ public sealed partial class ServerTests
     }
 
     [Theory]
+    [InlineData("::: skill-check guide | dc 10", "::: skill-check guide hp dc 10")]
+    [InlineData("::: skill-check guide  | dc 10", "::: skill-check guide  hp dc 10")]
+    [InlineData("::: skill-check guide h|p dc 10", "::: skill-check guide hp dc 10")]
+    public async Task Explicit_actor_stat_completion_preserves_difficulty_and_replacement_range(
+        string line, string expected)
+    {
+        await using var client = new Client();
+        File.WriteAllText(client.PathOf(StorySource.ManifestFileName), """
+            game:
+              id: lsp-test
+              title: LSP test
+              start: start
+              ruleset: rpg
+            characters:
+              player: {first-name: Ada}
+              guide: {first-name: Bea}
+            """);
+        await client.Initialize();
+        var marked = "=== start\n" + line;
+        await client.Open("start.tale", marked.Replace("|", ""), 1);
+
+        var items = Items(await Completion(client, "start.tale", marked));
+        var item = Assert.Single(items, HasLabel("hp"));
+        Assert.DoesNotContain(items, HasLabel("guide"));
+        Assert.DoesNotContain(items, HasLabel("player"));
+        var edit = item.GetProperty("textEdit");
+        Assert.Equal("hp", edit.GetProperty("newText").GetString());
+        var range = edit.GetProperty("range");
+        var start = range.GetProperty("start");
+        var end = range.GetProperty("end");
+        Assert.Equal(1, start.GetProperty("line").GetInt32());
+        Assert.Equal(1, end.GetProperty("line").GetInt32());
+        var sourceLine = line.Replace("|", "");
+        var markedCaret = line.IndexOf('|');
+        var expectedStart = markedCaret > 0 && line[markedCaret - 1] == 'h' ? markedCaret - 1 : markedCaret;
+        Assert.Equal(expectedStart, start.GetProperty("character").GetInt32());
+        Assert.Equal(expectedStart + (expectedStart == markedCaret ? 0 : 2),
+            end.GetProperty("character").GetInt32());
+        Assert.Equal(expected, sourceLine[..start.GetProperty("character").GetInt32()] +
+            edit.GetProperty("newText").GetString() +
+            sourceLine[end.GetProperty("character").GetInt32()..]);
+    }
+
+    [Theory]
     [InlineData("->|", "start", "->start")]
     [InlineData("-> |", "start", "-> start")]
     [InlineData("->  |", "start", "->  start")]
