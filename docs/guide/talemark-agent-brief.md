@@ -1,95 +1,75 @@
-# Talemark brief for AI writing partners
+# Talemark authoring: start here
 
-> **Measured token count:** 1090 (`cl100k_base`, tiktoken 0.14.0; this document, including this line).
+Talemark is Talewright's language for interactive stories: prose, dialogue, choices and rules in
+`.tale` files, with characters and starting state in `story.talewright.yaml`.
 
-Copy or attach this provider-neutral brief when asking an AI assistant to help write or edit a
-Talewright story. It summarizes current authoring practices; it is not a complete language
-specification and does not guarantee generated content is correct.
+**If you use AI in your workflow, this guide can help it understand how to write Talemark.**
+Copy this URL into your prompt:
 
-## Read the existing story first
-
-- Inspect the whole story folder, including its manifest, `.tale` files and existing declarations.
-  Reuse its scene IDs, characters, items, flags and variables. Add new ones only when the request
-  requires them, and update the appropriate manifest or supporting configuration file.
-- Preserve the author's prose, meaning and structure except where the request asks for a change.
-  Make the smallest relevant edit; do not replace files or rewrite unrelated passages.
-- Do not invent syntax, operators, registrations or behavior. The [syntax reference](../reference/talemark-syntax.md)
-  and [operator registry](../reference/talemark-operators.md) describe what is implemented today.
-  The registry's **Planned changes** section is not implemented syntax.
-
-## Keep file roles and story flow clear
-
-- `story.talewright.yaml` is the story's settings file (manifest): it owns `game:` and commonly
-  declares characters, items, factions, flags and starting variables. `.tale` files contain scenes,
-  prose, dialogue, choices and story logic. YAML is not Talemark.
-- A scene begins with `=== scene-id`. Metadata belongs directly below its scene header. Scenes run
-  from top to bottom until a divert, choice or end.
-- `> character-id:` starts dialogue. Plain lines are reader-facing prose. Talemark is not Markdown:
-  only its documented formatting and inline constructs are interpreted.
-- `* [label] ... -> scene-id` offers a choice. Every choice needs its own destination or `END`.
-  After the first choice, use only more choices, choice-only conditions, comments or blank lines.
-- `-> scene-id` is an immediate divert; later lines in that scene do not run. `-> END` ends the
-  story. `* -> END` is instead a textless **Continue** choice the player selects.
-
-## Keep expressions, display and effects distinct
-
-- Expressions read values and calculate results; they do not change story state. A condition must
-  produce `true` or `false`—numbers are not implicitly true or false.
-- `(requires condition)` controls whether a choice is available. An optional `shown` clause can keep
-  an unavailable choice visible. A choice's `{ effects }` run only when that choice is selected.
-- `~ effect` applies effects at that point in a scene. Effects change state; substitutions and text
-  manipulators only display values and never change state.
-- Use `:` for property access and `#` for text manipulation in a substitution. Manipulators chain
-  left to right. Variables keep the type set by their first declaration or assignment.
-- Prose supports Talemark's documented bold/italic forms and escapes for literal braces and
-  backslashes. Other Markdown syntax is not implicitly supported; backticks are ordinary text.
-
-For exact syntax, examples and edge cases, use the [author cheat sheet](cheat-sheet.md), the
-[Talemark syntax reference](../reference/talemark-syntax.md), and the [operator registry](../reference/talemark-operators.md).
-The reference's [manifest section](../reference/talemark-syntax.md#1-storytalewrightyaml) explains
-configuration fields; [Organizing your story](organizing-your-story.md) covers supporting files.
-
-## Minimal complete example
-
-`story.talewright.yaml`:
-
-```yaml
-game:
-  id: night-ferry
-  title: The Night Ferry
-  version: 0.1.0
-  start: dock
-characters:
-  player: { first-name: Ada, inventory: [coin] }
-  ferryman: { first-name: Wick }
-items:
-  coin: { name: silver coin }
-flags: [paid]
-vars: { weather: "clear" }
+```text
+https://raw.githubusercontent.com/squid-farm/talewright/main/docs/guide/talemark-agent-brief.md
 ```
 
-`story.tale`:
+No skill installation, account integration or project changes are needed. Your assistant needs to
+be able to fetch URLs; otherwise, supply this file and the relevant topic files yourself.
+This guidance does not guarantee correct output.
 
-```tale
-=== dock
-@title The Dock
+## Instructions for the assistant
 
-~ var:weather = "foggy"
-> ferryman: The {var:weather} hides the far bank.
+1. Inspect the author's existing story files and IDs if available. Preserve prose, intent and
+   unrelated content. Do not invent syntax, names or extension registrations.
+2. Read **only the topic needed for the request**, using the table below. Topic pages are
+   self-contained and have no further documentation links to follow. Stop fetching once you have
+   the required syntax; do not crawl this repository or read all topics for a small edit.
+3. Use current implemented syntax, not another language's conventions or planned features.
+   Expressions read state; effects change it. Talemark is not Markdown, Ink or Twine.
+4. Validate the whole saved story with `talewright validate <story-folder>` if that tool is
+   available. Fix errors without changing the author's intended behavior. Report what you checked
+   and what you could not check. Playtest important routes; compilation cannot prove every outcome.
 
-* [Pay with the coin] (requires player has coin) { take player coin; set flag:paid } -> crossing
-* [Leave] -> END
+## Choose a topic
 
-=== crossing
-{if flag:paid}The ferryman waves you aboard.{else}The boat stays at the dock.{/if}
-You have {player:inventory:coin:count} coins.
-{item:coin#the#capitalize} was useful.
--> END
+Resolve these links relative to this page's URL. Each page contains a complete, compiler-checked
+manifest and story; adapt the relevant lines rather than replacing an existing story.
+
+| What the author needs | Read |
+|---|---|
+| A new story, manifest settings, declarations, file layout or valid names | [Story files](talemark/story-files.md) |
+| An if statement, conditional prose, testing a flag, item, visit or expression | [Conditions](talemark/conditions.md) |
+| Choices, requirements, unavailable labels, diverts or endings | [Choices and flow](talemark/choices.md) |
+| Set a flag, change variables, inventory, stats or standing; automatic triggers | [State and effects](talemark/state.md) |
+| Dialogue, substitutions, pronouns, manipulators, formatting, escapes or images | [Reader text](talemark/text.md) |
+| Hubs, tags, priorities, once-only storylets or generated choices | [Hubs](talemark/hubs.md) |
+| Skill checks, success/failure branches, hidden rolls or custom stats | [Skill checks](talemark/checks.md) |
+
+For "only discover the body if the murder has happened", read **Conditions**, then use the
+story's existing murder state. Read **State and effects** too only if asked to record the murder
+or discovery. For a complex new story, select the topics for its requested features; do not fetch
+the full reference.
+
+## Optional: remember this guidance across tasks
+
+Advanced authors can paste the following into their own `AGENTS.md`, `.github/copilot-instructions.md`,
+`CLAUDE.md` or their assistant's equivalent instruction file. Use the location your tool supports;
+you do not need all of these files.
+
+```text
+When writing or editing Talemark (.tale or story.talewright.yaml files), consult
+https://raw.githubusercontent.com/squid-farm/talewright/main/docs/guide/talemark-agent-brief.md
+Read only the linked topics needed for the current task; do not crawl the full documentation.
+Preserve my prose and existing story IDs. Validate the story when the CLI is available.
 ```
 
-## Validate the result
+## Reference and version
 
-Run `talewright validate <story-folder>` after editing, and fix compiler errors before handing back
-the story. See [Testing your story](testing-your-story.md#2-check-it-from-the-command-line) for
-other ways to validate. Validation checks the source, but it does not play every route; playtest
-important branches and preserve the author's intended outcomes.
+The topic pages summarize implemented behavior from the [syntax reference](../reference/talemark-syntax.md),
+[operator registry](../reference/talemark-operators.md), [manifest guidance](../reference/talemark-syntax.md#1-storytalewrightyaml)
+and [validation guide](testing-your-story.md). These are deeper references, **not required reading**
+for routine authoring; the registry's planned changes are not available syntax.
+
+The URL tracks `main`. For an older Talewright installation, use a matching release tag in place
+of `main` in the URL; relative topic links then stay on that version.
+
+Measured with tiktoken 0.14.0, `cl100k_base`: this entry is 1003 tokens; Conditions is 816 tokens.
+Entry plus all seven topics is 6300 tokens. These are documentation input sizes, not a price
+guarantee; model rates, generated output and tool calls also affect cost.

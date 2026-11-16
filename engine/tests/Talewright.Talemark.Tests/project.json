@@ -16,7 +16,8 @@
         "{workspaceRoot}/global.json",
         "testWorkflow",
         "{workspaceRoot}/docs/reference/diagnostics.md",
-        "{workspaceRoot}/docs/guide/talemark-agent-brief.md"
+        "{workspaceRoot}/docs/guide/talemark-agent-brief.md",
+        "{workspaceRoot}/docs/guide/talemark/*.md"
       ],
       "options": {
         "command": "dotnet test --filter 'FullyQualifiedName!~EditorSnippetTests&FullyQualifiedName!~EditorManifestSchemaTests&FullyQualifiedName!~EditorVocabularyContractTests'",

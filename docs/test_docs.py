@@ -28,6 +28,25 @@ class DocumentationLinksTests(unittest.TestCase):
 
         self.assertEqual([], broken, "Broken relative Markdown links:\n" + "\n".join(broken))
 
+    def test_assistant_topics_are_directly_discoverable_and_do_not_fan_out(self):
+        entry = ROOT / "docs/guide/talemark-agent-brief.md"
+        topics = entry.parent / "talemark"
+        linked_topics = set()
+        for match in LINK.finditer(entry.read_text(encoding="utf-8")):
+            destination = match.group(1) or match.group(2)
+            if destination.startswith("talemark/"):
+                linked_topics.add((entry.parent / destination).resolve())
+
+        self.assertEqual({path.resolve() for path in topics.glob("*.md")}, linked_topics)
+        self.assertTrue(linked_topics)
+        for topic in sorted(linked_topics):
+            with self.subTest(topic=topic.name):
+                text = topic.read_text(encoding="utf-8")
+                prose = re.sub(r"`[^`\n]+`", "", text)
+                self.assertEqual([], LINK.findall(prose), "Topic pages must not require another documentation hop.")
+                self.assertEqual(1, text.count("```yaml\n"))
+                self.assertEqual(1, text.count("```tale\n"))
+
 
 if __name__ == "__main__":
     unittest.main()

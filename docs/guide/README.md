@@ -16,5 +16,6 @@ Talemark is the story-authoring language in your `.tale` files. No programming r
 
 The [Talemark syntax reference](../reference/talemark-syntax.md) has quick examples first and the full language details after.
 The [author cheat sheet](cheat-sheet.md) summarizes syntax and VS Code shortcuts; the
-[AI writing-partner brief](talemark-agent-brief.md) is a compact, attachable guide for story-writing assistants.
+[optional assistant guidance](talemark-agent-brief.md) offers a copyable URL and focused topics
+if you already use AI in your workflow.
 Use [error codes](../reference/diagnostics.md) when a check reports a problem; start with the first error.

@@ -973,15 +973,20 @@ public class CompilerTests
         Assert.Equal(-3, Check(attribute, null).Total.Modifier);
     }
 
-    [Fact]
-    public void Documented_agent_brief_example_compiles()
+    [Theory]
+    [InlineData("story-files")]
+    [InlineData("conditions")]
+    [InlineData("choices")]
+    [InlineData("state")]
+    [InlineData("text")]
+    [InlineData("hubs")]
+    [InlineData("checks")]
+    public void Documented_agent_topic_example_compiles(string topic)
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);
         while (root is not null && !File.Exists(Path.Combine(root.FullName, "Talewright.slnx"))) root = root.Parent;
         Assert.NotNull(root);
-        var brief = File.ReadAllText(Path.Combine(root.FullName, "docs", "guide", "talemark-agent-brief.md"))
-            .Split("## Minimal complete example", StringSplitOptions.None)[1]
-            .Split("\n## ", StringSplitOptions.None)[0];
+        var brief = File.ReadAllText(Path.Combine(root.FullName, "docs", "guide", "talemark", $"{topic}.md"));
         var blocks = System.Text.RegularExpressions.Regex.Matches(brief, @"```(yaml|tale)\r?\n([\s\S]*?)\r?\n```");
         var yaml = Assert.Single(blocks, block => block.Groups[1].Value == "yaml").Groups[2].Value;
         var tale = Assert.Single(blocks, block => block.Groups[1].Value == "tale").Groups[2].Value;
@@ -989,7 +994,7 @@ public class CompilerTests
         {
             [StorySource.ManifestFileName] = yaml,
             ["main.tale"] = tale,
-        }));
+        }, topic == "text" ? ["images/lantern.png"] : []));
 
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         Assert.Empty(result.Diagnostics);
