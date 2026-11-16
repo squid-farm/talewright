@@ -9,6 +9,7 @@ using Talewright.Rules.Expressions;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Model;
 using Talewright.Talemark.Parsing;
 using Talewright.Testing;
 
