@@ -183,6 +183,51 @@ Stories with custom C# registrations need exported project metadata for completi
 [project metadata](https://github.com/squid-farm/talewright/blob/main/docs/developer/language-server.md#client-contract-and-workspace-behavior).
 The extension never executes that code.
 
+### Control Copilot suggestions
+
+GitHub Copilot may offer automatic inline suggestions as you write. To turn those off for Talemark,
+open the Command Palette and choose **Preferences: Open User Settings (JSON)**. Add `"tale": false`
+to `github.copilot.enable`:
+
+```json
+{
+  "github.copilot.enable": {
+    "tale": false
+  }
+}
+```
+
+If `github.copilot.enable` is already there, add `"tale": false` inside its existing object instead
+of adding a second setting or replacing its other entries. `tale` is the VS Code language ID for
+`.tale` files. This does not change your settings for other languages.
+
+To turn automatic Copilot completions back on for Talemark, change `"tale": false` to
+`"tale": true`. You can instead remove the `tale` entry to use your existing `*` setting or
+Copilot's default; that may be enabled or disabled. To change only the current workspace, use
+**Preferences: Open Workspace Settings (JSON)** instead. A workspace `tale` entry takes precedence
+over a user `tale` entry, and workspace settings may be shared with others.
+
+Copilot's next edit suggestions are a separate feature. If they still appear and you want to turn
+them off for Talemark too, add this to the same settings file, preserving any other entries in an
+existing `[tale]` object:
+
+```json
+{
+  "[tale]": {
+    "github.copilot.nextEditSuggestions.enabled": false
+  }
+}
+```
+
+To restore next edit suggestions, remove that setting or change it to `true`. A workspace
+language-specific setting can override your user setting.
+
+These are optional Copilot settings: Talewright does not change them for you. They do not disable
+Talewright's story-aware suggestion list, hover, diagnostics or grey substitution preview hints.
+You can still request Copilot completions manually and use Copilot Chat. Other AI extensions have
+their own settings. For more, see
+[Copilot inline suggestions in VS Code](https://code.visualstudio.com/docs/editing/ai-powered-suggestions).
+
 ## CLI actions
 
 These commands use the separately installed `talewright` CLI. The bundled language server is not the

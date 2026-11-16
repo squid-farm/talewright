@@ -8,6 +8,11 @@ For highlighting, suggestions and live checks as you type, use VS Code with the
 [Talewright extension](../../tooling/vscode-talewright/README.md). See
 [Getting started](getting-started.md) to set up your editor and check your story.
 
+If you use GitHub Copilot, it may suggest text as you write. You can
+[turn off its automatic suggestions for Talemark](../../tooling/vscode-talewright/README.md#control-copilot-suggestions)
+without losing Talewright's suggestions for names from your story. You can still ask Copilot for
+help when you want it, and turn its automatic suggestions back on at any time.
+
 ## Organizing your files
 
 - Put scenes in as many `.tale` files and subfolders as you like. Talewright reads them all.
