@@ -16,6 +16,7 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
     protected IPlayerDriver Driver { get; private set; } = null!;
     protected IBrowserContext Context { get; private set; } = null!;
     protected IPage Page { get; private set; } = null!;
+    protected string BaseUrl => host.BaseUrl;
     protected ILocator Latest => Page.GetByRole(AriaRole.Region, new() { Name = "Current passage" });
     protected ILocator Choices => Page.GetByRole(AriaRole.List, new() { Name = "Story choices" }).GetByRole(AriaRole.Button);
     protected ILocator Sheet => Page.GetByRole(AriaRole.Complementary, new() { Name = "Character sheet" });
@@ -51,6 +52,7 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
         Context.SetDefaultTimeout(10_000);
         await Context.Tracing.StartAsync(new() { Screenshots = true, Snapshots = true, Sources = true });
         Page = await Context.NewPageAsync();
+        Page.SetDefaultNavigationTimeout(30_000);
         Driver = new BrowserPlayerDriver(Page);
         Page.PageError += (_, error) =>
         {
