@@ -67,7 +67,9 @@ public partial class LostRelicTests
         Choose(history, "Continue");
         Choose(history, "Continue");
         Choose(history, route);
-        Assert.Equal("dream.eye-mark", history.Current.Scene!.Value.Value);
+        Assert.Contains(history.Transcript,
+            frame => frame.Frame.Scene == new SceneId("dream.eye-mark"));
+        Assert.Equal("dream.hub", history.Current.Scene!.Value.Value);
         AssertMarks(history, 2);
         Choose(history, "Continue");
     }
@@ -80,7 +82,7 @@ public partial class LostRelicTests
             Choose(history, "Promise to carry her message");
         }
         Choose(history, "Ask the Hands for passage");
-        var text = history.Current.Document.ToPlainText();
+        var text = PresentedText(history);
         Assert.Contains("The Hands have no owner", text);
         Assert.Contains("They offer the final mark", text);
         Choose(history, "Accept the hand mark and the price");
@@ -137,7 +139,7 @@ public partial class LostRelicTests
         Assert.True(history.State.GetFlag(new("dream-promise")));
         Assert.Equal(standing + 5, history.State.GetStanding(new("explorers-guild")));
         MeetHandsAndSleeper(history);
-        Assert.Contains("not a monster, but an opening", history.Current.Document.ToPlainText());
+        Assert.Contains("not a monster, but an opening", PresentedText(history));
         var saved = StoryHistory.Restore(history.Story, history.Save());
         Choose(history, "Pay the Hands and return to the temple");
         AssertMarks(history, 2);
@@ -149,8 +151,8 @@ public partial class LostRelicTests
         AssertMarks(saved, 3);
         Choose(saved, "Pay the Hands and return to the temple");
         Assert.Equal(history.Events, saved.Events);
-        Choose(history, "Continue");
         Assert.Equal("temple.hall", history.Current.Scene!.Value.Value);
+        Assert.Equal("Continue", Assert.Single(history.Current.Choices).Text);
     }
 
     [Theory]
@@ -185,7 +187,9 @@ public partial class LostRelicTests
         foreach (var choice in new[] { "Remember that you are dreaming", "Slip beneath its gaze" })
         {
             Choose(history, choice);
-            Assert.Equal("dream.watcher-failed", history.Current.Scene!.Value.Value);
+            Assert.Contains(history.Transcript,
+                frame => frame.Frame.Scene == new SceneId("dream.watcher-failed"));
+            Assert.Equal("dream.watcher-choice", history.Current.Scene!.Value.Value);
             Choose(history, "Continue");
         }
         Assert.Contains(history.Current.Choices, choice => choice.Text == "Wake rather than face it");
@@ -229,7 +233,9 @@ public partial class LostRelicTests
             var check = Assert.Single(history.Events.OfType<SkillCheckResolved>(),
                 check => check.Skill == new StatId("stealth"));
             if (check.Success != true) continue;
-            Assert.Equal("dream.eye-mark", history.Current.Scene!.Value.Value);
+            Assert.Contains(history.Transcript,
+                frame => frame.Frame.Scene == new SceneId("dream.eye-mark"));
+            Assert.Equal("dream.hub", history.Current.Scene!.Value.Value);
             AssertMarks(history, 2);
             Assert.Equal(history.Events, StoryHistory.Restore(history.Story, history.Save()).Events);
             return;
@@ -300,8 +306,9 @@ public partial class LostRelicTests
             if (check.Success != success) continue;
             Assert.Equal(6, check.Modifier);
             Choose(history, "Continue");
-            Assert.Equal(success ? "dream.watcher-sees" : "dream.watcher-missed",
-                history.Current.Scene!.Value.Value);
+            Assert.Contains(history.Transcript, frame => frame.Frame.Scene == new SceneId(
+                success ? "dream.watcher-sees" : "dream.watcher-missed"));
+            Assert.Equal("dream.watcher-choice", history.Current.Scene!.Value.Value);
             Assert.Equal(history.Events, StoryHistory.Restore(history.Story, history.Save()).Events);
             return;
         }
@@ -345,7 +352,7 @@ public partial class LostRelicTests
         Choose(history, "Continue");
         Choose(history, "Continue");
         if (history.Current.Scene == new SceneId("temple.niche")) Choose(history, "Leave it be");
-        Assert.Contains("voice beyond the door falls silent", history.Current.Document.ToPlainText());
+        Assert.Contains("voice beyond the door falls silent", PresentedText(history));
         Choose(history, ending == "leave" ? "Leave it where it lies" : "Take the relic");
         Choose(history, ending switch
         {
@@ -370,13 +377,12 @@ public partial class LostRelicTests
         var history = Dream(journal: true);
         Assert.False(history.Current.ClearsPrevious);
         history.Back();
-        Assert.Equal("dream.arrival", history.Current.Scene!.Value.Value);
-        Assert.True(history.Current.ClearsPrevious);
-        history.Back();
+        Assert.Equal("temple.door", history.Current.Scene!.Value.Value);
         Assert.False(history.Current.ClearsPrevious);
         history.Forward();
-        Assert.True(StoryHistory.Restore(history.Story, history.Save()).Current.ClearsPrevious);
-        history.Forward();
+        Assert.Contains(history.Transcript, frame =>
+            frame.Frame.Scene == new SceneId("dream.arrival") && frame.Frame.ClearsPrevious);
+        Assert.Contains(history.Transcript, frame => frame.Frame.Scene == new SceneId("dream.hub"));
         Assert.Contains("Glyph marks held: 0.", history.Current.Document.ToPlainText());
         Assert.Contains("3 more marks will let you approach", history.Current.Document.ToPlainText());
         Assert.True(history.Story.IsStatVisible(new("lucidity"), history.State));
@@ -391,7 +397,7 @@ public partial class LostRelicTests
         Choose(history, "Continue");
         Choose(history, "Continue");
         Choose(history, "Remember that you are dreaming");
-        Assert.Contains("A second glyph mark rests in your palm", history.Current.Document.ToPlainText());
+        Assert.Contains("A second glyph mark rests in your palm", PresentedText(history));
         Choose(history, "Continue");
         Assert.Contains("1 more mark will let you approach", history.Current.Document.ToPlainText());
         Choose(history, "Hear the guild ghost");
@@ -411,7 +417,7 @@ public partial class LostRelicTests
         Assert.True(sleeper.IsAvailable);
         Choose(history, "Approach the Sleeper");
         Choose(history, "Pay the Hands and return to the temple");
-        Assert.Contains("You keep 2 marks", history.Current.Document.ToPlainText());
+        Assert.Contains("You keep 2 marks", PresentedText(history));
         history.Back();
         history.Back();
         history.Back();

@@ -18,6 +18,7 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
     protected IPage Page { get; private set; } = null!;
     protected string BaseUrl => host.BaseUrl;
     protected ILocator Latest => Page.GetByRole(AriaRole.Region, new() { Name = "Current passage" });
+    protected ILocator RevealedPassage => Page.GetByRole(AriaRole.Group, new() { Name = "New story passage", Exact = true });
     protected ILocator Choices => Page.GetByRole(AriaRole.List, new() { Name = "Story choices" }).GetByRole(AriaRole.Button);
     protected ILocator Sheet => Page.GetByRole(AriaRole.Complementary, new() { Name = "Character sheet" });
     protected ILocator SaveStatus => Page.GetByRole(AriaRole.Status).And(Page.Locator(".tw-save-status"));
@@ -295,7 +296,9 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
         await AssertState(state =>
         {
             Assert.True(state.PassageVisible, "Current passage is visible.");
-            Assert.Contains(step.Contains, state.Passage);
+            Assert.True(state.Passage.Contains(step.Contains, StringComparison.Ordinal)
+                || state.Transcript.Contains(step.Contains, StringComparison.Ordinal),
+                $"Expected '{step.Contains}' in the current passage or visible transcript.");
             if (step.Choices is not null)
             {
                 Assert.Equal(step.Choices, state.Choices);

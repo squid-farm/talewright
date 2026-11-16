@@ -84,6 +84,8 @@
     <StoryStage @ref="_storyStage" Story="Story" Passages="_transcript"
                 PassageWindow="@TranscriptPresentation.PassageWindow" Current="_session.Current" State="_session.State"
                 Identity="_session" Busy="_busy" AtChoiceLimit="@(_session.Cursor >= StoryHistory.MaxChoices)"
+                ContinuationError="_session.AutomaticContinuationError" IncludeFromIndex="_presentationStartIndex"
+                RevealPassageIndex="_revealPassageIndex"
                 Hidden="_showHistory" OnChoose="Choose" OnRestart="Restart" />
     }
 </div>
@@ -149,6 +151,9 @@
     private StoryDefinition? _startedStory;
     private bool _focusLatest;
     private bool _preserveFocusOnReveal;
+    private int _presentationStartIndex;
+    private int _revealPassageIndex;
+    private bool _revealAtStoryStart;
     private bool _wasVisible = true;
     private IJSObjectReference? _module;
     private bool _busy;
@@ -199,7 +204,7 @@
             _startedStory = Story;
             ResetSession(ResumeHistory ?? new StoryHistory(Story, Seed, Character),
                 initialAutosave: ResumeHistory is null, preserveExistingFocus: true,
-                initialTriggerSave: ResumeHistory is null);
+                initialTriggerSave: ResumeHistory is null, revealStoryBeginning: ResumeHistory is null);
             _autosaveCheckComplete = AutosaveResumeChecked || SaveStore is null || ResumeHistory is not null;
             _resumePrompt = false;
             _startupResumeHistory = null;
@@ -225,7 +230,7 @@
     }
 
     private void ResetSession(StoryHistory session, bool initialAutosave, bool clearAutosaveError = true,
-        bool preserveExistingFocus = false, bool initialTriggerSave = false)
+        bool preserveExistingFocus = false, bool initialTriggerSave = false, bool revealStoryBeginning = false)
     {
         _session = session;
         UpdateDiagnosticContext();
@@ -253,13 +258,20 @@
         _initialTriggerSavePending = initialTriggerSave && session.TriggerSaveId is not null;
         _triggerSaveSequence++;
         _slots = [];
-        RequestReveal(preserveExistingFocus);
+        _presentationStartIndex = revealStoryBeginning
+            ? 0
+            : Math.Max(0, _transcript.Count - TranscriptPresentation.PassageWindow);
+        RequestReveal(preserveExistingFocus, revealStoryBeginning ? 0 : _transcript.Count - 1,
+            isStoryBeginning: revealStoryBeginning);
     }
 
-    private void RequestReveal(bool preserveExistingFocus = false)
+    private void RequestReveal(bool preserveExistingFocus = false, int? passageIndex = null,
+        bool isStoryBeginning = false)
     {
         _focusLatest = true;
         _preserveFocusOnReveal = preserveExistingFocus;
+        _revealPassageIndex = Math.Max(0, passageIndex ?? _transcript.Count - 1);
+        _revealAtStoryStart = isStoryBeginning;
     }
 
     private void UpdateDiagnosticContext() =>
@@ -274,7 +286,7 @@
     private async Task Restart()
     {
         ResetSession(new StoryHistory(Story, _session.Character is null ? Seed : _session.Seed, _session.Character), initialAutosave: true,
-            clearAutosaveError: false, initialTriggerSave: true);
+            clearAutosaveError: false, initialTriggerSave: true, revealStoryBeginning: true);
         _initialTriggerSavePending = false;
         await QueueTriggerSaveAsync();
         await QueueAutosaveAsync();
@@ -367,7 +379,7 @@
         _autosaveStartupError = null;
         _autosaveCheckComplete = true;
         _initialAutosavePending = false;
-        RequestReveal();
+        RequestReveal(passageIndex: 0, isStoryBeginning: true);
         _initialTriggerSavePending = false;
         await QueueTriggerSaveAsync();
         await QueueAutosaveAsync();
@@ -553,10 +565,12 @@
         {
             return;
         }
+        var firstNewPassage = _transcript.Count;
         _session.Choose(choice.Key);
         UpdateDiagnosticContext();
         ReconcileImageWarming(TimeSpan.Zero);
-        RequestReveal();
+        _presentationStartIndex = firstNewPassage;
+        RequestReveal(passageIndex: firstNewPassage);
         await QueueTriggerSaveAsync();
         await QueueAutosaveAsync();
     }
@@ -567,6 +581,7 @@
         _session.Back();
         UpdateDiagnosticContext();
         ReconcileImageWarming(StoryImageWarmer.HistorySettlingDelay);
+        _presentationStartIndex = Math.Max(0, _transcript.Count - TranscriptPresentation.PassageWindow);
         RequestReveal();
     }
 
@@ -576,6 +591,7 @@
         _session.Forward();
         UpdateDiagnosticContext();
         ReconcileImageWarming(StoryImageWarmer.HistorySettlingDelay);
+        _presentationStartIndex = Math.Max(0, _transcript.Count - TranscriptPresentation.PassageWindow);
         RequestReveal();
     }
 
@@ -713,6 +729,7 @@
             _showSaves = false;
             _restoreFocusAfterSaveClose = false;
             _saveMessage = $"Loaded '{SaveEntry.DisplayNameFor(slot)}'.";
+            _presentationStartIndex = Math.Max(0, _transcript.Count - TranscriptPresentation.PassageWindow);
             RequestReveal();
         }
     }
@@ -722,7 +739,7 @@
         _restoreFocusAfterSaveClose = true;
         _module ??= await JS.InvokeAsync<IJSObjectReference>("import",
             "./_content/Talewright.Player/Components/StoryPlayer.razor.js");
-        await _module.InvokeVoidAsync("revealLatest", TranscriptElement, _transcript.Count == 1);
+        await _module.InvokeVoidAsync("revealPassage", TranscriptElement, _transcript.Count - 1, false);
     }
 
     private Task ExportAsync(string slot) => SaveOperationAsync(PlayerDiagnosticOperation.SaveExport, async generation =>
@@ -912,11 +929,12 @@
             _focusLatest = false;
             var preserveExistingFocus = _preserveFocusOnReveal;
 
-            // Scroll the newest frame to the top and focus it, so the new text is visible and screen readers move to it.
+            // Reveal the first content reached by this action so readers do not skip its prose.
             try
             {
                 _module ??= await JS.InvokeAsync<IJSObjectReference>("import", "./_content/Talewright.Player/Components/StoryPlayer.razor.js");
-                await _module.InvokeVoidAsync("revealLatest", TranscriptElement, _transcript.Count == 1, preserveExistingFocus);
+                await _module.InvokeVoidAsync("revealPassage", TranscriptElement, _revealPassageIndex,
+                    _revealAtStoryStart, preserveExistingFocus);
             }
 
             catch (JSException)

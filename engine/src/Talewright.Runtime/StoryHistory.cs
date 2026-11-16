@@ -10,14 +10,22 @@ using Talewright.Talemark.Model;
 
 namespace Talewright.Runtime;
 
-public sealed record HistoryFrame(StoryFrame Frame, IReadOnlyList<RenderedInline>? Chosen = null);
+public sealed record HistoryFrame(StoryFrame Frame, IReadOnlyList<RenderedInline>? Chosen = null)
+{
+    /// <summary>Whether this choice was accepted automatically by a bare scene divert.</summary>
+    public bool ChosenAutomatically { get; init; }
+}
 
 /// <summary>Deterministic choice history. Restores are built separately before replacing a live session.</summary>
 public sealed class StoryHistory
 {
+    public const int MaxAutomaticTransitions = 1_000;
     public const int MaxChoices = SaveFormat.MaxChoices;
     public const int MaxSaveBytes = SaveFormat.MaxSaveBytes;
+    private const string AutomaticContinuationErrorMessage =
+        "Stopped after 1,000 automatic scene transitions to prevent a runaway chain. Check the story for a loop of bare diverts.";
     private readonly List<string> _choices = [];
+    private readonly List<bool> _automaticChoices = [];
     private List<byte[]>? _evidence;
     private List<byte[]>? _replayChoiceIdentities;
     private StorySession _session;
@@ -37,22 +45,25 @@ public sealed class StoryHistory
         TriggerSaveId = TriggerSaveFiredSince(eventStart);
         _evidence = CanRecordEvidence(story) ? [ReplayEvidence.Start(story, _session, Character, initialState)] : null;
         _replayChoiceIdentities = _evidence is null ? null : [];
+        ContinueAutomatically();
     }
 
     private StoryHistory(StoryDefinition story, CharacterSelection? character, StorySession session,
         List<HistoryFrame> frames, IEnumerable<string> choices, ReplayCursor timeline, List<byte[]>? evidence,
         List<byte[]>? replayChoiceIdentities,
-        string? restoredProgressKey)
+        IEnumerable<bool> automaticChoices, string? restoredProgressKey, string? automaticContinuationError)
     {
         Story = story;
         Character = character;
         _session = session;
         _frames = frames;
         _choices.AddRange(choices);
+        _automaticChoices.AddRange(automaticChoices);
         _timeline = timeline;
         _evidence = evidence;
         _replayChoiceIdentities = replayChoiceIdentities;
         RestoredProgressKey = restoredProgressKey;
+        AutomaticContinuationError = automaticContinuationError;
     }
 
     public StoryDefinition Story { get; }
@@ -63,12 +74,14 @@ public sealed class StoryHistory
     public StoryFrame Current => _session.Current!;
     public IReadOnlyList<HistoryFrame> Transcript => _frames.AsReadOnly();
     public int Cursor => _timeline.Position;
-    public bool CanBack => Story.UndoEnabled && _timeline.CanBack;
-    public bool CanForward => Story.UndoEnabled && _timeline.CanForward;
+    public bool CanBack => Story.UndoEnabled && PreviousPlayerChoice(_timeline.Position) is not null;
+    public bool CanForward => Story.UndoEnabled && NextPlayerChoice(_timeline.Position) is not null;
     /// <summary>The last saving trigger to fire during the latest start or choice step, if any.</summary>
     public string? TriggerSaveId { get; private set; }
     /// <summary>The original slot's progress after a load, until the timeline changes.</summary>
     public string? RestoredProgressKey { get; private set; }
+    /// <summary>Why play stopped when an automatic bare-divert chain exceeded its safety budget.</summary>
+    public string? AutomaticContinuationError { get; private set; }
 
     /// <summary>
     /// Forks validated player replay inputs into isolated synthetic author tooling, retaining redo. Each decision
@@ -77,7 +90,8 @@ public sealed class StoryHistory
     public AuthorSession ForkAuthor(bool captureDecisions = true)
     {
         var keys = new List<string?>(_choices.Count);
-        Replay(Story, Seed, _choices, _replayChoiceIdentities, Character, liveKeys: keys);
+        ReplayWithAutomaticContinuations(Story, Seed, _choices, _replayChoiceIdentities,
+            Character, liveKeys: keys);
         var unavailable = keys.IndexOf(null);
         if (unavailable >= 0)
         {
@@ -102,26 +116,9 @@ public sealed class StoryHistory
         var eventStart = _session.Events.Count;
         var frame = _session.Choose(key);
         TriggerSaveId = TriggerSaveFiredSince(eventStart);
-        if (_evidence is not null && choice.ReplayIdentity is { } identity)
-        {
-            var next = ReplayEvidence.Next(_evidence[_timeline.Position], previousFrame, identity, _session.Events, eventStart);
-            _evidence.RemoveRange(_timeline.Position + 1, _evidence.Count - _timeline.Position - 1);
-            _replayChoiceIdentities!.RemoveRange(_timeline.Position,
-                _replayChoiceIdentities.Count - _timeline.Position);
-            _evidence.Add(next);
-            _replayChoiceIdentities.Add(identity.ToArray());
-        }
-        else
-        {
-            _evidence = null;
-            _replayChoiceIdentities = null;
-        }
-        _frames[^1] = _frames[^1] with { Chosen = choice.Label };
-        _frames.Add(new HistoryFrame(frame));
-        _choices.RemoveRange(_timeline.Position, _timeline.Length - _timeline.Position);
-        _choices.Add(key);
-        _timeline = _timeline.AfterAppend();
+        AppendChoice(key, choice, previousFrame, frame, eventStart, automatically: false);
         RestoredProgressKey = null;
+        ContinueAutomatically();
     }
 
     public void Back()
@@ -131,7 +128,7 @@ public sealed class StoryHistory
             throw new InvalidOperationException("There is no previous choice to restore.");
         }
 
-        MoveTo(_timeline.Back());
+        MoveTo(_timeline.At(PreviousPlayerChoice(_timeline.Position)!.Value));
     }
 
     public void Forward()
@@ -141,16 +138,24 @@ public sealed class StoryHistory
             throw new InvalidOperationException("There is no next choice to restore.");
         }
 
-        MoveTo(_timeline.Forward());
+        var choice = NextPlayerChoice(_timeline.Position)!.Value;
+        var target = choice + 1;
+        while (target < _timeline.Length && IsAutomaticChoice(target))
+        {
+            target++;
+        }
+        MoveTo(_timeline.At(target));
     }
 
     private void MoveTo(ReplayCursor timeline)
     {
-        var (session, frames, _, _) = Replay(Story, Seed, _choices.Take(timeline.Position).ToArray(),
+        var replay = ReplayWithAutomaticContinuations(Story, Seed,
+            _choices.Take(timeline.Position).ToArray(),
             _replayChoiceIdentities?.Take(timeline.Position).ToArray(), Character);
-        _session = session;
-        _frames = frames;
-        _timeline = timeline;
+        _session = replay.Session;
+        _frames = replay.Frames;
+        _timeline = new ReplayCursor(replay.Choices.Count, timeline.Length);
+        AutomaticContinuationError = replay.AutomaticContinuationError;
         TriggerSaveId = null;
         RestoredProgressKey = null;
     }
@@ -162,6 +167,85 @@ public sealed class StoryHistory
         return _session.Events.Skip(eventStart).OfType<TriggerFired>()
             .LastOrDefault(trigger => savingTriggers.Contains(trigger.TriggerId))?.TriggerId;
     }
+
+    private void AppendChoice(string key, ChoiceView choice, StoryFrame previousFrame, StoryFrame frame,
+        int eventStart, bool automatically)
+    {
+        if (_evidence is not null && choice.ReplayIdentity is { } identity)
+        {
+            var next = ReplayEvidence.Next(_evidence[_timeline.Position], previousFrame, identity,
+                _session.Events, eventStart);
+            _evidence.RemoveRange(_timeline.Position + 1, _evidence.Count - _timeline.Position - 1);
+            _replayChoiceIdentities!.RemoveRange(_timeline.Position,
+                _replayChoiceIdentities.Count - _timeline.Position);
+            _evidence.Add(next);
+            _replayChoiceIdentities.Add(identity.ToArray());
+        }
+        else
+        {
+            _evidence = null;
+            _replayChoiceIdentities = null;
+        }
+
+        _frames[^1] = _frames[^1] with { Chosen = choice.Label, ChosenAutomatically = automatically };
+        _frames.Add(new HistoryFrame(frame));
+        _choices.RemoveRange(_timeline.Position, _timeline.Length - _timeline.Position);
+        _automaticChoices.RemoveRange(_timeline.Position, _timeline.Length - _timeline.Position);
+        _choices.Add(key);
+        _automaticChoices.Add(automatically);
+        _timeline = _timeline.AfterAppend();
+    }
+
+    private void ContinueAutomatically()
+    {
+        var transitions = 0;
+        while (_session.Current?.AutomaticallyContinue == true)
+        {
+            if (transitions == MaxAutomaticTransitions || Cursor >= MaxChoices)
+            {
+                AutomaticContinuationError = transitions == MaxAutomaticTransitions
+                    ? AutomaticContinuationErrorMessage
+                    : $"Stopped because this playthrough reached the {MaxChoices:N0}-choice limit during an automatic scene chain.";
+                _session.StopAutomaticContinuation();
+                _frames[^1] = _frames[^1] with { Frame = _session.Current! };
+                return;
+            }
+
+            var previousFrame = Current;
+            var choice = previousFrame.Choices.Single(choice => choice.Key == StorySession.ContinueKey);
+            var eventStart = _session.Events.Count;
+            var frame = _session.Choose(StorySession.ContinueKey);
+            TriggerSaveId = TriggerSaveFiredSince(eventStart) ?? TriggerSaveId;
+            AppendChoice(StorySession.ContinueKey, choice, previousFrame, frame, eventStart, automatically: true);
+            transitions++;
+        }
+    }
+
+    private int? PreviousPlayerChoice(int position)
+    {
+        for (var index = position - 1; index >= 0; index--)
+        {
+            if (!IsAutomaticChoice(index))
+            {
+                return index;
+            }
+        }
+        return null;
+    }
+
+    private int? NextPlayerChoice(int position)
+    {
+        for (var index = position; index < _timeline.Length; index++)
+        {
+            if (!IsAutomaticChoice(index))
+            {
+                return index;
+            }
+        }
+        return null;
+    }
+
+    private bool IsAutomaticChoice(int index) => _automaticChoices[index];
 
     public byte[] Save(SaveSummary? summary = null)
     {
@@ -298,6 +382,7 @@ public sealed class StoryHistory
             throw Incompatible(story, save, ex);
         }
 
+        var requiresNormalization = frames.Any(frame => frame.Frame.AutomaticallyContinue);
         if (timeline.CanForward)
         {
             List<byte[]>? prefixEvidence;
@@ -326,8 +411,39 @@ public sealed class StoryHistory
             throw ReplayMismatch(story, save, changed);
         }
 
-        return new StoryHistory(story, character, session, frames, save.Choices, timeline, evidence,
-            replayChoiceIdentities, KeyOf(save));
+        if (!requiresNormalization)
+        {
+            return new StoryHistory(story, character, session, frames, save.Choices, timeline, evidence,
+                replayChoiceIdentities, Enumerable.Repeat(false, save.Choices.Count), KeyOf(save), null);
+        }
+
+        var normalized = ReplayWithAutomaticContinuations(story, save.Seed, save.Choices,
+            save.ReplayChoiceIdentities, character, recordEvidence: true);
+        var normalizedCursor = normalized.CursorPositions[save.Cursor];
+        var currentSession = normalized.Session;
+        var currentFrames = normalized.Frames;
+        var currentError = normalized.AutomaticContinuationError;
+        if (normalizedCursor < normalized.Choices.Count)
+        {
+            var prefix = ReplayWithAutomaticContinuations(story, save.Seed,
+                normalized.Choices.Take(normalizedCursor).ToArray(),
+                normalized.ReplayChoiceIdentities?.Take(normalizedCursor).ToArray(), character,
+                recordEvidence: normalized.Evidence is not null);
+            if (normalized.Evidence is not null && (prefix.Evidence is null
+                || !CryptographicOperations.FixedTimeEquals(
+                    normalized.Evidence[normalizedCursor], prefix.Evidence[^1])))
+            {
+                throw ReplayMismatch(story, save, changed);
+            }
+            currentSession = prefix.Session;
+            currentFrames = prefix.Frames;
+            currentError = prefix.AutomaticContinuationError;
+        }
+
+        var normalizedTimeline = new ReplayCursor(normalizedCursor, normalized.Choices.Count);
+        return new StoryHistory(story, character, currentSession, currentFrames, normalized.Choices,
+            normalizedTimeline, normalized.Evidence, normalized.ReplayChoiceIdentities,
+            normalized.AutomaticChoices, KeyOf(save), currentError);
     }
 
     private static bool CanRecordEvidence(StoryDefinition story) =>
@@ -406,5 +522,170 @@ public sealed class StoryHistory
         }
 
         return (session, frames, evidence, replayedIdentities);
+    }
+
+    private sealed record AutomaticReplay(
+        StorySession Session,
+        List<HistoryFrame> Frames,
+        List<string> Choices,
+        List<bool> AutomaticChoices,
+        List<byte[]>? Evidence,
+        List<byte[]>? ReplayChoiceIdentities,
+        int[] CursorPositions,
+        string? AutomaticContinuationError);
+
+    private static AutomaticReplay ReplayWithAutomaticContinuations(StoryDefinition story, ulong seed,
+        IReadOnlyList<string> choices, IReadOnlyList<byte[]>? replayChoiceIdentities,
+        CharacterSelection? character, bool recordEvidence = false, List<string?>? liveKeys = null)
+    {
+        var session = new StorySession(story, seed, character: character);
+        var initialState = ReplayEvidence.InitialState(story, session.State);
+        var frames = new List<HistoryFrame> { new(session.Start()) };
+        var evidence = recordEvidence && CanRecordEvidence(story)
+            ? new List<byte[]> { ReplayEvidence.Start(story, session, character, initialState) } : null;
+        var replayedIdentities = evidence is null ? null : new List<byte[]>();
+        var replayedChoices = new List<string>();
+        var automaticChoices = new List<bool>();
+        var cursorPositions = new int[choices.Count + 1];
+        var savedIndex = 0;
+        string? automaticContinuationError = null;
+
+        void Record(string key, ChoiceView choice, StoryFrame previousFrame, StoryFrame nextFrame,
+            int eventStart, ReadOnlyMemory<byte>? identity, bool automatically)
+        {
+            if (identity is { } replayIdentity && evidence is not null && replayedIdentities is not null)
+            {
+                evidence.Add(ReplayEvidence.Next(evidence[^1], previousFrame, replayIdentity,
+                    session.Events, eventStart));
+                replayedIdentities.Add(replayIdentity.ToArray());
+            }
+            else
+            {
+                evidence = null;
+                replayedIdentities = null;
+            }
+
+            frames[^1] = frames[^1] with { Chosen = choice.Label, ChosenAutomatically = automatically };
+            frames.Add(new HistoryFrame(nextFrame));
+            replayedChoices.Add(key);
+            automaticChoices.Add(automatically);
+            liveKeys?.Add(key);
+        }
+
+        bool IsMatchingStoredAutomaticChoice(int index, ReadOnlyMemory<byte>? identity)
+        {
+            if (choices[index] != StorySession.ContinueKey)
+            {
+                return false;
+            }
+            return replayChoiceIdentities is null
+                || (identity is { } replayIdentity
+                    && replayChoiceIdentities[index].AsSpan().SequenceEqual(replayIdentity.Span));
+        }
+
+        void ContinueAutomatically()
+        {
+            var boundaryStart = savedIndex;
+            var transitions = 0;
+            while (session.Current?.AutomaticallyContinue == true)
+            {
+                if (transitions == MaxAutomaticTransitions || replayedChoices.Count >= MaxChoices)
+                {
+                    automaticContinuationError = transitions == MaxAutomaticTransitions
+                        ? AutomaticContinuationErrorMessage
+                        : $"Stopped because this playthrough reached the {MaxChoices:N0}-choice limit during an automatic scene chain.";
+                    session.StopAutomaticContinuation();
+                    frames[^1] = frames[^1] with { Frame = session.Current! };
+                    Array.Fill(cursorPositions, replayedChoices.Count);
+                    savedIndex = choices.Count;
+                    return;
+                }
+
+                var previousFrame = session.Current!;
+                var choice = previousFrame.Choices.Single(choice => choice.Key == StorySession.ContinueKey);
+                var eventStart = session.Events.Count;
+                var nextFrame = session.Choose(StorySession.ContinueKey);
+                Record(StorySession.ContinueKey, choice, previousFrame, nextFrame, eventStart,
+                    choice.ReplayIdentity, automatically: true);
+                transitions++;
+
+                if (savedIndex < choices.Count && IsMatchingStoredAutomaticChoice(savedIndex, choice.ReplayIdentity))
+                {
+                    savedIndex++;
+                }
+                for (var index = boundaryStart; index <= savedIndex; index++)
+                {
+                    cursorPositions[index] = replayedChoices.Count;
+                }
+            }
+        }
+
+        ContinueAutomatically();
+        cursorPositions[savedIndex] = replayedChoices.Count;
+        while (savedIndex < choices.Count && automaticContinuationError is null)
+        {
+            ContinueAutomatically();
+            cursorPositions[savedIndex] = replayedChoices.Count;
+            if (automaticContinuationError is not null || savedIndex >= choices.Count)
+            {
+                break;
+            }
+
+            var key = choices[savedIndex];
+            var previousFrame = session.Current!;
+            var eventStart = session.Events.Count;
+            ChoiceView? choice;
+            ReadOnlyMemory<byte>? identity;
+            if (replayChoiceIdentities is not null)
+            {
+                if (!session.ChooseReplay(replayChoiceIdentities[savedIndex], out choice) || choice is null)
+                {
+                    throw ReplayFailure();
+                }
+                identity = replayChoiceIdentities[savedIndex];
+                var selectedKey = choice.Key;
+                liveKeys?.Add(previousFrame.Choices.Any(offered => offered.Key == selectedKey) ? selectedKey : null);
+            }
+            else
+            {
+                choice = previousFrame.Choices.FirstOrDefault(candidate => candidate.Key == key);
+                if (choice is null)
+                {
+                    throw ReplayFailure();
+                }
+                identity = choice.ReplayIdentity;
+                session.Choose(key);
+                liveKeys?.Add(key);
+            }
+
+            var next = session.Current!;
+            if (identity is not null && evidence is not null && replayedIdentities is not null)
+            {
+                evidence.Add(ReplayEvidence.Next(evidence[^1], previousFrame, identity.Value,
+                    session.Events, eventStart));
+                replayedIdentities.Add(identity.Value.ToArray());
+            }
+            else
+            {
+                evidence = null;
+                replayedIdentities = null;
+            }
+
+            frames[^1] = frames[^1] with { Chosen = choice.Label };
+            frames.Add(new HistoryFrame(next));
+            replayedChoices.Add(key);
+            automaticChoices.Add(false);
+            savedIndex++;
+            cursorPositions[savedIndex] = replayedChoices.Count;
+        }
+
+        if (automaticContinuationError is null)
+        {
+            ContinueAutomatically();
+            cursorPositions[savedIndex] = replayedChoices.Count;
+        }
+
+        return new AutomaticReplay(session, frames, replayedChoices, automaticChoices,
+            evidence, replayedIdentities, cursorPositions, automaticContinuationError);
     }
 }

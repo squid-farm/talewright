@@ -2,7 +2,7 @@
 
 <div class="@(HasCharacterSheet ? "tw-columns" : "tw-columns tw-columns--full")" hidden="@Hidden">
     <main class="tw-transcript" aria-label="Story transcript" aria-live="polite" tabindex="-1" @ref="TranscriptElement">
-        @{ var groups = TranscriptPresentation.Group(Passages, PassageWindow); }
+        @{ var groups = TranscriptPresentation.Group(Passages, PassageWindow, IncludeFromIndex); }
         @for (var i = 0; i < groups.Count; i++)
         {
             var group = groups[i];
@@ -16,7 +16,12 @@
                     {
                         <CascadingValue @key="(Identity, passage.Index)"
                                         Name="HistoryReading" Value="@(!isLatest)">
-                            <StoryPassage Entry="passage.Entry" />
+                            <div class="tw-passage-anchor" data-tw-passage-index="@passage.Index"
+                                 role="@(passage.Index == RevealPassageIndex ? "group" : null)"
+                                 aria-label="@(passage.Index == RevealPassageIndex ? "New story passage" : null)"
+                                 tabindex="@(passage.Index == RevealPassageIndex ? "-1" : null)">
+                                <StoryPassage Entry="passage.Entry" />
+                            </div>
                         </CascadingValue>
                     }
                 </CascadingValue>
@@ -45,6 +50,9 @@
     [Parameter, EditorRequired] public object Identity { get; set; } = default!;
     [Parameter] public bool Busy { get; set; }
     [Parameter] public bool AtChoiceLimit { get; set; }
+    [Parameter] public string? ContinuationError { get; set; }
+    [Parameter] public int? IncludeFromIndex { get; set; }
+    [Parameter] public int RevealPassageIndex { get; set; } = -1;
     [Parameter] public bool Hidden { get; set; }
     [Parameter] public bool ShowCharacterSheet { get; set; } = true;
     [Parameter] public EventCallback<ChoiceView> OnChoose { get; set; }

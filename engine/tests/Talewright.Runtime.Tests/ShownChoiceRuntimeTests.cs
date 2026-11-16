@@ -219,8 +219,8 @@ public sealed class ShownChoiceRuntimeTests
         Assert.DoesNotContain(history.Current.Menu, entry => entry.Key == "storylet:blocked");
 
         history.Choose("storylet:once");
-        history.Choose(StorySession.ContinueKey);
 
+        Assert.True(history.Transcript[^2].ChosenAutomatically);
         Assert.Equal(
             ["storylet:blocked", "storylet:available", "c0"],
             history.Current.Menu.Select(entry => entry.Key));

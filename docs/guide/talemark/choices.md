@@ -56,8 +56,11 @@ The second choice provides a way out regardless of the player's inventory.
 - `* -> garden` omits authored text: it uses the destination's `@choice-label`, otherwise
   **Continue**. `* -> END` always uses **Continue**. An empty `[]` is not this shortcut.
   Use the labeled form when adding choice clauses; keep textless choices simple.
-- `-> garden` on its own leaves now and presents the rendered passage with **Continue**;
-  `-> END` presents the final frame. Do not declare a scene called `END`.
+- `-> garden` on its own leaves now and automatically enters `garden`; each reached scene's
+  rendered text remains in order. A conditional scene divert does the same. `-> END` presents the
+  final frame. Do not declare a scene called `END`.
+- A divert in a skill-check outcome still presents its result with **Continue**. Explicit choices,
+  including `* -> garden` and `* -> END`, always wait for the reader.
 - `@title` is a plain-text heading. `@choice-label` is reader text used by bare scene choices
   and hub offers. Metadata belongs directly under the scene header.
 - A scene without a possible exit is invalid. The compiler does not prove that some requirement

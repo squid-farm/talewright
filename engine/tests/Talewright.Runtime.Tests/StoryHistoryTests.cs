@@ -1,6 +1,7 @@
 using System.Text;
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
+using Talewright.Narrative.Rendering;
 using Talewright.Runtime.Saves;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
@@ -53,6 +54,31 @@ public class StoryHistoryTests
             EffectFaker.Decrease(TaleCharacterRef.Player.Field("hp"), 1),
             EffectFaker.Decrease(TaleCharacterRef.Player.Field("hp"), 2)),
         ChoiceFaker.Create("END", "Finish"));
+
+    private static string BareDivertChain(int firstTransitions, int? secondTransitions = null,
+        string finishChoice = "Finish")
+    {
+        var finalIndex = firstTransitions + (secondTransitions is null ? 0 : secondTransitions.Value + 1);
+        var tale = new StringBuilder();
+        for (var index = 0; index <= finalIndex; index++)
+        {
+            var scene = index == 0 ? "a" : $"scene-{index}";
+            tale.AppendLine($"=== {scene}");
+            if (secondTransitions is not null && index == firstTransitions)
+            {
+                tale.AppendLine(ChoiceFaker.Create($"scene-{index + 1}", "Again"));
+            }
+            else if (index < finalIndex)
+            {
+                tale.AppendLine($"-> scene-{index + 1}");
+            }
+            else
+            {
+                tale.AppendLine(ChoiceFaker.Create("END", finishChoice));
+            }
+        }
+        return tale.ToString();
+    }
 
     private static StoryDefinition Compile(string? yaml = null, string? tale = null, CompilerOptions? options = null)
     {
@@ -145,6 +171,249 @@ public class StoryHistoryTests
         Assert.Equal("right", history.Transcript[1].Frame.Scene!.Value.Value);
         Assert.Equal("shared", history.Current.Scene!.Value.Value);
         Assert.True(history.Current.ContinuesPrevious);
+    }
+
+    [Fact]
+    public void Bare_scene_diverts_auto_accept_and_preserve_ordered_rendered_history_and_saving_triggers()
+    {
+        var story = Compile(yaml: BuildManifest(declareVariables: true, saveTrigger: true).Build(), tale: """
+            === a
+            @title Arrival
+            ~ var:visits += 1
+            Arrival {var:visits}.
+            {if var:visits >= 1}
+            -> middle
+            {/if}
+            This line must not run.
+            === middle
+            @title Courtyard
+            ~ var:visits += 1
+            The courtyard is empty.
+            -> final
+            === final
+            Final visit: {var:visits}.
+            * [Continue the story] -> END
+            """);
+
+        var history = new StoryHistory(story, 42);
+
+        Assert.Equal("final", history.Current.Scene!.Value.Value);
+        Assert.Equal(["Arrival 1.", "The courtyard is empty.", "Final visit: 2."],
+            history.Transcript.Select(frame => frame.Frame.Document.ToPlainText()));
+        Assert.Equal(["a", "middle", "final"],
+            history.Events.OfType<SceneEntered>().Select(entry => entry.Scene.Value));
+        Assert.Equal(["continue", "continue"],
+            history.Events.OfType<ChoiceMade>().Select(choice => choice.ChoiceKey));
+        Assert.Equal([true, true], history.Transcript.Take(2).Select(frame => frame.ChosenAutomatically));
+        Assert.All(history.Transcript.Take(2), frame => Assert.Equal("Continue",
+            RenderedInline.ToPlainText(frame.Chosen!)));
+        Assert.Equal("first", history.TriggerSaveId);
+        Assert.Single(history.Events.OfType<TriggerFired>());
+
+        var restored = StoryHistory.Restore(story, history.Save());
+        AssertEquivalent(history, restored);
+        Assert.Equal(history.Save(), restored.Save());
+        Assert.Equal(history.Transcript.Select(frame => frame.ChosenAutomatically),
+            restored.Transcript.Select(frame => frame.ChosenAutomatically));
+    }
+
+    [Fact]
+    public void Empty_scene_diverts_can_end_without_an_interactive_continue()
+    {
+        var story = Compile(yaml: BuildManifest(declareVariables: true).Build(), tale: """
+            === a
+            Arrival.
+            -> empty
+            === empty
+            -> END
+            """);
+
+        var history = new StoryHistory(story, 42);
+
+        Assert.True(history.Current.IsEnded);
+        Assert.Equal(["a", "empty"],
+            history.Transcript.Select(frame => frame.Frame.Scene?.Value));
+        Assert.Equal(["Arrival.", ""], history.Transcript.Select(frame => frame.Frame.Document.ToPlainText()));
+        Assert.Equal(["continue"], history.Events.OfType<ChoiceMade>().Select(choice => choice.ChoiceKey));
+        Assert.True(history.Transcript[0].ChosenAutomatically);
+        Assert.False(history.Transcript[1].ChosenAutomatically);
+        Assert.True(history.Transcript[^1].Frame.IsEnded);
+        Assert.True(history.Current.IsEnded);
+    }
+
+    [Fact]
+    public void Check_outcome_continuations_remain_player_visible_and_back_forward_skip_only_automatic_actions()
+    {
+        var story = Compile(yaml: BuildManifest(declareVariables: true).Build(), tale: """
+            === a
+            ::: skill-check athletics dc 1
+            success: -> b
+            failure: -> b
+            :::
+            === b
+            ::: skill-check athletics dc 1
+            success: -> c
+            failure: -> c
+            :::
+            === c
+            * [Finish] -> END
+            """);
+        var history = new StoryHistory(story, 42);
+
+        Assert.Equal("a", history.Current.Scene!.Value.Value);
+        Assert.Equal("Continue", Assert.Single(history.Current.Choices).Text);
+        Assert.False(history.Transcript[0].Frame.AutomaticallyContinue);
+
+        history.Choose(StorySession.ContinueKey);
+        Assert.Equal("b", history.Current.Scene!.Value.Value);
+        Assert.Equal("Continue", Assert.Single(history.Current.Choices).Text);
+        Assert.False(history.Transcript[^1].Frame.AutomaticallyContinue);
+
+        history.Choose(StorySession.ContinueKey);
+        Assert.Equal("c", history.Current.Scene!.Value.Value);
+        Assert.Equal(["a", "b", "c"], history.Transcript.Select(frame => frame.Frame.Scene!.Value.Value));
+        Assert.All(history.Transcript.Take(2), frame => Assert.False(frame.ChosenAutomatically));
+
+        history.Back();
+        Assert.Equal("b", history.Current.Scene!.Value.Value);
+        history.Forward();
+        Assert.Equal("c", history.Current.Scene!.Value.Value);
+    }
+
+    [Fact]
+    public void Explicit_textless_choices_remain_interactive()
+    {
+        var story = Compile(yaml: BuildManifest(declareVariables: true).Build(), tale: """
+            === a
+            * -> b
+            * -> END
+            === b
+            * [Finish] -> END
+            """);
+        var history = new StoryHistory(story, 42);
+
+        Assert.Equal(["Continue", "Continue"], history.Current.Choices.Select(choice => choice.Text));
+        Assert.Single(history.Transcript);
+        history.Choose("c0");
+        Assert.Equal("b", history.Current.Scene!.Value.Value);
+        Assert.False(history.Transcript[0].ChosenAutomatically);
+        Assert.Equal("Continue", RenderedInline.ToPlainText(history.Transcript[0].Chosen!));
+    }
+
+    [Fact]
+    public void Automatic_transition_budget_accepts_exactly_one_thousand_transitions()
+    {
+        var story = Compile(yaml: BuildManifest(declareVariables: true).Build(),
+            tale: BareDivertChain(StoryHistory.MaxAutomaticTransitions));
+
+        var history = new StoryHistory(story, 42);
+
+        Assert.Null(history.AutomaticContinuationError);
+        Assert.Equal("scene-1000", history.Current.Scene!.Value.Value);
+        Assert.Equal(StoryHistory.MaxAutomaticTransitions, history.Cursor);
+        Assert.Equal(StoryHistory.MaxAutomaticTransitions + 1, history.Transcript.Count);
+        Assert.Equal(StoryHistory.MaxAutomaticTransitions,
+            history.Events.OfType<ChoiceMade>().Count(choice => choice.ChoiceKey == StorySession.ContinueKey));
+        Assert.Equal("Finish", Assert.Single(history.Current.Choices).Text);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    public void Automatic_transition_budget_stops_self_and_multi_scene_runaway_chains(int cycleLength)
+    {
+        var tale = cycleLength == 1
+            ? "=== a\n-> a"
+            : "=== a\n-> b\n=== b\n-> a";
+        var history = new StoryHistory(
+            Compile(yaml: BuildManifest(declareVariables: true).Build(), tale: tale), 42);
+
+        Assert.NotNull(history.AutomaticContinuationError);
+        Assert.Contains("1,000 automatic scene transitions", history.AutomaticContinuationError);
+        Assert.Equal(StoryHistory.MaxAutomaticTransitions, history.Cursor);
+        Assert.False(history.Current.IsEnded);
+        Assert.Empty(history.Current.Choices);
+        Assert.Equal(StoryHistory.MaxAutomaticTransitions + 1,
+            history.Events.OfType<SceneEntered>().Count());
+        Assert.Equal(StoryHistory.MaxAutomaticTransitions,
+            history.Events.OfType<ChoiceMade>().Count(choice => choice.ChoiceKey == StorySession.ContinueKey));
+    }
+
+    [Fact]
+    public void Automatic_transition_budget_resets_after_each_player_action()
+    {
+        var story = Compile(yaml: BuildManifest(declareVariables: true).Build(),
+            tale: BareDivertChain(600, secondTransitions: 600, finishChoice: "Again"));
+        var history = new StoryHistory(story, 42);
+
+        Assert.Null(history.AutomaticContinuationError);
+        Assert.Equal("scene-600", history.Current.Scene!.Value.Value);
+        Assert.Equal(600, history.Cursor);
+
+        history.Choose("c0");
+
+        Assert.Null(history.AutomaticContinuationError);
+        Assert.Equal("scene-1201", history.Current.Scene!.Value.Value);
+        Assert.Equal(1_201, history.Cursor);
+        Assert.Equal(1_202, history.Transcript.Count);
+    }
+
+    [Fact]
+    public void State_changing_scene_revisits_can_exit_an_automatic_chain_within_budget()
+    {
+        var story = Compile(yaml: BuildManifest(declareVariables: true).Build(), tale: """
+            === a
+            ~ var:visits += 1
+            {if var:visits < 3}
+            -> a
+            {/if}
+            * [Finish] -> END
+            """);
+
+        var history = new StoryHistory(story, 42);
+
+        Assert.Null(history.AutomaticContinuationError);
+        Assert.Equal("a", history.Current.Scene!.Value.Value);
+        Assert.Equal(3, history.State.GetVariable(new VarId("visits")));
+        Assert.Equal(2, history.Cursor);
+        Assert.Equal(["a", "a", "a"], history.Transcript.Select(frame => frame.Frame.Scene!.Value.Value));
+    }
+
+    [Fact]
+    public void Old_saves_at_automatic_pauses_advance_under_the_new_bare_divert_rule()
+    {
+        var story = Compile(yaml: BuildManifest(declareVariables: true).Build(), tale: """
+            === a
+            -> middle
+            === middle
+            -> final
+            === final
+            * [Finish] -> END
+            """);
+        var session = new StorySession(story, 42);
+        var initialState = ReplayEvidence.InitialState(story, session.State);
+        session.Start();
+        var evidence = ReplayEvidence.Start(story, session, null, initialState);
+        var oldSave = SaveFormat.Write(new SavedGame
+        {
+            StoryId = story.Id,
+            StoryVersion = story.Version,
+            ContentFingerprint = story.ContentFingerprint
+                ?? throw new InvalidOperationException("The compiled story must have a content fingerprint."),
+            Seed = session.Seed,
+            Choices = [],
+            Cursor = 0,
+            ReplayEvidence = ReplayEvidence.Encode(evidence, 0),
+            ReplayChoiceIdentities = [],
+        });
+
+        var restored = StoryHistory.Restore(story, oldSave);
+
+        Assert.Equal("final", restored.Current.Scene!.Value.Value);
+        Assert.Equal(["a", "middle", "final"],
+            restored.Transcript.Select(frame => frame.Frame.Scene!.Value.Value));
+        Assert.Equal(2, restored.Cursor);
+        Assert.False(restored.CanBack);
     }
 
     [Fact]
@@ -357,7 +626,10 @@ public class StoryHistoryTests
             === middle
             * [Continue] -> target
             === target
-            -> finish
+            ::: skill-check athletics dc 1
+            success: -> finish
+            failure: -> finish
+            :::
             === finish
             -> END
             """);
@@ -390,7 +662,10 @@ public class StoryHistoryTests
             @hub room
             === b
             @tags room
-            -> c
+            ::: skill-check athletics dc 1
+            success: -> c
+            failure: -> c
+            :::
             === c
             -> END
             """);
@@ -439,13 +714,19 @@ public class StoryHistoryTests
             @hub room
             === b
             @tags room
-            -> c
+            ::: skill-check athletics dc 1
+            success: -> c
+            failure: -> c
+            :::
             === c
             -> END
             """);
         var second = Compile(yaml: yaml, tale: """
             === a
-            -> extra
+            ::: skill-check athletics dc 1
+            success: -> extra
+            failure: -> extra
+            :::
             === extra
             @tags room
             -> END

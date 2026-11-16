@@ -54,6 +54,8 @@ public sealed record StoryFrame(
     IReadOnlyList<ChoiceView> Choices,
     bool IsEnded)
 {
+    internal bool AutomaticallyContinue { get; init; }
+
     /// <summary>Whether this scene joins the preceding passage on screen.</summary>
     public bool ContinuesPrevious { get; init; }
 

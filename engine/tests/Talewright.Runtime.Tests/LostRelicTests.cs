@@ -46,8 +46,23 @@ public partial class LostRelicTests
         return new StoryHistory(story, seed, story.Creation!.Default(story.World.Characters[EntityId.Player], preset));
     }
 
-    private static void Choose(StoryHistory history, string label) =>
-        history.Choose(Assert.Single(history.Current.Choices, c => c.Text == label).Key);
+    private static void Choose(StoryHistory history, string label)
+    {
+        var choice = history.Current.Choices.SingleOrDefault(candidate => candidate.Text == label);
+        if (choice is null && label == "Continue")
+        {
+            var previous = history.Transcript.Count > 1 ? history.Transcript[^2] : null;
+            var previousChoiceWasContinue = previous?.Chosen is { } chosen
+                && RenderedInline.ToPlainText(chosen) == "Continue";
+            if (previous?.ChosenAutomatically == true || previousChoiceWasContinue)
+                return;
+        }
+
+        history.Choose(choice?.Key ?? throw new InvalidOperationException($"Choice '{label}' is unavailable."));
+    }
+
+    private static string PresentedText(StoryHistory history) =>
+        string.Join("\n", history.Transcript.Select(frame => frame.Frame.Document.ToPlainText()));
 
     private static void BuySupplies(StoryHistory history)
     {
@@ -94,29 +109,29 @@ public partial class LostRelicTests
             var selection = story.Creation.Default(story.World.Characters[EntityId.Player]) with { Pronouns = pronouns };
             var history = new StoryHistory(story, 42, selection);
             var expected = $"{pronouns} {(pronouns == "they" ? "have" : "has")} to admit";
-            Assert.Contains(expected, history.Current.Document.ToPlainText());
-            Assert.DoesNotContain("they has", history.Current.Document.ToPlainText());
+            Assert.Contains(expected, PresentedText(history));
+            Assert.DoesNotContain("they has", PresentedText(history));
             var restored = StoryHistory.Restore(story, history.Save());
-            Assert.Equal(history.Current.Document.ToPlainText(), restored.Current.Document.ToPlainText());
-            Choose(history, "Continue");
-            history.Back();
-            Assert.Contains(expected, history.Current.Document.ToPlainText());
-            history.Forward();
+            Assert.Equal(PresentedText(history), PresentedText(restored));
             Choose(history, "Sign the expedition register");
+            history.Back();
+            Assert.Contains(expected, PresentedText(history));
+            history.Forward();
+            Assert.Equal("camp.hub", history.Current.Scene!.Value.Value);
             var forms = pronouns switch
             {
                 "she" => new[] { "She", "her", "hers", "herself" },
                 "he" => new[] { "He", "his", "his", "himself" },
                 _ => new[] { "They", "their", "theirs", "themselves" },
             };
-            var text = history.Current.Document.ToPlainText();
+            var text = PresentedText(history);
             Assert.Contains($"{forms[0]} signed\n{forms[1]} own name; this copy is {forms[2]}.", text);
             Assert.Contains($"check it {forms[3]}", text);
             Assert.Contains("MARA BURNS", text);
             Assert.Contains("An obsidian idol", text);
             Assert.Contains("this obsidian idol belongs to the guild", text);
             Assert.Contains("{expedition copy}", text);
-            Assert.Equal(text, StoryHistory.Restore(story, history.Save()).Current.Document.ToPlainText());
+            Assert.Equal(text, PresentedText(StoryHistory.Restore(story, history.Save())));
         }
     }
 
@@ -210,7 +225,7 @@ public partial class LostRelicTests
         Choose(history, "Share supper by the fire");
         Assert.Equal(1, history.State.GetItemCount(EntityId.Player, new("ration")));
         Assert.False(history.State.GetFlag(new("packing-open")));
-        Assert.Contains("one ration left", history.Current.Document.ToPlainText());
+        Assert.Contains("one ration left", PresentedText(history));
         Choose(history, "Continue");
         Assert.Equal(["Stand your ground", "Press on at dawn"], history.Current.Choices.Select(c => c.Text));
         var xp = history.State.GetBaseStat(EntityId.Player, new("xp"));
@@ -227,7 +242,8 @@ public partial class LostRelicTests
         Assert.Equal(["Follow the signal", "Press on at dawn"], history.Current.Choices.Select(c => c.Text));
         Choose(history, "Follow the signal");
         Choose(history, "Continue");
-        Assert.Equal("trail.wait", history.Current.Scene!.Value.Value);
+        Assert.Contains(history.Transcript, frame => frame.Frame.Scene == new SceneId("trail.wait"));
+        Assert.Equal("trail.night", history.Current.Scene!.Value.Value);
         Choose(history, "Continue");
         Choose(history, "Check the tripwire bell");
         Choose(history, "Ring the bell");
@@ -269,7 +285,9 @@ public partial class LostRelicTests
         Choose(history, "Catch your breath");
         Choose(history, "Follow the signal");
         Choose(history, "Continue");
-        Assert.Equal(destination, history.Current.Scene!.Value.Value);
+        Assert.Contains(history.Transcript,
+            frame => frame.Frame.Scene == new SceneId(destination));
+        Assert.Equal("trail.night", history.Current.Scene!.Value.Value);
         Assert.Equal(history.Events, StoryHistory.Restore(history.Story, history.Save()).Events);
     }
 
@@ -300,7 +318,8 @@ public partial class LostRelicTests
         Choose(history, "Continue");
         Choose(history, "Study your journal");
         Choose(history, "Puzzle out the glyphs");
-        Assert.Equal("camp.journal-solved", history.Current.Scene!.Value.Value);
+        Assert.Contains(history.Transcript, frame => frame.Frame.Scene == new SceneId("camp.journal-solved"));
+        Assert.Equal("camp.hub", history.Current.Scene!.Value.Value);
         Assert.Equal(initial + 2, history.State.GetBaseStat(EntityId.Player, new("lucidity")));
         Choose(history, "Continue");
         Assert.DoesNotContain(history.Current.Choices, choice => choice.Text == "Study your journal");
@@ -434,7 +453,8 @@ public partial class LostRelicTests
         Assert.Single(history.Current.Menu, entry => entry.Text == label);
 
     private static RenderedSpeech Speech(StoryHistory history) =>
-        history.Current.Document.Blocks.OfType<RenderedSpeech>().First();
+        history.Transcript.Where(frame => frame.Frame.Scene == new SceneId("camp.guide"))
+            .SelectMany(frame => frame.Frame.Document.Blocks).OfType<RenderedSpeech>().First();
 
     [Fact]
     public void Manifest_starts_the_guide_doubtful_until_the_labelled_offer_changes_his_mind()
@@ -444,12 +464,13 @@ public partial class LostRelicTests
         Assert.False(history.State.GetFlag(new("packing-open")));
         Assert.DoesNotContain(history.Events, @event => @event is FlagChanged);
         Choose(history, "Continue");
-        Assert.Contains("hasn't said what he thinks of your chances", history.Current.Document.ToPlainText());
+        Assert.Contains("hasn't said what he thinks of your chances", PresentedText(history));
         var offer = Assert.Single(history.Current.Choices, choice => choice.Text == "Ask Tomas about the temple");
         Assert.Contains(new RenderedText("Tomas", TextStyle.Strong), offer.Label);
 
         Choose(history, "Ask Tomas about the temple");
-        Assert.Equal("What the Guild Never Wrote Down", history.Current.Title);
+        Assert.Contains(history.Transcript, frame => frame.Frame.Scene == new SceneId("camp.guide")
+            && frame.Frame.Title == "What the Guild Never Wrote Down");
         var speech = Speech(history);
         Assert.Equal(4, speech.Paragraphs.Count);
         Assert.Equal("The old ones built it to keep something in, not people out.\nThe guild knows that. They never write it down.",
@@ -460,17 +481,17 @@ public partial class LostRelicTests
         Assert.False(history.State.GetFlag(new("guide-doubtful")));
 
         Choose(history, "Continue");
-        Assert.Contains("nods, as if the two of you have already agreed", history.Current.Document.ToPlainText());
+        Assert.Contains("nods, as if the two of you have already agreed", PresentedText(history));
         Choose(history, "Set out for the temple");
         Choose(history, "Let Tomas find a ford");
         if (history.Current.Scene == new SceneId("trail.far-bank"))
             Assert.DoesNotContain("didn't think you'd get this far", history.Current.Document.ToPlainText());
         history.Back();
         history.Back();
-        history.Back();
         Assert.False(history.State.GetFlag(new("guide-doubtful")));
         Assert.Equal(speech.ToPlainText(), Speech(history).ToPlainText());
-        Assert.Equal(history.Current.Document.ToPlainText(), StoryHistory.Restore(history.Story, history.Save()).Current.Document.ToPlainText());
+        Assert.Equal(PresentedText(history),
+            PresentedText(StoryHistory.Restore(history.Story, history.Save())));
         history.Back();
         Assert.True(history.State.GetFlag(new("guide-doubtful")));
         Assert.True(StoryHistory.Restore(history.Story, history.Save()).State.GetFlag(new("guide-doubtful")));
@@ -541,7 +562,7 @@ public partial class LostRelicTests
         Choose(history, "Continue");
         Choose(history, "Continue");
         Choose(history, "Check the tripwire bell");
-        Assert.Contains("The watch bell has sounded 0 times.", history.Current.Document.ToPlainText());
+        Assert.Contains("The watch bell has sounded 0 times.", PresentedText(history));
         Assert.Equal(["Ring the bell", "Silence the bell — it is already still", "Return to the fire"],
             history.Current.Menu.Select(entry => entry.Text));
         Assert.Equal([true, false, true], history.Current.Menu.Select(entry => entry.IsAvailable));
@@ -555,7 +576,7 @@ public partial class LostRelicTests
         Assert.Equal(0, history.State.GetVariable(new VarId("bell-count")));
 
         Choose(history, "Ring the bell");
-        Assert.Contains("The watch bell has sounded 1 time.", history.Current.Document.ToPlainText());
+        Assert.Contains("The watch bell has sounded 1 time.", PresentedText(history));
         Assert.Equal(["Ring the bell", "Silence the bell", "Return to the fire"],
             history.Current.Menu.Select(entry => entry.Text));
         Assert.Equal([false, true, true], history.Current.Menu.Select(entry => entry.IsAvailable));
@@ -563,7 +584,7 @@ public partial class LostRelicTests
         Assert.Equal(history.Current.Menu.Select(entry => (entry.Text, entry.IsAvailable)),
             restored.Current.Menu.Select(entry => (entry.Text, entry.IsAvailable)));
         Choose(history, "Silence the bell");
-        Assert.Contains("The watch bell has sounded 1 time.", history.Current.Document.ToPlainText());
+        Assert.Contains("The watch bell has sounded 1 time.", PresentedText(history));
         Assert.False(MenuEntry(history, "Silence the bell — it is already still").IsAvailable);
         history.Back();
         Assert.True(MenuEntry(history, "Silence the bell").IsAvailable);

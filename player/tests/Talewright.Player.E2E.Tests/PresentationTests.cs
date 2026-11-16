@@ -45,35 +45,79 @@ public sealed class PresentationTests(WebHostFixture host, ITestOutputHelper out
     {
         await Page.EmulateMediaAsync(new() { ReducedMotion = reduced ? ReducedMotion.Reduce : ReducedMotion.NoPreference });
         await Upload(TestStories.Long);
-        await Expect(Latest).ToBeFocusedAsync();
+        await Expect(RevealedPassage).ToBeFocusedAsync();
         await Choose("Next passage");
         await Expect(Latest).ToContainTextAsync("The new passage is visible.");
-        await Expect(Latest).ToBeFocusedAsync();
+        await Expect(RevealedPassage).ToBeFocusedAsync();
         await Expect(Latest).ToBeInViewportAsync();
         await Page.WaitForFunctionAsync("() => { const r = document.querySelector('.tw-latest').getBoundingClientRect(); return r.top >= 0 && r.bottom <= innerHeight; }");
         await Library();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Back to Player Test Continue where you left off" }).ClickAsync();
-        await Expect(Latest).ToBeFocusedAsync();
+        await Expect(RevealedPassage).ToBeFocusedAsync();
         await Expect(Latest).ToBeInViewportAsync();
         await Restart();
         await Expect(Latest).ToContainTextAsync("Long beginning");
-        await Expect(Latest).ToBeFocusedAsync();
+        await Expect(RevealedPassage).ToBeFocusedAsync();
         await Page.WaitForFunctionAsync("() => scrollY < 2");
+    }
+
+    [Fact]
+    public async Task Automatic_scene_diverts_reveal_the_first_new_passage_without_continue_annotations()
+    {
+        var id = $"automatic-diverts-{Guid.NewGuid():N}";
+        var longPassage = string.Join('\n', Enumerable.Repeat(
+            "The path winds through the forest, past trees older than the road.", 16));
+        await Upload(new StoryFixture(id, TestStories.DefaultManifest(id).Build(), $"""
+            === start
+            {longPassage}
+            * [Follow the trail] -> first
+            === first
+            The first newly presented passage.
+            {longPassage}
+            -> second
+            === second
+            The next passage follows automatically.
+            {longPassage}
+            -> final
+            === final
+            The final passage waits for the reader.
+            * [Finish] -> END
+            """));
+
+        await Choose("Follow the trail");
+
+        var firstNewPassage = Page.Locator(".tw-passage-anchor[data-tw-passage-index='1']");
+        await Expect(firstNewPassage).ToHaveAttributeAsync("role", "group");
+        await Expect(firstNewPassage).ToHaveAttributeAsync("aria-label", "New story passage");
+        await Expect(firstNewPassage).ToContainTextAsync("The first newly presented passage.");
+        await Expect(firstNewPassage).ToBeFocusedAsync();
+        await Expect(Latest).ToContainTextAsync("The final passage waits for the reader.");
+        await Expect(Page.Locator(".tw-chosen")).ToHaveCountAsync(1);
+        await Expect(Page.Locator(".tw-chosen").First).ToContainTextAsync("Follow the trail");
+        await Page.WaitForFunctionAsync("""
+            () => {
+                const passage = document.querySelector('.tw-passage-anchor[data-tw-passage-index="1"]');
+                const toolbar = document.querySelector('.tw-bar');
+                return passage && toolbar
+                    && Math.abs(passage.getBoundingClientRect().top - toolbar.getBoundingClientRect().bottom) <= 2;
+            }
+            """);
     }
 
     [Fact]
     public async Task Keyboard_activates_choices_and_navigation_with_semantic_focus()
     {
         await Upload(TestStories.Linear);
-        await Expect(Latest).ToBeFocusedAsync();
+        await Expect(RevealedPassage).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Tab");
         await Expect(Choices.First).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Enter");
         await Expect(Latest).ToContainTextAsync("Second passage text.");
-        await Expect(Latest).ToBeFocusedAsync();
+        await Expect(RevealedPassage).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Tab");
         await Page.Keyboard.PressAsync("Space");
         await Expect(Latest).ToContainTextAsync("Finished safely.");
+        await Expect(RevealedPassage).ToBeFocusedAsync();
         await Expect(Page.GetByRole(AriaRole.Main, new() { Name = "Story transcript" })).ToHaveAttributeAsync("aria-live", "polite");
         await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Play again" })).ToBeVisibleAsync();
     }
@@ -134,7 +178,7 @@ public sealed class PresentationTests(WebHostFixture host, ITestOutputHelper out
         await Expect(Choices.Nth(1)).ToContainTextAsync("2.");
 
         await Expect(Latest).ToContainTextAsync("The first passage remains here.");
-        await Expect(Latest).ToBeFocusedAsync();
+        await Expect(RevealedPassage).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("Tab");
         await Expect(Choices.Nth(1)).ToBeFocusedAsync();
         await Page.Keyboard.PressAsync("1");
@@ -144,6 +188,7 @@ public sealed class PresentationTests(WebHostFixture host, ITestOutputHelper out
         await Expect(Choices.Nth(0)).ToContainTextAsync("(Unavailable)");
         await Page.Keyboard.PressAsync("Enter");
         await Expect(Latest).ToContainTextAsync("No available actions.");
+        await Expect(RevealedPassage).ToBeFocusedAsync();
         await Expect(Choices).ToHaveCountAsync(1);
         await Expect(Choices.First).ToBeDisabledAsync();
         await Expect(Choices.First).ToContainTextAsync("Still locked");

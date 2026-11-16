@@ -63,7 +63,8 @@ The mechanism defeats you.
   target on **each** outcome. Do not add a trailing shared target or fall through after choices.
 - A `::: skill-check ...` block runs at that line, ends with `:::`, and needs both outcomes.
   Each outcome can apply effects. Without a divert it continues at the following scene step;
-  with a divert it leaves immediately. Put these blocks before the first choice.
+  with a divert it leaves immediately and pauses for **Continue** before any next scene. Put
+  these blocks before the first choice.
 - Built-in `none` and `rpg` checks use d20 plus modifiers. Non-attribute custom stats add their
   value; `category: attribute` instead adds `floor((score - 10) / 2)`. Do not mark an ordinary
   additive skill as an attribute. `randomness: off` supplies the ruleset's no-dice result;

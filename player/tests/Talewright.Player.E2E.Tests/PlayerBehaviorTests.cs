@@ -390,7 +390,9 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
         await Expect(Sheet).ToBeVisibleAsync();
         await Expect(Page.Locator(".tw-columns")).ToHaveCSSAsync("display", "grid");
         await Choices.First.ClickAsync();
-        await Expect(Page.Locator(".tw-past")).ToHaveCountAsync(1);
+        await Expect(Page.Locator(".tw-past")).ToHaveCountAsync(2);
+        await Expect(Page.Locator(".tw-past").Nth(0)).ToContainTextAsync("The boat leaves");
+        await Expect(Page.Locator(".tw-past").Nth(1)).ToContainTextAsync("The camp hums with insects.");
     }
 
     [Fact]
@@ -462,7 +464,7 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
         await Restart();
         await Expect(Latest.Locator(".tw-scene-title")).ToHaveTextAsync("First passage");
         await Expect(Page.Locator(".tw-chosen")).ToHaveCountAsync(0);
-        await Expect(Latest).ToBeFocusedAsync();
+        await Expect(RevealedPassage).ToBeFocusedAsync();
     }
 
     [Fact]

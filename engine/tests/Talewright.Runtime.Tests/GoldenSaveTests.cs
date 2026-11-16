@@ -160,6 +160,12 @@ public class GoldenSaveTests
         var history = new StoryHistory(story, quickSave.Seed, quickSave.Character);
         foreach (var choice in quickSave.Choices)
         {
+            if (choice == StorySession.ContinueKey
+                && history.Current.Choices.All(candidate => candidate.Key != StorySession.ContinueKey))
+            {
+                Assert.True(history.Transcript.Count > 1 && history.Transcript[^2].ChosenAutomatically);
+                continue;
+            }
             history.Choose(choice);
         }
 

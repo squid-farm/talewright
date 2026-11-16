@@ -156,7 +156,8 @@ public sealed class BrowserPlayerDriver(IPage page) : IPlayerDriver
                 Ended: active && Array.from(transcript.querySelectorAll('button'))
                     .some(button => button.textContent.trim() === 'Play again' && displayed(button)),
                 PassageVisible: active && passage !== null,
-                PassageFocused: active && passage !== null && passage === document.activeElement,
+                PassageFocused: active && passage !== null &&
+                    (passage === document.activeElement || passage.contains(document.activeElement)),
                 PassageInWindow: passageBounds != null && passageBounds.top >= 0 &&
                     passageBounds.bottom <= innerHeight,
                 SheetStacked: sheetBounds != null && transcriptBounds != null &&
