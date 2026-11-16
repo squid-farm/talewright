@@ -89,11 +89,13 @@ public sealed partial class ServerTests
     }
 
     [Theory]
-    [InlineData("::: skill-check guide | dc 10", "::: skill-check guide hp dc 10")]
-    [InlineData("::: skill-check guide  | dc 10", "::: skill-check guide  hp dc 10")]
-    [InlineData("::: skill-check guide h|p dc 10", "::: skill-check guide hp dc 10")]
+    [InlineData("::: skill-check guide | dc 10", "::: skill-check guide hp dc 10", "hp")]
+    [InlineData("::: skill-check guide |dc 10", "::: skill-check guide hp dc 10", "hp ")]
+    [InlineData("::: skill-check guide  | dc 10", "::: skill-check guide  hp dc 10", "hp")]
+    [InlineData("::: skill-check guide  |dc 10", "::: skill-check guide  hp dc 10", "hp ")]
+    [InlineData("::: skill-check guide h|p dc 10", "::: skill-check guide hp dc 10", "hp")]
     public async Task Explicit_actor_stat_completion_preserves_difficulty_and_replacement_range(
-        string line, string expected)
+        string line, string expected, string expectedNewText)
     {
         await using var client = new Client();
         File.WriteAllText(client.PathOf(StorySource.ManifestFileName), """
@@ -115,7 +117,7 @@ public sealed partial class ServerTests
         Assert.DoesNotContain(items, HasLabel("guide"));
         Assert.DoesNotContain(items, HasLabel("player"));
         var edit = item.GetProperty("textEdit");
-        Assert.Equal("hp", edit.GetProperty("newText").GetString());
+        Assert.Equal(expectedNewText, edit.GetProperty("newText").GetString());
         var range = edit.GetProperty("range");
         var start = range.GetProperty("start");
         var end = range.GetProperty("end");

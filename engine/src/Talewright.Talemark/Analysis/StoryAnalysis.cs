@@ -452,6 +452,9 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal void Reference(string text, SourceLocation location, AuthoringSymbolKind kind, params string[] keywords)
         => ReferenceCore(text, location, kind, keywords);
 
+    internal void ReferenceWithSuffix(string text, SourceLocation location, AuthoringSymbolKind kind, string suffix)
+        => ReferenceCore(text, location, kind, [], completionSuffix: suffix);
+
     internal void Speaker(string text, SourceLocation location)
     {
         var range = Range(location, text);
@@ -671,11 +674,10 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         AddSite(new("", new(location, location), [], keywords, [location], KeywordDetails: details));
 
     private void ReferenceCore(string text, SourceLocation location, AuthoringSymbolKind kind,
-        IReadOnlyList<string> keywords, IReadOnlyList<AuthoringSymbol>? candidates = null)
+        IReadOnlyList<string> keywords, IReadOnlyList<AuthoringSymbol>? candidates = null,
+        string? completionSuffix = null)
     {
-        var range = Range(location, text);
-        AddSite(new(text, range, [kind], keywords,
-            Enumerable.Range(0, text.Length + 1).Select(location.Offset).ToArray(), Candidates: candidates));
+        AddReferenceSite(location);
         if (text.Length == 0 && source.Files.TryGetValue(location.File, out var content))
         {
             if (!_lines.TryGetValue(location.File, out var lines))
@@ -684,8 +686,27 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             for (var column = location.Column; column <= line.Length && char.IsWhiteSpace(line[column - 1]); column++)
             {
                 var point = location with { Column = column + 1 };
-                AddSite(new("", new(point, point), [kind], keywords, [point], Candidates: candidates));
+                AddReferenceSite(point);
             }
+        }
+
+        void AddReferenceSite(SourceLocation siteLocation)
+        {
+            var siteRange = Range(siteLocation, text);
+            var site = new CompletionSite(text, siteRange, [kind], keywords,
+                Enumerable.Range(0, text.Length + 1).Select(siteLocation.Offset).ToArray(),
+                Candidates: candidates);
+            if (completionSuffix is not null && text.Length == 0 &&
+                source.Files.TryGetValue(siteLocation.File, out var siteContent))
+            {
+                if (!_lines.TryGetValue(siteLocation.File, out var siteLines))
+                    _lines.Add(siteLocation.File, siteLines = siteContent.ReplaceLineEndings("\n").Split('\n'));
+                var line = siteLines[siteLocation.Line - 1];
+                var next = siteLocation.Column - 1;
+                if (next < line.Length && !char.IsWhiteSpace(line[next]))
+                    site = site with { CompletionSuffix = completionSuffix };
+            }
+            AddSite(site);
         }
     }
 

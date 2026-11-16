@@ -103,7 +103,9 @@ public sealed class StoryCompletionTests
 
     [Theory]
     [InlineData("::: skill-check guide | dc 10", "::: skill-check guide hp dc 10")]
+    [InlineData("::: skill-check guide |dc 10", "::: skill-check guide hp dc 10")]
     [InlineData("::: skill-check guide  | dc 10", "::: skill-check guide  hp dc 10")]
+    [InlineData("::: skill-check guide  |dc 10", "::: skill-check guide  hp dc 10")]
     [InlineData("::: skill-check guide h|p dc 10", "::: skill-check guide hp dc 10")]
     public void Explicit_actor_stat_completion_preserves_difficulty_and_whitespace(string marked, string expected)
     {

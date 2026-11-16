@@ -905,7 +905,12 @@ internal sealed partial class TaleBinder
                 var end = wordClauses[0].ValueStart + wordClauses[0].ValueLength;
                 if (end < _lineLength && char.IsWhiteSpace(_text[_lineStart + end]) &&
                     _symbols.World.Characters.ContainsKey(new EntityId(words[0])))
-                    analysis.Reference("", At(end + 1), AuthoringSymbolKind.Stat);
+                {
+                    if (spec.DifficultyWord == 1)
+                        analysis.ReferenceWithSuffix("", At(end + 1), AuthoringSymbolKind.Stat, " ");
+                    else
+                        analysis.Reference("", At(end + 1), AuthoringSymbolKind.Stat);
+                }
             }
 
             if (difficultyClause is { } difficulty)
