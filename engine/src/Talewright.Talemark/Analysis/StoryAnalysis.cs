@@ -452,6 +452,66 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal void Reference(string text, SourceLocation location, AuthoringSymbolKind kind, params string[] keywords)
         => ReferenceCore(text, location, kind, keywords);
 
+    internal void Speaker(string text, SourceLocation location)
+    {
+        var range = Range(location, text);
+        var replacementRange = range;
+        var prefix = string.Empty;
+        var suffix = $"{ExpressionVocabulary.Separator} ";
+        if (source.Files.TryGetValue(location.File, out var content))
+        {
+            if (!_lines.TryGetValue(location.File, out var lines))
+                _lines.Add(location.File, lines = content.ReplaceLineEndings("\n").Split('\n'));
+            var line = lines[location.Line - 1];
+            var start = location.Column - 1;
+            if (start > 0 && line[start - 1] == SceneVocabulary.SpeechMarker)
+                prefix = " ";
+
+            var separator = start + text.Length;
+            while (separator < line.Length && char.IsWhiteSpace(line[separator]))
+                separator++;
+            if (text.Length == 0 && separator == line.Length)
+            {
+                for (var point = start; point <= line.Length; point++)
+                {
+                    var pointLocation = new SourceLocation(location.File, location.Line, point + 1);
+                    var pointRange = new SourceRange(pointLocation, pointLocation);
+                    var pointPrefix = point > 0 && line[point - 1] == SceneVocabulary.SpeechMarker ? " " : string.Empty;
+                    AddSite(new("", pointRange, [AuthoringSymbolKind.Character], [], [pointLocation])
+                    {
+                        ReplacementRange = pointRange,
+                        CompletionPrefix = pointPrefix,
+                        CompletionSuffix = suffix
+                    });
+                }
+                return;
+            }
+            if (separator < line.Length && line[separator] == ExpressionVocabulary.Separator)
+            {
+                var end = separator + 1;
+                while (end < line.Length && char.IsWhiteSpace(line[end]))
+                    end++;
+                suffix = line[(start + text.Length)..end];
+                if (end == separator + 1)
+                    suffix += " ";
+                replacementRange = new(range.Start, new SourceLocation(location.File, location.Line, end + 1));
+            }
+            else if (separator > start + text.Length)
+            {
+                suffix = $"{ExpressionVocabulary.Separator}{line[(start + text.Length)..separator]}";
+                replacementRange = new(range.Start, new SourceLocation(location.File, location.Line, separator + 1));
+            }
+        }
+
+        AddSite(new(text, range, [AuthoringSymbolKind.Character], [],
+            Enumerable.Range(0, text.Length + 1).Select(location.Offset).ToArray())
+        {
+            ReplacementRange = replacementRange,
+            CompletionPrefix = prefix,
+            CompletionSuffix = suffix
+        });
+    }
+
     internal void RequirementSuffix(string text, SourceLocation location, RequirementClauseSyntax? parsed = null)
     {
         var syntax = parsed ?? RequirementClauseSyntax.Parse(text);

@@ -33,7 +33,8 @@ public static class StoryCompletion
                 if (isKeyword && name == SceneVocabulary.If)
                     newText = SceneVocabulary.IfPrefix;
                 if (site.IsImagePath) newText = AuthoringSyntaxVocabulary.EscapeQuotedText(newText);
-                result.Add(new(name, detail, site.Range, newText));
+                newText = string.Concat(site.CompletionPrefix, newText, site.CompletionSuffix);
+                result.Add(new(name, detail, site.ReplacementRange ?? site.Range, newText));
             }
         }
         return result.Distinct().OrderBy(item => item.Label, StringComparer.Ordinal).ToArray();

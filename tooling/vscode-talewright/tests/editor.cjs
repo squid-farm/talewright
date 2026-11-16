@@ -442,6 +442,28 @@ async function testLiveDiagnostics() {
       `Conditional completion must hand off to the existing condition grammar: ${
         JSON.stringify({ text: document.getText(), position: editor.selection.active, items: conditionCompletions.items })}`);
 
+    const speakerStart = new vscode.WorkspaceEdit();
+    speakerStart.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
+      '=== start\n');
+    assert.equal(await vscode.workspace.applyEdit(speakerStart), true);
+    editor.selection = new vscode.Selection(1, 0, 1, 0);
+    await vscode.commands.executeCommand('type', { text: '>' });
+    await vscode.commands.executeCommand('type', { text: ' ' });
+    await vscode.commands.executeCommand('editor.action.triggerSuggest');
+    const speakerCompletions = await vscode.commands.executeCommand(
+      'vscode.executeCompletionItemProvider', document.uri, editor.selection.active);
+    const playerSpeaker = speakerCompletions.items.find(item => item.label === 'player');
+    assert.ok(playerSpeaker, 'A new speech header must offer declared character IDs in the installed editor');
+    assert.equal(playerSpeaker.insertText, 'player: ');
+    assert.equal(playerSpeaker.range.start.character, 2);
+    assert.equal(playerSpeaker.range.end.character, 2);
+    await vscode.commands.executeCommand('type', { text: 'p' });
+    await vscode.commands.executeCommand('acceptSelectedSuggestion');
+    assert.equal(document.getText(), '=== start\n> player: ',
+      'Accepting a speaker completion must preserve the marker spacing and insert the separator');
+    assert.equal(editor.selection.active.line, 1);
+    assert.equal(editor.selection.active.character, 10);
+
     const manifest = await vscode.workspace.openTextDocument(path.join(folder, 'story.talewright.yaml'));
     await vscode.window.showTextDocument(manifest);
     await waitForCompiler(manifest, items => items.some(item => item.code === 'TW4003') || items.length === 0);

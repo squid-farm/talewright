@@ -39,7 +39,6 @@ public sealed partial class ServerTests
 
     [Theory]
     [InlineData("-> sta|", "start")]
-    [InlineData("> pla|", "player")]
     [InlineData("@req|", "requires")]
     [InlineData("@choice-lab|", "choice-label")]
     [InlineData("@requires player:h|", "hp")]
@@ -87,6 +86,59 @@ public sealed partial class ServerTests
         var item = Assert.Single(Items(response), item => item.GetProperty("label").GetString() == expected);
         Assert.Equal(expected, item.GetProperty("textEdit").GetProperty("newText").GetString());
         Assert.Equal(1, item.GetProperty("textEdit").GetProperty("range").GetProperty("start").GetProperty("line").GetInt32());
+    }
+
+    [Theory]
+    [InlineData(">|", "> player: ")]
+    [InlineData(">pl|", "> player: ")]
+    [InlineData("> |", "> player: ")]
+    [InlineData(">   pl|", ">   player: ")]
+    [InlineData("> pla| ", "> player: ")]
+    [InlineData("> pl|ayer: words", "> player: words")]
+    [InlineData("> pl|ayer:", "> player: ")]
+    [InlineData("> pl|ayer:  words", "> player:  words")]
+    public async Task Speaker_completion_edits_create_valid_headers_without_losing_spacing(
+        string line, string expected)
+    {
+        await using var client = new Client();
+        DeclareRpg(client);
+        await client.Initialize();
+        var marked = "=== start\n" + line;
+        await client.Open("start.tale", marked.Replace("|", ""), 1);
+        var item = Assert.Single(Items(await Completion(client, "start.tale", marked)), HasLabel("player"));
+        var edit = item.GetProperty("textEdit");
+        var range = edit.GetProperty("range");
+        var start = range.GetProperty("start").GetProperty("character").GetInt32();
+        var end = range.GetProperty("end").GetProperty("character").GetInt32();
+        var source = line.Replace("|", "");
+
+        Assert.Equal(expected, source[..start] + edit.GetProperty("newText").GetString() + source[end..]);
+    }
+
+    [Theory]
+    [InlineData("=== start\n> player: Hello\n> pla|")]
+    [InlineData("=== start\n> player: Hello\n>\n>|")]
+    public async Task Speaker_completion_is_not_offered_on_open_speech_continuations(string marked)
+    {
+        await using var client = new Client();
+        DeclareRpg(client);
+        await client.Initialize();
+        await client.Open("start.tale", marked.Replace("|", ""), 1);
+
+        Assert.Empty(Items(await Completion(client, "start.tale", marked)));
+    }
+
+    [Fact]
+    public async Task Speaker_completion_returns_after_the_previous_speech_block_ends()
+    {
+        await using var client = new Client();
+        DeclareRpg(client);
+        await client.Initialize();
+        const string marked = "=== start\n> player: Hello\n\n> pla|";
+        await client.Open("start.tale", marked.Replace("|", ""), 1);
+
+        var item = Assert.Single(Items(await Completion(client, "start.tale", marked)), HasLabel("player"));
+        Assert.Equal("player: ", item.GetProperty("textEdit").GetProperty("newText").GetString());
     }
 
     [Theory]
