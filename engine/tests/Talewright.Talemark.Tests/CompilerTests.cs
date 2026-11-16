@@ -973,6 +973,28 @@ public class CompilerTests
         Assert.Equal(-3, Check(attribute, null).Total.Modifier);
     }
 
+    [Fact]
+    public void Documented_agent_brief_example_compiles()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "Talewright.slnx"))) root = root.Parent;
+        Assert.NotNull(root);
+        var brief = File.ReadAllText(Path.Combine(root.FullName, "docs", "guide", "talemark-agent-brief.md"))
+            .Split("## Minimal complete example", StringSplitOptions.None)[1]
+            .Split("\n## ", StringSplitOptions.None)[0];
+        var blocks = System.Text.RegularExpressions.Regex.Matches(brief, @"```(yaml|tale)\r?\n([\s\S]*?)\r?\n```");
+        var yaml = Assert.Single(blocks, block => block.Groups[1].Value == "yaml").Groups[2].Value;
+        var tale = Assert.Single(blocks, block => block.Groups[1].Value == "tale").Groups[2].Value;
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = yaml,
+            ["main.tale"] = tale,
+        }));
+
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        Assert.Empty(result.Diagnostics);
+    }
+
     [Theory]
     [InlineData("ruleset: generic")]
     [InlineData("ruleset: { base: generic }")]

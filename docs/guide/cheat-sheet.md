@@ -1,5 +1,6 @@
 # Author cheat sheet
 
+[Compact brief for AI writing partners](talemark-agent-brief.md) |
 [Full Talemark reference](../reference/talemark-syntax.md) |
 [Error codes](../reference/diagnostics.md) |
 [VS Code extension](../../tooling/vscode-talewright/README.md)
