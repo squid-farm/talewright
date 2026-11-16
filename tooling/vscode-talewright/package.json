@@ -58,7 +58,23 @@
       { "command": "talewright.runStory", "title": "Talewright: Run Story" },
       { "command": "talewright.newStory", "title": "Talewright: New Story" },
       { "command": "talewright.setUpCli", "title": "Talewright: Set Up CLI" },
-      { "command": "talewright.togglePreviewHints", "title": "Talewright: Toggle Substitution Preview Hints" }
+      { "command": "talewright.togglePreviewHints", "title": "Talewright: Toggle Substitution Preview Hints" },
+      { "command": "talewright.toggleBold", "title": "Talewright: Toggle Bold" },
+      { "command": "talewright.toggleItalic", "title": "Talewright: Toggle Italic" }
+    ],
+    "keybindings": [
+      {
+        "command": "talewright.toggleBold",
+        "key": "ctrl+b",
+        "mac": "cmd+b",
+        "when": "editorTextFocus && editorLangId == tale && editorHasSelection && editorReadonly != true"
+      },
+      {
+        "command": "talewright.toggleItalic",
+        "key": "ctrl+i",
+        "mac": "cmd+i",
+        "when": "editorTextFocus && editorLangId == tale && editorHasSelection && editorReadonly != true"
+      }
     ],
     "menus": {
       "editor/context": [
@@ -72,6 +88,14 @@
         {
           "command": "talewright.playFromScene",
           "when": "talewright.inScene"
+        },
+        {
+          "command": "talewright.toggleBold",
+          "when": "editorTextFocus && editorLangId == tale && editorReadonly != true"
+        },
+        {
+          "command": "talewright.toggleItalic",
+          "when": "editorTextFocus && editorLangId == tale && editorReadonly != true"
         }
       ]
     },

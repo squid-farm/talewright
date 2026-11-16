@@ -73,6 +73,7 @@ exports.run = async () => {
     // One command per character exercises the auto-closing path that a single multi-character type skips.
     for (const character of " It's {literal") await vscode.commands.executeCommand('type', { text: character });
     assert.equal(document.getText(), "Hello. It's {literal");
+    await testFormattingCommands(extension, editor, document);
     console.log('Installed VSIX smoke passed: .tale detection, five real snippet expansions and placeholder navigation, prose typing, comment toggle.');
   } finally {
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
@@ -85,6 +86,108 @@ exports.run = async () => {
   assert.equal((await bundledServerProcesses(extension)).length, 1,
     'The installed extension must run exactly its own bundled server executable');
 };
+
+async function testFormattingCommands(extension, editor, document) {
+  await extension.activate();
+  for (const [style, key, mac] of [['Bold', 'ctrl+b', 'cmd+b'], ['Italic', 'ctrl+i', 'cmd+i']]) {
+    const command = `talewright.toggle${style}`;
+    assert.ok(extension.packageJSON.contributes.keybindings.some(binding =>
+      binding.command === command && binding.key === key && binding.mac === mac),
+    `${command} must be contributed by the installed extension`);
+  }
+
+  const replaceText = async text => {
+    assert.equal(await editor.edit(edit => edit.replace(
+      new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)), text)), true);
+  };
+  const select = (start, end) => new vscode.Selection(document.positionAt(start), document.positionAt(end));
+  const selectText = text => {
+    const start = document.getText().indexOf(text);
+    assert.notEqual(start, -1, `Missing text to select: ${text}`);
+    editor.selection = select(start, start + text.length);
+  };
+  const invoke = async (style, selectedText) => {
+    await vscode.commands.executeCommand(`talewright.toggle${style}`);
+    assert.equal(document.getText(editor.selection), selectedText, 'Formatting must preserve the selected text');
+  };
+
+  await replaceText('plain');
+  selectText('plain');
+  await invoke('Bold', 'plain');
+  assert.equal(document.getText(), '**plain**');
+  await vscode.commands.executeCommand('undo');
+  assert.equal(document.getText(), 'plain', 'One undo must revert the formatting edit');
+  await vscode.commands.executeCommand('redo');
+  assert.equal(document.getText(), '**plain**', 'Redo must restore the formatting edit');
+
+  await replaceText('__snake__');
+  selectText('snake');
+  await invoke('Bold', 'snake');
+  assert.equal(document.getText(), 'snake', 'Surrounding alternative bold delimiters must toggle off');
+  await replaceText('__snake__');
+  editor.selection = select(0, document.getText().length);
+  await invoke('Bold', 'snake');
+  assert.equal(document.getText(), 'snake', 'Selected alternative bold delimiters must toggle off');
+
+  await replaceText('_italic_');
+  selectText('italic');
+  await invoke('Italic', 'italic');
+  assert.equal(document.getText(), 'italic');
+  await replaceText('*stars*');
+  editor.selection = select(0, document.getText().length);
+  await invoke('Italic', 'stars');
+  assert.equal(document.getText(), 'stars');
+
+  await replaceText('plain');
+  selectText('plain');
+  await invoke('Bold', 'plain');
+  await invoke('Italic', 'plain');
+  assert.equal(document.getText(), '**_plain_**');
+  selectText('_plain_');
+  await invoke('Bold', '_plain_');
+  assert.equal(document.getText(), '_plain_');
+  selectText('plain');
+  await invoke('Italic', 'plain');
+  assert.equal(document.getText(), 'plain');
+
+  const mixed = '**wrapped** plain __snake__';
+  await replaceText(mixed);
+  editor.selections = [select(2, 9), select(12, 17), select(18, 27)];
+  assert.deepEqual(editor.selections.map(selection => [
+    document.offsetAt(selection.start), document.offsetAt(selection.end),
+  ]), [[2, 9], [12, 17], [18, 27]], 'Editor must retain the requested source selections');
+  await vscode.commands.executeCommand('talewright.toggleBold');
+  assert.deepEqual(editor.selections.map(selection => [
+    document.offsetAt(selection.start), document.offsetAt(selection.end),
+  ]), [[0, 7], [10, 15], [18, 23]], 'Formatting must restore selections around the selected text');
+  assert.equal(document.getText(), 'wrapped **plain** snake');
+  assert.deepEqual(editor.selections.map(selection => document.getText(selection)), ['wrapped', 'plain', 'snake']);
+  await vscode.commands.executeCommand('undo');
+  assert.equal(document.getText(), mixed, 'Mixed multi-selection formatting must be one undoable edit');
+  await vscode.commands.executeCommand('redo');
+  assert.equal(document.getText(), 'wrapped **plain** snake');
+
+  await replaceText('caret');
+  editor.selection = select(2, 2);
+  await vscode.commands.executeCommand('talewright.toggleItalic');
+  assert.equal(document.getText(), 'caret', 'An empty cursor must not insert delimiters');
+
+  const renderer = await openRenderer();
+  try {
+    await replaceText('shortcut');
+    selectText('shortcut');
+    await renderer.dispatchKey('b', 'KeyB', 66, 2);
+    await waitUntil(() => document.getText() === '**shortcut**', 'Ctrl+B must dispatch in the installed Talemark editor');
+    assert.equal(document.getText(editor.selection), 'shortcut');
+    await renderer.dispatchKey('i', 'KeyI', 73, 2);
+    await waitUntil(() => document.getText() === '**_shortcut_**',
+      'Ctrl+I must dispatch in the installed Talemark editor');
+    assert.equal(document.getText(editor.selection), 'shortcut');
+  } finally {
+    renderer.close();
+  }
+  console.log('Installed VSIX formatting smoke passed: bold/italic toggles, alternatives, nesting, multi-selections, selection retention and undo/redo.');
+}
 
 async function testAuthorActions(extension) {
   const root = vscode.workspace.workspaceFolders[0].uri.fsPath;
@@ -551,8 +654,11 @@ async function testLiveDiagnostics() {
     editor.selection = new vscode.Selection(1, actorEnd, 1, actorEnd);
     await vscode.commands.executeCommand('type', { text: ' ' });
     assert.equal(document.lineAt(1).text, '::: skill-check guide ');
-    await new Promise(resolve => setTimeout(resolve, 300));
-    await vscode.commands.executeCommand('acceptSelectedSuggestion');
+    // The suggest widget fills only after the language server replies, so retry until it can be accepted.
+    await waitUntil(async () => {
+      await vscode.commands.executeCommand('acceptSelectedSuggestion');
+      return document.lineAt(1).text !== '::: skill-check guide ';
+    }, 'Typing whitespace after an explicit actor must automatically offer a stat without Ctrl+Space');
     assert.equal(document.lineAt(1).text, '::: skill-check guide acrobatics',
       'Typing whitespace after an explicit actor must automatically offer and accept a stat without Ctrl+Space');
 
@@ -831,26 +937,32 @@ async function openRenderer() {
     socket.addEventListener('error', reject, { once: true });
   });
   let requestId = 0;
+  const send = (method, params) => {
+    const id = ++requestId;
+    return new Promise((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        socket.removeEventListener('message', receive);
+        reject(new Error(`Timed out sending ${method} to the editor renderer`));
+      }, 5000);
+      function receive(event) {
+        const message = JSON.parse(event.data);
+        if (message.id !== id) return;
+        clearTimeout(timeout);
+        socket.removeEventListener('message', receive);
+        if (message.error || message.result?.exceptionDetails) reject(new Error(JSON.stringify(message)));
+        else resolve(message.result?.result?.value);
+      }
+      socket.addEventListener('message', receive);
+      socket.send(JSON.stringify({ id, method, params }));
+    });
+  };
   return {
     close: () => socket.close(),
-    evaluate: expression => {
-      const id = ++requestId;
-      return new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          socket.removeEventListener('message', receive);
-          reject(new Error('Timed out inspecting the editor renderer'));
-        }, 5000);
-        function receive(event) {
-          const message = JSON.parse(event.data);
-          if (message.id !== id) return;
-          clearTimeout(timeout);
-          socket.removeEventListener('message', receive);
-          if (message.error || message.result.exceptionDetails) reject(new Error(JSON.stringify(message)));
-          else resolve(message.result.result.value);
-        }
-        socket.addEventListener('message', receive);
-        socket.send(JSON.stringify({ id, method: 'Runtime.evaluate', params: { returnByValue: true, expression } }));
-      });
+    evaluate: expression => send('Runtime.evaluate', { returnByValue: true, expression }),
+    dispatchKey: async (key, code, keyCode, modifiers) => {
+      const params = { key, code, windowsVirtualKeyCode: keyCode, nativeVirtualKeyCode: keyCode, modifiers };
+      await send('Input.dispatchKeyEvent', { ...params, type: 'keyDown' });
+      await send('Input.dispatchKeyEvent', { ...params, type: 'keyUp' });
     },
   };
 }

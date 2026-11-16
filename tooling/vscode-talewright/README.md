@@ -89,6 +89,12 @@ substitutions, checks, bold and italic text, escapes and image calls. Markdown i
 invalid. Colors describe syntax, not whether your story compiles. An unfinished template or emphasis
 stops at the end of its line, so it doesn't color the rest of the story.
 
+Select text in a writable `.tale` file and press **Ctrl+B** (**Cmd+B** on macOS) to toggle bold, or
+**Ctrl+I** (**Cmd+I** on macOS) to toggle italic. The **Talewright: Toggle Bold** and **Talewright:
+Toggle Italic** commands are also available in the Command Palette. The commands keep the selected
+text selected, support multiple selections, and can be undone together. They insert `**bold**` and
+`_italic_`; the supported `__bold__` and `*italic*` alternatives also toggle off.
+
 Inside `image("`, completion suggests supported files from the story's `images/` folder, including
 subfolders. Paths are case-sensitive. Adding, renaming or deleting images refreshes suggestions and
 diagnostics without reopening the story.

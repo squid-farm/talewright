@@ -73,7 +73,7 @@ choices, choice-only conditions, comments or blank lines.
 
 | Syntax | Use |
 |---|---|
-| `**bold**` / `*italic*` | Prose formatting; `__bold__` and `_italic_` also work. |
+| `**bold**` / `_italic_` | Recommended prose formatting; `__bold__` and `*italic*` also work. |
 | `\{` / `\}` / `\\` | Literal `{`, `}` or `\` in reader text. |
 | `{image("key.png", "A brass key")}` | Image at `images/key.png` with alt text. |
 | `{image("ornament.png")#decorative}` | Decorative image without descriptive alt text. |
@@ -178,13 +178,16 @@ With the Talewright extension installed. Keys can be customized; on macOS, funct
 | Next / previous problem | `F8` / `Shift+F8` | `F8` / `Shift+F8` |
 | Show hover | `Ctrl+K`, `Ctrl+I` | `Cmd+K`, `Cmd+I` |
 | Toggle `//` comment | `Ctrl+/` | `Cmd+/` |
+| Bold selected Talemark text | `Ctrl+B` | `Cmd+B` |
+| Italicize selected Talemark text | `Ctrl+I` | `Cmd+I` |
 | Toggle word wrap | `Alt+Z` | `Option+Z` |
 
 **Snippets:** Use **Insert Snippet** from the Command Palette, then choose `tale-scene`,
 `tale-choice`, `tale-if`, `tale-image`, `tale-choice-check` or `tale-check`. `Tab` moves between
 fields; prefix-plus-`Tab` needs VS Code's optional Tab Completion setting.
 
-**Talewright commands:** type `Talewright` in the Command Palette. They have no shortcuts.
+**Talewright commands:** type `Talewright` in the Command Palette. Bold and italic commands also
+appear when a writable Talemark editor is focused.
 
 | Command | Does |
 |---|---|
