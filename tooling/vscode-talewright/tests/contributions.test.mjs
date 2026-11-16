@@ -36,6 +36,24 @@ test('Play From This Scene has gated menus, a default-enabled code lens, and an 
   assert.ok(!manifest.contributes.taskDefinitions[0].required.includes('scene'));
 });
 
+test('selected Talemark text has discoverable, context-gated formatting shortcuts', async () => {
+  const manifest = await json('package.json');
+  for (const [style, key, mac] of [['Bold', 'ctrl+b', 'cmd+b'], ['Italic', 'ctrl+i', 'cmd+i']]) {
+    const command = `talewright.toggle${style}`;
+    assert.ok(manifest.contributes.commands.some(item =>
+      item.command === command && item.title === `Talewright: Toggle ${style}`));
+    const shortcut = manifest.contributes.keybindings.find(item => item.command === command);
+    assert.equal(shortcut.key, key);
+    assert.equal(shortcut.mac, mac);
+    assert.match(shortcut.when, /editorTextFocus/);
+    assert.match(shortcut.when, /editorLangId == tale/);
+    assert.match(shortcut.when, /editorHasSelection/);
+    assert.match(shortcut.when, /editorReadonly != true/);
+    assert.ok(manifest.contributes.menus.commandPalette.some(item =>
+      item.command === command && /editorLangId == tale/.test(item.when)));
+  }
+});
+
 test('Talemark semantic highlighting is enabled while its TextMate grammar remains available', async () => {
   const manifest = await json('package.json');
   assert.equal(manifest.contributes.configurationDefaults['[tale]']['editor.semanticHighlighting.enabled'], true);

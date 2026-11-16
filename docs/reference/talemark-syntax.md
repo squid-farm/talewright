@@ -532,7 +532,8 @@ letter, digit, space or non-ASCII character stays visible, as in `C:\stories` an
 **Reader text is not Markdown.** Talemark implements its own small
 [reader-text grammar](talemark-operators.md#reader-text-grammar): word-boundary bold and italic,
 inline constructs and ASCII punctuation escapes. Backticks are ordinary text. Italic may use
-`*emphasis*` or `_emphasis_`; bold may use `**strong**` or `__strong__`. Unsupported Markdown-like
+`_emphasis_` (recommended) or `*emphasis*`; bold may use `**strong**` (recommended) or `__strong__`.
+Both alternatives remain supported. Unsupported Markdown-like
 syntax, including links, entities, headings and lists, remains literal text.
 This keeps Markdown-like punctuation from silently consuming your prose or changing its meaning.
 The same rules apply to dialogue, choice labels and image alt text, with or without substitutions.

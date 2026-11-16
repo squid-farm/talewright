@@ -83,6 +83,46 @@ public sealed class ReaderTextGrammarTests
     }
 
     [Fact]
+    public void Recommended_formatting_compiles_and_renders_in_prose_dialogue_and_choice_labels()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = TestStories.DefaultYaml,
+            ["main.tale"] = """
+                === start
+                This is **bold** and _italic_.
+
+                > player: This is **bold** and _italic_.
+
+                * [Choose **bold** and _italic_] -> END
+                """,
+        });
+        var result = StoryCompiler.Compile(source);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+
+        var story = result.Story!;
+        var scene = story.GetScene(new SceneId("start"));
+        var state = GameState.CreateInitial(story.World, 1);
+        var renderer = new TemplateRenderer();
+        var blocks = renderer.Render(CompilerTests.Templates(scene), state).Blocks;
+
+        AssertRenderedStyles(Assert.IsType<RenderedParagraph>(blocks[0]).Inlines);
+        AssertRenderedStyles(Assert.IsType<RenderedSpeech>(blocks[1]).Paragraphs[0]);
+
+        var choiceLabel = Assert.Single(StoryMap.SceneDetails(scene).Choices).Label;
+        Assert.NotNull(choiceLabel);
+        var renderedChoice = Assert.IsType<RenderedParagraph>(
+            Assert.Single(renderer.Render([new ParagraphTemplate(choiceLabel)], state).Blocks));
+        AssertRenderedStyles(renderedChoice.Inlines);
+
+        static void AssertRenderedStyles(IEnumerable<RenderedInline> inlines)
+        {
+            Assert.Contains(inlines, inline => inline is RenderedText { Text: "bold", Style: TextStyle.Strong });
+            Assert.Contains(inlines, inline => inline is RenderedText { Text: "italic", Style: TextStyle.Emphasis });
+        }
+    }
+
+    [Fact]
     public void Emphasis_matches_the_shared_editor_grammar_corpus()
     {
         var fixturePath = Path.Combine(

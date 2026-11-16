@@ -3,11 +3,13 @@ const path = require('node:path');
 const { accessSync, constants, readFileSync } = require('node:fs');
 const { LanguageClient } = require('vscode-languageclient/node');
 const { registerAuthorActions } = require('./author-actions.cjs');
+const { registerFormattingCommands } = require('./formatting.cjs');
 const { registerRefactorSaves } = require('./refactor-saves.cjs');
 
 let client;
 
 async function activate(context) {
+  registerFormattingCommands(context, vscode);
   await registerAuthorActions(context);
   context.subscriptions.push(vscode.commands.registerCommand('talewright.togglePreviewHints', async () => {
     const configuration = vscode.workspace.getConfiguration('editor', {

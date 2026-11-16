@@ -72,7 +72,9 @@ Fog rolls over the river. A lantern swings at the end of the dock, and beneath i
 ```
 
 - `=== dock` starts a scene called `dock`. `@title` gives it a heading.
-- Plain lines are prose. `**bold**` and `*italics*` formatting work; backticks are ordinary text.
+- Plain lines are prose. Use `**bold**` and `_italic_` for formatting; `__bold__` and `*italic*`
+  also work. In VS Code, select text and press `Ctrl+B` / `Cmd+B` for bold or `Ctrl+I` / `Cmd+I`
+  for italic. Backticks are ordinary text.
   Talemark is not Markdown, so other Markdown is not supported.
 - `> ferryman:` is a line of dialogue spoken by the `ferryman` character.
 - `{player:first-name}` is replaced with the player's name, "Ada".
