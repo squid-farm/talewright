@@ -109,7 +109,7 @@ public sealed class AuthoringSyntaxVocabularyTests
         Assert.Equal("camp and records", AuthoringSyntaxVocabulary.FormatHubSelector(["camp", "records"], true));
         Assert.Equal("camp or records", AuthoringSyntaxVocabulary.FormatHubSelector(["camp", "records"], false));
         Assert.Equal("camp", AuthoringSyntaxVocabulary.FormatHubSelector(["camp"], true));
-        Assert.Equal([":", "@", "#", ">", "(", "\"", "{", "/"], AuthoringSyntaxVocabulary.CompletionTriggerCharacters);
+        Assert.Equal([" ", "\t", ":", "@", "#", ">", "(", "\"", "{", "/"], AuthoringSyntaxVocabulary.CompletionTriggerCharacters);
     }
 
     [Theory]
