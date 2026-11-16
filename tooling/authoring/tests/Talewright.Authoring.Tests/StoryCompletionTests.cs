@@ -102,6 +102,25 @@ public sealed class StoryCompletionTests
     }
 
     [Theory]
+    [InlineData("::: skill-check guide | dc 10", "::: skill-check guide hp dc 10")]
+    [InlineData("::: skill-check guide |dc 10", "::: skill-check guide hp dc 10")]
+    [InlineData("::: skill-check guide  | dc 10", "::: skill-check guide  hp dc 10")]
+    [InlineData("::: skill-check guide  |dc 10", "::: skill-check guide  hp dc 10")]
+    [InlineData("::: skill-check guide h|p dc 10", "::: skill-check guide hp dc 10")]
+    public void Explicit_actor_stat_completion_preserves_difficulty_and_whitespace(string marked, string expected)
+    {
+        var (analysis, position) = Analyze("=== first\n" + marked);
+        var completions = StoryCompletion.Complete(analysis, position);
+        var completion = Assert.Single(completions, item => item.Label == "hp");
+
+        Assert.All(completions, item => Assert.Contains(analysis.Symbols,
+            symbol => symbol.Kind == AuthoringSymbolKind.Stat && symbol.Name == item.Label));
+        Assert.DoesNotContain(completions, item => item.Label is "guide" or "player");
+        Assert.Equal(expected, Apply(marked.Replace("|", ""), completion.Range.Start.Column,
+            completion.Range.End.Column, completion.NewText));
+    }
+
+    [Theory]
     [InlineData(">|", "player", "> player: ")]
     [InlineData(">pl|", "player", "> player: ")]
     [InlineData("> |", "player", "> player: ")]
