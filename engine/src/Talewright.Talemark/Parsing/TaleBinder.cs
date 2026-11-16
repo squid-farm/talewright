@@ -546,7 +546,7 @@ internal sealed partial class TaleBinder
 
         var who = Head(syntax);
         var speakerLocation = At(Part(syntax).HeadStart);
-        _symbols.Analysis?.Reference(who, speakerLocation, AuthoringSymbolKind.Character);
+        _symbols.Analysis?.Speaker(who, speakerLocation);
         if (syntax.IsInvalid)
             return;
 

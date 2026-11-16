@@ -14,7 +14,12 @@ namespace Talewright.Talemark.Analysis;
 public sealed record CompletionSite(string Text, SourceRange Range, IReadOnlyList<AuthoringSymbolKind> Kinds,
     IReadOnlyList<string> Keywords, IReadOnlyList<SourceLocation> Positions,
     char? FollowingDelimiter = null, IReadOnlyList<AuthoringSymbol>? Candidates = null,
-    IReadOnlyDictionary<string, string>? KeywordDetails = null, bool IsImagePath = false);
+    IReadOnlyDictionary<string, string>? KeywordDetails = null, bool IsImagePath = false)
+{
+    public SourceRange? ReplacementRange { get; init; }
+    public string CompletionPrefix { get; init; } = string.Empty;
+    public string? CompletionSuffix { get; init; }
+}
 
 internal static class ExpressionCompletion
 {

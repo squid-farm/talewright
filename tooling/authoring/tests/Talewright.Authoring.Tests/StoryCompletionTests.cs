@@ -102,6 +102,64 @@ public sealed class StoryCompletionTests
     }
 
     [Theory]
+    [InlineData(">|", "player", "> player: ")]
+    [InlineData(">pl|", "player", "> player: ")]
+    [InlineData("> |", "player", "> player: ")]
+    [InlineData(">   pl|", "player", ">   player: ")]
+    [InlineData("> pla| ", "player", "> player: ")]
+    [InlineData("> pl|ayer: words", "player", "> player: words")]
+    [InlineData("> pl|ayer:", "player", "> player: ")]
+    [InlineData("> pl|ayer:  words", "player", "> player:  words")]
+    [InlineData("> pla|yer:words", "player", "> player: words")]
+    public void Speaker_completion_inserts_a_header_and_preserves_surrounding_spacing(
+        string marked, string speaker, string expected)
+    {
+        var (analysis, position) = Analyze("=== first\n" + marked);
+        var item = Assert.Single(StoryCompletion.Complete(analysis, position),
+            completion => completion.Label == speaker);
+        var source = marked.Replace("|", "");
+
+        Assert.Equal(expected, Apply(source, item.Range.Start.Column, item.Range.End.Column, item.NewText));
+    }
+
+    [Theory]
+    [InlineData("> guide.f|riend: words", "guide.friend", "> guide.friend: words")]
+    [InlineData("> guide-f|riend", "guide-friend", "> guide-friend: ")]
+    public void Speaker_completion_replaces_dotted_and_hyphenated_ids(
+        string marked, string speaker, string expected)
+    {
+        var manifest = Manifest.Replace("  guide: {first-name: Bea}",
+            "  guide: {first-name: Bea}\n  guide.friend: {first-name: Dot}\n  guide-friend: {first-name: Hyphen}",
+            StringComparison.Ordinal);
+        var (analysis, position) = Analyze("=== first\n" + marked, manifest);
+        var item = Assert.Single(StoryCompletion.Complete(analysis, position),
+            completion => completion.Label == speaker);
+        var source = marked.Replace("|", "");
+
+        Assert.Equal(expected, Apply(source, item.Range.Start.Column, item.Range.End.Column, item.NewText));
+    }
+
+    [Theory]
+    [InlineData("> guide: First.\n> pla|")]
+    [InlineData("> guide: First.\n>\n>|")]
+    public void Speaker_completion_is_not_offered_in_continuation_or_paragraph_lines(string marked)
+    {
+        var (analysis, position) = Analyze("=== first\n" + marked);
+
+        Assert.Empty(StoryCompletion.Complete(analysis, position));
+    }
+
+    [Fact]
+    public void Speaker_completion_is_available_after_the_previous_speech_block_ends()
+    {
+        var (analysis, position) = Analyze("=== first\n> guide: First.\n\n> gui|");
+
+        var item = Assert.Single(StoryCompletion.Complete(analysis, position),
+            completion => completion.Label == "guide");
+        Assert.Equal("guide: ", item.NewText);
+    }
+
+    [Theory]
     [InlineData("{|", "{if ")]
     [InlineData("{i|", "{if ")]
     [InlineData("{|}", "{if }")]
@@ -825,13 +883,13 @@ public sealed class StoryCompletionTests
             Apply(marked.Split('\n')[1].Replace("|", ""), item.Range.Start.Column, item.Range.End.Column, item.NewText));
     }
 
-    private static (StoryAnalysis Analysis, SourceLocation Position) Analyze(string marked)
+    private static (StoryAnalysis Analysis, SourceLocation Position) Analyze(string marked, string manifest = Manifest)
     {
         var caret = marked.IndexOf('|');
         var position = Position("main.tale", marked[..caret]);
         var source = new StorySource(new Dictionary<string, string>
         {
-            [StorySource.ManifestFileName] = Manifest,
+            [StorySource.ManifestFileName] = manifest,
             ["main.tale"] = marked.Remove(caret, 1),
             ["other.tale"] = "=== second\n-> END"
         });
