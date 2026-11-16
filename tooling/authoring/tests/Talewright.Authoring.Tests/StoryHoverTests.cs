@@ -312,6 +312,9 @@ public sealed class StoryHoverTests
         var (analysis, position) = Analyze(marked);
         var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, position));
         Assert.Contains("Diverts to", hover.PlainText);
+        Assert.Contains("scene-level divert enters its destination automatically", hover.PlainText);
+        Assert.Contains("entry-check outcomes targeting a scene pause for Continue", hover.PlainText);
+        Assert.Contains("choice checks follow the selected outcome", hover.PlainText);
         Assert.Equal("->", analysis.Source.Files["main.tale"].Split('\n')[position.Line - 1]
             [(hover.Range.Start.Column - 1)..(hover.Range.End.Column - 1)]);
     }

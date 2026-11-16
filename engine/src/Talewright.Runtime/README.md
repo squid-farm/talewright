@@ -1,24 +1,32 @@
 # Talewright.Runtime — the engine loop
 
 Runs a compiled `StoryDefinition`. It is the only project that touches every layer: Core state, Rules
-(effects, checks, triggers, storylets), Narrative (rendering) and the compiled Talemark model. The UI talks to it through one
-small interface.
+(effects, checks, triggers, storylets), Narrative (rendering) and the compiled Talemark model. Use
+`StoryHistory` for player-facing play, including headless interfaces: it automatically accepts bare
+diverts, retains every reached passage and exposes replay, saves and navigation.
 
 ```csharp
-IStorySession session = new StorySession(story, seed: 1234);
-StoryFrame frame = session.Start();
-while (!frame.IsEnded)
+var history = new StoryHistory(story, seed: 1234);
+var presented = 0;
+while (true)
 {
-    Console.WriteLine(frame.Document.ToPlainText());
-    foreach (var entry in frame.Menu)
+    foreach (var passage in history.Transcript.Skip(presented))
+        Console.WriteLine(passage.Frame.Document.ToPlainText());
+    presented = history.Transcript.Count;
+    if (history.AutomaticContinuationError is { } error)
+        throw new InvalidOperationException(error);
+    if (history.Current.IsEnded) break;
+    foreach (var entry in history.Current.Menu)
         Console.WriteLine($"{entry.Number}. {entry.Text}{(entry.IsAvailable ? "" : " (unavailable)")}");
-    if (frame.Choices.Count == 0) break;
-    frame = session.Choose(frame.Choices[0].Key);
+    if (history.Current.Choices.Count == 0) break;
+    history.Choose(history.Current.Choices[0].Key);
 }
 ```
 
 `Menu` contains every shown entry in display order; `Choices` contains only entries that can be selected now.
-An active frame may have no available choices.
+An active frame may have no available choices. `StorySession` and `IStorySession` expose lower-level
+individual transitions for replay and author tooling, including synthetic Continue choices; they do not
+perform `StoryHistory`'s automatic orchestration.
 
 ## Files
 

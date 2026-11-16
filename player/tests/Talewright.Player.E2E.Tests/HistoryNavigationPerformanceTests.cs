@@ -139,11 +139,12 @@ public sealed class HistoryNavigationPerformanceTests : PlayerTest
                         let readyFrames = 0;
                         const observe = () => {
                             const latest = transcript.querySelector('.tw-latest');
+                            const revealed = transcript.querySelector('[aria-label="New story passage"]');
                             const ready = transcript.querySelectorAll('.tw-frame').length === Math.min(frames, 21) &&
                                 latest?.textContent.includes(`Visit ${frames}.`);
                             if (ready && domObservedMs === null)
                                 domObservedMs = performance.now() - start;
-                            if (ready && document.activeElement === latest && focusObservedMs === null)
+                            if (ready && document.activeElement === revealed && focusObservedMs === null)
                                 focusObservedMs = performance.now() - start;
                         };
                         const observer = new MutationObserver(observe);

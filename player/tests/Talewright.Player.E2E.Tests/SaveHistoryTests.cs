@@ -175,7 +175,8 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         var slot = olderVersion ? "Older sample" : "Pre-dream sample";
         await Driver.OpenBundledAsync();
         await Driver.ClickAsync("Start story");
-        await Choose("Continue");
+        await Observe(new(null, "The boat leaves"), newlyPresented: true);
+        await Observe(new(null, "The camp hums"));
         var before = await Driver.ObserveAsync();
         await Persist(old.Id, slot, bytes);
         await Driver.ClickAsync("Saves");
@@ -199,7 +200,8 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
             Assert.Equal(bytes, await ReadBrowserSaveAsync(old.Id, slot));
         }
         await Choose("Sign the expedition register");
-        await Observe(new(null, "MARA BURNS"));
+        await Observe(new(null, "MARA BURNS"), newlyPresented: true);
+        await Observe(new(null, "The camp hums"));
     }
 
     private async Task Persist(string storyId, string slot, byte[] bytes)

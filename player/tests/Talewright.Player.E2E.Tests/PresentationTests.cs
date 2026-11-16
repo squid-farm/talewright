@@ -69,6 +69,7 @@ public sealed class PresentationTests(WebHostFixture host, ITestOutputHelper out
             "The path winds through the forest, past trees older than the road.", 16));
         await Upload(new StoryFixture(id, TestStories.DefaultManifest(id).Build(), $"""
             === start
+            A marker from the earlier passage.
             {longPassage}
             * [Follow the trail] -> first
             === first
@@ -92,6 +93,13 @@ public sealed class PresentationTests(WebHostFixture host, ITestOutputHelper out
         await Expect(firstNewPassage).ToContainTextAsync("The first newly presented passage.");
         await Expect(firstNewPassage).ToBeFocusedAsync();
         await Expect(Latest).ToContainTextAsync("The final passage waits for the reader.");
+        await AssertState(state =>
+        {
+            Assert.DoesNotContain("A marker from the earlier passage.", state.NewPassages);
+            Assert.Contains("The first newly presented passage.", state.NewPassages);
+            Assert.Contains("The next passage follows automatically.", state.NewPassages);
+            Assert.Contains("The final passage waits for the reader.", state.NewPassages);
+        });
         await Expect(Page.Locator(".tw-chosen")).ToHaveCountAsync(1);
         await Expect(Page.Locator(".tw-chosen").First).ToContainTextAsync("Follow the trail");
         await Page.WaitForFunctionAsync("""
@@ -102,6 +110,68 @@ public sealed class PresentationTests(WebHostFixture host, ITestOutputHelper out
                     && Math.abs(passage.getBoundingClientRect().top - toolbar.getBoundingClientRect().bottom) <= 2;
             }
             """);
+
+        await Driver.ClickAsync("Saves");
+        await Driver.ClickAsync("Save game");
+        await Driver.ClickAsync("Close saves");
+        await Driver.ClickAsync("Back");
+        await Expect(RevealedPassage).ToBeFocusedAsync();
+        await Expect(RevealedPassage).ToContainTextAsync("The path winds through the forest");
+        await Driver.ClickAsync("Forward");
+        await Expect(RevealedPassage).ToBeFocusedAsync();
+        await Expect(RevealedPassage).ToContainTextAsync("The first newly presented passage.");
+        await Choose("Finish");
+        await Driver.ClickAsync("Saves");
+        await Driver.ClickAsync("Load My save");
+        await Driver.ClickAsync("Load save");
+        await Expect(RevealedPassage).ToBeFocusedAsync();
+        await Expect(RevealedPassage).ToContainTextAsync("The first newly presented passage.");
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task Automatic_diverts_focus_the_first_passage_remaining_after_a_clear(bool onStart)
+    {
+        var id = $"automatic-clear-{Guid.NewGuid():N}";
+        var startExit = onStart ? "-> first" : "* [Follow] -> first";
+        await Upload(new StoryFixture(id, TestStories.DefaultManifest(id).Build(), $"""
+            === start
+            Before the journey.
+            {startExit}
+            === first
+            Before the clear.
+            -> cleared
+            === cleared
+            @clear
+            The first visible passage.
+            -> final
+            === final
+            The final passage.
+            * [Finish] -> END
+            """));
+
+        if (!onStart) await Choose("Follow");
+
+        await Expect(RevealedPassage).ToContainTextAsync("The first visible passage.");
+        await Expect(RevealedPassage).ToBeFocusedAsync();
+        await Expect(Latest).ToContainTextAsync("The final passage.");
+        await Expect(Page.GetByRole(AriaRole.Main, new() { Name = "Story transcript" }))
+            .Not.ToContainTextAsync("Before the clear.");
+    }
+
+    [Fact]
+    public async Task Runaway_automatic_diverts_show_an_error_without_a_continue_or_success()
+    {
+        var id = $"runaway-diverts-{Guid.NewGuid():N}";
+        await Upload(new StoryFixture(id, TestStories.DefaultManifest(id).Build(), """
+            === start
+            -> start
+            """));
+
+        await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("1,000 automatic scene transitions");
+        await Expect(Choices).ToHaveCountAsync(0);
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Play again", Exact = true })).ToHaveCountAsync(0);
     }
 
     [Fact]

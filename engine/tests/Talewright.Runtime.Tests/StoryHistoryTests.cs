@@ -56,7 +56,7 @@ public class StoryHistoryTests
         ChoiceFaker.Create("END", "Finish"));
 
     private static string BareDivertChain(int firstTransitions, int? secondTransitions = null,
-        string finishChoice = "Finish")
+        string finishChoice = "Finish", bool checkBoundary = false)
     {
         var finalIndex = firstTransitions + (secondTransitions is null ? 0 : secondTransitions.Value + 1);
         var tale = new StringBuilder();
@@ -66,7 +66,10 @@ public class StoryHistoryTests
             tale.AppendLine($"=== {scene}");
             if (secondTransitions is not null && index == firstTransitions)
             {
-                tale.AppendLine(ChoiceFaker.Create($"scene-{index + 1}", "Again"));
+                var target = $"scene-{index + 1}";
+                tale.AppendLine(checkBoundary
+                    ? SkillCheckFaker.Entry("athletics", 1, successTarget: target, failureTarget: target)
+                    : ChoiceFaker.Create(target, "Again"));
             }
             else if (index < finalIndex)
             {
@@ -281,6 +284,48 @@ public class StoryHistoryTests
     }
 
     [Fact]
+    public void Choice_check_enters_its_outcome_without_an_extra_continue()
+    {
+        var story = Compile(yaml: BuildManifest(declareVariables: true).Build(), tale: """
+            === a
+            * [Attempt] skill-check athletics dc 1
+              success: -> b
+              failure: -> b
+            === b
+            The outcome is reached.
+            * [Finish] -> END
+            """);
+        var history = new StoryHistory(story, 42);
+
+        Assert.Equal("Attempt", Assert.Single(history.Current.Choices).Text);
+        history.Choose("c0");
+
+        Assert.Equal("b", history.Current.Scene!.Value.Value);
+        Assert.Contains("The outcome is reached.", history.Current.Document.ToPlainText());
+        Assert.Equal("Finish", Assert.Single(history.Current.Choices).Text);
+        Assert.False(history.Transcript[0].ChosenAutomatically);
+    }
+
+    [Fact]
+    public void Entry_check_outcome_to_end_finishes_in_the_current_frame()
+    {
+        var story = Compile(yaml: BuildManifest(declareVariables: true).Build(), tale: """
+            === a
+            The final result.
+            ::: skill-check athletics dc 1
+            success: -> END
+            failure: -> END
+            :::
+            """);
+        var history = new StoryHistory(story, 42);
+
+        Assert.True(history.Current.IsEnded);
+        Assert.Empty(history.Current.Choices);
+        Assert.Single(history.Transcript);
+        Assert.Contains("The final result.", history.Current.Document.ToPlainText());
+    }
+
+    [Fact]
     public void Explicit_textless_choices_remain_interactive()
     {
         var story = Compile(yaml: BuildManifest(declareVariables: true).Build(), tale: """
@@ -317,6 +362,22 @@ public class StoryHistoryTests
         Assert.Equal("Finish", Assert.Single(history.Current.Choices).Text);
     }
 
+    [Fact]
+    public void Automatic_transition_budget_stops_before_a_finite_1001st_transition()
+    {
+        var story = Compile(yaml: BuildManifest(declareVariables: true).Build(),
+            tale: BareDivertChain(StoryHistory.MaxAutomaticTransitions + 1));
+
+        var history = new StoryHistory(story, 42);
+
+        Assert.NotNull(history.AutomaticContinuationError);
+        Assert.Equal("scene-1000", history.Current.Scene!.Value.Value);
+        Assert.Equal(StoryHistory.MaxAutomaticTransitions, history.Cursor);
+        Assert.False(history.Current.IsEnded);
+        Assert.Empty(history.Current.Choices);
+        Assert.DoesNotContain(history.Events.OfType<SceneEntered>(), entry => entry.Scene.Value == "scene-1001");
+    }
+
     [Theory]
     [InlineData(1)]
     [InlineData(2)]
@@ -339,23 +400,27 @@ public class StoryHistoryTests
             history.Events.OfType<ChoiceMade>().Count(choice => choice.ChoiceKey == StorySession.ContinueKey));
     }
 
-    [Fact]
-    public void Automatic_transition_budget_resets_after_each_player_action()
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Automatic_transition_budget_resets_after_each_player_action(bool checkBoundary)
     {
         var story = Compile(yaml: BuildManifest(declareVariables: true).Build(),
-            tale: BareDivertChain(600, secondTransitions: 600, finishChoice: "Again"));
+            tale: BareDivertChain(600, secondTransitions: 600, finishChoice: "Again", checkBoundary: checkBoundary));
         var history = new StoryHistory(story, 42);
 
         Assert.Null(history.AutomaticContinuationError);
         Assert.Equal("scene-600", history.Current.Scene!.Value.Value);
         Assert.Equal(600, history.Cursor);
+        Assert.Equal(checkBoundary ? "Continue" : "Again", Assert.Single(history.Current.Choices).Text);
 
-        history.Choose("c0");
+        history.Choose(checkBoundary ? StorySession.ContinueKey : "c0");
 
         Assert.Null(history.AutomaticContinuationError);
         Assert.Equal("scene-1201", history.Current.Scene!.Value.Value);
         Assert.Equal(1_201, history.Cursor);
         Assert.Equal(1_202, history.Transcript.Count);
+        Assert.False(history.Transcript[600].ChosenAutomatically);
     }
 
     [Fact]
@@ -626,10 +691,7 @@ public class StoryHistoryTests
             === middle
             * [Continue] -> target
             === target
-            ::: skill-check athletics dc 1
-            success: -> finish
-            failure: -> finish
-            :::
+            -> finish
             === finish
             -> END
             """);
@@ -639,11 +701,13 @@ public class StoryHistoryTests
         indirect.Choose("c1");
         indirect.Choose("c0");
 
-        Assert.Equal(direct.Current.Choices.Single().ReplayIdentity!.Value.ToArray(),
-            indirect.Current.Choices.Single().ReplayIdentity!.Value.ToArray());
+        var directTarget = Assert.Single(direct.Transcript, frame => frame.Frame.Scene == new SceneId("target"));
+        var indirectTarget = Assert.Single(indirect.Transcript, frame => frame.Frame.Scene == new SceneId("target"));
+        Assert.True(directTarget.ChosenAutomatically);
+        Assert.True(indirectTarget.ChosenAutomatically);
+        Assert.Equal(directTarget.Frame.Choices.Single().ReplayIdentity!.Value.ToArray(),
+            indirectTarget.Frame.Choices.Single().ReplayIdentity!.Value.ToArray());
 
-        direct.Choose(StorySession.ContinueKey);
-        indirect.Choose(StorySession.ContinueKey);
         AssertEquivalent(direct, StoryHistory.Restore(story, direct.Save()));
         AssertEquivalent(indirect, StoryHistory.Restore(story, indirect.Save()));
         var legacy = Mutate(direct.Save(), save => save with
@@ -662,10 +726,7 @@ public class StoryHistoryTests
             @hub room
             === b
             @tags room
-            ::: skill-check athletics dc 1
-            success: -> c
-            failure: -> c
-            :::
+            -> c
             === c
             -> END
             """);
@@ -700,8 +761,8 @@ public class StoryHistoryTests
 
         var history = new StoryHistory(story, 7);
         history.Choose("storylet:b");
-        history.Choose(StorySession.ContinueKey);
 
+        Assert.True(history.Transcript[^2].ChosenAutomatically);
         AssertEquivalent(history, StoryHistory.Restore(story, history.Save()));
     }
 
@@ -714,19 +775,13 @@ public class StoryHistoryTests
             @hub room
             === b
             @tags room
-            ::: skill-check athletics dc 1
-            success: -> c
-            failure: -> c
-            :::
+            -> c
             === c
             -> END
             """);
         var second = Compile(yaml: yaml, tale: """
             === a
-            ::: skill-check athletics dc 1
-            success: -> extra
-            failure: -> extra
-            :::
+            -> extra
             === extra
             @tags room
             -> END
@@ -741,10 +796,10 @@ public class StoryHistoryTests
         Assert.Equal(firstIdentities, HubIdentities(first));
         var original = new StoryHistory(first, 7);
         original.Choose("storylet:b");
-        original.Choose(StorySession.ContinueKey);
+        Assert.True(original.Transcript[^2].ChosenAutomatically);
         AssertEquivalent(original, StoryHistory.Restore(first, original.Save()));
         var other = new StoryHistory(second, 7);
-        other.Choose(StorySession.ContinueKey);
+        Assert.True(other.Transcript[0].ChosenAutomatically);
         AssertEquivalent(other, StoryHistory.Restore(second, other.Save()));
 
         static string[] HubIdentities(StoryDefinition story) =>

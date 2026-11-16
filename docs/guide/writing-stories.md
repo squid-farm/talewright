@@ -339,9 +339,10 @@ failure: -> hall
 :::
 ```
 
-An entry-check outcome without `->` continues with the next line. An outcome with a target leaves
-immediately. A check expression is hidden only when you add `, hidden`; the check event and result
-still exist, but no check note is shown.
+An entry-check outcome without `->` continues with the next line. An outcome targeting another scene
+pauses for **Continue**; `-> END` finishes in the current frame. A choice check follows its selected
+outcome without an extra pause. A check expression is hidden only when you add `, hidden`; the check
+event and result still exist, but no check note is shown.
 
 Checks work on any declared stat. With the built-in rulesets, a check rolls a d20 and adds a modifier;
 the ruleset determines whether it beats the DC. The modifier depends on the stat's category:

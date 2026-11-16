@@ -30,7 +30,7 @@
 
         @if (Current is { } current)
         {
-            <StoryChoices Current="current" Busy="Busy" AtChoiceLimit="AtChoiceLimit"
+            <StoryChoices Current="current" Busy="Busy" AtChoiceLimit="AtChoiceLimit" ContinuationError="@ContinuationError"
                           OnChoose="OnChoose" OnRestart="OnRestart" />
         }
     </main>

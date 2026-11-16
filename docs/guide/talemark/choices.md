@@ -59,8 +59,9 @@ The second choice provides a way out regardless of the player's inventory.
 - `-> garden` on its own leaves now and automatically enters `garden`; each reached scene's
   rendered text remains in order. A conditional scene divert does the same. `-> END` presents the
   final frame. Do not declare a scene called `END`.
-- A divert in a skill-check outcome still presents its result with **Continue**. Explicit choices,
-  including `* -> garden` and `* -> END`, always wait for the reader.
+- An entry skill-check outcome targeting another scene still presents its result with **Continue**;
+  an outcome targeting `END` finishes in that frame. A choice check follows its selected outcome
+  without an extra pause. Explicit choices, including `* -> garden` and `* -> END`, wait for the reader.
 - `@title` is a plain-text heading. `@choice-label` is reader text used by bare scene choices
   and hub offers. Metadata belongs directly under the scene header.
 - A scene without a possible exit is invalid. The compiler does not prove that some requirement

@@ -14,6 +14,7 @@ public sealed record PlayerBounds(double X, double Y, double Width, double Heigh
 public sealed record PlayerObservation(
     string Passage,
     string Transcript,
+    string NewPassages,
     string Sheet,
     string Library,
     string[] Choices,
@@ -139,6 +140,9 @@ public sealed class BrowserPlayerDriver(IPage page) : IPlayerDriver
         () => {
             const passage = document.querySelector('[aria-label="Current passage"]');
             const transcript = document.querySelector('[aria-label="Story transcript"]');
+            const revealedPassage = transcript?.querySelector('[aria-label="New story passage"]');
+            const passageAnchors = transcript ? Array.from(transcript.querySelectorAll('.tw-passage-anchor')) : [];
+            const firstNewPassage = passageAnchors.indexOf(revealedPassage);
             const sheet = document.querySelector('[aria-label="Character sheet"]');
             const library = document.querySelector('.tw-library');
             const displayed = element => element !== null && element.checkVisibility();
@@ -149,6 +153,8 @@ public sealed class BrowserPlayerDriver(IPage page) : IPlayerDriver
             return {
                 Passage: active ? passage?.innerText ?? '' : '',
                 Transcript: active ? transcript.innerText : '',
+                NewPassages: active && firstNewPassage >= 0
+                    ? passageAnchors.slice(firstNewPassage).map(anchor => anchor.innerText).join('\n') : '',
                 Sheet: active ? sheet?.innerText ?? '' : '',
                 Library: displayed(library) ? library.innerText : '',
                 Choices: active ? Array.from(document.querySelectorAll('[aria-label="Story choices"] button'),
@@ -156,8 +162,7 @@ public sealed class BrowserPlayerDriver(IPage page) : IPlayerDriver
                 Ended: active && Array.from(transcript.querySelectorAll('button'))
                     .some(button => button.textContent.trim() === 'Play again' && displayed(button)),
                 PassageVisible: active && passage !== null,
-                PassageFocused: active && passage !== null &&
-                    (passage === document.activeElement || passage.contains(document.activeElement)),
+                PassageFocused: active && revealedPassage === document.activeElement,
                 PassageInWindow: passageBounds != null && passageBounds.top >= 0 &&
                     passageBounds.bottom <= innerHeight,
                 SheetStacked: sheetBounds != null && transcriptBounds != null &&

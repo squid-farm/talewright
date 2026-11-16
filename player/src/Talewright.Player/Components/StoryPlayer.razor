@@ -84,7 +84,7 @@
     <StoryStage @ref="_storyStage" Story="Story" Passages="_transcript"
                 PassageWindow="@TranscriptPresentation.PassageWindow" Current="_session.Current" State="_session.State"
                 Identity="_session" Busy="_busy" AtChoiceLimit="@(_session.Cursor >= StoryHistory.MaxChoices)"
-                ContinuationError="_session.AutomaticContinuationError" IncludeFromIndex="_presentationStartIndex"
+                ContinuationError="@_session.AutomaticContinuationError" IncludeFromIndex="_presentationStartIndex"
                 RevealPassageIndex="_revealPassageIndex"
                 Hidden="_showHistory" OnChoose="Choose" OnRestart="Restart" />
     }
@@ -222,7 +222,7 @@
 
         if (Visible && !_wasVisible)
         {
-            RequestReveal();
+            RequestReveal(passageIndex: CurrentBoundaryStartIndex());
         }
 
         _wasVisible = Visible;
@@ -258,11 +258,19 @@
         _initialTriggerSavePending = initialTriggerSave && session.TriggerSaveId is not null;
         _triggerSaveSequence++;
         _slots = [];
-        _presentationStartIndex = revealStoryBeginning
-            ? 0
-            : Math.Max(0, _transcript.Count - TranscriptPresentation.PassageWindow);
-        RequestReveal(preserveExistingFocus, revealStoryBeginning ? 0 : _transcript.Count - 1,
+        _presentationStartIndex = revealStoryBeginning ? 0 : CurrentBoundaryStartIndex();
+        RequestReveal(preserveExistingFocus, _presentationStartIndex,
             isStoryBeginning: revealStoryBeginning);
+    }
+
+    private int CurrentBoundaryStartIndex()
+    {
+        var index = _transcript.Count - 1;
+        while (index > 0 && _transcript[index - 1].ChosenAutomatically)
+        {
+            index--;
+        }
+        return Math.Max(0, index);
     }
 
     private void RequestReveal(bool preserveExistingFocus = false, int? passageIndex = null,
@@ -271,6 +279,13 @@
         _focusLatest = true;
         _preserveFocusOnReveal = preserveExistingFocus;
         _revealPassageIndex = Math.Max(0, passageIndex ?? _transcript.Count - 1);
+        for (var index = _revealPassageIndex + 1; index < _transcript.Count; index++)
+        {
+            if (_transcript[index].Frame.ClearsPrevious)
+            {
+                _revealPassageIndex = index;
+            }
+        }
         _revealAtStoryStart = isStoryBeginning;
     }
 
@@ -581,8 +596,8 @@
         _session.Back();
         UpdateDiagnosticContext();
         ReconcileImageWarming(StoryImageWarmer.HistorySettlingDelay);
-        _presentationStartIndex = Math.Max(0, _transcript.Count - TranscriptPresentation.PassageWindow);
-        RequestReveal();
+        _presentationStartIndex = CurrentBoundaryStartIndex();
+        RequestReveal(passageIndex: _presentationStartIndex);
     }
 
     private void Forward()
@@ -591,8 +606,8 @@
         _session.Forward();
         UpdateDiagnosticContext();
         ReconcileImageWarming(StoryImageWarmer.HistorySettlingDelay);
-        _presentationStartIndex = Math.Max(0, _transcript.Count - TranscriptPresentation.PassageWindow);
-        RequestReveal();
+        _presentationStartIndex = CurrentBoundaryStartIndex();
+        RequestReveal(passageIndex: _presentationStartIndex);
     }
 
     private async Task ShowSavesAsync()
@@ -729,8 +744,8 @@
             _showSaves = false;
             _restoreFocusAfterSaveClose = false;
             _saveMessage = $"Loaded '{SaveEntry.DisplayNameFor(slot)}'.";
-            _presentationStartIndex = Math.Max(0, _transcript.Count - TranscriptPresentation.PassageWindow);
-            RequestReveal();
+            _presentationStartIndex = CurrentBoundaryStartIndex();
+            RequestReveal(passageIndex: _presentationStartIndex);
         }
     }
 
@@ -739,7 +754,7 @@
         _restoreFocusAfterSaveClose = true;
         _module ??= await JS.InvokeAsync<IJSObjectReference>("import",
             "./_content/Talewright.Player/Components/StoryPlayer.razor.js");
-        await _module.InvokeVoidAsync("revealPassage", TranscriptElement, _transcript.Count - 1, false);
+        await _module.InvokeVoidAsync("revealPassage", TranscriptElement, _revealPassageIndex, false);
     }
 
     private Task ExportAsync(string slot) => SaveOperationAsync(PlayerDiagnosticOperation.SaveExport, async generation =>

@@ -328,20 +328,18 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
     {
         await Driver.OpenBundledAsync();
         await Driver.ClickAsync("Start story");
-        await Choose("Continue");
+        await Observe(new(null, "The boat leaves"), newlyPresented: true);
         await Choose("Haggle for supplies");
         await Observe(new(null, "Two trail rations"));
         await Choose("Sign the expedition register");
-        await Observe(new(null, "MARA BURNS"));
-        await Choose("Continue");
+        await Observe(new(null, "MARA BURNS"), newlyPresented: true);
         await Choose("Set out for the temple");
         await Choose("Tie off the rope and cross carefully");
         await Choose("Make camp before the climb");
         await AssertState(state => Assert.Equal(["Eat a ration", "Press on at dawn"], state.Choices));
         await Choose("Eat a ration");
         await Choose("Share supper by the fire");
-        await Observe(new(null, "one ration left"));
-        await Choose("Continue");
+        await Observe(new(null, "one ration left"), newlyPresented: true);
         await Choose("Stand your ground");
         await Observe(new(null, "Your Courage is 10"));
         await Driver.ClickAsync("Saves");
@@ -357,9 +355,7 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
         await Driver.ClickAsync("Forward");
         await Choose("Catch your breath");
         await Choose("Follow the signal");
-        await Choose("Continue");
-        await Observe(new(null, "The ledger cannot answer for you"));
-        await Choose("Continue");
+        await Observe(new(null, "The ledger cannot answer for you"), newlyPresented: true);
         await Choose("Check the tripwire bell");
         await Choose("Ring the bell");
         await Choose("Silence the bell");

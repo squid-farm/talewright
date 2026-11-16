@@ -200,17 +200,22 @@ public sealed class NativePlayerDriver(string artifacts, string? executableOverr
         var nodes = root.Descendants().ToArray();
         AccessibleNode? Named(string name) => nodes.FirstOrDefault(node => node.Name == name);
         var passage = Named("Current passage");
+        var revealedPassage = Named("New story passage");
         var transcript = Named("Story transcript");
+        var newPassages = transcript is null || revealedPassage is null ? "" : Regex.Replace(
+            string.Join(" ", transcript.Descendants()
+                .SkipWhile(node => !ReferenceEquals(node, revealedPassage))
+                .SelectMany(node => new[] { node.Name, node.Text })), @"\s+", " ").Trim();
         var sheet = Named("Character sheet");
         var choices = Named("Story choices")?.Descendants()
             .Where(node => node.Role == "push button")
             .Select(node => Regex.Replace(node.Name, @"^\d+\.\s*", "")).ToArray() ?? [];
         var window = nodes.FirstOrDefault(node => node.Role == "frame");
         return new(
-            passage?.NarrativeContent ?? "", transcript?.Content ?? "", sheet?.Content ?? "",
+            passage?.NarrativeContent ?? "", transcript?.Content ?? "", newPassages, sheet?.Content ?? "",
             passage is null ? root.Content : "", choices,
             nodes.Any(node => node.Role == "push button" && node.Name == "Play again"),
-            passage is not null, passage?.Focused == true,
+            passage is not null, revealedPassage?.Focused == true,
             passage is not null && window is not null &&
                 passage.Bounds.Y >= window.Bounds.Y &&
                 passage.Bounds.Y + passage.Bounds.Height <= window.Bounds.Y + window.Bounds.Height,

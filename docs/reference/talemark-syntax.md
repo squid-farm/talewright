@@ -395,7 +395,7 @@ Optional double-quoted reader text replaces the scene title only while that requ
 | `~ effect`                                         | Effect batch applied when this line is reached.                                               |
 | `* [label] (requires expr[, shown ["reader text"]]) { effects } -> target` | Choice. `(requires…)` and `{effects}` are optional. Hidden when `requires` is false unless `shown` is present; its optional reader text replaces the label while unavailable. A skill-check expression may include `, hidden` before the optional `shown` suffix. |
 | `* -> target`                                      | Interactive, textless choice; uses the destination's `@choice-label` when present, otherwise **Continue**. `* -> END` always shows **Continue**. It only supports a divert. |
-| `-> target`                                        | Leave now; later lines do not run. A scene destination is entered automatically; `-> END` shows the final frame. A divert from a skill-check outcome still pauses for **Continue**. |
+| `-> target`                                        | Leave now; later lines do not run. A scene destination is entered automatically; `-> END` shows the final frame. An entry-check outcome targeting a scene still pauses for **Continue**. |
 | `{if expr}` / `{else}` / `{/if}`                   | Conditionals — on their own lines (block) or inside a paragraph (inline).                      |
 
 Hub selectors use one operator throughout: `and` requires every tag, and `or` requires at least one. Do not mix
@@ -480,8 +480,9 @@ currently English for textless choices and skill-check result pauses.
 
 A scene-level `->` leaves immediately and automatically enters its destination, keeping each scene's
 already-rendered prose in order (or showing the final frame for `-> END`). Diverts inside a reached
-condition work the same way. Skill-check outcomes still pause for **Continue**, and explicit choices
-remain interactive. Put conditional early exits **before** the choices:
+condition work the same way. An entry-check outcome targeting a scene still pauses for **Continue**;
+an outcome targeting `END` finishes in that frame. Choice checks follow their selected outcomes without
+an extra pause, and explicit choices remain interactive. Put conditional early exits **before** the choices:
 
 ```tale
 {if faction:gang:standing <= -31}

@@ -62,6 +62,7 @@ public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelp
         if (title == "The Lost Relic")
         {
             Assert.Contains("Tomas", first.Passage);
+            Assert.Contains("The boat leaves", first.NewPassages);
             const string alt = "A riverside expedition camp with canvas tents and supplies at the edge of dense jungle.";
             if (Driver is NativePlayerDriver imageDriver)
             {
@@ -86,7 +87,7 @@ public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelp
         }
         if (creation)
         {
-            Assert.Contains(Environment.GetEnvironmentVariable("TALEWRIGHT_PUBLISHED_CHARACTER") ?? "Tester", first.Passage);
+            Assert.Contains(Environment.GetEnvironmentVariable("TALEWRIGHT_PUBLISHED_CHARACTER") ?? "Tester", first.NewPassages);
         }
         await Choose(first.Choices[0]);
         await AssertState(state => Assert.NotEqual(first.Passage, state.Passage));

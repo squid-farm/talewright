@@ -291,14 +291,12 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
         }
     }
 
-    protected async Task Observe(PlayerStep step)
+    protected async Task Observe(PlayerStep step, bool newlyPresented = false)
     {
         await AssertState(state =>
         {
             Assert.True(state.PassageVisible, "Current passage is visible.");
-            Assert.True(state.Passage.Contains(step.Contains, StringComparison.Ordinal)
-                || state.Transcript.Contains(step.Contains, StringComparison.Ordinal),
-                $"Expected '{step.Contains}' in the current passage or visible transcript.");
+            Assert.Contains(step.Contains, newlyPresented ? state.NewPassages : state.Passage);
             if (step.Choices is not null)
             {
                 Assert.Equal(step.Choices, state.Choices);
