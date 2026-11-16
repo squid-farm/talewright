@@ -41,6 +41,8 @@ public static class AuthoringSyntaxVocabulary
     /// <summary>Characters that can start a Talemark completion request.</summary>
     public static IReadOnlyList<string> CompletionTriggerCharacters { get; } = Array.AsReadOnly(new[]
     {
+        " ",
+        "\t",
         ExpressionVocabulary.Separator.ToString(),
         SceneVocabulary.MetadataMarker.ToString(),
         ExpressionVocabulary.PredicateMarker.ToString(),

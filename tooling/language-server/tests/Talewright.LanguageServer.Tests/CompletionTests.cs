@@ -89,6 +89,50 @@ public sealed partial class ServerTests
     }
 
     [Theory]
+    [InlineData("->|", "start", "->start")]
+    [InlineData("-> |", "start", "-> start")]
+    [InlineData("->  |", "start", "->  start")]
+    [InlineData("->    |", "start", "->    start")]
+    [InlineData("->\t|", "start", "->\tstart")]
+    [InlineData("~ give |", "player", "~ give player")]
+    [InlineData("~ give  |", "player", "~ give  player")]
+    [InlineData("~ give    |", "player", "~ give    player")]
+    [InlineData("~ give player |", "rope", "~ give player rope")]
+    [InlineData("~ give player  |", "rope", "~ give player  rope")]
+    [InlineData("~ give player    |", "rope", "~ give player    rope")]
+    [InlineData("~ give player\t|", "rope", "~ give player\trope")]
+    [InlineData("@requires player visited |", "start", "@requires player visited start")]
+    [InlineData("@requires player visited  |", "start", "@requires player visited  start")]
+    [InlineData("@requires player visited    |", "start", "@requires player visited    start")]
+    [InlineData("@requires player visited\t|", "start", "@requires player visited\tstart")]
+    public async Task Completion_after_legal_horizontal_whitespace_preserves_spacing(
+        string line, string label, string expected)
+    {
+        await using var client = new Client();
+        DeclareRpg(client);
+        File.AppendAllText(client.PathOf(StorySource.ManifestFileName), "items: {rope: Rope}\n");
+        await client.Initialize();
+        var marked = "=== start\n" + line;
+        await client.Open("start.tale", marked.Replace("|", ""), 1);
+
+        var item = Assert.Single(Items(await Completion(client, "start.tale", marked)), HasLabel(label));
+        var edit = item.GetProperty("textEdit");
+        var range = edit.GetProperty("range");
+        var rangeStart = range.GetProperty("start");
+        var rangeEnd = range.GetProperty("end");
+        var start = rangeStart.GetProperty("character").GetInt32();
+        var end = rangeEnd.GetProperty("character").GetInt32();
+        var source = line.Replace("|", "");
+
+        Assert.Equal(1, rangeStart.GetProperty("line").GetInt32());
+        Assert.Equal(1, rangeEnd.GetProperty("line").GetInt32());
+        Assert.Equal(line.IndexOf('|'), start);
+        Assert.Equal(start, end);
+        Assert.Equal(label, edit.GetProperty("newText").GetString());
+        Assert.Equal(expected, source[..start] + edit.GetProperty("newText").GetString() + source[end..]);
+    }
+
+    [Theory]
     [InlineData(">|", "> player: ")]
     [InlineData(">pl|", "> player: ")]
     [InlineData("> |", "> player: ")]

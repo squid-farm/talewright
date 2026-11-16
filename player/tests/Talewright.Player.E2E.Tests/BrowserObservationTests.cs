@@ -15,7 +15,7 @@ public sealed class BrowserObservationTests(WebHostFixture host, ITestOutputHelp
     [Fact]
     public async Task Choosing_waits_for_the_passage_to_change_when_choice_labels_are_reused()
     {
-        await Page.SetContentAsync("""
+        await SetSyntheticPageContentAsync("""
             <!DOCTYPE html>
             <main aria-label="Story transcript">
                 <section aria-label="Current passage">First</section>
@@ -47,7 +47,7 @@ public sealed class BrowserObservationTests(WebHostFixture host, ITestOutputHelp
     [Fact]
     public async Task Choosing_fails_if_the_click_does_not_advance_the_passage()
     {
-        await Page.SetContentAsync("""
+        await SetSyntheticPageContentAsync("""
             <!DOCTYPE html>
             <main aria-label="Story transcript">
                 <section aria-label="Current passage">Unchanged</section>
@@ -147,7 +147,7 @@ public sealed class BrowserObservationTests(WebHostFixture host, ITestOutputHelp
 
     private async Task SetMediaChoiceAsync(int spacerHeight)
     {
-        await Page.SetContentAsync($$"""
+        await SetSyntheticPageContentAsync($$"""
             <!DOCTYPE html>
             <style>.tw-media img { display: block; max-width: 100%; height: auto; } img[hidden] { display: none; }</style>
             <main aria-label="Story transcript">
@@ -173,7 +173,7 @@ public sealed class BrowserObservationTests(WebHostFixture host, ITestOutputHelp
     [Fact]
     public async Task Observations_remain_coherent_while_library_is_replaced()
     {
-        await Page.SetContentAsync("<div id='view'></div>");
+        await SetSyntheticPageContentAsync("<div id='view'></div>");
         await Page.EvaluateAsync("""
             () => {
                 const view = document.querySelector('#view');
@@ -210,6 +210,7 @@ public sealed class BrowserObservationTests(WebHostFixture host, ITestOutputHelp
                     Assert.Empty(state.Sheet);
                     Assert.Empty(state.Choices);
                 }
+
             }
 
             Assert.Equal(2, observedStates.Count);
@@ -218,5 +219,18 @@ public sealed class BrowserObservationTests(WebHostFixture host, ITestOutputHelp
         {
             await Page.EvaluateAsync("() => clearInterval(window.observationTimer)");
         }
+    }
+
+    private async Task SetSyntheticPageContentAsync(string content)
+    {
+        await Page.GotoAsync("about:blank");
+        await Page.SetContentAsync(content);
+        await Page.EvaluateAsync("""
+            baseUrl => {
+                const base = document.createElement('base');
+                base.href = baseUrl;
+                document.head.prepend(base);
+            }
+            """, BaseUrl);
     }
 }

@@ -80,6 +80,7 @@ exports.run = async () => {
   }
   await testYamlSchema();
   await testLiveDiagnostics();
+  await testWhitespaceCompletions();
   await testRename();
   assert.equal((await bundledServerProcesses(extension)).length, 1,
     'The installed extension must run exactly its own bundled server executable');
@@ -577,6 +578,102 @@ async function testLiveDiagnostics() {
     await vscode.window.showTextDocument(document);
     console.log('Installed VSIX LSP smoke passed: compiler diagnostics, unsaved clearing, semantic completion, source-aware Markdown hover and supporting-file navigation.');
   } finally {
+    await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+    await fs.rm(folder, { recursive: true, force: true });
+  }
+}
+
+async function testWhitespaceCompletions() {
+  const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'talewright-lsp-whitespace-'));
+  let renderer;
+  try {
+    renderer = await openRenderer();
+    const diskText = '=== start\n-> missing\n';
+    await fs.writeFile(path.join(folder, 'story.talewright.yaml'),
+      'game:\n  id: whitespace\n  title: Whitespace\n  start: start\ncharacters:\n  player: {first-name: Ada}\n');
+    const file = path.join(folder, 'start.tale');
+    await fs.writeFile(file, diskText);
+    const document = await vscode.workspace.openTextDocument(file);
+    const editor = await vscode.window.showTextDocument(document);
+    await waitForCompiler(document, items => items.some(item => item.code === 'TW2002'));
+
+    const start = new vscode.WorkspaceEdit();
+    start.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
+      '=== start\n->');
+    assert.equal(await vscode.workspace.applyEdit(start), true);
+    editor.selection = new vscode.Selection(1, 2, 1, 2);
+
+    const type = async text => {
+      for (const character of text) await vscode.commands.executeCommand('type', { text: character });
+    };
+    const waitForStartSuggestion = async () => waitUntil(async () =>
+      renderer.evaluate(`(() => {
+        const widget = document.querySelector('.suggest-widget');
+        if (!widget) return false;
+        const style = getComputedStyle(widget);
+        const rect = widget.getBoundingClientRect();
+        if (style.display === 'none' || style.visibility === 'hidden' || rect.width === 0 || rect.height === 0)
+          return false;
+        return Array.from(widget.querySelectorAll('.monaco-list-row'))
+          .some(row => (row.getAttribute('aria-label') || row.textContent || '').includes('start'));
+      })()`), 'Automatic completion must show the start target');
+
+    await type('    ');
+    await waitForStartSuggestion();
+    await type('sta');
+    await waitForStartSuggestion();
+    assert.equal(document.getText(), '=== start\n->    sta');
+    await vscode.commands.executeCommand('acceptSelectedSuggestion');
+    assert.equal(document.getText(), '=== start\n->    start',
+      'Accepting the automatic suggestion must replace only the target and preserve repeated spaces');
+    assert.equal(document.isDirty, true, 'Completion must leave the edited buffer unsaved');
+    assert.equal(await fs.readFile(file, 'utf8'), diskText, 'Completion must not save the edited buffer');
+
+    for (const _ of '    start') await vscode.commands.executeCommand('deleteLeft');
+    await type('  ');
+    await waitForStartSuggestion();
+    await type('sta');
+    await waitForStartSuggestion();
+    await vscode.commands.executeCommand('acceptSelectedSuggestion');
+    assert.equal(document.getText(), '=== start\n->  start',
+      'Deleting and retyping must automatically reopen completion and preserve the new spacing');
+    assert.equal(document.isDirty, true);
+    assert.equal(await fs.readFile(file, 'utf8'), diskText);
+
+    const prose = new vscode.WorkspaceEdit();
+    prose.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
+      '=== start\nOrdinary prose');
+    assert.equal(await vscode.workspace.applyEdit(prose), true);
+    editor.selection = new vscode.Selection(1, document.lineAt(1).text.length, 1, document.lineAt(1).text.length);
+    await type('  ');
+    await new Promise(resolve => setTimeout(resolve, 500));
+    assert.equal(await renderer.evaluate(`(() => {
+      const widget = document.querySelector('.suggest-widget');
+      if (!widget) return false;
+      const style = getComputedStyle(widget);
+      const rect = widget.getBoundingClientRect();
+      return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+    })()`), false, 'Whitespace in prose must not open a completion popup');
+
+    const speech = new vscode.WorkspaceEdit();
+    speech.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
+      '=== start\n> player: Hello\n> continuation');
+    assert.equal(await vscode.workspace.applyEdit(speech), true);
+    editor.selection = new vscode.Selection(2, document.lineAt(2).text.length, 2, document.lineAt(2).text.length);
+    await type('  ');
+    await new Promise(resolve => setTimeout(resolve, 500));
+    assert.equal(await renderer.evaluate(`(() => {
+      const widget = document.querySelector('.suggest-widget');
+      if (!widget) return false;
+      const style = getComputedStyle(widget);
+      const rect = widget.getBoundingClientRect();
+      return style.display !== 'none' && style.visibility !== 'hidden' && rect.width > 0 && rect.height > 0;
+    })()`), false, 'Whitespace in speech continuation must not open a completion popup');
+    assert.equal(document.isDirty, true, 'The acceptance scenario must remain unsaved');
+    assert.equal(await fs.readFile(file, 'utf8'), diskText);
+    console.log('Installed VSIX whitespace completion smoke passed: automatic repeated-space suggestions, deletion/retyping, accepted edits, quiet prose/speech, unsaved buffer.');
+  } finally {
+    renderer?.close();
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
     await fs.rm(folder, { recursive: true, force: true });
   }
