@@ -759,16 +759,11 @@ async function testWhitespaceCompletions() {
       await vscode.commands.executeCommand('hideSuggestWidget');
       await replaceStory(`=== start\n${line}`);
       editor.selection = new vscode.Selection(1, line.length, 1, line.length);
-      await waitUntil(async () => {
-        const items = await vscode.commands.executeCommand(
-          'vscode.executeCompletionItemProvider', document.uri, editor.selection.active);
-        return items?.items?.some(item => item.label === 'skill-check');
-      }, `Manual completion must offer skill-check after ${JSON.stringify(line)}`);
-      await vscode.commands.executeCommand('editor.action.triggerSuggest');
+      await renderer.dispatchKey(' ', 'Space', 32, 2);
       await waitForSkillCheckSuggestion();
       await vscode.commands.executeCommand('acceptSelectedSuggestion');
       assert.equal(document.lineAt(1).text, '::: skill-check ',
-        'Manual acceptance must create a spaced entry skill-check block');
+        'Ctrl+Space acceptance must create a spaced entry skill-check block');
     };
 
     await type('    ');
