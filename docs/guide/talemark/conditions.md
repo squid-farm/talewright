@@ -1,7 +1,7 @@
 # Conditions: reveal content only when something is true
 
-Use the author's existing state when available. "The murder happened" and "the player discovered
-the body" are different facts: do not conflate them, and do not set the murder flag just to make a
+Use the author's existing state when available. "The festival happened" and "the player found
+the letter" are different facts: do not conflate them, and do not set the festival flag just to make a
 condition pass. If the story provides no way to identify the event, explain which state is needed.
 
 `{if condition}reader text{else}other text{/if}` selects text; `{else}` is optional.
@@ -15,46 +15,46 @@ evaluated when its prose line renders. Nest `{if}` blocks for additional tests; 
 `story.talewright.yaml`:
 
 ```yaml
-game: { id: mystery, title: The Locked Study, start: hall }
+game: { id: festival, title: The Letter, start: hall }
 characters:
   player: { first-name: Ada }
-flags: [murder-happened]
+flags: [festival-happened]
 ```
 
 `story.tale`:
 
 ```tale
 === hall
-{if flag:murder-happened}The house is silent.{else}Music fills the house.{/if}
-* [Wait until midnight] { set flag:murder-happened } -> study
+{if flag:festival-happened}The festival is over.{else}The festival is about to begin.{/if}
+* [Attend the festival] { set flag:festival-happened } -> study
 * [Visit the study now] -> study
 
 === study
-{if flag:murder-happened}
-You discover the body.
+{if flag:festival-happened}
+You find a letter on the desk.
 {else}
-The host greets you, very much alive.
+The desk is empty.
 {/if}
 * [Return to the hall] -> hall
 * [Leave] -> END
 ```
 
-The first route reveals the body; visiting before midnight does not. In an existing scene, insert
-just the conditional around the intended prose, not this whole sample. This does not prevent
-repeated discovery on later visits; use a separate discovery flag if requested.
+The first route reveals the letter; visiting before the festival does not. In an existing scene,
+insert just the conditional around the intended prose, not this whole sample. This does not prevent
+finding the letter again on later visits; use a separate discovery flag if requested.
 
 ## Expression toolbox
 
 | Test | Form |
 |---|---|
-| Flag / opposite | `flag:murder-happened` / `not flag:murder-happened` |
+| Flag / opposite | `flag:festival-happened` / `not flag:festival-happened` |
 | Holds an item | `player has key` |
 | Has at least two items | `player:inventory:coin:count >= 2` |
 | Entered a scene / visit count | `player visited hall` / `hall:player:visits > 1` |
 | Current scene visit count | `scene:player:visits == 1` |
 | Text / number variable | `var:weather == "rain"` / `var:clues >= 3` |
 | Stat / faction | `player:hp > 0` / `faction:guild:tier >= friendly` |
-| Combine | `flag:murder-happened and (var:clues >= 3 or player has key)` |
+| Combine | `flag:festival-happened and (var:clues >= 3 or player has key)` |
 
 Examples in the table require those names to exist in the story; do not add them merely to copy
 an expression. Conditions are boolean: use a comparison for a number, not `if var:clues`.

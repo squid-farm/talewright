@@ -42,8 +42,8 @@ manifest and story; adapt the relevant lines rather than replacing an existing s
 | Hubs, tags, priorities, once-only storylets or generated choices | [Hubs](talemark/hubs.md) |
 | Skill checks, success/failure branches, hidden rolls or custom stats | [Skill checks](talemark/checks.md) |
 
-For "only discover the body if the murder has happened", read **Conditions**, then use the
-story's existing murder state. Read **State and effects** too only if asked to record the murder
+For "only find the letter after the festival", read **Conditions**, then use the
+story's existing festival state. Read **State and effects** too only if asked to record the festival
 or discovery. For a complex new story, select the topics for its requested features; do not fetch
 the full reference.
 
@@ -70,6 +70,6 @@ for routine authoring; the registry's planned changes are not available syntax.
 The URL tracks `main`. For an older Talewright installation, use a matching release tag in place
 of `main` in the URL; relative topic links then stay on that version.
 
-Measured with tiktoken 0.14.0, `cl100k_base`: this entry is 1003 tokens; Conditions is 816 tokens.
-Entry plus all seven topics is 6300 tokens. These are documentation input sizes, not a price
+Measured with tiktoken 0.14.0, `cl100k_base`: this entry is 1001 tokens; Conditions is 810 tokens.
+Entry plus all seven topics is 6292 tokens. These are documentation input sizes, not a price
 guarantee; model rates, generated output and tool calls also affect cost.
