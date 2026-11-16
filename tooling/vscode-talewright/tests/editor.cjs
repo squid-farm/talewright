@@ -532,13 +532,33 @@ async function testLiveDiagnostics() {
 
     const manifestBuffer = await vscode.workspace.openTextDocument(path.join(folder, 'story.talewright.yaml'));
     await vscode.window.showTextDocument(manifestBuffer);
-    const flagManifest = 'game:\n  id: live\n  title: Live\n  start: start\nflags: [ready]\ncharacters:\n  player: {first-name: Ada}\n';
+    const flagManifest = 'game:\n  id: live\n  title: Live\n  start: start\n  ruleset: rpg\nflags: [ready]\ncharacters:\n  player: {first-name: Ada}\n  guide: {first-name: Bea}\n';
     const flagManifestEdit = new vscode.WorkspaceEdit();
     flagManifestEdit.replace(manifestBuffer.uri,
       new vscode.Range(manifestBuffer.positionAt(0), manifestBuffer.positionAt(manifestBuffer.getText().length)),
       flagManifest);
     assert.equal(await vscode.workspace.applyEdit(flagManifestEdit), true);
     assert.equal(manifestBuffer.isDirty, true, 'Exercise an unsaved root-manifest overlay');
+
+    const skillCheckStory = '=== start\n::: skill-check guide dc 10\nsuccess: -> END\nfailure: -> END\n:::\n';
+    const skillCheckEdit = new vscode.WorkspaceEdit();
+    skillCheckEdit.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
+      skillCheckStory);
+    assert.equal(await vscode.workspace.applyEdit(skillCheckEdit), true);
+    await waitForCompiler(document, items => items.length > 0);
+    editor = await vscode.window.showTextDocument(document);
+    const actorEnd = '::: skill-check guide'.length;
+    editor.selection = new vscode.Selection(1, actorEnd, 1, actorEnd);
+    await vscode.commands.executeCommand('type', { text: ' ' });
+    assert.equal(document.lineAt(1).text, '::: skill-check guide  dc 10');
+    const emptySlotCompletions = await vscode.commands.executeCommand(
+      'vscode.executeCompletionItemProvider', document.uri, editor.selection.active);
+    assert.ok(emptySlotCompletions.items.some(item => item.label === 'acrobatics'),
+      'The installed language server must offer stats in the empty slot before dc 10');
+    for (const character of 'arc') await vscode.commands.executeCommand('type', { text: character });
+    await vscode.commands.executeCommand('acceptSelectedSuggestion');
+    assert.equal(document.lineAt(1).text, '::: skill-check guide  arcana dc 10',
+      'Typing a stat prefix after an explicit actor must automatically offer and accept a stat without Ctrl+Space');
 
     const undeclaredFlag = new vscode.WorkspaceEdit();
     undeclaredFlag.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),

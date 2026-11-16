@@ -897,8 +897,10 @@ internal sealed partial class TaleBinder
                 }
             }
 
-            // "skill-check guard " with no dc yet: the word is a known actor, so offer stats after it.
-            if (spec.DifficultyWord == 0 && difficultyClause is null && words.Count == 1)
+            // A known actor needs a stat slot both before and after a following dc clause.
+            if (words.Count == 1 &&
+                (spec.DifficultyWord == 0 && difficultyClause is null ||
+                 spec.DifficultyWord == 1 && difficultyClause is not null))
             {
                 var end = wordClauses[0].ValueStart + wordClauses[0].ValueLength;
                 if (end < _lineLength && char.IsWhiteSpace(_text[_lineStart + end]) &&
