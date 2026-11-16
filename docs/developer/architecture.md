@@ -202,6 +202,8 @@ renders `StoryFrame`/`ChoiceView`, and reads `IGameStateView` for the character 
 exposes the compiled definition and event history as public contracts. The Player does not interpret `Expr`
 or `Effect`, or execute `SceneDefinition.Steps`; `StorySession` owns scene execution. `StoryPlayer` uses
 `StoryHistory` for transcript, Back/Forward and save orchestration; presentation does not reimplement replay.
+It also automatically accepts bare-divert continuations. Headless player interfaces should consume
+`StoryHistory` and its transcript rather than driving low-level `StorySession` transitions directly.
 
 `Talewright.Runtime` also owns the headless `AuthorSession` API for synthetic scene starts, state edits,
 jumps and reload checkpoints. `StoryHistory.ForkAuthor` adapts a player's validated choice history into
@@ -428,8 +430,8 @@ the [reader-text grammar](../reference/talemark-operators.md#reader-text-grammar
 
 ### 3.6 `Talewright.Runtime` — the orchestrator
 
-- `IStorySession`: `Start()`, `Choose(key)`, `Current`, `State`, `Events`, `Seed`, `Story`. The UI's only
-  contract.
+- `IStorySession`: low-level `Start()`, `Choose(key)`, `Current`, `State`, `Events`, `Seed`, `Story`.
+- `StoryHistory`: player-facing automatic continuation, transcript, Back/Forward and save orchestration.
 - `StorySession`: the engine loop (§5).
 - `StoryFrame(Scene, Title, Document, Choices, IsEnded)`: `Choices` contains available choices only; `Menu` carries all shown entries in order with stable numbers and availability.
 - `EventNarrator.Describe(events, state)`: turns the events produced by an action into `RenderedNote`s
@@ -542,7 +544,7 @@ flowchart LR
 3. **Play.** Fixed stories start immediately; creation stories first validate and snapshot an author-approved
    selection. `StorySession` creates an `EventLog` from world + seed, applies character initialization,
    primes triggers and enters the start scene. Every `Choose(key)` appends events and returns a new frame.
-   `StoryHistory` replays a fresh session from the seed and choice history for save restore and Back/Forward;
+   `StoryHistory` accepts bare-divert continuations automatically, and replays a fresh session from the seed and choice history for save restore and Back/Forward;
    it validates the entire saved redo sequence before replacement, preserving deterministic dice and trigger edge memory.
 4. **Render.** `StoryPlayer` appends each frame to its transcript and asks `DocumentView` to draw it. The character
    sheet re-reads `IGameStateView` on each render, so it's always current.
@@ -668,7 +670,7 @@ This is how the "dating sim doesn't want strength" requirement is met, and where
 | New text modifier (`#shout`)                      | —                                                                                        | `TextModifierRegistry.Register(new DelegateTextModifier("shout", …))`      |
 | Other language / possessive style                 | —                                                                                        | implement `IGrammar`, pass to `StorySession`                               |
 | Different story source (database, HTTP)           | —                                                                                        | implement `IStoryLibrary` and register it in the host                      |
-| Different UI (console, Unity, MAUI)               | —                                                                                        | consume `IStorySession` + `RenderedDocument`; ignore `Talewright.Player`   |
+| Different UI (console, Unity, MAUI)               | —                                                                                        | consume `StoryHistory` + `RenderedDocument`; ignore `Talewright.Player`    |
 
 The C# column works by installing the NuGet packages and passing a custom `CompilerOptions`
 (`Rulesets`, `Predicates`, `Modifiers`); see [C# extensions](csharp-extensions.md) and the

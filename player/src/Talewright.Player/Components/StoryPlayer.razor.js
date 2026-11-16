@@ -20,14 +20,14 @@ function sceneScrollTop(transcript, element, isFirst) {
     return Math.max(0, Math.min(desired, maximum));
 }
 
-// Brings the newest frame to the top of the viewport and gives it focus (so screen readers move to it).
+// Brings the first newly presented passage to the top and gives it focus (so screen readers do not skip prose).
 // Plain focus() only scrolls when the element is entirely off-screen, so a frame that starts near the bottom of
 // the window would otherwise stay mostly hidden.
 // The first frame of a playthrough scrolls the page to the very top instead, so the title bar stays visible.
-export function revealLatest(transcript, isFirst, preserveExistingFocus = false) {
+export function revealPassage(transcript, passageIndex, isFirst, preserveExistingFocus = false) {
     stopReveal(transcript);
-    // Back can make an existing keyed frame current without recapturing its element reference.
-    const element = transcript?.querySelector(".tw-latest");
+    const element = transcript?.querySelector(
+        `.tw-passage-anchor[data-tw-passage-index="${passageIndex}"]`);
     if (!element || !element.isConnected) {
         return;
     }
@@ -47,6 +47,7 @@ export function revealLatest(transcript, isFirst, preserveExistingFocus = false)
     const abort = new AbortController();
     const state = { abort, frame: 0, adjusting: true, pendingImage: false, imageScroll: 0, height: document.documentElement.scrollHeight, target };
     reveals.set(transcript, state);
+    const isCurrentReveal = () => reveals.get(transcript) === state && element.isConnected;
     const options = { signal: abort.signal, capture: true };
     const stop = () => stopReveal(transcript);
     for (const event of ["wheel", "touchstart", "pointerdown"]) {
@@ -70,8 +71,7 @@ export function revealLatest(transcript, isFirst, preserveExistingFocus = false)
             && Math.abs(window.scrollY - state.target) > 1) stop();
     }, options);
     transcript.addEventListener("load", event => {
-        if (!(event.target instanceof HTMLImageElement) || !element.isConnected ||
-            transcript.querySelector(".tw-latest") !== element) return;
+        if (!(event.target instanceof HTMLImageElement) || !isCurrentReveal()) return;
         state.adjusting = true;
         state.pendingImage = true;
         state.imageScroll = window.scrollY;

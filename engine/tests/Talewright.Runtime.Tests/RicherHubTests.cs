@@ -59,11 +59,10 @@ public sealed class RicherHubTests
         var history = History(query);
         Assert.Equal(["storylet:first", "storylet:second", "c0"], history.Current.Choices.Select(c => c.Key));
         history.Choose("storylet:first");
-        history.Choose("continue");
+        Assert.True(history.Transcript[^2].ChosenAutomatically);
         Assert.Equal(["storylet:second", $"storylet:{next}", "c0"], history.Current.Choices.Select(c => c.Key));
         var loaded = StoryHistory.Restore(history.Story, history.Save());
         Assert.Equal(history.Current.Choices.Select(c => c.Key), loaded.Current.Choices.Select(c => c.Key));
-        loaded.Back();
         loaded.Back();
         Assert.Contains(loaded.Current.Choices, c => c.Key == "storylet:first");
     }

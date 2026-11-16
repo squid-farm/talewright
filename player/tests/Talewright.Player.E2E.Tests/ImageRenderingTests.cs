@@ -281,12 +281,10 @@ public sealed class ImageRenderingTests : PlayerTest
             """);
         await Driver.OpenBundledAsync();
         await Driver.ClickAsync("Start story");
-        await Choose("Continue");
         await Choose("Haggle for supplies");
         const string alt = "A low fire lights an expedition awning and a brass tripwire bell at the foot of a jungle stair.";
         var images = Page.GetByAltText(alt, new() { Exact = true });
         await Choose("Sign the expedition register");
-        await Choose("Continue");
         await Choose("Set out for the temple");
         await Choose("Tie off the rope and cross carefully");
         await Choose("Make camp before the climb");
@@ -297,7 +295,6 @@ public sealed class ImageRenderingTests : PlayerTest
         await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0", await images.First.ElementHandleAsync());
         var url = await images.First.GetAttributeAsync("src");
         await Choose("Share supper by the fire");
-        await Choose("Continue");
         await Expect(images).ToHaveCountAsync(1);
         await images.Last.ScrollIntoViewIfNeededAsync();
         await Expect(images.Last).ToHaveAttributeAsync("src", url!);

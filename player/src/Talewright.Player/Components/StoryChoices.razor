@@ -9,28 +9,36 @@ else
     {
         <p class="tw-error" role="alert">This playthrough has reached the @StoryHistory.MaxChoices.ToString("N0")-choice limit. You can save, go back, or restart to continue playing.</p>
     }
-    <ol class="tw-choices" aria-label="Story choices">
-        @foreach (var entry in Current.Menu)
-        {
-            <li>
-                <button type="button" class="tw-choice" disabled="@(Busy || AtChoiceLimit || !entry.IsAvailable)"
-                        data-tw-choice="@entry.Key" @onclick="() => Choose(entry.Key)">
-                    <span class="tw-choice-number">@(entry.Number).</span>
-                    <InlineView Inlines="entry.Label" />
-                    @if (!entry.IsAvailable)
-                    {
-                        <span class="tw-choice-status"> (Unavailable)</span>
-                    }
-                </button>
-            </li>
-        }
-    </ol>
+    @if (ContinuationError is not null)
+    {
+        <p class="tw-error" role="alert">@ContinuationError</p>
+    }
+    @if (Current.Menu.Count > 0)
+    {
+        <ol class="tw-choices" aria-label="Story choices">
+            @foreach (var entry in Current.Menu)
+            {
+                <li>
+                    <button type="button" class="tw-choice" disabled="@(Busy || AtChoiceLimit || !entry.IsAvailable)"
+                            data-tw-choice="@entry.Key" @onclick="() => Choose(entry.Key)">
+                        <span class="tw-choice-number">@(entry.Number).</span>
+                        <InlineView Inlines="entry.Label" />
+                        @if (!entry.IsAvailable)
+                        {
+                            <span class="tw-choice-status"> (Unavailable)</span>
+                        }
+                    </button>
+                </li>
+            }
+        </ol>
+    }
 }
 
 @code {
     [Parameter, EditorRequired] public StoryFrame Current { get; set; } = default!;
     [Parameter] public bool Busy { get; set; }
     [Parameter] public bool AtChoiceLimit { get; set; }
+    [Parameter] public string? ContinuationError { get; set; }
     [Parameter] public EventCallback<ChoiceView> OnChoose { get; set; }
     [Parameter] public EventCallback OnRestart { get; set; }
 

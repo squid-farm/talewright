@@ -20,9 +20,8 @@ public sealed class StoryLoadingTests(WebHostFixture host, ITestOutputHelper out
         files[prefix + "chapters/main.tale"] = "=== start\nFirst file.\n-> finish";
         files[prefix + "chapters/ending.tale"] = "=== finish\nSecond file.\n-> END";
         await UploadBytes("multi.zip", TestArchives.Create(files));
-        await Observe(new(null, "First file."));
-        await Choose("Continue");
-        await Observe(new(null, "Second file."));
+        await Observe(new(null, "First file."), newlyPresented: true);
+        await Observe(new(null, "Second file.", Ended: true));
     }
 
     [Fact]
@@ -63,9 +62,9 @@ public sealed class StoryLoadingTests(WebHostFixture host, ITestOutputHelper out
         }
         await UploadBytes("lost-relic.zip", buffer.ToArray());
         await Driver.ClickAsync("Start story");
-        await Observe(new(null, "Tomas"));
-        await Choose("Continue");
+        await Observe(new(null, "Tomas"), newlyPresented: true);
         await Observe(new(null, "The camp hums"));
+        await AssertState(state => Assert.Contains("Haggle for supplies", state.Choices));
     }
 
     [Theory]

@@ -60,10 +60,12 @@ The mechanism defeats you.
 - Checks can appear in `{if}`, choice `(requires ...)`, hub `@requires`, numeric assignments and
   trigger `do`, but not trigger `when`. Boolean short-circuiting can skip an expression check.
 - Choice checks need a reader label, both `success:` and `failure:` outcomes, and an explicit
-  target on **each** outcome. Do not add a trailing shared target or fall through after choices.
+  target on **each** outcome. The chosen check follows its outcome without an extra **Continue**
+  pause. Do not add a trailing shared target or fall through after choices.
 - A `::: skill-check ...` block runs at that line, ends with `:::`, and needs both outcomes.
   Each outcome can apply effects. Without a divert it continues at the following scene step;
-  with a divert it leaves immediately. Put these blocks before the first choice.
+  a scene target pauses for **Continue**, while `-> END` finishes in the current frame. Put these
+  blocks before the first choice.
 - Built-in `none` and `rpg` checks use d20 plus modifiers. Non-attribute custom stats add their
   value; `category: attribute` instead adds `floor((score - 10) / 2)`. Do not mark an ordinary
   additive skill as an attribute. `randomness: off` supplies the ruleset's no-dice result;

@@ -61,7 +61,7 @@ public static class TestStories
         === second
         @title Second passage
         Second passage text.
-        -> finish
+        * [Continue] -> finish
         === finish
         @title Finished
         Finished safely.
@@ -89,16 +89,16 @@ public static class TestStories
         ~ faction:guild:standing += 20
         ~ set flag:ready
         Supplies collected.
-        -> start
+        * [Continue] -> start
         === talk
         @title Talk once
         @tags room
         @once
         The guide answers.
-        -> start
+        * [Continue] -> start
         === flag
         The flag is ready.
-        -> start
+        * [Continue] -> start
         === finish
         Gate route complete.
         -> END

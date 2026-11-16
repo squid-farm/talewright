@@ -11,7 +11,7 @@ using Talewright.Talemark.Model;
 namespace Talewright.Runtime;
 
 internal sealed record SceneExecution(IReadOnlyList<RenderedBlock> Blocks,
-    IReadOnlyList<VisibleChoice> Choices, DivertTarget? Target);
+    IReadOnlyList<VisibleChoice> Choices, DivertTarget? Target, bool AutomaticallyContinue);
 
 /// <summary>Executes authored steps; StorySession owns entry, transitions, history and presentation.</summary>
 internal sealed class SceneExecutor(StoryDefinition story, EventLog log, TemplateRenderer renderer,
@@ -56,13 +56,14 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
         var blocks = new List<RenderedBlock>();
         var choices = new List<VisibleChoice>();
         _replayChoices.Clear();
-        var target = Execute(scene, scene.Steps, blocks, choices, _replayChoices, refresh, out _);
+        var target = Execute(scene, scene.Steps, blocks, choices, _replayChoices, refresh, out var stopReason);
         if (!refresh && rememberEntry)
         {
             var lastBatch = _visits.FindLastIndex(id => _notes.ContainsKey(id));
             _settled.UnionWith(_visits.Take(lastBatch + 1));
         }
-        return new(new RenderedDocument(blocks).TrimUnboundedBlankLines().Blocks, choices, target);
+        return new(new RenderedDocument(blocks).TrimUnboundedBlankLines().Blocks, choices, target,
+            target is not null && stopReason == DecisionReason.EarlierDivert);
     }
 
     private DivertTarget? Execute(SceneDefinition scene, IReadOnlyList<SceneStep> steps, List<RenderedBlock> blocks,

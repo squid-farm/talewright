@@ -139,11 +139,12 @@ public sealed class HistoryNavigationPerformanceTests : PlayerTest
                         let readyFrames = 0;
                         const observe = () => {
                             const latest = transcript.querySelector('.tw-latest');
+                            const revealed = transcript.querySelector('[aria-label="New story passage"]');
                             const ready = transcript.querySelectorAll('.tw-frame').length === Math.min(frames, 21) &&
                                 latest?.textContent.includes(`Visit ${frames}.`);
                             if (ready && domObservedMs === null)
                                 domObservedMs = performance.now() - start;
-                            if (ready && document.activeElement === latest && focusObservedMs === null)
+                            if (ready && document.activeElement === revealed && focusObservedMs === null)
                                 focusObservedMs = performance.now() - start;
                         };
                         const observer = new MutationObserver(observe);
@@ -174,7 +175,7 @@ public sealed class HistoryNavigationPerformanceTests : PlayerTest
             var result = await Page.EvaluateAsync<JsonElement>("() => window.__historyNavigation");
             await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(Math.Min(frames, 21));
             await Expect(Latest).ToContainTextAsync($"Visit {frames}.");
-            await Expect(Latest).ToBeFocusedAsync();
+            await Expect(RevealedPassage).ToBeFocusedAsync();
             await Expect(Page.Locator(".tw-chosen")).ToHaveCountAsync(Math.Min(frames, 21) - 1);
             Assert.Equal($"Visit {depth - 19}.", await Page.EvaluateAsync<string>("() => getSelection().toString()"));
             if (iteration >= 0)

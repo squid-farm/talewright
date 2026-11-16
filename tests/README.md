@@ -68,6 +68,14 @@ matter. The checked-in story corpus and byte-sensitive performance fixtures stay
 byte-stable. JavaScript schema and VS Code tests keep their own static YAML fixtures
 because they can't use the .NET faker library.
 
+## Native accessibility synchronization
+
+Native AT-SPI activation acknowledges a requested action before Blazor and WebKit finish
+updating the UI. Before taking a one-shot accessibility snapshot, use `AssertState` or
+`Observe` to wait for the expected state. In particular, wait for the passage to become
+visible after closing Settings: an open modal excludes the transcript from the
+accessibility tree.
+
 ## Fast .NET tests
 
 ```bash

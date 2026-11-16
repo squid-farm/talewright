@@ -129,17 +129,17 @@ public sealed class SceneImageRevealTests : PlayerTest
         {
             await ReloadAsync();
             await Expect(Latest).ToContainTextAsync("First scene before navigation.");
-            await Expect(Latest).ToBeFocusedAsync();
+            await Expect(RevealedPassage).ToBeFocusedAsync();
             await WaitForRequest("first.jpeg");
             Assert.Equal(0, await Page.EvaluateAsync<double>("scrollY"));
             await Release("first.jpeg", "First image");
             Assert.Equal(0, await Page.EvaluateAsync<double>("scrollY"));
-            await Expect(Latest).ToBeFocusedAsync();
+            await Expect(RevealedPassage).ToBeFocusedAsync();
 
             await WaitForRequest("one.jpeg");
             await Choose("Go to destination");
             await Expect(Latest).ToContainTextAsync("The destination begins here.");
-            await Expect(Latest).ToBeFocusedAsync();
+            await Expect(RevealedPassage).ToBeFocusedAsync();
             await AssertAligned();
             if (!longScene)
             {
@@ -162,15 +162,15 @@ public sealed class SceneImageRevealTests : PlayerTest
             if (!longScene)
                 Assert.True(await Page.EvaluateAsync<double>("scrollY") > beforeArrival,
                     "The first image made more of the scene's beginning reachable.");
-            await Expect(Latest).ToBeFocusedAsync();
+            await Expect(RevealedPassage).ToBeFocusedAsync();
             await Release("two.jpeg", "Second destination image");
             await AssertAligned();
-            await Expect(Latest).ToBeFocusedAsync();
+            await Expect(RevealedPassage).ToBeFocusedAsync();
             if (!longScene)
             {
                 await Release("choice.jpeg", "Choice image");
                 await AssertAligned();
-                await Expect(Latest).ToBeFocusedAsync();
+                await Expect(RevealedPassage).ToBeFocusedAsync();
             }
             else
             {

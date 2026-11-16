@@ -37,7 +37,7 @@ public sealed class LostRelicDreamTests(WebHostFixture host, ITestOutputHelper o
         }
         else
         {
-            var image = Latest.GetByAltText(alt, new() { Exact = true });
+            var image = RevealedPassage.GetByAltText(alt, new() { Exact = true });
             await image.ScrollIntoViewIfNeededAsync();
             await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0",
                 await image.ElementHandleAsync());
@@ -70,7 +70,7 @@ public sealed class LostRelicDreamTests(WebHostFixture host, ITestOutputHelper o
     private async Task EnterDream(bool journal, bool night)
     {
         await Driver.ClickAsync("Start story");
-        await Observe(new(null, "reputation for punctuality"));
+        await Observe(new(null, "reputation for punctuality"), newlyPresented: true);
         if (!PlayerTarget.IsDesktop)
         {
             var image = Page.GetByAltText(
@@ -79,14 +79,11 @@ public sealed class LostRelicDreamTests(WebHostFixture host, ITestOutputHelper o
             await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0",
                 await image.ElementHandleAsync());
         }
-        await Choose("Continue");
         await Choose("Ask Tomas about the temple");
-        await Choose("Continue");
         if (journal)
         {
             await Choose("Study your journal");
             await Choose("Puzzle out the glyphs");
-            await Choose("Continue");
         }
         await Choose("Agree on a night watchword");
         await Choose("Keep quiet river");
@@ -94,7 +91,6 @@ public sealed class LostRelicDreamTests(WebHostFixture host, ITestOutputHelper o
         await Choose("Close the watch ledger");
         await Choose("Haggle for supplies");
         await Choose("Sign the expedition register");
-        await Choose("Continue");
         await Choose("Set out for the temple");
         await AssertImage("A rope stretches across a swollen jungle river toward an ancient green stone stair on the opposite bank.");
         await Choose("Tie off the rope and cross carefully");
@@ -104,7 +100,6 @@ public sealed class LostRelicDreamTests(WebHostFixture host, ITestOutputHelper o
             await AssertImage("A low fire lights an expedition awning and a brass tripwire bell at the foot of a jungle stair.");
             await Choose("Eat a ration");
             await Choose("Share supper by the fire");
-            await Choose("Continue");
             await Choose("Stand your ground");
             await AssertImage("A watchful jaguar emerges from wet foliage at the edge of the campfire's light.");
             await Choose("Catch your breath");
@@ -113,7 +108,6 @@ public sealed class LostRelicDreamTests(WebHostFixture host, ITestOutputHelper o
         else await Choose("Climb straight to the temple");
         await Choose("Close your eyes");
         await AssertImage("An expedition table and a solitary explorer stand on still dark water in a hall of mist.");
-        await Choose("Continue");
     }
 
     private async Task MeetKeepers(string watcherRoute)
@@ -132,9 +126,7 @@ public sealed class LostRelicDreamTests(WebHostFixture host, ITestOutputHelper o
         await Choose("Face the Watcher");
         await Observe(new(null, "It has no eyelid"));
         await Choose("Continue");
-        await Choose("Continue");
         await Choose(watcherRoute);
-        await Choose("Continue");
         await Observe(new(null, "Glyph marks held: 2"));
         await Choose("Hear the guild ghost");
         await Observe(new(null, "They still put your name in the ledger"));
@@ -149,17 +141,12 @@ public sealed class LostRelicDreamTests(WebHostFixture host, ITestOutputHelper o
     private async Task Finish(string ending)
     {
         await Choose("Pay the Hands and return to the temple");
-        await Observe(new(null, "You keep 2 marks"));
-        await Choose("Continue");
+        await Observe(new(null, "You keep 2 marks"), newlyPresented: true);
         await Choose("Continue");
         if ((await Driver.ObserveAsync()).Choices.Contains("Take the idol")) await Choose("Take the idol");
         await Choose(ending == "leave" ? "Leave it where it lies" : "Take the relic");
-        await Choose(ending switch
-        {
-            "guild" => "Hand the relic to the guild",
-            "keep" => "Keep it for yourself",
-            _ => "Continue",
-        });
+        if (ending == "guild") await Choose("Hand the relic to the guild");
+        else if (ending == "keep") await Choose("Keep it for yourself");
         await Observe(new(null, ending switch
         {
             "guild" => "testimony",

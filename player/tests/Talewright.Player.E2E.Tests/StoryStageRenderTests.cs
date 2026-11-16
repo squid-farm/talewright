@@ -67,6 +67,24 @@ public sealed class StoryStageRenderTests
     }
 
     [Fact]
+    public async Task Runaway_automatic_diverts_show_an_actionable_error_without_a_continue_choice()
+    {
+        var story = new StoryFixture("runaway-stage", TestStories.DefaultYaml, """
+            === start
+            -> start
+            """).Compile();
+        var history = new StoryHistory(story, 42);
+
+        var html = await RenderStageAsync(story, history);
+
+        Assert.NotNull(history.AutomaticContinuationError);
+        Assert.Contains("role=\"alert\"", html);
+        Assert.Contains("1,000 automatic scene transitions", html);
+        Assert.DoesNotContain("aria-label=\"Story choices\"", html);
+        Assert.DoesNotContain("Play again", html);
+    }
+
+    [Fact]
     public async Task Speech_paragraphs_and_spacers_render_inside_one_panel_per_turn()
     {
         var yaml = """
@@ -283,6 +301,7 @@ public sealed class StoryStageRenderTests
                 [nameof(StoryStage.Passages)] = history.Transcript,
                 [nameof(StoryStage.PassageWindow)] = passageWindow,
                 [nameof(StoryStage.Current)] = history.Current,
+                [nameof(StoryStage.ContinuationError)] = history.AutomaticContinuationError,
                 [nameof(StoryStage.State)] = history.State,
                 [nameof(StoryStage.Identity)] = history,
                 [nameof(StoryStage.ShowCharacterSheet)] = showCharacterSheet,

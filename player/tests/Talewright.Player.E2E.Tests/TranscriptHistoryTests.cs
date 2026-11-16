@@ -27,7 +27,7 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
 
         await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(2);
         await Expect(Page.Locator(".tw-past")).ToContainTextAsync("Final scene stays visible.");
-        await Expect(Latest).ToBeFocusedAsync();
+        await Expect(RevealedPassage).ToBeFocusedAsync();
     }
 
     [Fact]
@@ -55,7 +55,7 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
         await Expect(Latest).ToContainTextAsync("After the clear.");
         await Expect(Latest).Not.ToContainTextAsync("Before the break.");
         await Expect(Latest).Not.ToContainTextAsync("Before the clear.");
-        await Expect(Latest).ToBeFocusedAsync();
+        await Expect(RevealedPassage).ToBeFocusedAsync();
 
         await Driver.ClickAsync("Saves");
         await Driver.ClickAsync("Save game");
@@ -72,12 +72,12 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
         await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(2);
         await Expect(Latest).ToContainTextAsync("Before the clear.");
         await Expect(Latest).Not.ToContainTextAsync("After the clear.");
-        await Expect(Latest).ToBeFocusedAsync();
+        await Expect(RevealedPassage).ToBeFocusedAsync();
 
         await Driver.ClickAsync("Forward");
         await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(1);
         await Expect(Latest).ToContainTextAsync("After the clear.");
-        await Expect(Latest).ToBeFocusedAsync();
+        await Expect(RevealedPassage).ToBeFocusedAsync();
 
         await Choices.GetByText("Continue").ClickAsync();
         await Expect(Latest).ToContainTextAsync("Finished.");
@@ -88,7 +88,7 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
         await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(1);
         await Expect(Latest).ToContainTextAsync("After the clear.");
         await Expect(Latest).Not.ToContainTextAsync("Before the break.");
-        await Expect(Latest).ToBeFocusedAsync();
+        await Expect(RevealedPassage).ToBeFocusedAsync();
     }
 
     [Fact]

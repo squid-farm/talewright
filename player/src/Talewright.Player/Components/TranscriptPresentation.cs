@@ -7,10 +7,13 @@ internal static class TranscriptPresentation
 {
     internal const int PassageWindow = 21;
 
-    internal static IReadOnlyList<PassageGroup> Group(IReadOnlyList<HistoryFrame> passages, int window)
+    internal static IReadOnlyList<PassageGroup> Group(
+        IReadOnlyList<HistoryFrame> passages, int window, int? includeFromIndex = null)
     {
         var groups = new List<List<PresentedPassage>>();
         var start = Math.Max(0, passages.Count - window);
+        if (includeFromIndex is { } include && include < start)
+            start = Math.Max(0, include);
         for (var index = start; index < passages.Count; index++)
         {
             var passage = new PresentedPassage(index, passages[index]);

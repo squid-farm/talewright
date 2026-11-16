@@ -352,7 +352,8 @@ public sealed class StorySession : IStorySession
         {
             SkipHub(scene);
             return next.IsEnd ? EndStory(blocks, scene) : Present(scene, blocks,
-                BuildMenu(scene, ContinueTo(scene, next), includeHubOffers: false));
+                BuildMenu(scene, ContinueTo(scene, next), includeHubOffers: false),
+                automaticallyContinue: execution.AutomaticallyContinue);
         }
         var menuMark = _log.Events.Count;
         var menu = BuildMenu(scene, execution.Choices);
@@ -484,6 +485,10 @@ public sealed class StorySession : IStorySession
     }
 
     private StoryFrame Present(SceneDefinition scene, List<RenderedBlock> blocks, StoryMenu menu)
+        => Present(scene, blocks, menu, automaticallyContinue: false);
+
+    private StoryFrame Present(SceneDefinition scene, List<RenderedBlock> blocks, StoryMenu menu,
+        bool automaticallyContinue)
     {
         _actions.Clear();
         foreach (var choice in menu.Choices.Where(choice => choice.IsAvailable))
@@ -494,11 +499,28 @@ public sealed class StorySession : IStorySession
         Current = new StoryFrame(scene.Id, scene.Title, new RenderedDocument(blocks),
             menu.AvailableChoices, IsEnded: false)
         {
+            AutomaticallyContinue = automaticallyContinue,
             ContinuesPrevious = scene.ContinuesPrevious,
             ClearsPrevious = scene.ClearsPrevious,
             Menu = menu.Entries,
         };
         return Current;
+    }
+
+    internal void StopAutomaticContinuation()
+    {
+        if (Current?.AutomaticallyContinue != true)
+        {
+            throw new InvalidOperationException("The current passage is not an automatic continuation.");
+        }
+
+        _actions.Clear();
+        Current = Current with
+        {
+            AutomaticallyContinue = false,
+            Choices = [],
+            Menu = [],
+        };
     }
 
     private StoryFrame EndStory(List<RenderedBlock> blocks, SceneDefinition? scene)

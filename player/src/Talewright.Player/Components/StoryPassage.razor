@@ -3,7 +3,7 @@
     <h2 class="tw-scene-title">@Entry.Frame.Title</h2>
 }
 <DocumentView Document="Entry.Frame.Document" />
-@if (Entry.Chosen is not null)
+@if (Entry.Chosen is not null && !Entry.ChosenAutomatically)
 {
     <p class="tw-chosen">→ <InlineView Inlines="Entry.Chosen" /></p>
 }
@@ -34,6 +34,7 @@
             return true;
         }
         if (previous.Frame.Title != current.Frame.Title ||
+            previous.ChosenAutomatically != current.ChosenAutomatically ||
             !SameInlines(previous.Chosen, current.Chosen))
         {
             return false;

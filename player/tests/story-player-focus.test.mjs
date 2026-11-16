@@ -3,19 +3,24 @@ import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
 
 const source = await readFile(new URL("../src/Talewright.Player/Components/StoryPlayer.razor.js", import.meta.url));
-const { revealLatest, dispose } = await import(`data:text/javascript;base64,${source.toString("base64")}`);
+const { revealPassage, dispose } = await import(`data:text/javascript;base64,${source.toString("base64")}`);
 
 function setup() {
     const calls = [];
     const toolbar = { getBoundingClientRect: () => ({ bottom: 60, height: 60 }) };
     const outside = {};
+    const first = {
+        isConnected: true,
+        focus(options) { calls.push(["focus", options]); document.activeElement = this; },
+        getBoundingClientRect: () => ({ top: 200 }),
+    };
     const latest = {
         isConnected: true,
         focus(options) { calls.push(["focus", options]); document.activeElement = this; },
         getBoundingClientRect: () => ({ top: 400 }),
     };
     const player = {
-        contains: element => element === toolbar || element === latest,
+        contains: element => element === toolbar || element === first || element === latest,
         querySelector: () => toolbar,
     };
     const transcript = {
@@ -25,7 +30,8 @@ function setup() {
             remove(value) { this.values.delete(value); },
             contains(value) { return this.values.has(value); },
         },
-        querySelector: selector => selector === ".tw-latest" ? latest : null,
+        querySelector: selector => selector === '.tw-passage-anchor[data-tw-passage-index="0"]' ? first
+            : selector === '.tw-passage-anchor[data-tw-passage-index="1"]' ? latest : null,
         closest: selector => selector === ".tw-player" ? player : null,
         addEventListener() {},
     };
@@ -44,14 +50,14 @@ function setup() {
     globalThis.requestAnimationFrame = () => 1;
     globalThis.cancelAnimationFrame = () => {};
     globalThis.getComputedStyle = () => ({ top: "0px" });
-    return { calls, latest, outside, toolbar, transcript };
+    return { calls, first, latest, outside, toolbar, transcript };
 }
 
 test("A delayed initial reveal does not steal focus from the player's toolbar", () => {
     const { calls, toolbar, transcript } = setup();
     document.activeElement = toolbar;
 
-    revealLatest(transcript, true, true);
+    revealPassage(transcript, 1, true, true);
 
     assert.equal(document.activeElement, toolbar);
     assert.deepEqual(calls, []);
@@ -60,7 +66,7 @@ test("A delayed initial reveal does not steal focus from the player's toolbar", 
 test("An initial reveal still focuses the first passage when focus is outside the player", () => {
     const { calls, latest, transcript } = setup();
 
-    revealLatest(transcript, true, true);
+    revealPassage(transcript, 1, true, true);
 
     assert.equal(document.activeElement, latest);
     assert.deepEqual(calls, [
@@ -73,11 +79,23 @@ test("Explicit navigation still reveals and focuses a passage from the toolbar",
     const { calls, latest, toolbar, transcript } = setup();
     document.activeElement = toolbar;
 
-    revealLatest(transcript, false, false);
+    revealPassage(transcript, 1, false, false);
 
     assert.equal(document.activeElement, latest);
     assert.deepEqual(calls, [
         ["scrollTo", { top: 340, behavior: "auto" }],
+        ["focus", { preventScroll: true }],
+    ]);
+});
+
+test("A reveal focuses the requested first passage, not the latest passage", () => {
+    const { calls, first, transcript } = setup();
+
+    revealPassage(transcript, 0, false);
+
+    assert.equal(document.activeElement, first);
+    assert.deepEqual(calls, [
+        ["scrollTo", { top: 140, behavior: "auto" }],
         ["focus", { preventScroll: true }],
     ]);
 });
@@ -87,7 +105,7 @@ test("Fractional scroll positions keep the passage below the toolbar", () => {
     latest.getBoundingClientRect = () => ({ top: 400.7 });
     toolbar.getBoundingClientRect = () => ({ bottom: 60.1, height: 60.1 });
 
-    revealLatest(transcript, false);
+    revealPassage(transcript, 1, false);
 
     assert.deepEqual(calls[0], ["scrollTo", { top: 340, behavior: "auto" }]);
 });
@@ -101,13 +119,13 @@ test("Automatic reveal suppresses anchoring only until the reader takes control"
         calls.push(["scrollTo", options]);
     };
 
-    revealLatest(transcript, false);
+    revealPassage(transcript, 1, false);
     assert.equal(transcript.classList.contains("tw-transcript--revealing"), true);
 
     listeners.get("wheel")();
     assert.equal(transcript.classList.contains("tw-transcript--revealing"), false);
 
-    revealLatest(transcript, false);
+    revealPassage(transcript, 1, false);
     dispose(transcript);
     assert.equal(transcript.classList.contains("tw-transcript--revealing"), false);
 });
@@ -133,7 +151,7 @@ for (const timing of ["unchanged layout", "layout changed", "image loaded"]) {
         globalThis.cancelAnimationFrame = id => frames.delete(id);
         globalThis.HTMLImageElement = class {};
 
-        revealLatest(transcript, false);
+        revealPassage(transcript, 1, false);
         if (timing !== "unchanged layout") document.documentElement.scrollHeight += 100;
         if (timing === "image loaded") {
             window.scrollY = 80;
@@ -184,7 +202,7 @@ test("A delayed adjustment scroll does not cancel later image realignment", () =
     globalThis.cancelAnimationFrame = id => frames.delete(id);
     globalThis.HTMLImageElement = class {};
 
-    revealLatest(transcript, false);
+    revealPassage(transcript, 1, false);
     runFrame();
     sceneTop += 100;
     document.documentElement.scrollHeight += 100;
@@ -206,7 +224,7 @@ test("Restart still focuses the first passage from the toolbar", () => {
     const { calls, latest, toolbar, transcript } = setup();
     document.activeElement = toolbar;
 
-    revealLatest(transcript, true, false);
+    revealPassage(transcript, 1, true, false);
 
     assert.equal(document.activeElement, latest);
     assert.deepEqual(calls, [
@@ -230,7 +248,7 @@ for (const { preference, systemReducesMotion, behavior } of [
                 return { matches: systemReducesMotion };
             };
 
-            revealLatest(transcript, isFirst);
+            revealPassage(transcript, 1, isFirst);
 
             assert.equal(document.activeElement, latest);
             assert.deepEqual(calls, [

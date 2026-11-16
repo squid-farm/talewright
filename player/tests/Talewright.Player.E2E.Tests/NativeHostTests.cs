@@ -63,6 +63,40 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
     }
 
     [Fact]
+    public async Task Automatic_diverts_focus_the_first_new_passage_on_desktop()
+    {
+        await Driver.StartAsync();
+        await Upload(new StoryFixture("automatic-focus-native", TestStories.DefaultYaml, """
+            === start
+            The journey begins.
+            * [Follow] -> first
+            === first
+            The first new passage.
+            -> final
+            === final
+            The final passage.
+            * [Finish] -> END
+            """));
+        await Choose("Follow");
+        await AssertState(state =>
+        {
+            Assert.True(state.PassageFocused);
+            Assert.DoesNotContain("The journey begins.", state.NewPassages);
+            Assert.Contains("The first new passage.", state.NewPassages);
+            Assert.Contains("The final passage.", state.NewPassages);
+        });
+
+        var native = Assert.IsType<NativePlayerDriver>(Driver);
+        var nodes = (await native.SnapshotAsync()).Descendants().ToArray();
+        var revealed = Assert.Single(nodes, node => node.Name == "New story passage");
+        var current = Assert.Single(nodes, node => node.Name == "Current passage");
+        Assert.True(revealed.Focused);
+        Assert.Contains("The first new passage.", revealed.Content);
+        Assert.Contains("The final passage.", current.Content);
+        Assert.DoesNotContain(current.Descendants(), node => node.Name == "New story passage");
+    }
+
+    [Fact]
     public async Task Shown_unavailable_choices_are_exposed_as_disabled_and_skipped_by_keyboard_on_desktop()
     {
         await Driver.StartAsync();
@@ -132,8 +166,10 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
         await Driver.StartAsync();
         await Driver.OpenBundledAsync();
         await Driver.ClickAsync("Start story");
+        await Observe(new(null, "The camp hums"));
         await Driver.ClickAsync("More actions");
         await Driver.ClickAsync("Settings");
+        await AssertState(state => Assert.Contains("Close settings", state.Library));
 
         var native = Assert.IsType<NativePlayerDriver>(Driver);
         var snapshot = await native.SnapshotAsync();
@@ -154,6 +190,7 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
         await Observe(new(null, "First passage"));
         await Driver.ClickAsync("More actions");
         await Driver.ClickAsync("Settings");
+        await AssertState(state => Assert.Contains("Close settings", state.Library));
         var native = Assert.IsType<NativePlayerDriver>(Driver);
 
         await native.ActivateAsync("Theme");
@@ -210,6 +247,7 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
 
         await Driver.ClickAsync("More actions");
         await Driver.ClickAsync("Settings");
+        await AssertState(state => Assert.Contains("Close settings", state.Library));
         var settings = Assert.Single((await native.SnapshotAsync()).Descendants(),
             node => node.Role == "dialog" && node.Name == "Settings");
         Assert.Contains(settings.Descendants(),
@@ -231,6 +269,7 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
         await Driver.PressAsync("End");
         await Driver.ClickAsync("Close settings");
 
+        await AssertState(state => Assert.True(state.PassageVisible));
         var after = await native.SnapshotAsync();
         var transcriptAfter = Assert.Single(after.Descendants(), node => node.Name == "Story transcript");
         var passageAfter = Assert.Single(after.Descendants(), node => node.Name == "Current passage");
@@ -300,6 +339,7 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
         await Driver.ResizeAsync(720, 600);
         await Driver.ClickAsync("More actions");
         await Driver.ClickAsync("Settings");
+        await AssertState(state => Assert.Contains("Close settings", state.Library));
 
         var native = Assert.IsType<NativePlayerDriver>(Driver);
         var reducedMotion = Assert.Single((await native.SnapshotAsync()).Descendants(),
@@ -331,6 +371,7 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
 
         await Driver.ClickAsync("More actions");
         await Driver.ClickAsync("Settings");
+        await AssertState(state => Assert.Contains("Close settings", state.Library));
         var native = Assert.IsType<NativePlayerDriver>(Driver);
         var dialog = Assert.Single((await native.SnapshotAsync()).Descendants(),
             node => node.Role == "dialog" && node.Name == "Settings");
@@ -344,6 +385,7 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
         await Driver.PressAsync("Space");
         await Driver.ClickAsync("Close settings");
 
+        await AssertState(state => Assert.True(state.PassageVisible));
         var hidden = await Driver.ObserveAsync();
         Assert.DoesNotContain("Level 2!", hidden.Transcript);
         await Driver.ChooseAsync("Donate relic");
@@ -358,12 +400,14 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
         await Driver.StartAsync();
         await Driver.OpenBundledAsync();
         await Driver.ClickAsync("Start story");
+        await Observe(new(null, "The camp hums"));
         var native = Assert.IsType<NativePlayerDriver>(Driver);
         var before = await native.SnapshotAsync();
         var passageBefore = Assert.Single(before.Descendants(), node => node.Name == "Current passage");
 
         await Driver.ClickAsync("More actions");
         await Driver.ClickAsync("Settings");
+        await AssertState(state => Assert.Contains("Close settings", state.Library));
         var dialog = Assert.Single((await native.SnapshotAsync()).Descendants(),
             node => node.Role == "dialog" && node.Name == "Settings");
         var textSize = Assert.Single(dialog.Descendants(),
@@ -375,6 +419,7 @@ public sealed class NativeHostTests(WebHostFixture host, ITestOutputHelper outpu
         await Driver.PressAsync("End");
         await Driver.ClickAsync("Close settings");
 
+        await AssertState(state => Assert.True(state.PassageVisible));
         var after = await native.SnapshotAsync();
         var passageAfter = Assert.Single(after.Descendants(), node => node.Name == "Current passage");
         Assert.True(passageAfter.Bounds.Height > passageBefore.Bounds.Height,

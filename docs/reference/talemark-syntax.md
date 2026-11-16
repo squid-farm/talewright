@@ -378,7 +378,7 @@ Optional double-quoted reader text replaces the scene title only while that requ
 | -------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
 | `=== id`                                           | Starts a scene. IDs use the shared identifier rules; dots may group words, as in `camp.arrival`. |
 | `@title text`                                      | Scene heading; fallback text for hub choices without `@choice-label`.                           |
-| `@choice-label text`                               | Reader text for hub choices and bare `* -> scene` choices targeting this scene. Does not add a heading; otherwise hub choices fall back to `@title`, then the scene ID, and bare scene diverts show **Continue**. |
+| `@choice-label text`                               | Reader text for hub choices and bare `* -> scene` choices targeting this scene. Does not add a heading; otherwise hub choices fall back to `@title`, then the scene ID, and bare choices show **Continue**. |
 | `@continues`                                       | Add this scene's text to the previous passage, without a heading or section break.              |
 | `@clear`                                           | Start this scene on a cleared play screen; earlier passages remain in History and saves.        |
 | `@requires expr[, shown ["reader text"]]`          | A rule that decides whether a scene is available when using a hub. Without `shown`, a false requirement hides the scene. The optional reader text replaces the normal choice text while unavailable. A skill-check expression may include its own `, hidden` modifier before this optional `shown` suffix. |
@@ -394,8 +394,8 @@ Optional double-quoted reader text replaces the scene title only while that requ
 | `{image("path", "alt text")}`                      | Image media in any narrative-template context; alt text is optional. Append `#decorative` only when the image is purely decorative and has no descriptive alt text. |
 | `~ effect`                                         | Effect batch applied when this line is reached.                                               |
 | `* [label] (requires expr[, shown ["reader text"]]) { effects } -> target` | Choice. `(requires…)` and `{effects}` are optional. Hidden when `requires` is false unless `shown` is present; its optional reader text replaces the label while unavailable. A skill-check expression may include `, hidden` before the optional `shown` suffix. |
-| `* -> target`                                      | Textless choice; uses the destination's `@choice-label` when present, otherwise **Continue**. `* -> END` always shows **Continue**. It only supports a divert. |
-| `-> target`                                        | Leave now; later lines do not run. Shows **Continue**, or a final frame for `-> END`.          |
+| `* -> target`                                      | Interactive, textless choice; uses the destination's `@choice-label` when present, otherwise **Continue**. `* -> END` always shows **Continue**. It only supports a divert. |
+| `-> target`                                        | Leave now; later lines do not run. A scene destination is entered automatically; `-> END` shows the final frame. An entry-check outcome targeting a scene still pauses for **Continue**. |
 | `{if expr}` / `{else}` / `{/if}`                   | Conditionals — on their own lines (block) or inside a paragraph (inline).                      |
 
 Hub selectors use one operator throughout: `and` requires every tag, and `or` requires at least one. Do not mix
@@ -476,10 +476,13 @@ supports a divert; put a conditional textless choice inside a block `{if}`, or a
 
 An omitted label needs an explicit `->` destination and cannot be used with a choice requirement,
 effects or skill check. An explicitly empty `[]` is not the textless shortcut. **Continue** is
-currently English for both textless choices and automatic scene continuations.
+currently English for textless choices and skill-check result pauses.
 
-A scene-level `->` leaves immediately, showing the prose already rendered with a single **Continue**
-(or as the final frame for `-> END`). Put conditional early exits **before** the choices:
+A scene-level `->` leaves immediately and automatically enters its destination, keeping each scene's
+already-rendered prose in order (or showing the final frame for `-> END`). Diverts inside a reached
+condition work the same way. An entry-check outcome targeting a scene still pauses for **Continue**;
+an outcome targeting `END` finishes in that frame. Choice checks follow their selected outcomes without
+an extra pause, and explicit choices remain interactive. Put conditional early exits **before** the choices:
 
 ```tale
 {if faction:gang:standing <= -31}
