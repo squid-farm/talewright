@@ -19,6 +19,16 @@ top level or inside a single folder.
 - **Talewright: Validate Story** in the Command Palette uses the separate CLI, not the live checker.
   Run **Talewright: Set Up CLI** first if VS Code says the CLI is missing.
 
+## VS Code keeps suggesting text while I write
+
+If GitHub Copilot's suggestions are distracting, you can
+[turn off its automatic suggestions for Talemark](../../tooling/vscode-talewright/README.md#control-copilot-suggestions)
+without turning off Talewright's story suggestions. Other AI extensions have their own settings.
+
+The grey text after a `{...}` substitution is a Talewright preview, not a Copilot suggestion. To
+hide or show those previews, run **Talewright: Toggle Substitution Preview Hints** from the Command
+Palette.
+
 ## A choice I wrote doesn't appear
 
 Choices with `(requires ...)` are hidden while the condition is false. So are choices inside an

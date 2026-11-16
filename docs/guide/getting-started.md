@@ -70,8 +70,7 @@ Mistakes are underlined as you type and listed in the **Problems** panel with th
 ![An unknown item named lantern underlined in red, with the error also listed in the Problems panel](../images/vscode-diagnostics.png)
 
 The [extension guide](../../tooling/vscode-talewright/README.md) has more detail, including how to
-install the extension from a download and
-[control Copilot suggestions while writing](../../tooling/vscode-talewright/README.md#control-copilot-suggestions).
+install the extension from a download.
 
 ### Finding the Command Palette
 
