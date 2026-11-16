@@ -177,9 +177,11 @@ async function testFormattingCommands(extension, editor, document) {
     editor = await vscode.window.showTextDocument(document);
     await replaceText('shortcut');
     selectText('shortcut');
+    assert.equal(await renderer.focusEditor(), true, 'Editor input must be focused before Ctrl+B');
     await renderer.dispatchKey('b', 'KeyB', 66, 2);
     await waitUntil(() => document.getText() === '**shortcut**', 'Ctrl+B must dispatch in the installed Talemark editor');
     assert.equal(document.getText(editor.selection), 'shortcut');
+    assert.equal(await renderer.focusEditor(), true, 'Editor input must be focused before Ctrl+I');
     await renderer.dispatchKey('i', 'KeyI', 73, 2);
     await waitUntil(() => document.getText() === '**_shortcut_**',
       'Ctrl+I must dispatch in the installed Talemark editor');
@@ -432,7 +434,9 @@ async function waitForDiagnostics(document, predicate, timeoutMs = 15000) {
 
 async function testLiveDiagnostics() {
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'talewright-lsp-editor-'));
+  let renderer;
   try {
+    renderer = await openRenderer();
     await fs.writeFile(path.join(folder, 'story.talewright.yaml'),
       'game:\n  id: live\n  title: Live\n  start: start\ncharacters:\n  player: {first-name: Ada}\n');
     const file = path.join(folder, 'start.tale');
@@ -655,11 +659,17 @@ async function testLiveDiagnostics() {
     editor.selection = new vscode.Selection(1, actorEnd, 1, actorEnd);
     await vscode.commands.executeCommand('type', { text: ' ' });
     assert.equal(document.lineAt(1).text, '::: skill-check guide ');
-    // The suggest widget fills only after the language server replies, so retry until it can be accepted.
-    await waitUntil(async () => {
-      await vscode.commands.executeCommand('acceptSelectedSuggestion');
-      return document.lineAt(1).text !== '::: skill-check guide ';
-    }, 'Typing whitespace after an explicit actor must automatically offer a stat without Ctrl+Space');
+    await waitUntil(async () => renderer.evaluate(`(() => {
+      const widget = document.querySelector('.suggest-widget');
+      if (!widget) return false;
+      const style = getComputedStyle(widget);
+      const rect = widget.getBoundingClientRect();
+      if (style.display === 'none' || style.visibility === 'hidden' || rect.width === 0 || rect.height === 0)
+        return false;
+      return Array.from(widget.querySelectorAll('.monaco-list-row'))
+        .some(row => (row.getAttribute('aria-label') || row.textContent || '').includes('acrobatics'));
+    })()`), 'Typing whitespace after an explicit actor must automatically offer a stat without Ctrl+Space');
+    await vscode.commands.executeCommand('acceptSelectedSuggestion');
     assert.equal(document.lineAt(1).text, '::: skill-check guide acrobatics',
       'Typing whitespace after an explicit actor must automatically offer and accept a stat without Ctrl+Space');
 
@@ -701,6 +711,7 @@ async function testLiveDiagnostics() {
     await vscode.window.showTextDocument(document);
     console.log('Installed VSIX LSP smoke passed: compiler diagnostics, unsaved clearing, semantic completion, source-aware Markdown hover and supporting-file navigation.');
   } finally {
+    renderer?.close();
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
     await fs.rm(folder, { recursive: true, force: true });
   }
@@ -761,6 +772,7 @@ async function testWhitespaceCompletions() {
       await replaceStory(`=== start\n${line}`);
       await vscode.window.showTextDocument(document);
       editor.selection = new vscode.Selection(1, line.length, 1, line.length);
+      assert.equal(await renderer.focusEditor(), true, 'Editor input must be focused before Ctrl+Space');
       await renderer.dispatchKey(' ', 'Space', 32, 2);
       await waitForSkillCheckSuggestion();
       await vscode.commands.executeCommand('acceptSelectedSuggestion');
@@ -1004,6 +1016,19 @@ async function openRenderer() {
   return {
     close: () => socket.close(),
     evaluate: expression => send('Runtime.evaluate', { returnByValue: true, expression }),
+    focusEditor: async () => {
+      await send('Page.bringToFront', {});
+      return send('Runtime.evaluate', {
+        returnByValue: true,
+        expression: `(() => {
+          const input = document.querySelector('.monaco-editor.focused .inputarea')
+            || document.querySelector('.monaco-editor .inputarea');
+          if (!input) return false;
+          input.focus();
+          return document.activeElement === input;
+        })()`,
+      });
+    },
     dispatchKey: async (key, code, keyCode, modifiers) => {
       const params = { key, code, windowsVirtualKeyCode: keyCode, nativeVirtualKeyCode: keyCode, modifiers };
       await send('Input.dispatchKeyEvent', { ...params, type: 'keyDown' });
