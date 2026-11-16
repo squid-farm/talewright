@@ -4,6 +4,23 @@ Use this procedure when you can create story files, run terminal commands and co
 but cannot drive native windows. No Talewright source checkout or VS Code integration is needed.
 If a required tool is unavailable, use the fallback below or report the limitation.
 
+A story folder contains a YAML manifest and one or more `.tale` files. For example,
+`story.talewright.yaml` can start this small story:
+
+```yaml
+game: { id: playtest, title: Playtest, start: start }
+characters:
+  player: { first-name: Alex }
+```
+
+```tale
+=== start
+@title The Start
+
+Your story is ready for playtesting.
+* [Finish] -> END
+```
+
 **Do not use `talewright run` or `talewright debug` for browser automation.** They open native
 windows. There is currently no `talewright run --web` option, and `--non-interactive` does not
 change that.
