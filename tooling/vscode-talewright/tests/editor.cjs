@@ -174,6 +174,7 @@ async function testFormattingCommands(extension, editor, document) {
 
   const renderer = await openRenderer();
   try {
+    editor = await vscode.window.showTextDocument(document);
     await replaceText('shortcut');
     selectText('shortcut');
     await renderer.dispatchKey('b', 'KeyB', 66, 2);
@@ -758,6 +759,7 @@ async function testWhitespaceCompletions() {
     const completeManually = async line => {
       await vscode.commands.executeCommand('hideSuggestWidget');
       await replaceStory(`=== start\n${line}`);
+      await vscode.window.showTextDocument(document);
       editor.selection = new vscode.Selection(1, line.length, 1, line.length);
       await renderer.dispatchKey(' ', 'Space', 32, 2);
       await waitForSkillCheckSuggestion();
