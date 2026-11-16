@@ -3,6 +3,7 @@ using Talewright.Rules.Expressions;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Authoring.Tests;
 
@@ -98,6 +99,90 @@ public sealed class StoryCompletionTests
     {
         var (analysis, position) = Analyze("=== first\n" + line);
         Assert.Contains(StoryCompletion.Complete(analysis, position), item => item.Label == expected);
+    }
+
+    [Theory]
+    [InlineData("{|", "{if ")]
+    [InlineData("{i|", "{if ")]
+    [InlineData("{|}", "{if }")]
+    [InlineData("{i|}", "{if }")]
+    [InlineData("Hello {|}", "Hello {if }")]
+    [InlineData("> guide: {|}", "> guide: {if }")]
+    [InlineData("* [Go {|] -> END", "* [Go {if ] -> END")]
+    public void Offers_and_applies_conditional_completion_at_inline_openings(string marked, string expected)
+    {
+        var (analysis, position) = Analyze("=== first\n" + marked);
+
+        var items = StoryCompletion.Complete(analysis, position);
+        var matches = items.Where(item => item.Label == SceneVocabulary.If).ToArray();
+        Assert.True(matches.Length == 1,
+            $"At {position}; completion sites: {string.Join("; ", analysis.CompletionSitesAt(position).Select(site =>
+                $"{site.Text} [{string.Join(",", site.Keywords)}] {site.Range}"))}");
+        var conditional = Assert.Single(matches);
+
+        Assert.Equal(SceneVocabulary.IfPrefix, conditional.NewText);
+        Assert.Equal(expected, Apply(marked.Replace("|", ""), conditional.Range.Start.Column,
+            conditional.Range.End.Column, conditional.NewText));
+        if (marked is "{|" or "{|}")
+        {
+            Assert.Contains(items, item => item.Label == ExpressionVocabulary.ImageCall);
+            Assert.Contains(items, item => item.Label == ExpressionVocabulary.VarPrefix);
+        }
+    }
+
+    [Fact]
+    public void Escaped_literal_opening_brace_does_not_offer_conditional_completion()
+    {
+        var (analysis, position) = Analyze("=== first\n\\{|}");
+
+        Assert.DoesNotContain(StoryCompletion.Complete(analysis, position),
+            item => item.Label == SceneVocabulary.If);
+    }
+
+    [Fact]
+    public void Character_named_if_keeps_its_original_completion_edit()
+    {
+        var marked = "=== first\n{i|f:first-name}";
+        var caret = marked.IndexOf('|');
+        var manifest = Manifest.Replace("  guide: {first-name: Bea}",
+            "  guide: {first-name: Bea}\n  if: {first-name: If}");
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = manifest,
+            ["main.tale"] = marked.Remove(caret, 1),
+            ["other.tale"] = "=== second\n-> END"
+        });
+        var position = Position("main.tale", marked[..caret]);
+        var analysis = StoryAnalyzer.Analyze(source);
+
+        var completion = Assert.Single(StoryCompletion.Complete(analysis, position),
+            item => item.Label == "if" && item.Detail.StartsWith("Character:", StringComparison.Ordinal));
+
+        Assert.Equal("if", completion.NewText);
+    }
+
+    [Fact]
+    public void Scene_named_if_keeps_its_original_completion_edit()
+    {
+        var (analysis, position) = Analyze("=== first\n-> i|f\n=== if\n-> END");
+
+        var completion = Assert.Single(StoryCompletion.Complete(analysis, position),
+            item => item.Label == SceneVocabulary.If);
+
+        Assert.Equal(SceneVocabulary.If, completion.NewText);
+    }
+
+    [Theory]
+    [InlineData("{if |")]
+    [InlineData("* [Go {if |] -> END")]
+    public void Condition_completion_works_at_an_incomplete_inline_conditional(string line)
+    {
+        var (analysis, position) = Analyze("=== first\n" + line);
+
+        var items = StoryCompletion.Complete(analysis, position);
+        Assert.True(items.Any(item => item.Label == ExpressionVocabulary.True),
+            $"At {position}; completion sites: {string.Join("; ", analysis.CompletionSitesAt(position).Select(site =>
+                $"{site.Text} [{string.Join(",", site.Keywords)}] {site.Range}"))}");
     }
 
     [Theory]

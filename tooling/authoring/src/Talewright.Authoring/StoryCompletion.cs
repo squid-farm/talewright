@@ -20,15 +20,18 @@ public static class StoryCompletion
             var length = site.Positions.TakeWhile(point => Compare(point, position) <= 0).Count() - 1;
             var prefix = site.Text[..Math.Clamp(length, 0, site.Text.Length)];
             var symbols = (site.Candidates ?? analysis.Symbols).Where(symbol => site.Kinds.Contains(symbol.Kind))
-                .Select(symbol => (symbol.Name, Detail: symbol.Kind == AuthoringSymbolKind.Modifier &&
+                .Select(symbol => (Name: symbol.Name, Detail: symbol.Kind == AuthoringSymbolKind.Modifier &&
                     AuthoringSyntaxVocabulary.TryGetKeywordHelp(symbol.Name, out var help)
                         ? help.Description
-                        : $"{symbol.Kind}: {symbol.Type}"));
-            foreach (var (name, detail) in symbols.Concat(site.Keywords.Select(keyword =>
-                         (keyword, KeywordDetail(site, keyword)))))
+                        : $"{symbol.Kind}: {symbol.Type}", IsKeyword: false));
+            var keywords = site.Keywords.Select(keyword =>
+                (Name: keyword, Detail: KeywordDetail(site, keyword), IsKeyword: true));
+            foreach (var (name, detail, isKeyword) in symbols.Concat(keywords))
             {
                 if (!name.StartsWith(prefix, site.IsImagePath ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase)) continue;
                 var newText = site.FollowingDelimiter is { } delimiter && name.EndsWith(delimiter) ? name[..^1] : name;
+                if (isKeyword && name == SceneVocabulary.If)
+                    newText = SceneVocabulary.IfPrefix;
                 if (site.IsImagePath) newText = AuthoringSyntaxVocabulary.EscapeQuotedText(newText);
                 result.Add(new(name, detail, site.Range, newText));
             }

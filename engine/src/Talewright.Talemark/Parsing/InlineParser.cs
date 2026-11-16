@@ -521,8 +521,13 @@ internal static class InlineParser
         {
             var incomplete = text[start..];
             var lead = incomplete.Length - incomplete.TrimStart().Length;
-            var condition = incomplete[lead..].StartsWith(SceneVocabulary.IfPrefix, StringComparison.Ordinal);
-            var expressionOffset = condition ? lead + SceneVocabulary.IfPrefix.Length : 0;
+            var conditionalText = incomplete[lead..];
+            var bareCondition = conditionalText.Equals(SceneVocabulary.If, StringComparison.Ordinal);
+            var condition = conditionalText.StartsWith(SceneVocabulary.IfPrefix, StringComparison.Ordinal) ||
+                bareCondition;
+            var expressionOffset = condition
+                ? lead + (bareCondition ? SceneVocabulary.If.Length : SceneVocabulary.IfPrefix.Length)
+                : 0;
             if (condition)
             {
                 analysis.Tokens.Add(new(SceneVocabulary.If,

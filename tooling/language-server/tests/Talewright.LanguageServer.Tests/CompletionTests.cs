@@ -3,6 +3,7 @@ using Talewright.Authoring;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.LanguageServer.Tests;
 
@@ -86,6 +87,45 @@ public sealed partial class ServerTests
         var item = Assert.Single(Items(response), item => item.GetProperty("label").GetString() == expected);
         Assert.Equal(expected, item.GetProperty("textEdit").GetProperty("newText").GetString());
         Assert.Equal(1, item.GetProperty("textEdit").GetProperty("range").GetProperty("start").GetProperty("line").GetInt32());
+    }
+
+    [Theory]
+    [InlineData("{|", "{if ")]
+    [InlineData("{i|", "{if ")]
+    [InlineData("{|}", "{if }")]
+    [InlineData("> guide: {|}", "> guide: {if }")]
+    [InlineData("* [Go {|] -> END", "* [Go {if ] -> END")]
+    public async Task Conditional_completion_edits_preserve_the_opening_brace_and_caret_prefix(
+        string line, string expected)
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        var marked = "=== start\n" + line;
+        await client.Open("start.tale", marked.Replace("|", ""), 1);
+
+        Assert.True(AuthoringSyntaxVocabulary.TryGetHelp(AuthoringTokenKind.If, out var conditionalHelp));
+        var item = Assert.Single(Items(await Completion(client, "start.tale", marked)),
+            item => item.GetProperty("label").GetString() == conditionalHelp.Spelling);
+        var edit = item.GetProperty("textEdit");
+        Assert.Equal(conditionalHelp.Spelling + " ", edit.GetProperty("newText").GetString());
+        var range = edit.GetProperty("range");
+        var start = range.GetProperty("start").GetProperty("character").GetInt32();
+        var end = range.GetProperty("end").GetProperty("character").GetInt32();
+        var sourceLine = line.Replace("|", "");
+        Assert.Equal(expected, sourceLine[..start] + edit.GetProperty("newText").GetString() + sourceLine[end..]);
+    }
+
+    [Theory]
+    [InlineData("{if |")]
+    [InlineData("* [Go {if |] -> END")]
+    public async Task Conditional_expression_completion_remains_available_before_a_choice_label_end(string line)
+    {
+        await using var client = new Client();
+        await client.Initialize();
+        var marked = "=== start\n" + line;
+        await client.Open("start.tale", marked.Replace("|", ""), 1);
+
+        Assert.Contains(Items(await Completion(client, "start.tale", marked)), HasLabel("true"));
     }
 
     [Fact]
