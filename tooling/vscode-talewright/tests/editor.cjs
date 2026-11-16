@@ -654,8 +654,11 @@ async function testLiveDiagnostics() {
     editor.selection = new vscode.Selection(1, actorEnd, 1, actorEnd);
     await vscode.commands.executeCommand('type', { text: ' ' });
     assert.equal(document.lineAt(1).text, '::: skill-check guide ');
-    await new Promise(resolve => setTimeout(resolve, 300));
-    await vscode.commands.executeCommand('acceptSelectedSuggestion');
+    // The suggest widget fills only after the language server replies, so retry until it can be accepted.
+    await waitUntil(async () => {
+      await vscode.commands.executeCommand('acceptSelectedSuggestion');
+      return document.lineAt(1).text !== '::: skill-check guide ';
+    }, 'Typing whitespace after an explicit actor must automatically offer a stat without Ctrl+Space');
     assert.equal(document.lineAt(1).text, '::: skill-check guide acrobatics',
       'Typing whitespace after an explicit actor must automatically offer and accept a stat without Ctrl+Space');
 
