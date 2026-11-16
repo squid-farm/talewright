@@ -1,5 +1,6 @@
 # Author cheat sheet
 
+[Optional assistant guidance](talemark-agent-brief.md) |
 [Full Talemark reference](../reference/talemark-syntax.md) |
 [Error codes](../reference/diagnostics.md) |
 [VS Code extension](../../tooling/vscode-talewright/README.md)

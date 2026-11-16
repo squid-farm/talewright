@@ -140,6 +140,21 @@ class CiRoutingTests(unittest.TestCase):
         for group in ("build", "editor", "browser", "linux-desktop"):
             self.assertEqual([], plan[group])
 
+    def test_assistant_guidance_selects_compiler_contracts_and_docs_only(self):
+        topics = ROOT / "docs/guide/talemark"
+        for changed in ["docs/guide/talemark-agent-brief.md",
+                        *(str(path.relative_to(ROOT)) for path in sorted(topics.glob("*.md")))]:
+            with self.subTest(changed=changed):
+                plan = make_plan(affected_graph(changed))
+                self.assertEqual(
+                    [{"project": "Talewright.Talemark.Tests", "target": "test"}], plan["unit"],
+                )
+                self.assertEqual(
+                    [{"project": "talewright-docs", "target": "check"}], plan["checks"],
+                )
+                for group in ("build", "editor", "browser", "linux-desktop"):
+                    self.assertEqual([], plan[group])
+
     def test_documented_manifests_select_only_schema_verification(self):
         schema_test = ROOT / "tooling/vscode-talewright/tests/story-schema.test.mjs"
         consumed = set(re.findall(r"'(docs/[^']+\.md)'", schema_test.read_text()))
