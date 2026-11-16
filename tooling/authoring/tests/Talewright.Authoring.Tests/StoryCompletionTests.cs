@@ -140,6 +140,28 @@ public sealed class StoryCompletionTests
     }
 
     [Fact]
+    public void Character_named_if_keeps_its_original_completion_edit()
+    {
+        var marked = "=== first\n{i|f:first-name}";
+        var caret = marked.IndexOf('|');
+        var manifest = Manifest.Replace("  guide: {first-name: Bea}",
+            "  guide: {first-name: Bea}\n  if: {first-name: If}");
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = manifest,
+            ["main.tale"] = marked.Remove(caret, 1),
+            ["other.tale"] = "=== second\n-> END"
+        });
+        var position = Position("main.tale", marked[..caret]);
+        var analysis = StoryAnalyzer.Analyze(source);
+
+        var completion = Assert.Single(StoryCompletion.Complete(analysis, position),
+            item => item.Label == "if" && item.Detail.StartsWith("Character:", StringComparison.Ordinal));
+
+        Assert.Equal("if", completion.NewText);
+    }
+
+    [Fact]
     public void Scene_named_if_keeps_its_original_completion_edit()
     {
         var (analysis, position) = Analyze("=== first\n-> i|f\n=== if\n-> END");
