@@ -8,6 +8,28 @@ Substitutions use `{expression#manipulator}`. `:` accesses properties; dots rema
 Manipulators change display, not state, and chain left to right. Text manipulators must precede
 formatting manipulators such as `#bold` and `#italic`.
 
+## Prefer speech and reusable grammar
+
+Write spoken dialogue as character speech, not quoted narration. This preserves speaker identity
+and lets the player apply the character's speech presentation. Keep descriptions of actions
+outside speech. Separate speakers with a blank line; another consecutive `>` line continues the
+current speaker.
+
+Declare character names and pronouns in the manifest, then reference them where text depends on
+those values. Do not write separate he/she/they branches just to change pronouns or verb endings.
+Use pronoun references and `#one-many` so changing pronouns does not require rewriting the story.
+
+The complete example below demonstrates speech and agreement. With `player` using `pronouns: they`,
+its sentence renders "They have a light." Changing that declaration to `she` renders "She has a light."
+
+Use the same approach for other grammatical forms: `:pronoun:object` for them/her/him,
+`:pronoun:possessive-pronoun:determiner` for their/her/his, and `:pronoun:reflexive` for reflexives.
+For items, use the article, possessive and number helpers rather than duplicating display names or
+assuming that adding "s" makes a plural.
+
+These are authoring defaults. Preserve deliberate quotations, ambiguity and an existing author's
+narrative voice.
+
 ## Complete example
 
 `story.talewright.yaml`:
