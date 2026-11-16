@@ -141,6 +141,10 @@ substitutions offers registered text modifiers. After `<character>:pronoun:`,
 completion offers `subject`, `object`, `possessive-pronoun` and `reflexive`;
 `possessive-pronoun:` offers `determiner` and `independent`, both explicit.
 These property slots work in substitutions, conditions and assignment expressions.
+Typing `{` at the start of a reader-text construct offers `if` alongside substitution
+forms; accepting it inserts `if ` and leaves the caret ready for condition completion.
+This works in prose, dialogue and choice labels where inline syntax is valid. An escaped
+literal brace does not offer Talemark completion.
 Ordinary prose, comments, expression
 string literals, and unknown namespaces do not receive story-ID suggestions.
 Identifiers replace the whole current token, including text after the cursor;

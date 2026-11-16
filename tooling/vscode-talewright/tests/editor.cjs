@@ -333,7 +333,7 @@ async function testLiveDiagnostics() {
     const file = path.join(folder, 'start.tale');
     await fs.writeFile(file, '=== start\n* [Go] -> missing\n');
     const document = await vscode.workspace.openTextDocument(file);
-    await vscode.window.showTextDocument(document);
+    let editor = await vscode.window.showTextDocument(document);
     await waitForCompiler(document, items => items.length > 0);
     const missingScene = vscode.languages.getDiagnostics(document.uri)
       .find(item => item.source === 'talewright' && item.code === 'TW2002');
@@ -366,7 +366,7 @@ async function testLiveDiagnostics() {
     assert.equal(await fs.readFile(path.join(folder, 'missing.tale'), 'utf8'), '=== missing\n',
       'New-file scene creation must save its contents before opening');
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
-    await vscode.window.showTextDocument(document);
+    editor = await vscode.window.showTextDocument(document);
 
     const edit = new vscode.WorkspaceEdit();
     edit.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
@@ -417,6 +417,30 @@ async function testLiveDiagnostics() {
       'vscode.executeHoverProvider', document.uri, new vscode.Position(1, 0));
     assert.ok(choiceHovers.some(hover => hover.contents.some(content => content.value?.includes('Continue'))),
       'Textless choice hover must explain its default label');
+
+    const conditionalStart = new vscode.WorkspaceEdit();
+    conditionalStart.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
+      '=== start\n');
+    assert.equal(await vscode.workspace.applyEdit(conditionalStart), true);
+    editor.selection = new vscode.Selection(1, 0, 1, 0);
+    await vscode.commands.executeCommand('type', { text: '{' });
+    assert.equal(document.getText(), '=== start\n{', 'Typing must leave the opening brace at the caret');
+    const openingBraceCompletions = await vscode.commands.executeCommand(
+      'vscode.executeCompletionItemProvider', document.uri, editor.selection.active);
+    assert.ok(openingBraceCompletions.items.some(item => item.label === 'if'),
+      `The completion triggered after an opening brace must include the conditional candidate: ${JSON.stringify(openingBraceCompletions.items)}`);
+    await vscode.commands.executeCommand('type', { text: 'i' });
+    await vscode.commands.executeCommand('acceptSelectedSuggestion');
+    assert.equal(document.getText(), '=== start\n{if ',
+      'Accepting the automatic conditional suggestion must preserve one opening brace and insert its prefix');
+    assert.equal(editor.selection.active.line, 1);
+    assert.equal(editor.selection.active.character, 4,
+      'The caret must be ready for the conditional expression');
+    const conditionCompletions = await vscode.commands.executeCommand(
+      'vscode.executeCompletionItemProvider', document.uri, editor.selection.active);
+    assert.ok(conditionCompletions.items.some(item => item.label === 'true'),
+      `Conditional completion must hand off to the existing condition grammar: ${
+        JSON.stringify({ text: document.getText(), position: editor.selection.active, items: conditionCompletions.items })}`);
 
     const manifest = await vscode.workspace.openTextDocument(path.join(folder, 'story.talewright.yaml'));
     await vscode.window.showTextDocument(manifest);

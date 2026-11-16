@@ -35,6 +35,8 @@ internal static class ExpressionCompletion
     {
         var text = tokens.Source;
         var offsets = new HashSet<int> { text.Length };
+        if (kind is ExpressionContextKind.Condition or ExpressionContextKind.Substitution)
+            offsets.Add(0);
         foreach (var token in tokens)
         {
             if (token.Kind is TokenKind.Identifier or TokenKind.NamedPredicate) offsets.Add(token.Offset);
@@ -231,7 +233,8 @@ internal static class ExpressionCompletion
                         => [.. EffectVerbs, VarPrefix, FactionPrefix, SceneVocabulary.SkillCheck],
                     ExpressionContextKind.Effects => [VarPrefix, FactionPrefix, ScenePrefix, SceneVocabulary.SkillCheck],
                     ExpressionContextKind.Number => [VarPrefix, ScenePrefix, SceneVocabulary.SkillCheck],
-                    ExpressionContextKind.Substitution when before.Length == 0 => [VarPrefix, FlagPrefix, FactionPrefix, ItemPrefix, ScenePrefix, ImageCall],
+                    ExpressionContextKind.Substitution when before.Length == 0 => [SceneVocabulary.If,
+                        VarPrefix, FlagPrefix, FactionPrefix, ItemPrefix, ScenePrefix, ImageCall],
                     ExpressionContextKind.Substitution => [VarPrefix, FlagPrefix, FactionPrefix, ItemPrefix, ScenePrefix],
                     _ => [FlagPrefix, VarPrefix, FactionPrefix, ItemPrefix, ScenePrefix, True, False, Not,
                         SceneVocabulary.SkillCheck]

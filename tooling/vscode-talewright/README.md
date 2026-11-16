@@ -158,10 +158,13 @@ show each variable's type, including unsaved changes.
 
 ## Completion, hover and previews
 
-Press **Ctrl+Space** in a divert (`-> dest`), speaker, metadata line, condition or substitution for
-story-aware suggestions: scenes, characters, stats, items, factions, flags, variables, predicates and
-modifiers. It also completes story values such as `start: "dest"` in the manifest. Plain prose gets no
-story suggestions. See [semantic completion](https://github.com/squid-farm/talewright/blob/main/docs/developer/language-server.md#semantic-completion)
+Typing `{` in prose, dialogue or a choice label automatically offers `if` where an inline conditional
+is valid. Accepting it inserts the conditional prefix and leaves the caret ready for condition
+completion. Press **Ctrl+Space** in a divert (`-> dest`), speaker, metadata line, condition or
+substitution for other story-aware suggestions: scenes, characters, stats, items, factions, flags,
+variables, predicates and modifiers. It also completes story values such as `start: "dest"` in the
+manifest. Plain prose outside a Talemark construct gets no story suggestions. See
+[semantic completion](https://github.com/squid-farm/talewright/blob/main/docs/developer/language-server.md#semantic-completion)
 for details.
 
 Hover a name for its kind and declaration. Directives and expressions also show syntax help, and

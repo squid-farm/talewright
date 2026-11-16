@@ -29,6 +29,8 @@ public static class StoryCompletion
             {
                 if (!name.StartsWith(prefix, site.IsImagePath ? StringComparison.Ordinal : StringComparison.OrdinalIgnoreCase)) continue;
                 var newText = site.FollowingDelimiter is { } delimiter && name.EndsWith(delimiter) ? name[..^1] : name;
+                if (name == SceneVocabulary.If && site.Keywords.Contains(name))
+                    newText = SceneVocabulary.IfPrefix;
                 if (site.IsImagePath) newText = AuthoringSyntaxVocabulary.EscapeQuotedText(newText);
                 result.Add(new(name, detail, site.Range, newText));
             }

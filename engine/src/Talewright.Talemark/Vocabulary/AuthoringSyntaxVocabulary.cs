@@ -49,6 +49,7 @@ public static class AuthoringSyntaxVocabulary
         SceneVocabulary.Divert[^1].ToString(),
         ExpressionVocabulary.OpenParen.ToString(),
         TextVocabulary.QuoteMark.ToString(),
+        SceneVocabulary.InlineOpen.ToString(),
         SceneVocabulary.EndIf[0].ToString(),
     }.Distinct(StringComparer.Ordinal).ToArray());
 
