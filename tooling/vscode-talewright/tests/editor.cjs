@@ -739,6 +739,37 @@ async function testWhitespaceCompletions() {
         return Array.from(widget.querySelectorAll('.monaco-list-row'))
           .some(row => (row.getAttribute('aria-label') || row.textContent || '').includes('start'));
       })()`), 'Automatic completion must show the start target');
+    const waitForSkillCheckSuggestion = async () => waitUntil(async () =>
+      renderer.evaluate(`(() => {
+        const widget = document.querySelector('.suggest-widget');
+        if (!widget) return false;
+        const style = getComputedStyle(widget);
+        const rect = widget.getBoundingClientRect();
+        if (style.display === 'none' || style.visibility === 'hidden' || rect.width === 0 || rect.height === 0)
+          return false;
+        return Array.from(widget.querySelectorAll('.monaco-list-row'))
+          .some(row => (row.getAttribute('aria-label') || row.textContent || '').includes('skill-check'));
+      })()`), 'Completion must show the entry skill-check keyword');
+    const replaceStory = async text => {
+      const edit = new vscode.WorkspaceEdit();
+      edit.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)), text);
+      assert.equal(await vscode.workspace.applyEdit(edit), true);
+    };
+    const completeManually = async line => {
+      await vscode.commands.executeCommand('hideSuggestWidget');
+      await replaceStory(`=== start\n${line}`);
+      editor.selection = new vscode.Selection(1, line.length, 1, line.length);
+      await waitUntil(async () => {
+        const items = await vscode.commands.executeCommand(
+          'vscode.executeCompletionItemProvider', document.uri, editor.selection.active);
+        return items?.items?.some(item => item.label === 'skill-check');
+      }, `Manual completion must offer skill-check after ${JSON.stringify(line)}`);
+      await vscode.commands.executeCommand('editor.action.triggerSuggest');
+      await waitForSkillCheckSuggestion();
+      await vscode.commands.executeCommand('acceptSelectedSuggestion');
+      assert.equal(document.lineAt(1).text, '::: skill-check ',
+        'Manual acceptance must create a spaced entry skill-check block');
+    };
 
     await type('    ');
     await waitForStartSuggestion();
@@ -761,6 +792,23 @@ async function testWhitespaceCompletions() {
       'Deleting and retyping must automatically reopen completion and preserve the new spacing');
     assert.equal(document.isDirty, true);
     assert.equal(await fs.readFile(file, 'utf8'), diskText);
+
+    await completeManually(':::');
+    await completeManually('::: ');
+    for (const suffix of ['', ' ']) {
+      await replaceStory('=== start\n');
+      editor.selection = new vscode.Selection(1, 0, 1, 0);
+      await type(':::');
+      if (suffix) {
+        await waitForSkillCheckSuggestion();
+        await vscode.commands.executeCommand('hideSuggestWidget');
+        await type(suffix);
+      }
+      await waitForSkillCheckSuggestion();
+      await vscode.commands.executeCommand('acceptSelectedSuggestion');
+      assert.equal(document.lineAt(1).text, '::: skill-check ',
+        `Automatic acceptance after ${JSON.stringify(`:::${suffix}`)} must not duplicate whitespace`);
+    }
 
     const prose = new vscode.WorkspaceEdit();
     prose.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
@@ -793,7 +841,7 @@ async function testWhitespaceCompletions() {
     })()`), false, 'Whitespace in speech continuation must not open a completion popup');
     assert.equal(document.isDirty, true, 'The acceptance scenario must remain unsaved');
     assert.equal(await fs.readFile(file, 'utf8'), diskText);
-    console.log('Installed VSIX whitespace completion smoke passed: automatic repeated-space suggestions, deletion/retyping, accepted edits, quiet prose/speech, unsaved buffer.');
+    console.log('Installed VSIX completion smoke passed: automatic/manual skill-check entry acceptance, repeated-space suggestions, deletion/retyping, quiet prose/speech, unsaved buffer.');
   } finally {
     renderer?.close();
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');

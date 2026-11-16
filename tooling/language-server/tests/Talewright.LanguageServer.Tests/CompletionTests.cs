@@ -89,6 +89,50 @@ public sealed partial class ServerTests
     }
 
     [Theory]
+    [InlineData(":::|", "::: skill-check ", " skill-check ", 3, 3)]
+    [InlineData("::: |", "::: skill-check ", "skill-check ", 4, 4)]
+    [InlineData(":::ski|ll-che", "::: skill-check ", " skill-check ", 3, 12)]
+    [InlineData("::: ski|ll-che", "::: skill-check ", "skill-check ", 4, 13)]
+    [InlineData("  ::: ski|ll-che dc 10", "  ::: skill-check dc 10", "skill-check", 6, 15)]
+    public async Task Entry_skill_check_completion_uses_whole_keyword_range_and_preserves_surrounding_text(
+        string line, string expected, string expectedNewText, int expectedStart, int expectedEnd)
+    {
+        await using var client = new Client();
+        DeclareRpg(client);
+        await client.Initialize();
+        var marked = "=== start\n" + line;
+        await client.Open("start.tale", marked.Replace("|", ""), 1);
+
+        var item = Assert.Single(Items(await Completion(client, "start.tale", marked)), HasLabel("skill-check"));
+        var edit = item.GetProperty("textEdit");
+        Assert.Equal(expectedNewText, edit.GetProperty("newText").GetString());
+        var range = edit.GetProperty("range");
+        var start = range.GetProperty("start");
+        var end = range.GetProperty("end");
+        Assert.Equal(1, start.GetProperty("line").GetInt32());
+        Assert.Equal(1, end.GetProperty("line").GetInt32());
+        Assert.Equal(expectedStart, start.GetProperty("character").GetInt32());
+        Assert.Equal(expectedEnd, end.GetProperty("character").GetInt32());
+
+        var sourceLine = line.Replace("|", "");
+        Assert.Equal(expected, sourceLine[..expectedStart] + expectedNewText + sourceLine[expectedEnd..]);
+    }
+
+    [Theory]
+    [InlineData(":::|")]
+    [InlineData("::: |")]
+    public async Task Closing_skill_check_fence_does_not_offer_entry_keyword(string closingFence)
+    {
+        await using var client = new Client();
+        DeclareRpg(client);
+        await client.Initialize();
+        var marked = "=== start\n::: skill-check guide grit dc 10\nsuccess: -> END\nfailure: -> END\n" + closingFence;
+        await client.Open("start.tale", marked.Replace("|", ""), 1);
+
+        Assert.Empty(Items(await Completion(client, "start.tale", marked)));
+    }
+
+    [Theory]
     [InlineData("::: skill-check guide | dc 10", "::: skill-check guide hp dc 10", "hp")]
     [InlineData("::: skill-check guide |dc 10", "::: skill-check guide hp dc 10", "hp ")]
     [InlineData("::: skill-check guide  | dc 10", "::: skill-check guide  hp dc 10", "hp")]

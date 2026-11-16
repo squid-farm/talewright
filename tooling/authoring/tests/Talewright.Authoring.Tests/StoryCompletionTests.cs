@@ -102,6 +102,43 @@ public sealed class StoryCompletionTests
     }
 
     [Theory]
+    [InlineData(":::|", "::: skill-check ", " skill-check ")]
+    [InlineData("::: |", "::: skill-check ", "skill-check ")]
+    [InlineData("  :::|", "  ::: skill-check ", " skill-check ")]
+    [InlineData(":::ski|ll-che", "::: skill-check ", " skill-check ")]
+    [InlineData("::: ski|ll-che", "::: skill-check ", "skill-check ")]
+    [InlineData("  ::: ski|ll-che dc 10", "  ::: skill-check dc 10", "skill-check")]
+    public void Entry_skill_check_completion_creates_a_usable_block_without_disturbing_text(
+        string marked, string expected, string expectedNewText)
+    {
+        var (analysis, position) = Analyze("=== first\n" + marked);
+        var item = Assert.Single(StoryCompletion.Complete(analysis, position),
+            completion => completion.Label == "skill-check");
+
+        var completed = Apply(marked.Replace("|", ""), item.Range.Start.Column,
+            item.Range.End.Column, item.NewText);
+        Assert.Equal(expected, completed);
+        Assert.Equal(expectedNewText, item.NewText);
+
+        if (completed == "::: skill-check ")
+        {
+            var (completedAnalysis, completedPosition) = Analyze("=== first\n" + completed + "|");
+            Assert.Contains(StoryCompletion.Complete(completedAnalysis, completedPosition),
+                completion => completion.Label == "guide");
+        }
+    }
+
+    [Theory]
+    [InlineData(":::|")]
+    [InlineData("::: |")]
+    public void Closing_skill_check_fence_does_not_offer_entry_keyword(string markedFence)
+    {
+        var (analysis, position) = Analyze(
+            "=== first\n::: skill-check guide grit dc 10\nsuccess: -> END\nfailure: -> END\n" + markedFence);
+        Assert.Empty(StoryCompletion.Complete(analysis, position));
+    }
+
+    [Theory]
     [InlineData("::: skill-check guide | dc 10", "::: skill-check guide hp dc 10")]
     [InlineData("::: skill-check guide |dc 10", "::: skill-check guide hp dc 10")]
     [InlineData("::: skill-check guide  | dc 10", "::: skill-check guide  hp dc 10")]

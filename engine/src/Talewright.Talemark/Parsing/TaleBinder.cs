@@ -829,6 +829,7 @@ internal sealed partial class TaleBinder
 
     private void ParseBlockCheck(TaleLineSyntax syntax)
     {
+        AddEntrySkillCheckCompletion(syntax);
         // Syntax reported a fence that does not open a skill check.
         if (syntax.IsInvalid)
             return;
@@ -840,6 +841,38 @@ internal sealed partial class TaleBinder
             _scene!.CurrentSteps.Add(new CheckStep(StepId(location), SpanFrom(location),
                 new CheckBranch(check.Check, success, failure, check.Identity)));
         }
+    }
+
+    private void AddEntrySkillCheckCompletion(TaleLineSyntax syntax)
+    {
+        if (syntax.IsAttached || _symbols.Analysis is not { } analysis)
+            return;
+
+        var raw = _syntax.RawText(_sceneSyntax!, syntax);
+        var fenceEnd = syntax.Indent + SceneVocabulary.SkillCheckFence.Length;
+        var keywordStart = fenceEnd;
+        while (keywordStart < raw.Length && char.IsWhiteSpace(raw[keywordStart]))
+            keywordStart++;
+        var keywordEnd = keywordStart;
+        while (keywordEnd < raw.Length && !char.IsWhiteSpace(raw[keywordEnd]))
+            keywordEnd++;
+
+        var keywordText = raw[keywordStart..keywordEnd].ToString();
+        if (keywordText == SceneVocabulary.SkillCheck)
+            return;
+
+        if (keywordText.Length == 0)
+        {
+            for (var offset = fenceEnd; offset <= keywordStart; offset++)
+                analysis.KeywordCompletion("", At(offset), SceneVocabulary.SkillCheck,
+                    offset == fenceEnd ? " " : "",
+                    offset == raw.Length ? " " : null);
+            return;
+        }
+
+        analysis.KeywordCompletion(keywordText, At(keywordStart), SceneVocabulary.SkillCheck,
+            keywordStart == fenceEnd ? " " : "",
+            keywordEnd == raw.Length ? " " : null);
     }
 
     /// <summary>

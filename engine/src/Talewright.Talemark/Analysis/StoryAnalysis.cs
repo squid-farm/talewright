@@ -673,6 +673,18 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         IReadOnlyDictionary<string, string> details) =>
         AddSite(new("", new(location, location), [], keywords, [location], KeywordDetails: details));
 
+    internal void KeywordCompletion(string text, SourceLocation location, string keyword,
+        string completionPrefix = "", string? completionSuffix = null)
+    {
+        var range = Range(location, text);
+        AddSite(new(text, range, [], [keyword],
+            Enumerable.Range(0, text.Length + 1).Select(location.Offset).ToArray())
+        {
+            CompletionPrefix = completionPrefix,
+            CompletionSuffix = completionSuffix,
+        });
+    }
+
     private void ReferenceCore(string text, SourceLocation location, AuthoringSymbolKind kind,
         IReadOnlyList<string> keywords, IReadOnlyList<AuthoringSymbol>? candidates = null,
         string? completionSuffix = null)
