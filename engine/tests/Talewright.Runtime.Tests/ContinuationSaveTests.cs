@@ -100,14 +100,33 @@ public sealed class ContinuationSaveTests
     }
 
     [Fact]
-    public void Changed_recorded_choice_outcome_is_rejected_instead_of_resuming_from_checkpoint()
+    public void Changed_recorded_choice_outcome_is_not_reapplied_when_continuing()
     {
         var original = PlayToSquare(Compile(new()));
+        var bytes = original.Save();
+        var unchanged = bytes.ToArray();
+        var replayOnly = SaveFormat.Write(SaveFormat.Read(bytes) with { Continuation = null });
         var updated = Compile(new() { Version = "2", ChangedChoiceEffect = true });
 
-        var error = Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(updated, original.Save()));
-
+        var error = Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(updated, replayOnly));
         Assert.Contains("has changed", error.Message);
+
+        var restored = StoryHistory.Restore(updated, bytes);
+
+        Assert.NotNull(restored.Continuation);
+        Assert.False(restored.Continuation.RedoDiscarded);
+        Assert.Equal(original.State.GetVariable(Gold), restored.State.GetVariable(Gold));
+        Assert.Equal(original.State.GetVariable(Bonus), restored.State.GetVariable(Bonus));
+        Assert.Equal(original.Current.Scene, restored.Current.Scene);
+        Assert.Equal(Plain(original.Transcript), Plain(restored.Transcript));
+        Assert.False(restored.CanBack);
+        Assert.False(restored.CanForward);
+        Assert.Equal(unchanged, bytes);
+
+        var gold = restored.State.GetVariable(Gold);
+        restored.Choose(KeyOf(restored.Current, "Return to the road"));
+        restored.Choose(KeyOf(restored.Current, "Go to market"));
+        Assert.Equal(gold + 2, restored.State.GetVariable(Gold));
     }
 
     [Fact]
