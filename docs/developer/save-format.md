@@ -1,20 +1,23 @@
 # Save format
 
 Player saves, Quick Save, autosave and exported backups all use one binary format, stored with the
-`.twsave` extension. A save holds replay inputs and compact replay evidence: story identity, seed,
-character choices and the choice history. It never stores the event log or game state. Restoring
-replays the choices into a fresh session (see [Architecture](architecture.md)).
+`.twsave` extension. A save holds replay inputs, compact replay evidence, a continuation checkpoint
+and a readable transcript. It does not store the event log. Restoring prefers replay into a fresh
+session and can continue from the checkpoint after an incompatible update (see
+[Architecture](architecture.md)).
 
 Code and the generated MessagePack formatters:
 [`SaveFormat.cs`](../../engine/src/Talewright.Runtime/Saves/SaveFormat.cs) and
-[`SavePayload.cs`](../../engine/src/Talewright.Runtime/Saves/SavePayload.cs).
+[`SavePayload.cs`](../../engine/src/Talewright.Runtime/Saves/SavePayload.cs), plus
+[`SaveContinuation.cs`](../../engine/src/Talewright.Runtime/Saves/SaveContinuation.cs) and
+[`ContinuationCheckpoint.cs`](../../engine/src/Talewright.Runtime/Saves/ContinuationCheckpoint.cs).
 
 ## Layout
 
 | Bytes | Content |
 |---|---|
 | 4 | Magic `TWSV` |
-| 1 | Format version, currently `4` |
+| 1 | Format version, written as `5`; the reader accepts `4` and `5` |
 | 4 | Decoded body length, unsigned little-endian |
 | rest | zlib stream (RFC 1950, `CompressionLevel.SmallestSize`) of the body |
 
@@ -32,15 +35,54 @@ The body is an array-keyed MessagePack object. Its positions are the schema:
 | 7 | Display summary | nil or a binary value containing a MessagePack summary array |
 | 8 | Replay evidence | nil or a 33-byte binary value: evidence version followed by a SHA-256 digest |
 | 9 | Replay choice identities | nil or an array of binary choice-outcome identities, one per choice |
+| 10 | Continuation | nil or `[current checkpoint, transcript, base checkpoint or nil, base transcript length]` |
 
 Replay evidence and replay choice identities are either both present or both `nil`. The reader
-accepts missing trailing fields, but saves without evidence can only be loaded by the exact same story revision.
+accepts missing trailing fields. A base requires both evidence fields to be `nil`. Format 4 always
+decodes with a `nil` continuation, including when it has unknown fields at position 10 or later.
 
 The character array is `[first name, last name, pronouns, preset, stats]`. Optional strings are
 `nil`; `stats` is an array of `[id, value]` arrays, sorted by id before writing. The summary array
 is `[scene title, UTC ticks, UTC offset minutes, character name]`. It is stored as a separate
 MessagePack byte sequence so damaged display metadata can be discarded without rejecting replay
 data.
+
+The continuation's current checkpoint is taken immediately before the current passage's target is
+entered. It is an array of:
+
+1. target scene id, or `nil` for the ending;
+2. scene current before entry, or `nil`;
+3. characters;
+4. faction standings;
+5. flags;
+6. number variables;
+7. text variables;
+8. scene visits;
+9. fired triggers;
+10. trigger edges;
+11. known trigger ids;
+12. known item ids;
+13. pending rendered blocks.
+
+A character is `[id, first name, last name, pronouns or nil, stats, items]`. Pronouns are
+`[subject, object, possessive, possessive pronoun, reflexive, agreement]`. Stats, items, standings,
+flags (0 or 1), number variables and visits use `[id, int32]` pairs; text variables use
+`[id, string]`. Every id list is sorted ordinally. Seed and character selection remain in the
+top-level fields.
+
+The transcript contains frames before the current passage, including earlier continuation segments.
+The base transcript length says how many of those frames precede the optional base. A frame is
+`[scene id or nil, title or nil, blocks, chosen inlines or nil, chosen automatically, ended,
+continues previous, clears previous]`. A block is
+`[kind, inlines or nil, speaker or nil, text or nil, paragraphs or nil, note kind]`; an inline is
+`[kind, text or nil, style, media id or nil, accessibility]`.
+
+The integer tokens are frozen in `TranscriptCodec`: block kinds are paragraph 0, blank line 1,
+speech 2 and note 3; inline kinds are text 0, line break 1, blank line 2 and media 3. Note kinds
+are check 0, change 1 and info 2. Text-style bits are emphasis 1, strong 2 and code 4 (0 is none);
+media accessibility is descriptive 0 or decorative 1. Pronoun agreement is singular 0 or plural 1.
+These are not CLR enum ordinals. The codec coverage test requires every rendered type and enum member
+to have an encoding.
 
 The runtime uses MessagePack-CSharp 3.1.12 with its compile-time source-generated formatters and
 `MessagePackSecurity.UntrustedData`. No protobuf schema, handwritten wire codec, or runtime-generated
@@ -50,14 +92,16 @@ The reader requires the decoded length to equal the declared length and the file
 body's Adler-32 checksum. .NET's `ZLibStream` accepts a truncated stream or one missing its checksum,
 so these checks are done explicitly.
 
-Any other format version is reported as unsupported. There is no migration between format versions.
+Any other format version is reported as unsupported. Reading version 4 is compatibility support, not
+save migration; a later save writes version 5.
 
 ## Array-key rules
 
 Array positions are permanent. Never reorder or reuse a position; add new fields only at the end.
-Older readers skip unknown trailing positions, while new readers supply defaults for missing trailing
-positions. The MessagePack source generator and the frozen layout tests keep the annotated key
-positions and wire layout aligned.
+Readers skip unknown trailing positions, while new readers supply defaults for missing top-level
+trailing positions. The version bump prevents a version-4 reader from silently replaying
+base-relative choices from the story start. The MessagePack source generator and frozen layout tests
+keep the annotated key positions and wire layout aligned.
 
 Character statistics use an array rather than a map so their serialization order is deterministic.
 The save format does not depend on reflection, typeless deserialization, or dynamic code generation;
@@ -76,26 +120,85 @@ the generated formatter works in desktop and Blazor WebAssembly builds.
 
 | Limit | Value | Enforced |
 |---|---|---|
-| Compressed save | 2 MiB | Writing, storage, import and reading |
-| Decoded body | 8 MiB (declared length checked first; decompression stops one byte past it) | Writing and reading |
+| Compressed save | 10 MiB | Writing, storage, import and reading |
+| Decoded body | 32 MiB (declared length checked first; decompression stops one byte past it) | Writing and reading |
 | Choices | 10,000 | Playing and reading; array size checked before deserialization |
 | Choice key | 1–512 characters | Saving and reading |
 | Character stats | 1,000 | Reading; array size checked before deserialization |
 | Summary UTC offset | ±14 hours | Reading (invalid details are dropped, not fatal) |
 | Replay evidence | 33 bytes, version 4 | Reading; malformed or unsupported evidence rejects the save |
 | Replay choice identity | 8 bytes, or 32 bytes for a colliding scene | Reading; count and encoding are checked before replay |
+| Transcript frames | 10,000 | Reading; base transcript length plus choice count may not exceed 10,000 |
 
 Collection counts are checked with `MessagePackReader` before the generated deserializer allocates
-their lists. Other decoded structures are bounded by the 8 MiB body limit. A repeated-choice
-playthrough of about 200 choices compresses below 4 KiB.
+their lists. Continuation arrays cannot declare more elements than the remaining bytes; maps are
+not allowed. The base transcript length must be between zero and the frame count, each character
+has at most 1,000 stats, and a base cannot carry replay evidence. A checkpoint's total visit count
+cannot exceed its preceding transcript frames (the base transcript length for a base checkpoint).
+Other decoded structures are bounded by the 32 MiB body limit. These save limits are provisional pending
+[#760](https://github.com/squid-farm/talewright/issues/760).
 
 ## Compatibility
 
-A save must have the same story id. When the story version or content fingerprint changes, loading
-also requires replay evidence, per-choice outcome identities, and the same replay/extension identity.
-The runtime replays the complete timeline, including redo, and accepts the update only when the
-starting state and full gameplay evidence match. It then rebuilds the visible cursor from the validated
-timeline. Loading never rewrites the original bytes; a later save uses the current story identity.
+A save must have the same story id. Format 4 and format 5 saves with a `nil` continuation keep
+the replay-only policy: an update requires replay evidence, per-choice outcome identities and the
+same replay/extension identity. The runtime validates the full timeline, including redo, before
+rebuilding the visible cursor. A save without evidence loads only against the exact story revision.
+Loading never rewrites the original bytes or replaces an active session on failure.
+
+Every normal format-5 player save carries a continuation. For an unchanged story, a save without a
+base replays from the start with evidence; a save with a base rebuilds it, enters its target once,
+then replays the choices since that boundary without evidence. Failure rejects as damaged rather
+than falling back. For a changed story without a base, compatible evidence replay is tried first.
+It preserves undo and redo and re-renders History using the updated prose. If replay fails, or the
+save already has a base, the runtime continues from the current checkpoint.
+
+### Continuing from a checkpoint
+
+The checkpoint restores state from current declarations, then enters its target once using the
+updated story. The current passage's entry effects, checks, prose and choices come from the update;
+effects of the choice that led there were already applied and are not repeated. Pending output from
+that choice is retained. Automatic diverts continue normally.
+
+Earlier passages are saved rendered frames: History shows their original text and choice labels
+without executing or re-rendering them. A continuation starts a new undo boundary at cursor zero;
+Back cannot cross it and redo is discarded. `StoryHistory.Continuation` reports whether redo was
+discarded and lists author-facing notes. It remains `null` for replay loads. A subsequent save uses
+the normalized resumed checkpoint as its base and retains the earlier transcript; further incompatible
+updates add boundaries in the same way. Restart starts a new playthrough without a base.
+
+For declaration changes:
+
+| Change | Continuation behavior |
+|---|---|
+| Character, stat, item, faction, flag, variable, scene or trigger added | Use the current initial value. An item known to the save but absent from its counts has count zero. |
+| Declaration removed | Keep its value for later saves, report it in notes, but do not load it. If the same id and kind return, restore the retained value. |
+| Number variable changed to text, or text to number | Reject, including when the old value was retained through an intermediate version. |
+| Stat range narrowed | Clamp the saved value and add a note. |
+| Initial value, stat default, preset or creation defaults changed | Keep the saved values. |
+| Saved character selection no longer validates | Reject with the character detail. |
+| Target scene removed | Reject. Renames are removal plus addition; there is no mapping. |
+
+Structural rejections tell the player to open the save with the story version that created it.
+Visits to existing scenes are restored, removed-scene visits are retained, and entering the target
+increments its visit count. Seeded rolls remain keyed by seed, check identity and visit count.
+`RollCount` is not saved and counts only rolls after continuation; rebuilding does not invent rolls.
+
+Fired once-triggers and edge memory are restored for known triggers. A newly declared trigger is
+primed against the restored state, so the update alone does not fire it. A known trigger whose
+condition changed keeps its old edge: if that edge was false and the condition is now true, it can
+fire at the normal evaluation after entering the target. Rebuilding itself does not run triggers
+or level changes.
+
+`PlaythroughLength` is the base transcript length plus cursor; `IsAtChoiceLimit` applies the
+10,000-choice limit to that sum. Progress identity hashes the save without its summary and reduces
+the continuation to `[nil, nil, base, base transcript length]`. Thus historical rendered text and
+the current checkpoint do not change the key, while different bases do. After continuation,
+`RestoredProgressKey` identifies the original slot until play changes.
+
+`ForkAuthor` rejects a history with a base because an Author Debugger timeline must replay from
+the story start. The player-facing notice and host/storage changes are separate work in
+[#759](https://github.com/squid-farm/talewright/issues/759); this runtime change does not add that UI.
 
 Each choice identity is a SHA-256 prefix describing its scene and gameplay outcome: destination,
 ordered effects, and skill-check definition and outcomes. The usual encoding is the first 8 bytes.
@@ -104,7 +207,7 @@ uses the full 32-byte hash. Choice labels, prose, source positions, availability
 other offered choices are excluded. When replaying, the runtime chooses the first current authored
 choice with the same outcome identity, even if its availability requirement is now false. Live choice
 keys and availability behavior are unchanged. Recorded hub selections match existing destinations
-regardless of their current tag eligibility; removed destinations still reject the save.
+regardless of their current tag eligibility; a removed destination makes replay fail.
 
 `ChoiceReplayIdentity` owns the outcome description, a JSON array tagged `choice-replay-v1`. Its
 operator, name-part and pronoun-form tokens are frozen in that class, not taken from enum member
@@ -135,13 +238,13 @@ changing evidence is a compatibility break under the
 a version bump and migration notes. The
 [golden save tests](../../engine/tests/Talewright.Runtime.Tests/SaveSamples/golden/README.md) load real saves to prove gameplay is unchanged.
 
-Prose, label, unrelated-choice, ordering, and availability-requirement changes can be compatible.
-Changed starting values or recorded gameplay outcomes are not. This checks a replay path, not a saved
-state snapshot, and does not provide general state mappings or save-format migration.
+Prose, label, unrelated-choice, ordering, and availability-requirement changes can be replay-compatible.
+Changed starting values or recorded gameplay outcomes are not replay-compatible; saves with a
+continuation can instead resume under the rules above. This does not provide general state mappings
+or save-format migration.
 
-Saves without evidence only load against the exact same story revision. Reopening and re-saving
-such a save is not an approved migration path. Stories without a replay/extension identity remain
-exact-revision only. The author-facing guidance is in
+Replay-only saves without evidence load only against the exact same story revision. Reopening and
+re-saving such a save is not an approved migration path. The current author-facing guidance is in
 [Sharing your story](../guide/sharing-your-story.md) and
 [Updating a story with existing saves](../guide/playing-and-saving.md#updating-a-story-with-existing-saves).
 

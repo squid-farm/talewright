@@ -31,6 +31,45 @@ public class GoldenSaveTests
     }
 
     [Fact]
+    public void Lost_relic_continuation_save_replays_against_the_unchanged_sample()
+    {
+        var (save, history) = Restore("lost-relic-continuation.twsave",
+            "1452158E32301F4FBCE400AABAAE8010AD429E482BADCCA7A6AD011812AD19FE", LostRelic());
+
+        Assert.NotNull(save.Continuation);
+        Assert.Null(history.Continuation);
+        Assert.Equal(11, history.Cursor);
+        Assert.False(history.CanForward);
+        Assert.Equal("trail.jaguar", history.Current.Scene!.Value.Value);
+        AssertCampAndTrigger(history);
+        Assert.Equal(2, history.State.VisitCount(new SceneId("trail.night")));
+        Assert.Empty(history.Events.OfType<DiceRolled>());
+        AssertSameEvidence(save, history);
+    }
+
+    [Fact]
+    public void Lost_relic_continuation_save_keeps_past_values_after_an_incompatible_update()
+    {
+        var source = StorySource.FromDirectory(Path.Combine(Root, "samples", "LostRelic"));
+        var files = source.Files.ToDictionary(file => file.Key, file => file.Value, StringComparer.Ordinal);
+        const string header = "=== camp.hub\n@title The Camp\n@hub camp";
+        var camp = files["chapters/01-camp.tale"];
+        files["chapters/01-camp.tale"] = camp.Replace(header, header + "\n~ var:supplies += 10", StringComparison.Ordinal);
+        Assert.NotEqual(camp, files["chapters/01-camp.tale"]);
+        var updated = Compile(new StorySource(files, source.ImagePaths), null);
+        var (save, history) = Restore("lost-relic-continuation.twsave",
+            "1452158E32301F4FBCE400AABAAE8010AD429E482BADCCA7A6AD011812AD19FE", updated);
+
+        Assert.NotNull(save.Continuation);
+        Assert.NotNull(history.Continuation);
+        Assert.Equal(0, history.Cursor);
+        Assert.Equal("trail.jaguar", history.Current.Scene!.Value.Value);
+        Assert.Equal(2, history.State.GetVariable(new VarId("supplies")));
+        AssertCampAndTrigger(history);
+        Assert.False(history.CanBack);
+    }
+
+    [Fact]
     public void Lost_relic_named_save_restores_redo_before_the_skill_check()
     {
         var (save, history) = Restore("lost-relic-slot.twsave",
@@ -72,12 +111,27 @@ public class GoldenSaveTests
             Convert.ToHexString(SHA256.HashData(bytes)));
 
         var (story, expected) = CreateLostRelicTriggerCheckpoint();
-        Assert.Equal(bytes, TriggerSaveCodec.Encode(expected));
+        var current = TriggerSaveCodec.Decode(TriggerSaveCodec.Encode(expected));
+        Assert.Equal(expected.TriggerId, current.TriggerId);
+        Assert.Equal(expected.Data, current.Data);
+        Assert.Equal(SaveFormat.Version, current.Data[4]);
+        var currentSave = SaveFormat.Read(current.Data);
+        Assert.NotNull(currentSave.Continuation);
+
+        // Compare the unchanged v4 envelope with the v4 projection of the same replay inputs.
+        var legacyBody = SaveFormat.EncodeBody(currentSave with { Continuation = null });
+        Assert.Equal(0x9b, legacyBody[0]);
+        Assert.Equal(0xc0, legacyBody[^1]);
+        legacyBody[0] = 0x9a;
+        var legacyData = SaveFormat.Pack(legacyBody.AsSpan(0, legacyBody.Length - 1));
+        legacyData[4] = 4;
+        Assert.Equal(bytes, TriggerSaveCodec.Encode(expected with { Data = legacyData }));
 
         var checkpoint = TriggerSaveCodec.Decode(bytes);
         Assert.Equal("courage-earned", checkpoint.TriggerId);
         var save = SaveFormat.Read(checkpoint.Data);
         var history = StoryHistory.Restore(story, checkpoint.Data);
+        var currentHistory = StoryHistory.Restore(story, current.Data);
 
         Assert.Equal(11, history.Cursor);
         Assert.False(history.CanForward);
@@ -86,6 +140,12 @@ public class GoldenSaveTests
         Assert.Equal(2, history.State.VisitCount(new SceneId("trail.night")));
         Assert.Empty(history.Events.OfType<DiceRolled>());
         AssertSameEvidence(save, history);
+        Assert.Null(currentHistory.Continuation);
+        Assert.Equal(history.Cursor, currentHistory.Cursor);
+        Assert.Equal(history.Current.Scene, currentHistory.Current.Scene);
+        Assert.Equal(history.Events, currentHistory.Events);
+        AssertCampAndTrigger(currentHistory);
+        AssertSameEvidence(currentSave, currentHistory);
     }
 
     [Fact]

@@ -278,12 +278,11 @@ real `FileSaveStore` write/read, restore, Back/Forward and story-only CLI public
 The warmed hub-choice case separately measures selection from the generated bounded
 hub, which offers at most 20 storylets. `BoundaryInputBenchmarks` times exact and
 immediately-over former directory ceilings (now accepted) and retained ZIP text file-size,
-expanded-size and file-count defenses, plus directory nesting depth. The runtime suite also verifies a valid save
-at exactly 2 MiB with legal 512-character choice keys; the first additional choice
-crosses the byte cap. Existing compiler/runtime/CLI/player tests provide matching
-ZIP, UTF-16/BOM, upload, save-store, 10,000-choice and failed-publication safety
-checks. Those hard correctness/limit assertions remain separate from noisy
-performance comparisons.
+expanded-size and file-count defenses, plus directory nesting depth. The runtime suite also checks
+save-size and choice-key limits; compressed saves are capped at 10 MiB. Existing
+compiler/runtime/CLI/player tests provide matching ZIP, UTF-16/BOM, upload, save-store,
+10,000-choice and failed-publication safety checks. Those hard correctness/limit assertions
+remain separate from noisy performance comparisons.
 
 The corpus tiers measure size and limits, not story structure: each scene has one real
 destination, the scenes form a single ring with no endings, and one hub matches every scene.

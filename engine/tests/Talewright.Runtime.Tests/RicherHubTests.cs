@@ -1,6 +1,7 @@
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
 using Talewright.Rules.Expressions;
+using Talewright.Runtime.Saves;
 using Talewright.Testing;
 
 namespace Talewright.Runtime.Tests;
@@ -164,7 +165,9 @@ public sealed class RicherHubTests
         var original = new StoryHistory(Compile(), 42);
         original.Choose("storylet:first");
         if (redo) original.Back();
-        var bytes = original.Save();
+        var continuation = original.Save();
+        var continuationCopy = continuation.ToArray();
+        var bytes = SaveFormat.Write(SaveFormat.Read(continuation) with { Continuation = null });
         var unchanged = bytes.ToArray();
         var updated = change switch
         {
@@ -181,6 +184,19 @@ public sealed class RicherHubTests
         if (change == "removed")
         {
             Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(updated, bytes));
+            if (redo)
+            {
+                var continued = StoryHistory.Restore(updated, continuation);
+                Assert.True(continued.Continuation is { RedoDiscarded: true });
+                Assert.Equal(original.Current.Scene, continued.Current.Scene);
+                Assert.Equal(0, continued.Cursor);
+                Assert.False(continued.CanBack);
+                Assert.False(continued.CanForward);
+            }
+            else
+            {
+                Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(updated, continuation));
+            }
         }
         else
         {
@@ -192,8 +208,14 @@ public sealed class RicherHubTests
             restored.Forward();
             Assert.True(restored.Current.IsEnded);
             Assert.Equal(restored.Events, StoryHistory.Restore(updated, restored.Save()).Events);
+            var replayed = StoryHistory.Restore(updated, continuation);
+            Assert.Null(replayed.Continuation);
+            Assert.Equal(original.Cursor, replayed.Cursor);
+            Assert.Equal(original.Events, replayed.Events);
+            Assert.Equal(original.CanForward, replayed.CanForward);
         }
         Assert.Equal(unchanged, bytes);
+        Assert.Equal(continuationCopy, continuation);
         Assert.Equal(activeBefore, live.Save());
 
         static StoryDefinition Compile(string hubTags = "room", string firstTags = "room", bool includeFirst = true)

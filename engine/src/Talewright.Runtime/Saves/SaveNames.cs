@@ -27,7 +27,7 @@ public static class SaveNames
 
         if (data.Length > StoryHistory.MaxSaveBytes)
         {
-            throw new InvalidDataException("This saved game is too large to store or load (maximum 2 MiB). Choose another save.");
+            throw new InvalidDataException($"This saved game is too large to store or load (maximum {SaveFormat.MaxSaveBytes / 1024 / 1024} MiB). Choose another save.");
         }
     }
 }

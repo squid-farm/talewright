@@ -70,7 +70,7 @@ public sealed class StoryCompatibilityTests
         original.Choose("c0");
         original.Choose("c0");
         original.Back();
-        var bytes = original.Save();
+        var bytes = ReplayOnly(original.Save());
         var unchanged = bytes.ToArray();
         var active = Create(Compile());
         var activeBefore = active.Save();
@@ -91,6 +91,58 @@ public sealed class StoryCompatibilityTests
         Assert.Contains("Version 1 of Compatibility has changed", error.Message);
         Assert.DoesNotContain("choice", error.Message, StringComparison.OrdinalIgnoreCase);
         Assert.DoesNotContain("scene", error.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(unchanged, bytes);
+        Assert.Equal(activeBefore, active.Save());
+    }
+
+    [Theory]
+    [InlineData("changed-effect")]
+    [InlineData("changed-check")]
+    [InlineData("changed-character")]
+    [InlineData("invalid-character")]
+    [InlineData("changed-extension")]
+    [InlineData("changed-start")]
+    [InlineData("removed-redo-choice")]
+    [InlineData("changed-redo-destination")]
+    public void Divergent_updates_continue_from_the_checkpoint(string change)
+    {
+        var original = Create(Compile());
+        original.Choose("c0");
+        original.Choose("c0");
+        original.Back();
+        var bytes = original.Save();
+        var unchanged = bytes.ToArray();
+        var active = Create(Compile());
+        var activeBefore = active.Save();
+        var updated = change switch
+        {
+            "changed-effect" => Compile(version: "2", reward: 2),
+            "changed-check" => Compile(version: "2", difficulty: 13),
+            "changed-character" => Compile(version: "2", presetHp: 9),
+            "invalid-character" => Compile(version: "2", allowShe: false),
+            "changed-extension" => Compile(version: "2", compatibilityId: "custom-v2"),
+            "changed-start" => Compile(version: "2", startEffect: 1),
+            "removed-redo-choice" => Compile(version: "2", includeMiddleChoice: false),
+            "changed-redo-destination" => Compile(version: "2", middleDestination: "END"),
+            _ => throw new ArgumentOutOfRangeException(nameof(change)),
+        };
+
+        if (change == "invalid-character")
+        {
+            var error = Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(updated, bytes));
+            Assert.StartsWith("This save cannot continue in the updated story because its character is no longer valid:", error.Message);
+        }
+        else
+        {
+            var restored = StoryHistory.Restore(updated, bytes);
+            Assert.NotNull(restored.Continuation);
+            Assert.True(restored.Continuation.RedoDiscarded);
+            Assert.False(restored.CanBack);
+            Assert.False(restored.CanForward);
+            Assert.Equal(original.State.GetVariable(new VarId("score")), restored.State.GetVariable(new VarId("score")));
+            Assert.Equal(original.State.GetBaseStat(EntityId.Player, new StatId("hp")),
+                restored.State.GetBaseStat(EntityId.Player, new StatId("hp")));
+        }
         Assert.Equal(unchanged, bytes);
         Assert.Equal(activeBefore, active.Save());
     }
@@ -153,7 +205,7 @@ public sealed class StoryCompatibilityTests
         original.Choose("c0");
         original.Back();
         original.Back();
-        var bytes = original.Save();
+        var bytes = ReplayOnly(original.Save());
 
         Assert.Equal(0, original.Cursor);
         Assert.True(original.CanForward);
@@ -192,7 +244,7 @@ public sealed class StoryCompatibilityTests
         var history = new StoryHistory(result.Story!, 7);
         history.Choose("c0");
         history.Back();
-        var bytes = history.Save();
+        var bytes = ReplayOnly(history.Save());
         var target = result.Story!;
         if (updated)
         {
@@ -245,6 +297,7 @@ public sealed class StoryCompatibilityTests
         {
             ReplayEvidence = null,
             ReplayChoiceIdentities = null,
+            Continuation = null,
         });
         var updated = Compile(version: "2", prose: "Updated narrative.");
 
@@ -258,7 +311,22 @@ public sealed class StoryCompatibilityTests
         var original = Create(Compile());
         var updated = Compile(version: "2", initialScore: 5);
 
-        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(updated, original.Save()));
+        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(updated, ReplayOnly(original.Save())));
+    }
+
+    [Fact]
+    public void Changed_initial_world_defaults_keep_saved_values()
+    {
+        var original = Create(Compile());
+        var bytes = original.Save();
+        var copy = bytes.ToArray();
+        var updated = Compile(version: "2", initialScore: 5);
+
+        var restored = StoryHistory.Restore(updated, bytes);
+
+        Assert.NotNull(restored.Continuation);
+        Assert.Equal(original.State.GetVariable(new VarId("score")), restored.State.GetVariable(new VarId("score")));
+        Assert.Equal(copy, bytes);
     }
 
     [Fact]
@@ -480,6 +548,9 @@ public sealed class StoryCompatibilityTests
             return result.Story!;
         }
     }
+
+    private static byte[] ReplayOnly(byte[] bytes) =>
+        SaveFormat.Write(SaveFormat.Read(bytes) with { Continuation = null });
 
     private static string KeyOf(StoryFrame frame, string label) =>
         frame.Choices.Single(choice =>
