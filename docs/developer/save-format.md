@@ -150,8 +150,11 @@ Every normal format-5 player save carries a continuation. For an unchanged story
 base replays from the start with evidence; a save with a base rebuilds it, enters its target once,
 then replays the choices since that boundary without evidence. Failure rejects as damaged rather
 than falling back. For a changed story without a base, compatible evidence replay is tried first.
-It preserves undo and redo and re-renders History using the updated prose. If replay fails, or the
-save already has a base, the runtime continues from the current checkpoint.
+It preserves undo and redo and re-renders History using the updated prose. If replay cannot match a
+redo choice, evidence is unavailable, or the save already has a base, the runtime continues from the
+current checkpoint. For an applied choice whose identity changed, replay by its saved key must still
+match the recorded evidence; changed non-check outcomes are rejected, while seeded-check outcomes
+can continue from the checkpoint.
 
 ### Continuing from a checkpoint
 
