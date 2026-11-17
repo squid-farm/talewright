@@ -71,7 +71,8 @@ public sealed class StorySession : IStorySession
         AuthorSetup? setup, Action<RuleDecision>? observer,
         Action<SceneEntryBoundary, IReadOnlyList<GameEvent>>? beforeEntry = null,
         Action<SceneId, IReadOnlyList<AuthorEntryReplayStep>>? afterEntry = null,
-        IReadOnlyList<GameEvent>? initialEvents = null, IReadOnlyList<string>? triggerEdges = null)
+        IReadOnlyList<GameEvent>? initialEvents = null, IReadOnlyList<string>? triggerEdges = null,
+        bool? captureEntry = null)
     {
         Seed = DeterministicDice.ResolveSeed(seed, story.Seed);
         character = CharacterSelection.Validate(story, character, Seed);
@@ -128,7 +129,7 @@ public sealed class StorySession : IStorySession
         {
             setup?.Apply(_log);
         }
-        _captureEntry = setup is not null || initialEvents is not null;
+        _captureEntry = captureEntry ?? (setup is not null || initialEvents is not null);
         _observer = observer;
         _beforeEntry = beforeEntry;
         _afterEntry = afterEntry;
@@ -185,6 +186,29 @@ public sealed class StorySession : IStorySession
         Action<SceneEntryBoundary, IReadOnlyList<GameEvent>>? beforeEntry,
         Action<SceneId, IReadOnlyList<AuthorEntryReplayStep>>? afterEntry) =>
         new(story, seed, null, character, null, observer, beforeEntry, afterEntry, events, triggerEdges);
+
+    /// <summary>Rebuilds a player session and enters the checkpoint's target once.</summary>
+    internal static StorySession Resume(StoryDefinition story, ulong seed, CharacterSelection? character,
+        IReadOnlyList<GameEvent> events, IReadOnlyList<string> triggerEdges, DivertTarget target,
+        IReadOnlyList<RenderedBlock> pending)
+    {
+        var session = new StorySession(story, seed, null, character, null, null, null, null, events, triggerEdges,
+            captureEntry: false);
+        if (target.IsEnd && session.State.CurrentScene is { } sourceId)
+        {
+            // A direct ending normally inherits the frame it was chosen from.
+            var source = story.GetScene(sourceId);
+            session.Current = new StoryFrame(source.Id, source.Title, new RenderedDocument([]), [], IsEnded: false)
+            {
+                ContinuesPrevious = source.ContinuesPrevious,
+            };
+        }
+        session.Enter(target, pending.ToList());
+        return session;
+    }
+
+    /// <summary>The state boundary immediately before the current frame's scene (or ending) was entered.</summary>
+    internal PlayerEntryBoundary? LastEntry { get; private set; }
 
     internal void EditAuthorState(AuthorSetup values)
     {
@@ -321,6 +345,8 @@ public sealed class StorySession : IStorySession
     private StoryFrame Enter(DivertTarget target, List<RenderedBlock> pending)
     {
         BeforeTransition();
+        LastEntry = new PlayerEntryBoundary(target, _log.Events.Count, _triggers.CaptureEdgeMemory(),
+            Array.AsReadOnly(pending.ToArray()));
         if (target.IsEnd)
         {
             return EndStory(pending, scene: null);
@@ -544,3 +570,6 @@ public sealed class StorySession : IStorySession
 
 internal sealed record SceneEntryBoundary(SceneId Scene, int EventCount, IReadOnlyList<RenderedBlock> Pending,
     IReadOnlyList<string> TriggerEdges);
+
+internal sealed record PlayerEntryBoundary(DivertTarget Target, int EventCount, IReadOnlyList<string> TriggerEdges,
+    IReadOnlyList<RenderedBlock> Pending);

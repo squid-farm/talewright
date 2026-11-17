@@ -100,7 +100,7 @@ public sealed class FileSaveStore(string root) : ISaveStore
         await using var ownedStream = stream;
         if (stream.Length is 0 || stream.Length > maxBytes)
         {
-            throw new InvalidDataException("This saved game is empty or too large to load (maximum 2 MiB). Choose another save.");
+            throw new InvalidDataException($"This saved game is empty or too large to load (maximum {maxBytes / 1024 / 1024} MiB). Choose another save.");
         }
 
         var data = new byte[(int)stream.Length];

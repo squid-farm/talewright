@@ -371,15 +371,22 @@ public partial class LostRelicTests
         var older = StoryCompiler.Compile(new StorySource(files, source.ImagePaths)).Story!;
         var oldHistory = new StoryHistory(older, 42, older.Creation!.Default(older.World.Characters[EntityId.Player]));
         var bytes = oldHistory.Save();
-        var legacy = SaveFormat.Write(SaveFormat.Read(bytes) with
+        var withoutEvidence = SaveFormat.Read(bytes) with
         {
             ReplayEvidence = null,
             ReplayChoiceIdentities = null,
-        });
+        };
+        var legacy = SaveFormat.Write(withoutEvidence with { Continuation = null });
+        var continuation = SaveFormat.Write(withoutEvidence);
+        var copy = continuation.ToArray();
         var history = History();
         var events = history.Events.ToArray();
         Assert.StartsWith("Version 0.3.0 of ", Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, legacy)).Message);
         Assert.Equal(oldHistory.Events, StoryHistory.Restore(history.Story, bytes).Events);
+        var continued = StoryHistory.Restore(history.Story, continuation);
+        Assert.NotNull(continued.Continuation);
+        Assert.Equal(oldHistory.Current.Scene, continued.Current.Scene);
+        Assert.Equal(copy, continuation);
         Assert.Equal(events, history.Events);
     }
 

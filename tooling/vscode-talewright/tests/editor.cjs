@@ -179,12 +179,15 @@ async function testFormattingCommands(extension, editor, document) {
     selectText('shortcut');
     assert.equal(await renderer.focusEditor(), true, 'Editor input must be focused before Ctrl+B');
     await renderer.dispatchKey('b', 'KeyB', 66, 2);
-    await waitUntil(() => document.getText() === '**shortcut**', 'Ctrl+B must dispatch in the installed Talemark editor');
+    await waitUntil(() => document.getText() === '**shortcut**'
+      && document.getText(editor.selection) === 'shortcut',
+    'Ctrl+B must dispatch in the installed Talemark editor and restore the selected text');
     assert.equal(document.getText(editor.selection), 'shortcut');
     assert.equal(await renderer.focusEditor(), true, 'Editor input must be focused before Ctrl+I');
     await renderer.dispatchKey('i', 'KeyI', 73, 2);
-    await waitUntil(() => document.getText() === '**_shortcut_**',
-      'Ctrl+I must dispatch in the installed Talemark editor');
+    await waitUntil(() => document.getText() === '**_shortcut_**'
+      && document.getText(editor.selection) === 'shortcut',
+    'Ctrl+I must dispatch in the installed Talemark editor and restore the selected text');
     assert.equal(document.getText(editor.selection), 'shortcut');
   } finally {
     renderer.close();

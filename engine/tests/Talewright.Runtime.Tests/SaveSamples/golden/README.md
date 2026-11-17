@@ -2,11 +2,14 @@
 
 The quick, named and autosaves were written by the engine from the sample sources as they were checked in. The trigger checkpoint uses the test-only source overlay described below. These fixtures use replay-evidence version 4 and the keyed-roll contract. `GoldenSaveTests` loads each save against its corresponding source and checks the restored scene, cursor, state and replay evidence. Tests only read these files. They never regenerate them.
 
-Loading a save replays every saved choice, then compares the result with the replay evidence stored in the save. If an engine change alters gameplay (rule maths, trigger timing, evaluation order, compiler binding or emitted events), these saves stop loading, and saves that players already have would stop loading too.
+The format-4 saves replay every saved choice, then compare the result with the stored replay evidence.
+If an engine change alters gameplay (rule maths, trigger timing, evaluation order, compiler binding or
+emitted events), these legacy saves stop loading. The format-5 fixture also tests continuation from its
+checkpoint after an incompatible update.
 
 ## What each save covers
 
-All three Lost Relic saves come from one playthrough of [`samples/LostRelic`](../../../../../samples/LostRelic) with seed `42`, randomness `checks-only`, and the default character from the `explorer` creation preset:
+The Lost Relic saves come from one playthrough of [`samples/LostRelic`](../../../../../samples/LostRelic) with seed `42`, randomness `checks-only`, and the default character from the `explorer` creation preset:
 
 1. Continue, Haggle for supplies, Sign the expedition register, Continue. This is a camp hub selection; `camp.hub` is visited twice.
 2. Set out for the temple, Tie off the rope and cross carefully, Make camp before the climb, Eat a ration, Share supper by the fire, Continue, Stand your ground. Courage reaches 10 and the `courage-earned` trigger fires.
@@ -15,6 +18,7 @@ All three Lost Relic saves come from one playthrough of [`samples/LostRelic`](..
 | File | Written as | Covers |
 | --- | --- | --- |
 | `lost-relic-quick.twsave` | Quick Save after step 2 | Character creation, hub selection, the trigger firing, visit counts |
+| `lost-relic-continuation.twsave` | Format 5 Quick Save after step 2 | Replay and checkpoint continuation across an incompatible update |
 | `lost-relic-trigger.twtrigger` | Trigger checkpoint after step 2 | The `courage-earned` checkpoint envelope and restoration of the same playthrough |
 | `lost-relic-slot.twsave` | Named save after step 3, then Back | Redo: cursor 13 of 14 choices. Going forward replays the keyed check results |
 | `lost-relic-autosave.twsave` | Autosave after going forward again | The keyed Athletics and Perception check results and route |

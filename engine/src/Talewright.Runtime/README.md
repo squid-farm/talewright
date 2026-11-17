@@ -148,7 +148,8 @@ and full redo validation, then retains the normal start, character, seed, choice
 independent synthetic session. Each forked choice is the current choice that restore matched by outcome
 identity, not the saved positional key, so inserted or removed siblings cannot fork a different branch.
 If restore matched an outcome the current story no longer offers at that point (for example a retagged
-hub storylet), the fork fails instead of diverging. Normal save bytes, rules and slots are untouched.
+hub storylet), the fork fails instead of diverging. Histories continued from a checkpoint also cannot
+be forked. Normal save bytes, rules and slots are untouched.
 
 Value batches require every collection, including `textVariables` when empty; replay evidence includes
 empty text-variable state. Previous scenario formats are unsupported, not migrated.
@@ -313,24 +314,27 @@ trigger edge state and deterministic dice, not just event-backed state. Manifest
 navigation, not persistence.
 
 `Save()` returns bounded compressed MessagePack bytes. `StoryHistory.Restore(story, bytes)` creates and
-validates a separate candidate, including redo choices. Only replace an active history after this succeeds.
-The version-4 format includes story ID/version, SHA-256 source/extension fingerprint, seed, choices,
-cursor, character selection and compact replay evidence. Fixed-protagonist stories use a null
-character; creation stories require a valid selection. Older save formats are not supported.
-When the story has changed since the save was made, the save loads only if its replay evidence
-proves the same gameplay. Saves without evidence only load into the exact story revision that
-made them. See [Save format](../../../docs/developer/save-format.md#compatibility) for the rules and limits.
+validates a separate candidate, including redo choices when replaying. Only replace an active history after this succeeds.
+The version-5 format includes story ID/version, SHA-256 source/extension fingerprint, seed, choices,
+cursor, character selection, compact replay evidence, a pre-entry checkpoint and the earlier
+rendered transcript. Fixed-protagonist stories use a null character; creation stories require a
+valid selection. Format 4 remains readable with its replay-only compatibility rules. A version-5
+save first tries compatible replay; after an incompatible update it can preserve past state and
+continue at a new undo boundary. `Continuation` reports that boundary, discarded redo and notes.
+See [Save format](../../../docs/developer/save-format.md#compatibility) for the rules and limits.
 `Save(CaptureSummary(DateTimeOffset.UtcNow))` embeds optional scene/title, capture time and
 effective character-name metadata in the same atomic payload. `Save()` without metadata omits the
 summary. Malformed summary values do not prevent otherwise-valid replay restoration.
 `SaveCatalog.ListEntriesAsync` parses bounded payloads without replay, returning missing/unreadable
 details explicitly. `StoryHistory.ProgressKey` and each entry's matching key hash the canonical
-full replay payload excluding summary metadata. `RestoredProgressKey` also identifies a successfully
+replay payload and any base, excluding summary, current checkpoint and rendered transcript.
+`RestoredProgressKey` also identifies a successfully
 loaded original slot until the timeline changes, including after loading into a changed story. The player
 checks those keys against actual persisted slots before replacing a session; timestamps do not
 influence load protection.
-The limits are 2 MiB, 10,000 choices and 512 characters per choice key. Unknown fields, missing fields,
-unsupported formats and incompatible stories fail explicitly. Saves are never migrated.
+The provisional save limits are 10 MiB compressed, 32 MiB decoded, 10,000 choices across
+continuation boundaries and 512 characters per choice key. Unsupported formats and incompatible
+stories fail explicitly. Saves are never migrated.
 
 Built-in compiler options provide a compatibility identity. Custom C# hosts must set
 `CompilerOptions.CompatibilityId` and change it whenever registered extension behavior changes;

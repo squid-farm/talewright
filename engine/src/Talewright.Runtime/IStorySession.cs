@@ -21,8 +21,8 @@ public interface IStorySession
     IGameStateView State { get; }
 
     /// <summary>
-    /// Events emitted in this session. Folding them rebuilds state; player saves instead store a seed and
-    /// choice history, then recreate the events by replaying the story.
+    /// Events emitted in this session. Folding them rebuilds state; player saves store replay inputs and
+    /// may instead resume from a checkpoint after a story update.
     /// </summary>
     IReadOnlyList<GameEvent> Events { get; }
 

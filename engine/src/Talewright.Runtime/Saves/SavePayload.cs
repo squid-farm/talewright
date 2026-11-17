@@ -34,6 +34,9 @@ internal sealed partial class SavePayload
 
     [Key(9)]
     public List<byte[]>? ReplayChoiceIdentities { get; set; }
+
+    [Key(10)]
+    public ContinuationPayload? Continuation { get; set; }
 }
 
 [MessagePackObject(AllowPrivate = true)]

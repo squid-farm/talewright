@@ -7,8 +7,8 @@ namespace Talewright.Core.Events;
 /// <summary>
 /// Base type for everything that can happen in a game. Game state is a pure fold over these
 /// (see <see cref="State.GameState.Apply"/>). Events record <em>results</em> (new values, dice faces),
-/// never intentions, so folding an existing log reproduces the same state. Player saves store a seed and
-/// choice history, then recreate the event log by replaying the story.
+/// never intentions, so folding an existing log reproduces the same state. Player saves store replay
+/// inputs and a continuation checkpoint rather than the event log.
 /// </summary>
 public abstract record GameEvent;
 

@@ -7,7 +7,7 @@ using Talewright.Talemark.Model;
 
 namespace Talewright.Runtime.Saves;
 
-/// <summary>The replay inputs stored in a save. Saves never contain the event log or game state.</summary>
+/// <summary>The replay inputs and optional continuation stored in a save.</summary>
 public sealed record SavedGame
 {
     public required string StoryId { get; init; }
@@ -20,16 +20,17 @@ public sealed record SavedGame
     public SaveSummary? Summary { get; init; }
     public byte[]? ReplayEvidence { get; init; }
     public IReadOnlyList<byte[]>? ReplayChoiceIdentities { get; init; }
+    public SaveContinuation? Continuation { get; init; }
 }
 
 /// <summary>Reads and writes save files: a short header followed by a zlib-compressed MessagePack array.</summary>
 public static class SaveFormat
 {
-    public const int Version = 4;
+    public const int Version = 5;
     /// <summary>File extension for saves on disk and exported backups.</summary>
     public const string FileExtension = ".twsave";
-    public const int MaxSaveBytes = 2 * 1024 * 1024;
-    public const int MaxDecodedBytes = 8 * 1024 * 1024;
+    public const int MaxSaveBytes = 10 * 1024 * 1024;
+    public const int MaxDecodedBytes = 32 * 1024 * 1024;
     public const int MaxChoices = 10_000;
     public const int MaxChoiceKeyLength = 512;
     public const int MaxCharacterStats = 1_000;
@@ -41,7 +42,8 @@ public static class SaveFormat
 
     internal const string MalformedMessage = "This saved game is malformed or damaged. Choose another save or start a new game.";
     internal const string UnsupportedMessage = "This saved game uses an unsupported format. Open it with the player version that created it.";
-    internal const string TooLargeMessage = "This saved game is too large to load (maximum 2 MiB). Choose another save.";
+    internal static readonly string TooLargeMessage =
+        $"This saved game is too large to load (maximum {MaxSaveBytes / 1024 / 1024} MiB). Choose another save.";
     internal const string EmptyMessage = "This saved game is empty. Choose another save or start a new game.";
     internal const string HistoryMessage = "This saved game's history is damaged or exceeds the supported length. Choose another save.";
 
@@ -53,7 +55,7 @@ public static class SaveFormat
         var body = EncodeBody(save);
         if (body.Length > MaxDecodedBytes)
         {
-            throw new InvalidOperationException("This playthrough is too large to save (maximum 8 MiB uncompressed). You can continue playing, but this save could not be created.");
+            throw new InvalidOperationException($"This playthrough is too large to save (maximum {MaxDecodedBytes / 1024 / 1024} MiB uncompressed). You can continue playing, but this save could not be created.");
         }
 
         return Pack(body);
@@ -78,8 +80,11 @@ public static class SaveFormat
     /// <summary>Decodes a save. Throws <see cref="InvalidDataException"/> with a player-facing message.</summary>
     public static SavedGame Read(ReadOnlySpan<byte> data) => Read(data, out _);
 
-    internal static SavedGame Read(ReadOnlySpan<byte> data, out bool summaryDamaged) =>
-        DecodeBody(Decompress(data), out summaryDamaged);
+    internal static SavedGame Read(ReadOnlySpan<byte> data, out bool summaryDamaged)
+    {
+        var body = Decompress(data);
+        return DecodeBody(data[Magic.Length] == 4 ? StripLegacyFields(body) : body, out summaryDamaged);
+    }
 
     internal static byte[] EncodeBody(SavedGame save) =>
         EncodeBody(ToPayload(save));
@@ -124,6 +129,11 @@ public static class SaveFormat
             throw new InvalidDataException(HistoryMessage);
         }
 
+        if (payload.Continuation is { } continuation)
+        {
+            ContinuationCheckpoint.ValidatePayload(continuation);
+        }
+
         var character = payload.Character is null ? null : FromPayload(payload.Character);
         SaveSummary? summary = null;
         summaryDamaged = false;
@@ -152,6 +162,7 @@ public static class SaveFormat
             Summary = summary,
             ReplayEvidence = payload.ReplayEvidence,
             ReplayChoiceIdentities = payload.ReplayChoiceIdentities,
+            Continuation = payload.Continuation is null ? null : new SaveContinuation(payload.Continuation),
         };
     }
 
@@ -167,6 +178,7 @@ public static class SaveFormat
             Choices = save.Choices.ToList(),
             ReplayEvidence = save.ReplayEvidence,
             ReplayChoiceIdentities = save.ReplayChoiceIdentities?.Select(identity => identity.ToArray()).ToList(),
+            Continuation = save.Continuation?.Payload,
         };
         if (save.Character is { } character)
         {
@@ -279,6 +291,9 @@ public static class SaveFormat
             throw new InvalidDataException(MalformedMessage);
         }
 
+        var choiceCount = 0;
+        var hasEvidence = false;
+        var hasIdentities = false;
         for (var field = 0; field < count; field++)
         {
             switch (field)
@@ -298,7 +313,7 @@ public static class SaveFormat
                     ValidateCharacter(ref reader);
                     break;
                 case 6:
-                    ValidateChoices(ref reader);
+                    choiceCount = ValidateChoices(ref reader);
                     break;
                 case 7:
                     if (!reader.TryReadNil())
@@ -308,14 +323,16 @@ public static class SaveFormat
 
                     break;
                 case 8:
-                    if (!reader.TryReadNil() && reader.ReadBytes() is not { Length: ReplayEvidence.Length })
+                    hasEvidence = !reader.TryReadNil();
+                    if (hasEvidence && reader.ReadBytes() is not { Length: ReplayEvidence.Length })
                     {
                         throw new InvalidDataException(HistoryMessage);
                     }
 
                     break;
                 case 9:
-                    if (!reader.TryReadNil())
+                    hasIdentities = !reader.TryReadNil();
+                    if (hasIdentities)
                     {
                         var identityCount = reader.ReadArrayHeader();
                         if (identityCount > MaxChoices)
@@ -334,6 +351,9 @@ public static class SaveFormat
                     }
 
                     break;
+                case 10:
+                    ValidateContinuation(ref reader, choiceCount, hasEvidence || hasIdentities);
+                    break;
                 default:
                     reader.Skip();
                     break;
@@ -343,6 +363,175 @@ public static class SaveFormat
         if (!reader.End)
         {
             throw new InvalidDataException(MalformedMessage);
+        }
+    }
+
+    private static void ValidateContinuation(ref MessagePackReader reader, int choiceCount, bool hasEvidence)
+    {
+        if (reader.TryReadNil())
+        {
+            return;
+        }
+
+        var tree = reader;
+        ValidateContinuationTree(ref tree, 0);
+
+        var fields = reader.ReadArrayHeader();
+        if (fields is < 4 or > MaxArrayFields)
+        {
+            throw new InvalidDataException(MalformedMessage);
+        }
+
+        ValidateCheckpoint(ref reader);
+        var frames = reader.ReadArrayHeader();
+        if (frames > MaxChoices)
+        {
+            throw new InvalidDataException(MalformedMessage);
+        }
+        for (var i = 0; i < frames; i++)
+        {
+            reader.Skip();
+        }
+
+        var hasBase = !reader.TryReadNil();
+        if (hasBase)
+        {
+            ValidateCheckpoint(ref reader);
+        }
+        var baseLength = reader.ReadInt32();
+        if (baseLength < 0 || baseLength > frames || (long)baseLength + choiceCount > MaxChoices
+            || (hasBase && hasEvidence) || (!hasBase && baseLength != 0))
+        {
+            throw new InvalidDataException(MalformedMessage);
+        }
+        for (var field = 4; field < fields; field++)
+        {
+            reader.Skip();
+        }
+    }
+
+    private static void ValidateContinuationTree(ref MessagePackReader reader, int depth)
+    {
+        if (depth >= SerializerOptions.Security.MaximumObjectGraphDepth)
+        {
+            throw new InvalidDataException(MalformedMessage);
+        }
+
+        switch (reader.NextMessagePackType)
+        {
+            case MessagePackType.Map:
+                throw new InvalidDataException(MalformedMessage);
+            case MessagePackType.Array:
+                var count = reader.ReadArrayHeader();
+                if (count > reader.Sequence.Length - reader.Consumed)
+                {
+                    throw new InvalidDataException(MalformedMessage);
+                }
+                for (var i = 0; i < count; i++)
+                {
+                    ValidateContinuationTree(ref reader, depth + 1);
+                }
+                break;
+            default:
+                reader.Skip();
+                break;
+        }
+    }
+
+    private static void ValidateCheckpoint(ref MessagePackReader reader)
+    {
+        var fields = reader.ReadArrayHeader();
+        if (fields is < 13 or > MaxArrayFields)
+        {
+            throw new InvalidDataException(MalformedMessage);
+        }
+        for (var field = 0; field < fields; field++)
+        {
+            if (field == 2)
+            {
+                var characters = reader.ReadArrayHeader();
+                for (var i = 0; i < characters; i++)
+                {
+                    ValidateCheckpointCharacter(ref reader);
+                }
+            }
+            else
+            {
+                reader.Skip();
+            }
+        }
+    }
+
+    private static void ValidateCheckpointCharacter(ref MessagePackReader reader)
+    {
+        var fields = reader.ReadArrayHeader();
+        if (fields is < 6 or > MaxArrayFields)
+        {
+            throw new InvalidDataException(MalformedMessage);
+        }
+        for (var field = 0; field < fields; field++)
+        {
+            if (field == 4)
+            {
+                var stats = reader.ReadArrayHeader();
+                if (stats > MaxCharacterStats)
+                {
+                    throw new InvalidDataException(MalformedMessage);
+                }
+                for (var i = 0; i < stats; i++)
+                {
+                    reader.Skip();
+                }
+            }
+            else
+            {
+                reader.Skip();
+            }
+        }
+    }
+
+    private static byte[] StripLegacyFields(ReadOnlySpan<byte> body)
+    {
+        var bytes = body.ToArray();
+        try
+        {
+            var reader = new MessagePackReader(new ReadOnlySequence<byte>(bytes));
+            var fields = reader.ReadArrayHeader();
+            if (fields > MaxArrayFields)
+            {
+                throw new InvalidDataException(MalformedMessage);
+            }
+            if (fields <= 10)
+            {
+                return bytes;
+            }
+
+            var output = new ArrayBufferWriter<byte>();
+            var writer = new MessagePackWriter(output);
+            writer.WriteArrayHeader(10);
+            for (var field = 0; field < fields; field++)
+            {
+                var raw = reader.ReadRaw();
+                if (field < 10)
+                {
+                    writer.WriteRaw(raw);
+                }
+            }
+            writer.Flush();
+            if (!reader.End)
+            {
+                throw new InvalidDataException(MalformedMessage);
+            }
+            return output.WrittenSpan.ToArray();
+        }
+        catch (InvalidDataException)
+        {
+            throw;
+        }
+        catch (Exception ex) when (ex is MessagePackSerializationException or EndOfStreamException
+            or InvalidOperationException or ArgumentException or OverflowException)
+        {
+            throw new InvalidDataException(MalformedMessage, ex);
         }
     }
 
@@ -410,7 +599,7 @@ public static class SaveFormat
         }
     }
 
-    private static void ValidateChoices(ref MessagePackReader reader)
+    private static int ValidateChoices(ref MessagePackReader reader)
     {
         var count = reader.ReadArrayHeader();
         if (count > MaxChoices)
@@ -426,6 +615,8 @@ public static class SaveFormat
                 throw new InvalidDataException(HistoryMessage);
             }
         }
+
+        return count;
     }
 
     private static void ValidateSummary(ref MessagePackReader reader)
@@ -488,7 +679,7 @@ public static class SaveFormat
             throw new InvalidDataException(text.Length > 0 && text[0] == (byte)'{' ? UnsupportedMessage : MalformedMessage);
         }
 
-        if (data.Length <= Magic.Length || data[Magic.Length] != Version)
+        if (data.Length <= Magic.Length || data[Magic.Length] is not (4 or Version))
         {
             throw new InvalidDataException(data.Length == Magic.Length ? MalformedMessage : UnsupportedMessage);
         }

@@ -17,7 +17,7 @@ public sealed record HistoryFrame(StoryFrame Frame, IReadOnlyList<RenderedInline
 }
 
 /// <summary>Deterministic choice history. Restores are built separately before replacing a live session.</summary>
-public sealed class StoryHistory
+public sealed partial class StoryHistory
 {
     public const int MaxAutomaticTransitions = 1_000;
     public const int MaxChoices = SaveFormat.MaxChoices;
@@ -72,10 +72,13 @@ public sealed class StoryHistory
     public IGameStateView State => _session.State;
     public IReadOnlyList<GameEvent> Events => _session.Events;
     public StoryFrame Current => _session.Current!;
-    public IReadOnlyList<HistoryFrame> Transcript => _frames.AsReadOnly();
+    public IReadOnlyList<HistoryFrame> Transcript => _prefix.Count == 0 ? _frames.AsReadOnly() : [.. _prefix, .. _frames];
     public int Cursor => _timeline.Position;
+    public int PlaythroughLength => _prefix.Count + Cursor;
+    public bool IsAtChoiceLimit => PlaythroughLength >= MaxChoices;
     public bool CanBack => Story.UndoEnabled && PreviousPlayerChoice(_timeline.Position) is not null;
     public bool CanForward => Story.UndoEnabled && NextPlayerChoice(_timeline.Position) is not null;
+    public ContinuationReport? Continuation { get; private set; }
     /// <summary>The last saving trigger to fire during the latest start or choice step, if any.</summary>
     public string? TriggerSaveId { get; private set; }
     /// <summary>The original slot's progress after a load, until the timeline changes.</summary>
@@ -89,6 +92,11 @@ public sealed class StoryHistory
     /// </summary>
     public AuthorSession ForkAuthor(bool captureDecisions = true)
     {
+        if (_origin is not null)
+        {
+            throw new InvalidOperationException("This playthrough continued across a story update, so it can't be opened in the Author Debugger. Use a save made from the start with the current story version.");
+        }
+
         var keys = new List<string?>(_choices.Count);
         ReplayWithAutomaticContinuations(Story, Seed, _choices, _replayChoiceIdentities,
             Character, liveKeys: keys);
@@ -105,7 +113,7 @@ public sealed class StoryHistory
 
     public void Choose(string key)
     {
-        if (Cursor >= MaxChoices)
+        if (IsAtChoiceLimit)
         {
             throw new InvalidOperationException($"A playthrough supports at most {MaxChoices:N0} choices.");
         }
@@ -151,7 +159,8 @@ public sealed class StoryHistory
     {
         var replay = ReplayWithAutomaticContinuations(Story, Seed,
             _choices.Take(timeline.Position).ToArray(),
-            _replayChoiceIdentities?.Take(timeline.Position).ToArray(), Character);
+            _replayChoiceIdentities?.Take(timeline.Position).ToArray(), Character, origin: _origin,
+            baseTranscriptLength: _prefix.Count);
         _session = replay.Session;
         _frames = replay.Frames;
         _timeline = new ReplayCursor(replay.Choices.Count, timeline.Length);
@@ -201,7 +210,7 @@ public sealed class StoryHistory
         var transitions = 0;
         while (_session.Current?.AutomaticallyContinue == true)
         {
-            if (transitions == MaxAutomaticTransitions || Cursor >= MaxChoices)
+            if (transitions == MaxAutomaticTransitions || IsAtChoiceLimit)
             {
                 AutomaticContinuationError = transitions == MaxAutomaticTransitions
                     ? AutomaticContinuationErrorMessage
@@ -252,16 +261,16 @@ public sealed class StoryHistory
         var data = SaveFormat.Write(ToSavedGame(summary));
         if (data.Length > MaxSaveBytes)
         {
-            throw new InvalidOperationException("This playthrough is too large to save (maximum 2 MiB). You can continue playing, but this save could not be created.");
+            throw new InvalidOperationException($"This playthrough is too large to save (maximum {MaxSaveBytes / 1024 / 1024} MiB). You can continue playing, but this save could not be created.");
         }
 
         return data;
     }
 
     /// <summary>Identifies replay progress. Equal for every save of the same playthrough, whatever its details.</summary>
-    public string ProgressKey => KeyOf(ToSavedGame(null));
+    public string ProgressKey => KeyOf(ToSavedGame(null, progressKeyOnly: true));
 
-    private SavedGame ToSavedGame(SaveSummary? summary)
+    private SavedGame ToSavedGame(SaveSummary? summary, bool progressKeyOnly = false)
     {
         if (string.IsNullOrEmpty(Story.ContentFingerprint))
         {
@@ -285,11 +294,16 @@ public sealed class StoryHistory
             Summary = summary,
             ReplayEvidence = _evidence is null ? null : ReplayEvidence.Encode(_evidence[^1], Cursor),
             ReplayChoiceIdentities = _replayChoiceIdentities?.Select(identity => identity.ToArray()).ToArray(),
+            Continuation = progressKeyOnly ? ProgressContinuation() : CaptureContinuation(),
         };
     }
 
     private static string KeyOf(SavedGame save) =>
-        Convert.ToHexString(SHA256.HashData(SaveFormat.EncodeBody(save with { Summary = null })));
+        Convert.ToHexString(SHA256.HashData(SaveFormat.EncodeBody(save with
+        {
+            Summary = null,
+            Continuation = save.Continuation is null ? null : ProgressContinuation(save.Continuation.Payload),
+        })));
 
     public bool TryProgressKey([NotNullWhen(true)] out string? progressKey)
     {
@@ -320,7 +334,7 @@ public sealed class StoryHistory
     {
         if (bytes.Length is 0 or > MaxSaveBytes)
         {
-            return new(slot, null, null, "Saved game is empty or exceeds 2 MiB.");
+            return new(slot, null, null, $"Saved game is empty or exceeds {MaxSaveBytes / 1024 / 1024} MiB.");
         }
 
         try
@@ -334,9 +348,8 @@ public sealed class StoryHistory
         }
     }
 
-    public static StoryHistory Restore(StoryDefinition story, ReadOnlySpan<byte> data)
+    private static StoryHistory RestoreByReplay(StoryDefinition story, SavedGame save)
     {
-        var save = SaveFormat.Read(data);
         if (save.StoryId != story.Id)
         {
             throw new InvalidDataException("This save belongs to a different story. Open it with the story and player version that created it.");
@@ -536,12 +549,14 @@ public sealed class StoryHistory
 
     private static AutomaticReplay ReplayWithAutomaticContinuations(StoryDefinition story, ulong seed,
         IReadOnlyList<string> choices, IReadOnlyList<byte[]>? replayChoiceIdentities,
-        CharacterSelection? character, bool recordEvidence = false, List<string?>? liveKeys = null)
+        CharacterSelection? character, bool recordEvidence = false, List<string?>? liveKeys = null,
+        ContinuationCheckpoint? origin = null, int baseTranscriptLength = 0)
     {
-        var session = new StorySession(story, seed, character: character);
-        var initialState = ReplayEvidence.InitialState(story, session.State);
-        var frames = new List<HistoryFrame> { new(session.Start()) };
-        var evidence = recordEvidence && CanRecordEvidence(story)
+        var session = origin is null ? new StorySession(story, seed, character: character)
+            : origin.Resume(story, seed, character);
+        var initialState = origin is null ? ReplayEvidence.InitialState(story, session.State) : [];
+        var frames = new List<HistoryFrame> { new(origin is null ? session.Start() : session.Current!) };
+        var evidence = recordEvidence && origin is null && CanRecordEvidence(story)
             ? new List<byte[]> { ReplayEvidence.Start(story, session, character, initialState) } : null;
         var replayedIdentities = evidence is null ? null : new List<byte[]>();
         var replayedChoices = new List<string>();
@@ -589,7 +604,7 @@ public sealed class StoryHistory
             var transitions = 0;
             while (session.Current?.AutomaticallyContinue == true)
             {
-                if (transitions == MaxAutomaticTransitions || replayedChoices.Count >= MaxChoices)
+                if (transitions == MaxAutomaticTransitions || baseTranscriptLength + replayedChoices.Count >= MaxChoices)
                 {
                     automaticContinuationError = transitions == MaxAutomaticTransitions
                         ? AutomaticContinuationErrorMessage
@@ -629,6 +644,10 @@ public sealed class StoryHistory
             if (automaticContinuationError is not null || savedIndex >= choices.Count)
             {
                 break;
+            }
+            if (baseTranscriptLength + replayedChoices.Count >= MaxChoices)
+            {
+                throw ReplayFailure();
             }
 
             var key = choices[savedIndex];

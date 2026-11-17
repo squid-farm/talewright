@@ -78,8 +78,8 @@ public sealed class ValidatedSaveImportTests : IDisposable
             original[..^1],
             [.. original[..4], 99, .. original[5..]],
             SaveFormat.Write(save with { StoryId = "other" }),
-            SaveFormat.Write(save with { StoryVersion = "other" }),
-            SaveFormat.Write(save with { ContentFingerprint = "other" }),
+            SaveFormat.Write(save with { StoryVersion = "other", Continuation = null }),
+            SaveFormat.Write(save with { ContentFingerprint = "other", Continuation = null }),
             SaveFormat.Write(changedOutcomeSave with { ReplayChoiceIdentities = replayIdentities }),
             new byte[StoryHistory.MaxSaveBytes + 1],
         };
@@ -103,7 +103,8 @@ public sealed class ValidatedSaveImportTests : IDisposable
         var store = new FileSaveStore(_directory);
         await store.WriteAsync(updated.Id, "Slot", activeBefore);
 
-        Assert.Throws<InvalidDataException>(() => ValidatedSaveImport.Prepare(divergent, "Slot", bytes));
+        var replayOnly = SaveFormat.Write(SaveFormat.Read(bytes) with { Continuation = null });
+        Assert.Throws<InvalidDataException>(() => ValidatedSaveImport.Prepare(divergent, "Slot", replayOnly));
         var import = ValidatedSaveImport.Prepare(updated, "Slot", bytes);
         await Assert.ThrowsAnyAsync<IOException>(() => import.StoreAsync(store, overwrite: false));
         Assert.Equal(activeBefore, await store.ReadAsync(updated.Id, "Slot"));
@@ -133,7 +134,8 @@ public sealed class ValidatedSaveImportTests : IDisposable
         await using var store = new IndexedDbSaveStore(browser);
         await store.WriteAsync(updated.Id, "Slot", activeBefore);
 
-        Assert.Throws<InvalidDataException>(() => ValidatedSaveImport.Prepare(divergent, "Slot", bytes));
+        var replayOnly = SaveFormat.Write(SaveFormat.Read(bytes) with { Continuation = null });
+        Assert.Throws<InvalidDataException>(() => ValidatedSaveImport.Prepare(divergent, "Slot", replayOnly));
         var import = ValidatedSaveImport.Prepare(updated, "Slot", bytes);
         browser.FailWrites = true;
         await Assert.ThrowsAsync<JSException>(() => import.StoreAsync(store, overwrite: true));

@@ -889,8 +889,8 @@ public class StoryHistoryTests
             "format-new" => [.. before[..4], 99, .. before[5..]],
             "json" => """{"formatVersion":2,"storyId":"history"}"""u8.ToArray(),
             "story-id" => Mutate(before, save => save with { StoryId = "other" }),
-            "story-version" => Mutate(before, save => save with { StoryVersion = "other" }),
-            "fingerprint" => Mutate(before, save => save with { ContentFingerprint = "changed" }),
+            "story-version" => Mutate(before, save => save with { StoryVersion = "other", Continuation = null }),
+            "fingerprint" => Mutate(before, save => save with { ContentFingerprint = "changed", Continuation = null }),
             "cursor" => Mutate(before, save => save with { Cursor = 3 }),
             "choice" => Mutate(before, save => save with
             {
@@ -1067,6 +1067,7 @@ public class StoryHistoryTests
         {
             ReplayEvidence = null,
             ReplayChoiceIdentities = null,
+            Continuation = null,
         });
         var error = Assert.Throws<InvalidDataException>(() =>
             StoryHistory.Restore(updated, legacy));
@@ -1080,9 +1081,18 @@ public class StoryHistoryTests
         var history = new StoryHistory(Compile(options: new CompilerOptions()), 7);
         Assert.Throws<InvalidOperationException>(() => history.Save());
         var version1 = Compile(options: new CompilerOptions { CompatibilityId = "custom-v1" });
-        var save = new StoryHistory(version1, 7).Save();
+        var original = new StoryHistory(version1, 7);
+        var save = original.Save();
+        var copy = save.ToArray();
+        var replayOnly = SaveFormat.Write(SaveFormat.Read(save) with { Continuation = null });
         var version2 = Compile(options: new CompilerOptions { CompatibilityId = "custom-v2" });
-        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(version2, save));
+        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(version2, replayOnly));
+        var continued = StoryHistory.Restore(version2, save);
+        Assert.NotNull(continued.Continuation);
+        Assert.Equal(original.Current.Scene, continued.Current.Scene);
+        Assert.Equal(original.State.VisitCount(original.Current.Scene!.Value),
+            continued.State.VisitCount(continued.Current.Scene!.Value));
+        Assert.Equal(copy, save);
     }
 
     [Fact]

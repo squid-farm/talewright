@@ -6,7 +6,7 @@ namespace Talewright.Core.State;
 /// <summary>
 /// The append-only event log of a playthrough plus its current projected <see cref="GameState"/>.
 /// Folding an existing log reconstructs its state. Player saves use <c>StoryHistory</c>
-/// and store a seed and choice history, not this event list.
+/// and store replay inputs and a continuation checkpoint, not this event list.
 /// </summary>
 public sealed class EventLog
 {
