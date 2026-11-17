@@ -77,13 +77,17 @@
                          OnImport="ImportAsync" OnConfirmImport="ConfirmImportAsync" OnCancelImport="CancelImport"
                          OnExport="ExportAsync" OnClose="CloseSaves" />
     }
+    @if (_continuationNotice is not null)
+    {
+        <p class="tw-save-status" role="status">@_continuationNotice</p>
+    }
     @if (_showHistory)
     {
         <TranscriptHistory @key="_session" Frames="_historyFrames" OnClose="CloseHistory" />
     }
     <StoryStage @ref="_storyStage" Story="Story" Passages="_transcript"
                 PassageWindow="@TranscriptPresentation.PassageWindow" Current="_session.Current" State="_session.State"
-                Identity="_session" Busy="_busy" AtChoiceLimit="@(_session.Cursor >= StoryHistory.MaxChoices)"
+                Identity="_session" Busy="_busy" AtChoiceLimit="_session.IsAtChoiceLimit"
                 ContinuationError="@_session.AutomaticContinuationError" IncludeFromIndex="_presentationStartIndex"
                 RevealPassageIndex="_revealPassageIndex"
                 Hidden="_showHistory" OnChoose="Choose" OnRestart="Restart" />
@@ -167,6 +171,7 @@
     private string _slot = "My save";
     private string? _pendingOverwrite;
     private string? _saveMessage;
+    private string? _continuationNotice;
     private IReadOnlyList<SaveEntry> _slots = [];
     private string? _pendingLoad;
     private ValidatedSaveImport? _pendingImport;
@@ -233,6 +238,7 @@
         bool preserveExistingFocus = false, bool initialTriggerSave = false, bool revealStoryBeginning = false)
     {
         _session = session;
+        _continuationNotice = ContinuationNoticeFor(session.Continuation);
         UpdateDiagnosticContext();
         ImageWarmer.Clear(_warmOwner);
         Images?.BeginGeneration();
@@ -262,6 +268,11 @@
         RequestReveal(preserveExistingFocus, _presentationStartIndex,
             isStoryBeginning: revealStoryBeginning);
     }
+
+    private static string? ContinuationNoticeFor(ContinuationReport? continuation) =>
+        continuation is null ? null :
+            "This story has been updated since this save was made. Your progress and History were kept, and the story continues from here using the new version. You can't go Back before this point."
+            + (continuation.RedoDiscarded ? " Choices you had undone were discarded." : string.Empty);
 
     private int CurrentBoundaryStartIndex()
     {
@@ -576,12 +587,13 @@
 
     private async Task Choose(ChoiceView choice)
     {
-        if (_session.Cursor >= StoryHistory.MaxChoices)
+        if (_session.IsAtChoiceLimit)
         {
             return;
         }
         var firstNewPassage = _transcript.Count;
         _session.Choose(choice.Key);
+        _continuationNotice = null;
         UpdateDiagnosticContext();
         ReconcileImageWarming(TimeSpan.Zero);
         _presentationStartIndex = firstNewPassage;
@@ -734,6 +746,7 @@
             _triggerSaveWritePending = false;
             _triggerSaveError = null;
             _session = candidate;
+            _continuationNotice = ContinuationNoticeFor(candidate.Continuation);
             UpdateDiagnosticContext();
             ReconcileImageWarming(TimeSpan.Zero);
             _showHistory = false;
@@ -797,7 +810,8 @@
                 SaveNames.Validate(story.Id, slot);
                 if (args.File.Size > StoryHistory.MaxSaveBytes)
                 {
-                    throw new InvalidDataException("This saved game is too large to import (maximum 2 MiB). Choose another save.");
+                    throw new InvalidDataException(
+                        $"This saved game is too large to import (maximum {StoryHistory.MaxSaveBytes / 1024 / 1024:N0} MiB). Choose another save.");
                 }
 
                 await using var input = args.File.OpenReadStream(StoryHistory.MaxSaveBytes);

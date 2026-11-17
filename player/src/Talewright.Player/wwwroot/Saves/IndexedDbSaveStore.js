@@ -1,3 +1,19 @@
+let configuredMaxSaveBytes;
+
+export function configure(maxSaveBytes) {
+    if (!Number.isSafeInteger(maxSaveBytes) || maxSaveBytes <= 0) {
+        throw new RangeError("The browser save size limit must be a positive safe integer.");
+    }
+    configuredMaxSaveBytes = maxSaveBytes;
+}
+
+function maxSaveBytes() {
+    if (configuredMaxSaveBytes === undefined) {
+        throw new Error("Save storage is not configured.");
+    }
+    return configuredMaxSaveBytes;
+}
+
 function storageError(error) {
     const messages = {
         QuotaExceededError: "There is not enough browser storage to save this game. Free some space and try again.",
@@ -62,43 +78,47 @@ export async function list(storyId) {
 }
 
 export async function read(storyId, slot) {
+    const limit = maxSaveBytes();
     const record = await execute("readonly", store => store.get([storyId, slot]));
     if (!record) {
         throw new Error(`Save '${slot}' does not exist.`);
     }
-    if (!(record.data instanceof Uint8Array) || record.data.length === 0 || record.data.length > 2 * 1024 * 1024) {
+    if (!(record.data instanceof Uint8Array) || record.data.length === 0 || record.data.length > limit) {
         throw new Error(`Save '${slot}' contains invalid or oversized data.`);
     }
     return record.data;
 }
 
 export async function write(storyId, slot, data, overwrite) {
-    if (!(data instanceof Uint8Array) || data.length === 0 || data.length > 2 * 1024 * 1024) {
-        throw new Error("This saved game is empty or too large to store (maximum 2 MiB). Try another save.");
+    const limit = maxSaveBytes();
+    if (!(data instanceof Uint8Array) || data.length === 0 || data.length > limit) {
+        throw new Error(`This saved game is empty or too large to store (maximum ${limit / 1024 / 1024} MiB). Try another save.`);
     }
     const record = { storyId, slot, data };
     await execute("readwrite", store => overwrite ? store.put(record) : store.add(record));
 }
 
 export async function readTrigger(storyId) {
+    const limit = maxSaveBytes();
     const record = await execute("readonly", store => store.get([storyId, "\0trigger"]));
     if (!record) {
         throw new Error("Trigger checkpoint does not exist.");
     }
     if (typeof record.triggerId !== "string" || record.triggerId.length === 0
         || /[\u0000-\u001f\u007f]/.test(record.triggerId)
-        || new TextEncoder().encode(record.triggerId).length > 2 * 1024 * 1024
-        || !(record.data instanceof Uint8Array) || record.data.length === 0 || record.data.length > 2 * 1024 * 1024) {
+        || new TextEncoder().encode(record.triggerId).length > limit
+        || !(record.data instanceof Uint8Array) || record.data.length === 0 || record.data.length > limit) {
         throw new Error("Trigger checkpoint contains invalid or oversized data.");
     }
     return { triggerId: record.triggerId, data: record.data };
 }
 
 export async function writeTrigger(storyId, triggerId, data) {
+    const limit = maxSaveBytes();
     if (typeof triggerId !== "string" || triggerId.length === 0
         || /[\u0000-\u001f\u007f]/.test(triggerId)
-        || new TextEncoder().encode(triggerId).length > 2 * 1024 * 1024
-        || !(data instanceof Uint8Array) || data.length === 0 || data.length > 2 * 1024 * 1024) {
+        || new TextEncoder().encode(triggerId).length > limit
+        || !(data instanceof Uint8Array) || data.length === 0 || data.length > limit) {
         throw new Error("This trigger checkpoint is invalid or too large to store.");
     }
     const record = { storyId, slot: "\0trigger", triggerId, data };

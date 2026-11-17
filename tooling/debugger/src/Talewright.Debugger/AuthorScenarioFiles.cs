@@ -12,12 +12,13 @@ public static class AuthorScenarioFiles
         Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Talewright", "author-scenarios",
         Convert.ToHexString(SHA256.HashData(Encoding.UTF8.GetBytes(storyId))));
 
-    public static async Task<byte[]> ReadAsync(string path)
+    public static async Task<byte[]> ReadAsync(string path, int maxBytes)
     {
         await using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read);
-        if (stream.Length is 0 or > AuthorScenario.MaxBytes)
+        if (stream.Length == 0 || stream.Length > maxBytes)
         {
-            throw new InvalidDataException("Import must be nonempty and at most 2 MiB.");
+            throw new InvalidDataException(
+                $"Import must be nonempty and at most {maxBytes / 1024 / 1024:N0} MiB.");
         }
         var bytes = new byte[(int)stream.Length];
         await stream.ReadExactlyAsync(bytes);
