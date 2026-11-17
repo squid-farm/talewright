@@ -9,7 +9,7 @@ export function configure(maxSaveBytes) {
 
 function maxSaveBytes() {
     if (configuredMaxSaveBytes === undefined) {
-        throw new Error("Browser save storage has not been configured.");
+        throw new Error("Save storage is not configured.");
     }
     return configuredMaxSaveBytes;
 }
