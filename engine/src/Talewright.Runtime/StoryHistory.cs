@@ -23,11 +23,6 @@ public sealed partial class StoryHistory
     {
     }
 
-    private sealed class ReplayChoiceUnavailableException(int choiceIndex) : Exception
-    {
-        public int ChoiceIndex { get; } = choiceIndex;
-    }
-
     public const int MaxAutomaticTransitions = 1_000;
     public const int MaxChoices = SaveFormat.MaxChoices;
     public const int MaxSaveBytes = SaveFormat.MaxSaveBytes;
@@ -370,11 +365,6 @@ public sealed partial class StoryHistory
         }
 
         var changed = save.StoryVersion != story.Version || save.ContentFingerprint != story.ContentFingerprint;
-        if (changed && save.Continuation is not null
-            && save.ReplayEvidence is null && save.ReplayChoiceIdentities is null)
-        {
-            throw new CheckpointFallbackRequiredException();
-        }
         if (changed && (save.ReplayEvidence is null || save.ReplayChoiceIdentities is null
             || save.ReplayChoiceIdentities.Count != save.Choices.Count || !CanRecordEvidence(story)
             || !IsFingerprint(save.ContentFingerprint) || !IsFingerprint(story.ContentFingerprint)
@@ -391,11 +381,7 @@ public sealed partial class StoryHistory
         }
         catch (ArgumentException ex)
         {
-            if (changed)
-            {
-                if (save.Continuation is not null) throw new CheckpointFallbackRequiredException();
-                throw Incompatible(story, save, ex);
-            }
+            if (changed) throw Incompatible(story, save, ex);
             throw new InvalidDataException($"Invalid saved character: {ex.Message}", ex);
         }
         var timeline = new ReplayCursor(save.Cursor, save.Choices.Count);
@@ -403,18 +389,10 @@ public sealed partial class StoryHistory
         List<HistoryFrame> frames;
         List<byte[]>? evidence;
         List<byte[]>? replayChoiceIdentities;
-        var choiceKeyFallbacks = new HashSet<int>();
-        var choiceKeyFallbacksWithChecks = new HashSet<int>();
         try
         {
             (session, frames, evidence, replayChoiceIdentities) = Replay(story, save.Seed,
-                save.Choices, save.ReplayChoiceIdentities, character, recordEvidence: true,
-                choiceKeyFallbackBefore: changed ? save.Cursor : 0, choiceKeyFallbacks: choiceKeyFallbacks,
-                choiceKeyFallbacksWithChecks: choiceKeyFallbacksWithChecks);
-        }
-        catch (ReplayChoiceUnavailableException ex)
-        {
-            throw ReplayChoiceFailure(story, save, changed, ex);
+                save.Choices, save.ReplayChoiceIdentities, character, recordEvidence: true);
         }
         catch (InvalidDataException ex) when (changed)
         {
@@ -430,13 +408,7 @@ public sealed partial class StoryHistory
                 (session, frames, prefixEvidence, _) = Replay(story, save.Seed,
                     save.Choices.Take(timeline.Position).ToArray(),
                     save.ReplayChoiceIdentities?.Take(timeline.Position).ToArray(),
-                    character, recordEvidence: evidence is not null,
-                    choiceKeyFallbackBefore: changed ? save.Cursor : 0, choiceKeyFallbacks: choiceKeyFallbacks,
-                    choiceKeyFallbacksWithChecks: choiceKeyFallbacksWithChecks);
-            }
-            catch (ReplayChoiceUnavailableException ex)
-            {
-                throw ReplayChoiceFailure(story, save, changed, ex);
+                    character, recordEvidence: evidence is not null);
             }
             catch (InvalidDataException ex) when (changed)
             {
@@ -446,16 +418,14 @@ public sealed partial class StoryHistory
             if (evidence is not null && (prefixEvidence is null
                 || !CryptographicOperations.FixedTimeEquals(evidence[timeline.Position], prefixEvidence[^1])))
             {
-                throw ReplayMismatch(story, save, changed,
-                    HasNonCheckChoiceKeyFallback(choiceKeyFallbacks, choiceKeyFallbacksWithChecks, save.Cursor));
+                throw ReplayMismatch(story, save, changed);
             }
         }
 
         if (save.ReplayEvidence is { } savedEvidence
             && (evidence is null || !ReplayEvidence.Matches(savedEvidence, evidence[^1], save.Cursor)))
         {
-            throw ReplayMismatch(story, save, changed,
-                HasNonCheckChoiceKeyFallback(choiceKeyFallbacks, choiceKeyFallbacksWithChecks, save.Cursor));
+            throw ReplayMismatch(story, save, changed);
         }
 
         if (!requiresNormalization)
@@ -507,50 +477,18 @@ public sealed partial class StoryHistory
         return new InvalidDataException($"{subject} has changed, and this save is no longer compatible. Open it with the story and player version that created it.", inner);
     }
 
-    private static Exception ReplayMismatch(StoryDefinition story, SavedGame save, bool changed,
-        bool incompatibleChoiceKeyFallback = false) =>
+    private static Exception ReplayMismatch(StoryDefinition story, SavedGame save, bool changed) =>
         changed
-            ? incompatibleChoiceKeyFallback ? RejectChangedReplay(story, save)
-                : save.Continuation is null ? Incompatible(story, save) : new CheckpointFallbackRequiredException()
+            ? save.Continuation is null ? Incompatible(story, save) : new CheckpointFallbackRequiredException()
             : ReplayFailure();
-
-    private static Exception ReplayChoiceFailure(StoryDefinition story, SavedGame save, bool changed,
-        ReplayChoiceUnavailableException exception)
-    {
-        if (!changed) return ReplayFailure();
-        if (save.Continuation is null) return Incompatible(story, save, exception);
-        if (exception.ChoiceIndex >= save.Cursor) return new CheckpointFallbackRequiredException();
-        return RejectChangedReplay(story, save);
-    }
-
-    private static bool HasNonCheckChoiceKeyFallback(IReadOnlySet<int> fallbacks,
-        IReadOnlySet<int> fallbacksWithChecks, int cursor) =>
-        fallbacks.Any(index => index < cursor && !fallbacksWithChecks.Contains(index));
-
-    private static InvalidDataException RejectChangedReplay(StoryDefinition story, SavedGame save)
-    {
-        if (save.Continuation is not null)
-        {
-            ValidateCheckpoint(story, save);
-        }
-        return Incompatible(story, save);
-    }
 
     private static InvalidDataException ReplayFailure() =>
         new("This saved game cannot continue because the story has changed or the save is damaged. It is no longer compatible.");
 
-    private static void ValidateCheckpoint(StoryDefinition story, SavedGame save)
-    {
-        var character = ValidateCharacter(story, save, changed: true);
-        _ = ContinuationCheckpoint.Rebuild(story, save.Seed, character,
-            save.Continuation!.Payload.Current!, []);
-    }
-
     private static (StorySession Session, List<HistoryFrame> Frames, List<byte[]>? Evidence,
         List<byte[]>? ReplayChoiceIdentities) Replay(StoryDefinition story, ulong seed,
         IReadOnlyList<string> choices, IReadOnlyList<byte[]>? replayChoiceIdentities, CharacterSelection? character,
-        bool recordEvidence = false, List<string?>? liveKeys = null, int choiceKeyFallbackBefore = 0,
-        HashSet<int>? choiceKeyFallbacks = null, HashSet<int>? choiceKeyFallbacksWithChecks = null)
+        bool recordEvidence = false, List<string?>? liveKeys = null)
     {
         var session = new StorySession(story, seed, character: character);
         var initialState = ReplayEvidence.InitialState(story, session.State);
@@ -569,20 +507,7 @@ public sealed partial class StoryHistory
             {
                 if (!session.ChooseReplay(replayChoiceIdentities[index], out choice) || choice is null)
                 {
-                    choice = index < choiceKeyFallbackBefore
-                        ? previousFrame.Choices.FirstOrDefault(candidate => candidate.Key == key)
-                        : null;
-                    if (choice is null)
-                    {
-                        throw new ReplayChoiceUnavailableException(index);
-                    }
-                    choiceKeyFallbacks?.Add(index);
-                    var fallbackEventStart = session.Events.Count;
-                    session.Choose(key);
-                    if (session.Events.Skip(fallbackEventStart).Any(gameEvent => gameEvent is DiceRolled))
-                    {
-                        choiceKeyFallbacksWithChecks?.Add(index);
-                    }
+                    throw ReplayFailure();
                 }
                 identity = replayChoiceIdentities[index];
                 // Replay may select an equivalent choice that live play would not offer here.
@@ -594,7 +519,7 @@ public sealed partial class StoryHistory
                 choice = previousFrame.Choices.FirstOrDefault(c => c.Key == key);
                 if (choice is null)
                 {
-                    throw new ReplayChoiceUnavailableException(index);
+                    throw ReplayFailure();
                 }
                 identity = choice.ReplayIdentity;
                 session.Choose(key);
