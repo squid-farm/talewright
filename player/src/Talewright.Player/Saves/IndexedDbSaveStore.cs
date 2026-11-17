@@ -1,4 +1,5 @@
 using Microsoft.JSInterop;
+using Talewright.Runtime;
 using Talewright.Runtime.Saves;
 
 namespace Talewright.Player.Saves;
@@ -7,8 +8,18 @@ public sealed class IndexedDbSaveStore(IJSRuntime js) : ISaveStore, IAsyncDispos
 {
     private IJSObjectReference? _module;
 
-    private async Task<IJSObjectReference> ModuleAsync() =>
-        _module ??= await js.InvokeAsync<IJSObjectReference>("import", "./_content/Talewright.Player/Saves/IndexedDbSaveStore.js");
+    private async Task<IJSObjectReference> ModuleAsync()
+    {
+        if (_module is not null)
+        {
+            return _module;
+        }
+
+        var module = await js.InvokeAsync<IJSObjectReference>("import", "./_content/Talewright.Player/Saves/IndexedDbSaveStore.js");
+        await module.InvokeVoidAsync("configure", StoryHistory.MaxSaveBytes);
+        _module = module;
+        return module;
+    }
 
     public async Task<IReadOnlyList<string>> ListAsync(string storyId)
     {

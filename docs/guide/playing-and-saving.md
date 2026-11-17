@@ -52,6 +52,9 @@ available through **History**, even if the author turned off Back and Forward. H
 newest page; use **Earlier passages** and **Later passages** to move through it. Past choices are
 shown as text, not buttons, and reading History never changes your game.
 
+If a save continues after a story update, passages from before the update still show the text and
+choices as they were played. **Back** stops at the point where the updated story continued.
+
 To save memory, pictures in History stay hidden until you choose **Reveal image**. If the story's
 image files changed since you played, a revealed picture may look different or fail to load.
 Revealed pictures appear inline at their normal size, fitted to the reading width, without a
@@ -115,19 +118,30 @@ Save files aren't meant to be edited; changing one can break it.
 
 ## Updating a story with existing saves
 
-When you release a new version of your story, your players' saves may or may not load in it.
-A save still loads when your changes don't alter what has already happened in it. For example,
-rewording prose or choice labels, adding new choices, or changing when a choice is available can
-be fine. Changing starting values (such as a character's stats) or the result of a choice the
-player already made is not.
+Current saves first try to replay the playthrough in the updated story. If an earlier choice or
+check has changed so it cannot be replayed, the player can continue from the saved checkpoint at
+the current passage instead. The updated passage uses the new story's entry effects, checks, text
+and choices. Your saved character and game values carry over; changed starting values do not reset
+them, and newly added values use their current defaults. Effects from choices already made are not
+applied again, and changes to earlier passages do not change what already happened.
 
-If a save doesn't load, nothing is lost: the save and the current game are left untouched. So
-**keep a copy of each version of your story you release**, so players can always go back to the
-version that made their save. Exporting a save backs up the file, but doesn't make it work with a
-changed story.
+The player keeps earlier passages in **History** as they were originally played. Continuing from
+a checkpoint starts a new undo boundary: **Back** and **Forward** cannot cross it, and choices
+that had been undone are discarded. The player shows a notice when a save continues this way.
 
-A save that loads opens at its saved point with the updated story's text and choices, including
-new ones. The [save format notes](../developer/save-format.md#compatibility) have the exact rules.
+Some updates cannot continue a save. For example, the saved target scene may have been removed, a
+variable may have changed between a number and text, or the saved character may no longer be valid.
+In those cases the player says, “This save cannot continue in the updated story because … Open it
+with the story version that created it.” The failed load leaves your current game and save file
+untouched.
+
+Saves made before checkpoint continuation was introduced, including format-4 saves, keep the old
+replay-only behavior: they load only when the updated story can replay their saved history. If the
+history no longer matches, the save remains unchanged and can still be opened with the earlier
+story version. Keep a copy of each version you release; exporting a save backs it up but does not
+make it compatible with a changed story.
+
+The [save format notes](../developer/save-format.md#compatibility) have the exact rules.
 
 The story format itself is still changing between preview releases, so saves from one preview of
 Talewright may not load in the next. Starting with 1.0.0-preview.1, saves will keep loading in later
@@ -143,5 +157,6 @@ save switches to the character in that save.
 
 ## Very long playthroughs
 
-After 10,000 choices in one playthrough, the player stops accepting new choices and explains why.
-Saving, Back, Restart and Library still work.
+Each save file is limited to 10 MiB. A playthrough supports 10,000 choices total; choices made
+before a story update count toward that limit. At the limit, the player explains why it cannot
+accept another choice. Saving, Back, Restart and Library still work.

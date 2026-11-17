@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using Microsoft.Playwright;
+using Talewright.Runtime;
 using Talewright.Testing;
 using Xunit.Abstractions;
 using static Microsoft.Playwright.Assertions;
@@ -190,16 +191,18 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
     /// <summary>Writes raw save bytes to the browser save store. Saves are binary, so they cross into the page as base64.</summary>
     protected async Task WriteBrowserSaveAsync(string storyId, string slot, byte[] bytes, bool overwrite = false) =>
         await Page.EvaluateAsync("""
-            async ({storyId, slot, base64, overwrite}) => {
+            async ({storyId, slot, base64, overwrite, maxSaveBytes}) => {
                 const module = await import('./_content/Talewright.Player/Saves/IndexedDbSaveStore.js');
+                module.configure(maxSaveBytes);
                 await module.write(storyId, slot, Uint8Array.from(atob(base64), c => c.charCodeAt(0)), overwrite);
             }
-            """, new { storyId, slot, base64 = Convert.ToBase64String(bytes), overwrite });
+            """, new { storyId, slot, base64 = Convert.ToBase64String(bytes), overwrite, maxSaveBytes = StoryHistory.MaxSaveBytes });
 
     protected async Task<byte[]> ReadBrowserSaveAsync(string storyId, string slot) =>
         Convert.FromBase64String(await Page.EvaluateAsync<string>("""
-            async ({storyId, slot}) => {
+            async ({storyId, slot, maxSaveBytes}) => {
                 const module = await import('./_content/Talewright.Player/Saves/IndexedDbSaveStore.js');
+                module.configure(maxSaveBytes);
                 const bytes = await module.read(storyId, slot);
                 let text = '';
                 for (let i = 0; i < bytes.length; i += 0x8000) {
@@ -207,7 +210,7 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
                 }
                 return btoa(text);
             }
-            """, new { storyId, slot }));
+            """, new { storyId, slot, maxSaveBytes = StoryHistory.MaxSaveBytes }));
 
     internal static bool IsReloadCancellation(bool reloading, string resourceType, string url, string? failure) =>
         reloading && resourceType == "image" && url.StartsWith("blob:", StringComparison.Ordinal)

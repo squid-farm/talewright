@@ -83,7 +83,8 @@ public sealed class SavePortabilityTests(WebHostFixture host, ITestOutputHelper 
             (SaveFormat.Write(decoded with { StoryId = "different" }), "different story"),
             (SaveFormat.Write(decoded with { StoryVersion = "different", Continuation = null }), $"Version different of {story.Title} has changed"),
             (SaveFormat.Write(decoded with { ReplayChoiceIdentities = changedOutcomeIdentities }), "cannot continue"),
-            (new byte[StoryHistory.MaxSaveBytes + 1], "too large"),
+            (new byte[StoryHistory.MaxSaveBytes + 1],
+                $"too large to import (maximum {StoryHistory.MaxSaveBytes / 1024 / 1024:N0} MiB)"),
         };
         foreach (var (bytes, message) in invalid)
         {
@@ -109,6 +110,28 @@ public sealed class SavePortabilityTests(WebHostFixture host, ITestOutputHelper 
         await Driver.ClickAsync("Load My save");
         await Driver.ClickAsync("Load save");
         await Observe(new(null, "Second passage text."));
+    }
+
+    [Fact]
+    [Trait("Host", "Browser")]
+    public async Task Indexeddb_round_trips_a_save_at_the_configured_maximum_size()
+    {
+        var fixture = Fixture();
+        await Upload(fixture);
+        var roundTrips = await Page.EvaluateAsync<bool>("""
+            async ({ storyId, maxSaveBytes }) => {
+                const store = await import('./_content/Talewright.Player/Saves/IndexedDbSaveStore.js');
+                store.configure(maxSaveBytes);
+                const source = new Uint8Array(maxSaveBytes);
+                for (let index = 0; index < source.length; index++) source[index] = index % 251;
+                await store.write(storyId, "Maximum size", source, false);
+                const saved = await store.read(storyId, "Maximum size");
+                return source.length === maxSaveBytes
+                    && saved.length === source.length
+                    && source.every((value, index) => value === saved[index]);
+            }
+            """, new { storyId = fixture.Compile().Id, maxSaveBytes = StoryHistory.MaxSaveBytes });
+        Assert.True(roundTrips);
     }
 
     [Fact]
@@ -189,9 +212,10 @@ public sealed class SavePortabilityTests(WebHostFixture host, ITestOutputHelper 
 
     private async Task<byte[]> ReadStoredAsync(string storyId, string slot) =>
         (await Page.EvaluateAsync<int[]>("""
-            async ({ storyId, slot }) => {
+            async ({ storyId, slot, maxSaveBytes }) => {
                 const store = await import('./_content/Talewright.Player/Saves/IndexedDbSaveStore.js');
+                store.configure(maxSaveBytes);
                 return Array.from(await store.read(storyId, slot));
             }
-            """, new { storyId, slot })).Select(Convert.ToByte).ToArray();
+            """, new { storyId, slot, maxSaveBytes = StoryHistory.MaxSaveBytes })).Select(Convert.ToByte).ToArray();
 }

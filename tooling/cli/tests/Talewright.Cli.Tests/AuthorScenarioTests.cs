@@ -3,6 +3,7 @@ using Talewright.Core.Identity;
 using Talewright.Debugger;
 using Talewright.Runtime;
 using Talewright.Runtime.Saves;
+using Talewright.Talemark.Compilation;
 using Talewright.Testing;
 
 namespace Talewright.Cli.Tests;
@@ -246,6 +247,36 @@ public sealed class AuthorScenarioTests : IDisposable
         await File.WriteAllBytesAsync(model.PlayerSavePath, mismatched);
         await model.ImportPlayerSave();
         Assert.NotNull(model.Error);
+        Assert.Same(session, model.Session);
+    }
+
+    [Fact]
+    public async Task Continued_player_save_cannot_be_imported_without_changing_the_debugger_session()
+    {
+        var model = Start();
+        var history = new StoryHistory(model.Story!, 42);
+        history.Choose("c0");
+        var original = history.Save();
+        var updatedTale = BuildTale().Replace(
+            ChoiceFaker.Create("target", "Next"),
+            ChoiceFaker.Create("target", "Next", effect: "var:count += 1"),
+            StringComparison.Ordinal);
+        var updated = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = BuildManifest(),
+            ["main.tale"] = updatedTale,
+        }));
+        Assert.True(updated.Success, string.Join("\n", updated.Diagnostics));
+        var continued = StoryHistory.Restore(updated.Story!, original).Save();
+        model.PlayerSavePath = Path.Combine(_root, "continued" + SaveFormat.FileExtension);
+        await File.WriteAllBytesAsync(model.PlayerSavePath, continued);
+
+        var session = model.Session;
+        await model.ImportPlayerSave();
+
+        Assert.Contains(
+            "This playthrough continued across a story update, so it can't be opened in the Author Debugger. Use a save made from the start with the current story version.",
+            model.Error);
         Assert.Same(session, model.Session);
     }
 

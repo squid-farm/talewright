@@ -5,6 +5,7 @@ using Talewright.Core.Randomness;
 using Talewright.Core.State;
 using Talewright.Core.World;
 using Talewright.Runtime;
+using Talewright.Runtime.Saves;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Model;
@@ -157,7 +158,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
 
     private async Task LoadScenario(bool adopt) => await AttemptFile(async () =>
     {
-        var bytes = await AuthorScenarioFiles.ReadAsync(ScenarioPath);
+        var bytes = await AuthorScenarioFiles.ReadAsync(ScenarioPath, AuthorScenario.MaxBytes);
         var story = Story ?? throw new InvalidOperationException("Load a story first.");
         var candidate = AuthorScenario.Import(story, bytes, CompilerOptions.Default.CompatibilityId!, adopt);
         AdoptSession(candidate.Session);
@@ -170,7 +171,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
 
     public async Task ImportPlayerSave() => await AttemptFile(async () =>
     {
-        var bytes = await AuthorScenarioFiles.ReadAsync(PlayerSavePath);
+        var bytes = await AuthorScenarioFiles.ReadAsync(PlayerSavePath, SaveFormat.MaxSaveBytes);
         var story = Story ?? throw new InvalidOperationException("Load a story first.");
         var history = StoryHistory.Restore(story, bytes);
         var candidate = history.ForkAuthor();
