@@ -90,12 +90,12 @@ public sealed partial class StoryUpdateTests(WebHostFixture host, ITestOutputHel
     }
 
     [Fact]
-    public async Task Changed_recorded_outcome_rejects_autosave_and_slot_without_changing_them()
+    public async Task Changed_recorded_outcome_rejects_replay_only_autosave_and_slot_without_changing_them()
     {
         var id = $"update-{Guid.NewGuid():N}";
         await PlayOriginalAndSaveBeforeTheCheck(id);
-        var slot = await ReadSave(id, "My save");
-        var autosave = await ReadSave(id, SaveEntry.AutosaveSlot);
+        var slot = await MakeReplayOnly(id, "My save");
+        var autosave = await MakeReplayOnly(id, SaveEntry.AutosaveSlot);
 
         await Reopen(Fixture(id, Revision.ChangedRecordedEffect), resumeAutosave: null);
         await AssertPageText(text => Assert.Contains(Incompatible, text));
@@ -115,6 +115,41 @@ public sealed partial class StoryUpdateTests(WebHostFixture host, ITestOutputHel
         await Observe(new(null, "You reach the river with 2 coil of rope.", ["Climb the bank"]));
         Assert.Equal(slot, await ReadSave(id, "My save"));
         Assert.Equal(autosave, await ReadSave(id, recovered));
+    }
+
+    [Fact]
+    public async Task Changed_recorded_outcome_continues_autosave_and_slot_without_reapplying_past_effects()
+    {
+        var id = $"update-{Guid.NewGuid():N}";
+        var rope = await PlayOriginalAndSaveBeforeTheCheck(id);
+        var slot = await ReadSave(id, "My save");
+        var autosave = await ReadSave(id, SaveEntry.AutosaveSlot);
+
+        await Reopen(Fixture(id, Revision.ChangedRecordedEffect), resumeAutosave: true);
+        await AssertState(state =>
+        {
+            Assert.Contains($"Coils counted: {rope}.", state.Passage);
+            Assert.Equal(["Rest"], state.Choices);
+            Assert.Contains("The camp is quiet tonight.", state.Transcript);
+            Assert.DoesNotContain("The camp hums with insects.", state.Transcript);
+        });
+        Assert.Equal(autosave, await ReadSave(id, SaveEntry.AutosaveSlot));
+
+        await Driver.ClickAsync("Saves");
+        await Driver.ClickAsync("Load My save");
+        await Driver.ClickAsync("Load save");
+        await Observe(new(null, "You reach the river with 1 coil of rope.", ["Climb the bank"]));
+        Assert.Equal(slot, await ReadSave(id, "My save"));
+
+        await Choose("Climb the bank");
+        await Observe(new(null, $"Coils counted: {rope}.", ["Rest"]));
+        await Reopen(Fixture(id, Revision.ChangedRecordedEffect), resumeAutosave: true);
+        await Observe(new(null, $"Coils counted: {rope}.", ["Rest"]));
+        await Driver.ClickAsync("Back");
+        await Observe(new(null, "You reach the river with 1 coil of rope.", ["Climb the bank"]));
+        await Driver.ClickAsync("Forward");
+        await Observe(new(null, $"Coils counted: {rope}.", ["Rest"]));
+        Assert.Equal(slot, await ReadSave(id, "My save"));
     }
 
     /// <summary>Saves at the river with the check as redo; the autosave stays at the bank after the check.</summary>
@@ -174,6 +209,28 @@ public sealed partial class StoryUpdateTests(WebHostFixture host, ITestOutputHel
 
         var store = new FileSaveStore(NativeSaveRoot);
         return slot == SaveEntry.AutosaveSlot ? await store.ReadAutosaveAsync(storyId) : await store.ReadAsync(storyId, slot);
+    }
+
+    private async Task<byte[]> MakeReplayOnly(string storyId, string slot)
+    {
+        var bytes = SaveFormat.Write(SaveFormat.Read(await ReadSave(storyId, slot)) with { Continuation = null });
+        if (PlayerTarget.IsDesktop)
+        {
+            var store = new FileSaveStore(NativeSaveRoot);
+            if (slot == SaveEntry.AutosaveSlot)
+            {
+                await store.WriteAutosaveAsync(storyId, bytes);
+            }
+            else
+            {
+                await store.WriteAsync(storyId, slot, bytes, overwrite: true);
+            }
+        }
+        else
+        {
+            await WriteBrowserSaveAsync(storyId, slot, bytes, overwrite: true);
+        }
+        return bytes;
     }
 
     private async Task<IReadOnlyList<string>> ListSaves(string storyId) => PlayerTarget.IsDesktop

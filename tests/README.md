@@ -97,6 +97,8 @@ Both IndexedDB and native Linux file storage are exercised; save lists never rep
 Quick Save tests cover repeated replacement, names colliding with the checkpoint's display label,
 story isolation, redo and process/reload persistence, created identity, quota/transaction-abort
 and native I/O failures. Sticky-toolbar tests check Quick Save during actual scrolling.
+Story-update tests distinguish replay-only rejection from checkpoint-enabled continuation on both
+web and desktop, preserving stored bytes and already-applied effects across load and restart.
 
 ### Reproducible performance budgets
 

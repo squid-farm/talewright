@@ -79,9 +79,9 @@ public sealed class SavePortabilityTests(WebHostFixture host, ITestOutputHelper 
             (valid[..^1], "malformed"),
             ([.. valid[..4], 99, .. valid[5..]], "unsupported format"),
             ("""{"formatVersion":2,"storyId":"player-test"}"""u8.ToArray(), "unsupported format"),
-            (SaveFormat.Write(decoded with { ContentFingerprint = "different" }), $"Version {story.Version} of {story.Title} has changed"),
+            (SaveFormat.Write(decoded with { ContentFingerprint = "different", Continuation = null }), $"Version {story.Version} of {story.Title} has changed"),
             (SaveFormat.Write(decoded with { StoryId = "different" }), "different story"),
-            (SaveFormat.Write(decoded with { StoryVersion = "different" }), $"Version different of {story.Title} has changed"),
+            (SaveFormat.Write(decoded with { StoryVersion = "different", Continuation = null }), $"Version different of {story.Title} has changed"),
             (SaveFormat.Write(decoded with { ReplayChoiceIdentities = changedOutcomeIdentities }), "cannot continue"),
             (new byte[StoryHistory.MaxSaveBytes + 1], "too large"),
         };

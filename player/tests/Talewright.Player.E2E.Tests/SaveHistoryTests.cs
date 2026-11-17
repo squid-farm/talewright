@@ -167,6 +167,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         {
             ReplayEvidence = null,
             ReplayChoiceIdentities = null,
+            Continuation = null,
         });
         if (!olderVersion)
         {
