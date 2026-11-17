@@ -205,6 +205,9 @@ public sealed class ValidatedSaveImportTests : IDisposable
                 case "import":
                     result = this;
                     break;
+                case "configure":
+                    Assert.Equal(StoryHistory.MaxSaveBytes, Assert.IsType<int>(Assert.Single(args!)));
+                    break;
                 case "read":
                     result = _saves[(Assert.IsType<string>(args![0]), Assert.IsType<string>(args[1]))].ToArray();
                     break;
