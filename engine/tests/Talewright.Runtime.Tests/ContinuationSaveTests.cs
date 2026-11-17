@@ -100,6 +100,17 @@ public sealed class ContinuationSaveTests
     }
 
     [Fact]
+    public void Changed_recorded_choice_outcome_is_rejected_instead_of_resuming_from_checkpoint()
+    {
+        var original = PlayToSquare(Compile(new()));
+        var updated = Compile(new() { Version = "2", ChangedChoiceEffect = true });
+
+        var error = Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(updated, original.Save()));
+
+        Assert.Contains("has changed", error.Message);
+    }
+
+    [Fact]
     public void Conditional_prose_alone_keeps_replay_and_complete_undo()
     {
         var original = PlayToSquare(Compile(new()));
@@ -743,6 +754,7 @@ public sealed class ContinuationSaveTests
         public bool RemoveSquare { get; init; }
         public bool IncludeRope { get; init; } = true;
         public int RopeInitial { get; init; }
+        public bool ChangedChoiceEffect { get; init; }
         public bool AddPotion { get; init; }
         public bool RemoveArrived { get; init; }
         public bool ChangedTrigger { get; init; }
@@ -792,7 +804,8 @@ public sealed class ContinuationSaveTests
         var square = options.RemoveSquare ? "start" : "square";
         var lines = new List<string> { SceneFaker.Header("start"), "The road." };
         if (legacy is not null) lines.Add(EffectFaker.Line(EffectFaker.Increase(legacy, 2)));
-        lines.Add(ChoiceFaker.Create("market", "Go to market", effect: EffectFaker.Increase(gold, 1)));
+        lines.Add(ChoiceFaker.Create("market", "Go to market",
+            effect: EffectFaker.Increase(gold, options.ChangedChoiceEffect ? 2 : 1)));
         lines.Add(SceneFaker.Header("market"));
         if (options.HpLoss) lines.Add(EffectFaker.Line(EffectFaker.Decrease(TaleCharacterRef.Player.Field("hp"), 5)));
         lines.Add("The market.");

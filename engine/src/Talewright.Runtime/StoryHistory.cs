@@ -19,6 +19,10 @@ public sealed record HistoryFrame(StoryFrame Frame, IReadOnlyList<RenderedInline
 /// <summary>Deterministic choice history. Restores are built separately before replacing a live session.</summary>
 public sealed partial class StoryHistory
 {
+    private sealed class CheckpointFallbackRequiredException : Exception
+    {
+    }
+
     public const int MaxAutomaticTransitions = 1_000;
     public const int MaxChoices = SaveFormat.MaxChoices;
     public const int MaxSaveBytes = SaveFormat.MaxSaveBytes;
@@ -473,8 +477,10 @@ public sealed partial class StoryHistory
         return new InvalidDataException($"{subject} has changed, and this save is no longer compatible. Open it with the story and player version that created it.", inner);
     }
 
-    private static InvalidDataException ReplayMismatch(StoryDefinition story, SavedGame save, bool changed) =>
-        changed ? Incompatible(story, save) : ReplayFailure();
+    private static Exception ReplayMismatch(StoryDefinition story, SavedGame save, bool changed) =>
+        changed
+            ? save.Continuation is null ? Incompatible(story, save) : new CheckpointFallbackRequiredException()
+            : ReplayFailure();
 
     private static InvalidDataException ReplayFailure() =>
         new("This saved game cannot continue because the story has changed or the save is damaged. It is no longer compatible.");

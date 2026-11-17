@@ -57,9 +57,9 @@ public sealed partial class StoryHistory
             {
                 return RestoreByReplay(story, save);
             }
-            catch (InvalidDataException)
+            catch (CheckpointFallbackRequiredException)
             {
-                // An incompatible replay can continue from its checkpoint.
+                // Replayable choices with changed evidence can continue from their checkpoint.
             }
         }
         return ResumeFromCheckpoint(story, continuation, save);
