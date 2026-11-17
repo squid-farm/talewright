@@ -121,7 +121,7 @@ the generated formatter works in desktop and Blazor WebAssembly builds.
 | Limit | Value | Enforced |
 |---|---|---|
 | Compressed save | 10 MiB | Writing, storage, import and reading |
-| Decoded body | 32 MiB (declared length checked first; decompression stops one byte past it) | Writing and reading |
+| Decoded body | 16 MiB (declared length checked first; decompression stops one byte past it) | Writing and reading |
 | Choices | 10,000 | Playing and reading; array size checked before deserialization |
 | Choice key | 1–512 characters | Saving and reading |
 | Character stats | 1,000 | Reading; array size checked before deserialization |
@@ -135,8 +135,15 @@ their lists. Continuation arrays cannot declare more elements than the remaining
 not allowed. The base transcript length must be between zero and the frame count, each character
 has at most 1,000 stats, and a base cannot carry replay evidence. A checkpoint's total visit count
 cannot exceed its preceding transcript frames (the base transcript length for a base checkpoint).
-Other decoded structures are bounded by the 32 MiB body limit. These save limits are provisional pending
-[#760](https://github.com/squid-farm/talewright/issues/760).
+Other decoded structures are bounded by the 16 MiB body limit. These limits follow the desktop and
+three-browser measurements in the [performance scorecard](performance-scorecard.md#save-size-and-continuation):
+the largest measured 10,000-choice save is 65,365 compressed bytes and 7,033,682 decoded bytes.
+Doubling the decoded sample is 14,067,364 bytes (13.42 MiB); 16 MiB is the next whole-MiB ceiling
+above that sample. At 10,000 choices, Chromium's `performance.memory` reported 11.9 MB used,
+17.1 MB total and a 3.76 GB V8 JavaScript heap limit, so the decoded ceiling is below that reported
+limit. This API does not measure the WebAssembly managed heap; Firefox and WebKit heap use and
+limits were not measured. The compressed ceiling is the minimum 10 MiB tier and is over 8 times the
+largest measured compressed save.
 
 ## Compatibility
 
