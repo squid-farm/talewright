@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using BenchmarkDotNet.Attributes;
 using Talewright.Runtime;
+using Talewright.Runtime.Saves;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
 using Talewright.Testing;
@@ -14,6 +15,8 @@ public class IndependentDimensionBenchmarks
     private PerformanceCorpus _corpus = null!;
     private StorySource _source = null!;
     private StoryDefinition _story = null!;
+    private StoryDefinition _changedStory = null!;
+    private StoryHistory _history = null!;
     private byte[] _save = [];
 
     [ParamsSource(nameof(Cases))]
@@ -49,7 +52,16 @@ public class IndependentDimensionBenchmarks
             history.Choose(history.Current.Choices[0].Key);
         }
 
+        _history = history;
         _save = history.Save();
+        _changedStory = AddStartEffect(_source);
+        if (StoryHistory.Restore(_changedStory, _save).Continuation is null)
+        {
+            throw new InvalidOperationException("The changed corpus did not exercise checkpoint continuation.");
+        }
+
+        Console.WriteLine(
+            $"Save sizes ({CorpusCase}): encoded={_save.Length} bytes, decoded={DecodedSaveBytes(_save)} bytes.");
         BenchmarkMetadataWriter.Write(_corpus.Metadata);
     }
 
@@ -83,6 +95,12 @@ public class IndependentDimensionBenchmarks
 
         return restored;
     }
+
+    [Benchmark]
+    public byte[] SaveAtConfiguredDepth() => _history.Save();
+
+    [Benchmark]
+    public StoryHistory ContinueAtConfiguredDepth() => StoryHistory.Restore(_changedStory, _save);
 
     [GlobalCleanup]
     public void Cleanup()
@@ -127,4 +145,49 @@ public class IndependentDimensionBenchmarks
         "50MiB" => 50L * 1024 * 1024,
         _ => throw new ArgumentException($"Unknown corpus byte volume '{value}'.", nameof(value)),
     };
+
+    private static StoryDefinition AddStartEffect(StorySource source)
+    {
+        var files = source.Files.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        const string header = "=== scene.0";
+        var path = files.FirstOrDefault(pair => pair.Key.EndsWith(".tale", StringComparison.Ordinal)
+            && pair.Value.Contains(header, StringComparison.Ordinal)).Key;
+        if (path is null)
+        {
+            throw new InvalidOperationException("The history corpus start scene was not found.");
+        }
+
+        var effect = EffectFaker.Line(EffectFaker.Increase(new TaleVariableRef("visits"), 1));
+        files[path] = InsertAfterMetadata(files[path], header, effect);
+        var result = StoryCompiler.Compile(new StorySource(files));
+        return result.Story
+            ?? throw new InvalidOperationException(
+                $"The changed history corpus did not compile: {string.Join("\n", result.Diagnostics)}");
+    }
+
+    private static string InsertAfterMetadata(string text, string header, string effect)
+    {
+        var index = text.IndexOf(header, StringComparison.Ordinal);
+        var insertion = text.IndexOf('\n', index + header.Length);
+        if (insertion < 0)
+        {
+            throw new InvalidOperationException("The history corpus scene header is incomplete.");
+        }
+
+        insertion++;
+        while (insertion < text.Length && text[insertion] == '@')
+        {
+            var lineEnd = text.IndexOf('\n', insertion);
+            if (lineEnd < 0)
+            {
+                insertion = text.Length;
+                break;
+            }
+            insertion = lineEnd + 1;
+        }
+
+        return text.Insert(insertion, effect + "\n");
+    }
+
+    private static int DecodedSaveBytes(ReadOnlySpan<byte> save) => SaveFormat.DecodedBodyLength(save);
 }

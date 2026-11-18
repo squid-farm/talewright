@@ -13,6 +13,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Talewright.Runtime.Tests" />
+    <InternalsVisibleTo Include="Talewright.BenchmarkDotNet" />
   </ItemGroup>
 
   <PropertyGroup>

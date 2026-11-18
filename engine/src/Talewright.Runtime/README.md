@@ -332,9 +332,9 @@ replay payload and any base, excluding summary, current checkpoint and rendered 
 loaded original slot until the timeline changes, including after loading into a changed story. The player
 checks those keys against actual persisted slots before replacing a session; timestamps do not
 influence load protection.
-The provisional save limits are 10 MiB compressed, 32 MiB decoded, 10,000 choices across
-continuation boundaries and 512 characters per choice key. Unsupported formats and incompatible
-stories fail explicitly. Saves are never migrated.
+The save limits are 10 MiB compressed, 16 MiB decoded, 10,000 choices across continuation
+boundaries and 512 characters per choice key. Unsupported formats and incompatible stories fail
+explicitly. Saves are never migrated.
 
 Built-in compiler options provide a compatibility identity. Custom C# hosts must set
 `CompilerOptions.CompatibilityId` and change it whenever registered extension behavior changes;

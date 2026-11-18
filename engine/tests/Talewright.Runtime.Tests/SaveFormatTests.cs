@@ -330,7 +330,22 @@ public class SaveFormatTests
     {
         var tooLarge = Sample with { StoryId = new string('s', SaveFormat.MaxDecodedBytes + 1) };
         var error = Assert.Throws<InvalidOperationException>(() => SaveFormat.Write(tooLarge));
-        Assert.Contains("maximum 32 MiB uncompressed", error.Message);
+        Assert.Contains(
+            $"maximum {SaveFormat.MaxDecodedBytes / 1024 / 1024} MiB uncompressed",
+            error.Message);
+    }
+
+    [Fact]
+    public void Write_and_read_accept_a_body_at_the_decoded_size_limit()
+    {
+        var emptyStoryIdBodyLength = SaveFormat.EncodeBody(Sample with { StoryId = "" }).Length;
+        // The large story id uses a five-byte str32 header instead of the empty string's one-byte fixstr.
+        var storyIdLength = SaveFormat.MaxDecodedBytes - emptyStoryIdBodyLength - 4;
+        var atLimit = Sample with { StoryId = new string('s', storyIdLength) };
+        var body = SaveFormat.EncodeBody(atLimit);
+
+        Assert.Equal(SaveFormat.MaxDecodedBytes, body.Length);
+        Assert.Equal(atLimit.StoryId, SaveFormat.Read(SaveFormat.Write(atLimit)).StoryId);
     }
 
     [Fact]

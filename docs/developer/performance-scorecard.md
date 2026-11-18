@@ -20,10 +20,107 @@ percentile.
 | Managed allocation | BenchmarkDotNet `MemoryDiagnoser`; console allocation ceilings for realistic compile and analysis | Cumulative managed bytes per operation, not retained memory |
 | Live managed heap after repeated open/close/restore | Not measured | Needs a stable post-operation collection and retention protocol |
 | Process peak RSS | Benchmark worker metadata and standalone publication measurements | Worker peak includes setup and harness; it is not an isolated operation or a live heap measurement |
-| Browser process memory | Not measured | `navigator.deviceMemory` is only a browser-reported device-capacity hint, not memory usage |
+| Browser process memory | Not measured | Chromium `performance.memory` JS-heap snapshots are recorded for save scale; they are not process or WebAssembly managed-heap measurements |
 | Allocation stacks | Not available from the local trace | EventPipe capture completed, but Speedscope conversion yielded no allocation profiles or managed allocation stacks; CPU samples must not be reported as allocation attribution |
 | Main-thread blocking | Chromium long-task entries in the browser integration | Firefox and WebKit do not report this metric in the current harness |
 | Constrained device | Not measured | Available local host and hosted runners are not representative constrained devices |
+
+## Save size and continuation
+
+Save, replay-restore and continuation-restore measurements were collected on
+Linux Mint 22.3 x64, an AMD Ryzen 9 7940HS (16 logical processors), .NET
+10.0.15 / SDK 10.0.115, and BenchmarkDotNet 0.15.2. The independent loop
+benchmark used one out-of-process launch, five warmups and thirty measured
+iterations. Times are means; allocations are cumulative managed bytes
+per operation. These are local baselines, not product budgets.
+
+The independent loop corpus holds the story constant and varies only history
+depth. Save sizes are the container length and decoded MessagePack body length.
+
+| Choices | Encoded / decoded | Save mean / allocation | Replay restore mean / allocation | Continuation mean / allocation |
+|---:|---:|---:|---:|---:|
+| 100 | 2,528 / 10,608 B | 0.177 ms / 0.12 MiB | 1.059 ms / 1.28 MiB | 1.289 ms / 1.45 MiB |
+| 1,000 | 7,534 / 93,126 B | 1.779 ms / 0.91 MiB | 14.468 ms / 11.77 MiB | 11.390 ms / 12.47 MiB |
+| 5,000 | 28,125 / 461,698 B | 12.106 ms / 4.63 MiB | 95.140 ms / 58.74 MiB | 104.680 ms / 62.07 MiB |
+| 10,000 | 53,390 / 932,347 B | 29.479 ms / 9.25 MiB | 168.890 ms / 116.24 MiB | 199.610 ms / 125.10 MiB |
+
+The realistic desktop benchmark uses a generated 20-chapter story. Requested
+actions and saved choices differ because automatic choices also contribute to
+the 10,000-choice cap. The 10,000-action case stops at exactly 10,000 saved
+choices without restarting.
+
+| Requested / completed actions | Saved choices | Encoded / decoded | Save mean / allocation | Replay restore mean / allocation | Continuation mean / allocation |
+|---:|---:|---:|---:|---:|---:|
+| 1,000 / 1,000 | 1,502 | 13,177 / 1,056,290 B | 8.175 ms / 3.61 MiB | 299.577 ms / 312.55 MiB | 174.748 ms / 163.54 MiB |
+| 5,000 / 5,000 | 7,502 | 50,085 / 5,276,456 B | 56.835 ms / 17.66 MiB | 1,605.091 ms / 1,557.53 MiB | 888.634 ms / 812.33 MiB |
+| 10,000 / 6,665 | 10,000 | 65,365 / 7,033,682 B | 83.626 ms / 23.31 MiB | 1,600.231 ms / 2,071.45 MiB | 720.166 ms / 1,078.12 MiB |
+
+Browser save/load times are the test's click-to-status observations, including
+the player UI and IndexedDB path. Autosave timings are 50 per-choice samples;
+the p50/p95 below describe these local samples, not a population-wide
+percentile. Sizes are the stored bytes observed by the test.
+
+| Browser | Choices | Replay save ms / bytes | Replay load ms | Continuation save ms / bytes | Continuation load ms |
+|---|---:|---:|---:|---:|---:|
+| Chromium | 1,000 | 151.8 / 7,560 | 590.8 | 104.7 / 6,744 | 223.9 |
+| Chromium | 5,000 | 275.3 / 28,222 | 1,732.2 | 191.4 / 26,814 | 586.1 |
+| Chromium | 10,000 | 420.1 / 53,498 | 2,979.7 | 321.0 / 51,599 | 1,012.8 |
+| Firefox | 1,000 | 193.5 / 7,560 | 652.4 | 144.4 / 6,745 | 270.8 |
+| Firefox | 5,000 | 361.2 / 28,222 | 2,646.7 | 266.7 / 26,818 | 714.0 |
+| Firefox | 10,000 | 561.9 / 53,499 | 4,360.0 | 404.3 / 51,601 | 1,269.6 |
+| WebKit | 1,000 | 144.2 / 7,560 | 634.3 | 114.9 / 6,744 | 227.7 |
+| WebKit | 5,000 | 291.2 / 28,220 | 1,855.6 | 195.1 / 26,817 | 624.0 |
+| WebKit | 10,000 | 439.5 / 53,498 | 3,294.1 | 334.9 / 51,604 | 1,088.0 |
+
+| Browser | Choices | Replay autosave p50 / p95 ms | Continuation autosave p50 / p95 ms | Autosave bytes, replay / continuation |
+|---|---:|---:|---:|---:|
+| Chromium | 1,000 | 24.2 / 37.3 | 19.7 / 24.8 | 7,850 / 7,079 |
+| Chromium | 5,000 | 72.4 / 78.6 | 59.3 / 68.8 | 28,502 / 26,979 |
+| Chromium | 10,000 | 131.3 / 145.7 | 104.0 / 113.5 | 53,498 / 51,615 |
+| Firefox | 1,000 | 32 / 50 | 27 / 64 | 7,849 / 7,081 |
+| Firefox | 5,000 | 88 / 118 | 72 / 83 | 28,501 / 26,981 |
+| Firefox | 10,000 | 160 / 181 | 151 / 187 | 53,498 / 51,616 |
+| WebKit | 1,000 | 29 / 42 | 26 / 32 | 7,849 / 7,078 |
+| WebKit | 5,000 | 77 / 88 | 63 / 73 | 28,501 / 26,980 |
+| WebKit | 10,000 | 136 / 152 | 107 / 119 | 53,497 / 51,618 |
+
+At 10,000 choices, autosave sampling starts at 9,950 because the playthrough
+cap prevents another 50 choices. Chromium's observed p95 is above the
+candidate 50 ms target for both replay and continuation. Recommend that #756
+consider incremental autosave; this measurement issue does not change autosave
+behavior or the choice cap.
+
+At 10,000 choices, Chromium's non-standard `performance.memory` reported
+11.9 MB used, 17.1 MB total and a 3.76 GB V8 JavaScript heap limit. The 16 MiB
+decoded-body limit is below that reported JS-heap ceiling, but these are
+JavaScript-heap observations, not process memory or the WebAssembly managed
+heap. Firefox and WebKit expose no equivalent metric in this harness, so
+browser-specific WebAssembly headroom remains unmeasured.
+
+Story source size is not limited by the save limits: saves contain replay data
+and continuation state, not story source. The largest measured save is the
+realistic 10,000-choice save: 65,365 encoded
+bytes and 7,033,682 decoded bytes. Twice the decoded size is 14,067,364 bytes
+(13.42 MiB), so the selected 16 MiB decoded-body ceiling clears that minimum.
+The 10 MiB compressed ceiling is more than eight times the largest measured
+compressed save. Four times the decoded ceiling is 64 MiB; the independent
+10,000-choice replay and continuation restores allocate 116.24 MiB and
+125.10 MiB. This bound is not met, so allocation reduction is tracked as a
+separate follow-up rather than addressed by raising the save limits.
+
+The browser runs used Chromium 153.0.8010.12, Firefox 155 and WebKit 26.6 on
+the same host, with .NET 10.0.15. They are single local runs with 50 autosave
+samples per path; there are no constrained-device measurements. The quota
+regression test also passed with a prepared largest measured realistic save in
+all three browsers, preserving the existing slot when a new save fails.
+The combined real-corpus acceptance filter was also attempted. Its Chromium run
+had four unrelated failures at
+[`RealCorpusPerformanceTests.cs:80`](../../player/tests/Talewright.Player.E2E.Tests/RealCorpusPerformanceTests.cs):
+the visit-count expectations were 201, 2,001, 10,001 and 20,001, while the
+observed values were 199, 1,999, 10,000 and 20,000. The four `SaveScalePerformanceTests`
+and the low-compressibility real-corpus test passed in that Chromium run. The
+combined run was stopped after Chromium; the SaveScale measurement and quota
+tests were separately run and passed in all three browsers.
 
 ## Published browser observations
 
@@ -224,6 +321,18 @@ regression envelopes, not these product budgets.
 From the repository root:
 
 ```bash
+# Save, replay-restore and continuation-restore at each independent history depth.
+MSBUILDDISABLENODEREUSE=1 dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
+  --filter '*IndependentDimensionBenchmarks.*AtConfiguredDepth*history-*' --artifacts artifacts/scorecard/saves
+
+# All realistic-story benchmarks, including 20-chapter save, replay and continuation cases.
+MSBUILDDISABLENODEREUSE=1 dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
+  --filter '*RealisticStoryBenchmarks*' --artifacts artifacts/scorecard/saves-realistic
+
+# Browser real-corpus and save-scale measurements, including Chromium, Firefox and WebKit.
+python3 player/tests/run_e2e.py web \
+  --filter "FullyQualifiedName~RealCorpusBrowserPerformanceTests|FullyQualifiedName~SaveScalePerformanceTests"
+
 # Verify all deterministic corpus tiers and replay histories.
 dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- --verify-corpora
 

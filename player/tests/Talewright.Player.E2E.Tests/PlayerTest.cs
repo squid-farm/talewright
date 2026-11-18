@@ -102,7 +102,7 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
     protected async Task UploadBytes(string name, byte[] bytes) =>
         await Driver.UploadAsync(name, bytes);
 
-    private async Task ResolveAutosavePromptAsync(bool resumeAutosave)
+    protected async Task ResolveAutosavePromptAsync(bool resumeAutosave)
     {
         if (Driver is NativePlayerDriver native)
         {

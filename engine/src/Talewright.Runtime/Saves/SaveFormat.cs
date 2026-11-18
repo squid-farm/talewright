@@ -30,7 +30,7 @@ public static class SaveFormat
     /// <summary>File extension for saves on disk and exported backups.</summary>
     public const string FileExtension = ".twsave";
     public const int MaxSaveBytes = 10 * 1024 * 1024;
-    public const int MaxDecodedBytes = 32 * 1024 * 1024;
+    public const int MaxDecodedBytes = 16 * 1024 * 1024;
     public const int MaxChoices = 10_000;
     public const int MaxChoiceKeyLength = 512;
     public const int MaxCharacterStats = 1_000;
@@ -85,6 +85,8 @@ public static class SaveFormat
         var body = Decompress(data);
         return DecodeBody(data[Magic.Length] == 4 ? StripLegacyFields(body) : body, out summaryDamaged);
     }
+
+    internal static int DecodedBodyLength(ReadOnlySpan<byte> data) => Decompress(data).Length;
 
     internal static byte[] EncodeBody(SavedGame save) =>
         EncodeBody(ToPayload(save));

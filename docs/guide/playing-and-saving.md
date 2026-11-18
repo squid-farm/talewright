@@ -157,6 +157,6 @@ save switches to the character in that save.
 
 ## Very long playthroughs
 
-Each save file is limited to 10 MiB. A playthrough supports 10,000 choices total; choices made
-before a story update count toward that limit. At the limit, the player explains why it cannot
-accept another choice. Saving, Back, Restart and Library still work.
+Each save file is limited to 10 MiB compressed (16 MiB decoded). A playthrough supports 10,000
+choices total; choices made before a story update count toward that limit. At the limit, the player
+explains why it cannot accept another choice. Saving, Back, Restart and Library still work.
