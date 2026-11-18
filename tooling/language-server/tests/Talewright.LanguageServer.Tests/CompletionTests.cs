@@ -179,6 +179,62 @@ public sealed partial class ServerTests
     }
 
     [Theory]
+    [InlineData("::: skill-check perception |", "::: skill-check perception dc ", "dc ")]
+    [InlineData("::: skill-check guide perception |", "::: skill-check guide perception dc ", "dc ")]
+    [InlineData("::: skill-check perception d|", "::: skill-check perception dc ", "dc ")]
+    [InlineData("::: skill-check guide perception d|", "::: skill-check guide perception dc ", "dc ")]
+    [InlineData("::: skill-check perception    |", "::: skill-check perception    dc ", "dc ")]
+    [InlineData("::: skill-check perception|", "::: skill-check perception dc ", " dc ")]
+    public async Task Difficulty_keyword_completion_follows_a_declared_stat(
+        string line, string expected, string expectedNewText)
+    {
+        await using var client = new Client();
+        DeclareRpgWithGuideForDifficultyCompletion(client);
+        await client.Initialize();
+        var marked = "=== start\n" + line;
+        await client.Open("start.tale", marked.Replace("|", ""), 1);
+
+        var item = Assert.Single(Items(await Completion(client, "start.tale", marked)), HasLabel("dc"));
+        var edit = item.GetProperty("textEdit");
+        Assert.Equal(expectedNewText, edit.GetProperty("newText").GetString());
+        var range = edit.GetProperty("range");
+        var start = range.GetProperty("start");
+        var end = range.GetProperty("end");
+        Assert.Equal(1, start.GetProperty("line").GetInt32());
+        Assert.Equal(1, end.GetProperty("line").GetInt32());
+        var sourceLine = line.Replace("|", "");
+        Assert.Equal(expected, sourceLine[..start.GetProperty("character").GetInt32()] +
+            edit.GetProperty("newText").GetString() +
+            sourceLine[end.GetProperty("character").GetInt32()..]);
+    }
+
+    [Theory]
+    [InlineData("::: skill-check perception dc |")]
+    [InlineData("::: skill-check guide perception dc |")]
+    public async Task Difficulty_keyword_completion_does_not_duplicate_an_existing_dc(string line)
+    {
+        await using var client = new Client();
+        DeclareRpgWithGuideForDifficultyCompletion(client);
+        await client.Initialize();
+        var marked = "=== start\n" + line;
+        await client.Open("start.tale", marked.Replace("|", ""), 1);
+
+        Assert.DoesNotContain(Items(await Completion(client, "start.tale", marked)), HasLabel("dc"));
+    }
+
+    private static void DeclareRpgWithGuideForDifficultyCompletion(Client client) =>
+        File.WriteAllText(client.PathOf(StorySource.ManifestFileName), """
+            game:
+              id: lsp-test
+              title: LSP test
+              start: start
+              ruleset: rpg
+            characters:
+              player: {first-name: Ada}
+              guide: {first-name: Bea}
+            """);
+
+    [Theory]
     [InlineData("->|", "start", "->start")]
     [InlineData("-> |", "start", "-> start")]
     [InlineData("->  |", "start", "->  start")]

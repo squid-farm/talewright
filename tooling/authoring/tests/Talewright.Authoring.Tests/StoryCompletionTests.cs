@@ -158,6 +158,32 @@ public sealed class StoryCompletionTests
     }
 
     [Theory]
+    [InlineData("::: skill-check perception |", "::: skill-check perception dc ", "dc ")]
+    [InlineData("::: skill-check guide perception |", "::: skill-check guide perception dc ", "dc ")]
+    [InlineData("::: skill-check perception d|", "::: skill-check perception dc ", "dc ")]
+    [InlineData("::: skill-check guide perception d|", "::: skill-check guide perception dc ", "dc ")]
+    [InlineData("::: skill-check perception    |", "::: skill-check perception    dc ", "dc ")]
+    public void Difficulty_keyword_completion_follows_a_declared_stat(string marked, string expected, string newText)
+    {
+        var (analysis, position) = Analyze("=== first\n" + marked);
+        var completion = Assert.Single(StoryCompletion.Complete(analysis, position),
+            item => item.Label == "dc");
+
+        Assert.Equal(newText, completion.NewText);
+        Assert.Equal(expected, Apply(marked.Replace("|", ""), completion.Range.Start.Column,
+            completion.Range.End.Column, completion.NewText));
+    }
+
+    [Theory]
+    [InlineData("::: skill-check perception dc |")]
+    [InlineData("::: skill-check guide perception dc |")]
+    public void Difficulty_keyword_completion_does_not_duplicate_an_existing_dc(string marked)
+    {
+        var (analysis, position) = Analyze("=== first\n" + marked);
+        Assert.DoesNotContain(StoryCompletion.Complete(analysis, position), item => item.Label == "dc");
+    }
+
+    [Theory]
     [InlineData(">|", "player", "> player: ")]
     [InlineData(">pl|", "player", "> player: ")]
     [InlineData("> |", "player", "> player: ")]
