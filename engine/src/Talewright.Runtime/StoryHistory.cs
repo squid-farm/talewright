@@ -542,11 +542,13 @@ public sealed partial class StoryHistory
             {
                 if (transitions == MaxAutomaticTransitions)
                 {
+                    if (savedIndex < choices.Count)
+                    {
+                        throw ReplayFailure();
+                    }
                     automaticContinuationError = AutomaticContinuationErrorMessage;
                     session.StopAutomaticContinuation();
                     frames[^1] = frames[^1] with { Frame = session.Current! };
-                    Array.Fill(cursorPositions, replayedChoices.Count);
-                    savedIndex = choices.Count;
                     return;
                 }
 

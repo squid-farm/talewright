@@ -376,6 +376,30 @@ public class StoryHistoryTests
         Assert.False(history.Current.IsEnded);
         Assert.Empty(history.Current.Choices);
         Assert.DoesNotContain(history.Events.OfType<SceneEntered>(), entry => entry.Scene.Value == "scene-1001");
+
+        var restored = StoryHistory.Restore(story, history.Save());
+
+        Assert.Equal(history.Cursor, restored.Cursor);
+        Assert.Equal(history.Current.Scene, restored.Current.Scene);
+        Assert.Equal(history.AutomaticContinuationError, restored.AutomaticContinuationError);
+    }
+
+    [Fact]
+    public void Restore_rejects_saved_choices_after_the_automatic_transition_budget()
+    {
+        var story = Compile(yaml: BuildManifest(declareVariables: true).Build(),
+            tale: BareDivertChain(StoryHistory.MaxAutomaticTransitions + 1));
+        var history = new StoryHistory(story, 42);
+        var invalidSave = Mutate(history.Save(), save => save with
+        {
+            Choices = [.. save.Choices, "invalid"],
+            Cursor = save.Choices.Count + 1,
+            ReplayEvidence = null,
+            ReplayChoiceIdentities = null,
+            Continuation = null,
+        });
+
+        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(story, invalidSave));
     }
 
     [Theory]
