@@ -5,7 +5,17 @@ using Talewright.Talemark.Analysis;
 
 namespace Talewright.Talemark.Model;
 
-/// <summary>An executable scene line or block. Id is stable for the same source position within its scene.</summary>
+/// <summary>
+/// An executable scene line or block. Id is stable for the same source position within its scene.
+/// </summary>
+/// <param name="Id">
+/// Must be unique among all steps of its scene, including steps nested in conditionals. Live authoring keeps what a
+/// step produced (prose, branch decisions, notes, check outcomes) by Id, so the same step should keep the same Id
+/// wherever author-session continuity is expected; the compiler uses <c>step:&lt;line&gt;:&lt;column&gt;</c>.
+/// A step whose Id is not recognized is not treated as already run, and an effect or check step is then rejected on
+/// refresh. Ids are not stored in saves.
+/// </param>
+/// <param name="Source">Where the step was written.</param>
 public abstract record SceneStep(string Id, SourceRange Source);
 
 public sealed record ProseStep(string Id, SourceRange Source, TemplateBlock Block) : SceneStep(Id, Source);

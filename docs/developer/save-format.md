@@ -145,6 +145,80 @@ The decoded limit stays at 1 GiB because .NET arrays top out near 2 GiB; the com
 the trigger-save encoding within a 32-bit length. Browser storage quota can refuse a save well
 below these limits; the player then reports a storage error and play continues.
 
+## Stories built without the compiler
+
+The Talemark compiler fills in the identity fields below. A producer that builds a
+`StoryDefinition` directly (C# code, another compiler, a generator) must supply them itself;
+nothing checks the model for them when it is constructed. These rules describe what the engine does
+with each field. They do not change the save format and do not make arbitrary story updates
+compatible; the update policy is the [Compatibility](#compatibility) section below and the
+closed issues [#171](https://github.com/squid-farm/talewright/issues/171) and
+[#478](https://github.com/squid-farm/talewright/issues/478).
+
+### Content fingerprint
+
+`StoryDefinition.ContentFingerprint` is stored in every save (position 2) and compared, together
+with `Version`, by string equality when a save is restored.
+
+- **Non-empty to save.** With a null or empty fingerprint, `StoryHistory.Save()` and `ProgressKey`
+  throw `InvalidOperationException` (`TryProgressKey` returns `false`) and `StoryHistory.Restore`
+  throws `InvalidDataException`.
+- **Deterministic.** The producer must return the same value every time it produces the same story,
+  so a save made in one run matches the story built in the next. A value that varies between runs
+  (a timestamp, a random id) makes every save look like it belongs to a changed story.
+- **Changes with the story.** The value must change when anything that affects replay changes:
+  story content and the behavior of any registered extension. The engine only compares strings and
+  cannot detect a change the value does not reflect. If the content changes but the value does not,
+  a restore replays the save against the new content and may be rejected as incompatible or damaged.
+- **How the compiler does it.** The fingerprint is an uppercase hexadecimal SHA-256 of
+  length-prefixed UTF-8: the replay version (`talewright-replay-v3`), `CompilerOptions.CompatibilityId`,
+  then each source file's path and text in ordinal path order. It is a hash of the source files, not
+  of the compiled model. A blank `CompatibilityId` produces no fingerprint, which turns saving off
+  for that story.
+- **Updated stories.** Replaying a save against a changed story is only attempted when both the save's
+  and the story's fingerprints are 64 hexadecimal characters and the story has a non-empty
+  `ReplayCompatibilityId` (the compiler sets it from the replay version and `CompatibilityId`).
+  A producer that leaves `ReplayCompatibilityId` null can still save and restore an unchanged story,
+  but its saves carry no replay evidence.
+
+### Choice keys
+
+`ChoiceDefinition.Key` is written to the save's choice history (position 6), 1 to 512 characters;
+a longer key makes `Save()` throw.
+
+- **Identify the intended choice.** A lookup by key selects the first offered choice with that key,
+  so keys must be distinct within a scene.
+- **Declaration-index keys can change meaning.** The compiler names choices `c0`, `c1`, ... by
+  their order among the scene's choice steps. Adding, removing or reordering a choice changes which
+  choice `cN` names, so an old save's recorded key can point at a different choice or at none.
+  Saves that carry replay choice identities (those made from stories that have a `ReplayCompatibilityId`) select the choice by its outcome identity
+  instead, but the key is still persisted and still names the choice for live play and for saves
+  without those identities. A producer should give choices keys that keep naming the same choice
+  across edits.
+- **Live authoring.** `AuthorSession.Reload` checks that each choice already played still has the same
+  scene, key and outcome identity in the new story ("previously consumed scene/choice meaning
+  changed" otherwise). When that replay check fails, `Reload` falls back to continuing from the
+  current scene-entry checkpoint without the played history and sets `historyChanged`.
+- **Reserved.** `continue` is the key of the engine's synthetic Continue choice and `storylet:` is
+  the prefix of hub storylet choices; do not use them for other choices.
+
+### Step IDs
+
+`SceneStep.Id` is not stored in saves. The runtime uses it for live authoring (`AuthorSession`):
+
+- **Unique within the scene,** including steps nested in conditionals. The runtime keeps per-step
+  results in dictionaries keyed by this id (rendered prose, branch decisions, notes, check outcomes),
+  and the author inspection indexes steps by scene id and step id to map recorded decisions to source
+  ranges. A duplicate would mix up two steps' recorded results or fail to build that index.
+- **Stable for the same step** wherever author-session continuity is expected. A live edit of author
+  state re-runs the current scene and reuses what a step recorded when its id matches one that
+  already ran. A step whose id does not match is not treated as already run: prose and conditionals
+  are evaluated again, and an effect or check step is rejected with "This edit reaches an effect or
+  check that did not run in this passage." The compiler uses `step:<line>:<column>` of the step's
+  source position, so moving a line changes its id.
+- `AuthorSession.Reload` rebuilds the session by replaying its recorded commands on the new story,
+  and its structural comparison (`AuthorReloadComparison`) skips a step's `Id` and `Source`
+  properties, so an id that differs between two builds is not by itself what makes a reload fail.
 ## Compatibility
 
 A save must have the same story id. Format 4 and format 5 saves with a `nil` continuation keep
