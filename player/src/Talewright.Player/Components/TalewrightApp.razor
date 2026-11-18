@@ -265,7 +265,10 @@
         {
             // FromZip needs a seekable stream; browser streams aren't, so buffer first.
             // Pre-size so large archives don't transiently need twice their size while the buffer grows.
-            var buffer = new MemoryStream((int)Math.Min(Math.Min(e.File.Size, MaxUploadBytes), Array.MaxLength));
+            var initialCapacity = e.File.Size > MaxUploadBytes
+                ? 0
+                : (int)Math.Min(e.File.Size, Array.MaxLength);
+            var buffer = new MemoryStream(initialCapacity);
             try
             {
                 await using (var upload = e.File.OpenReadStream(MaxUploadBytes))
