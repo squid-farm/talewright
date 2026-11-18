@@ -26,9 +26,14 @@ internal static class StoryMenuBuilder
         bool includeHubOffers = true,
         bool previewSkillChecks = false)
     {
+        if (!includeHubOffers || scene.Hub is null)
+        {
+            return BuildWithoutHubOffers(choices);
+        }
+
         var offered = choices.Select((choice, index) =>
             (Choice: choice, Priority: 0, IsGenerated: false, Order: index)).ToList();
-        if (includeHubOffers && scene.Hub is { } hub)
+        if (scene.Hub is { } hub)
         {
             var hubOffers = new Dictionary<SceneId, VisibleChoice>();
             var declarationOrder = story.Scenes
@@ -85,5 +90,30 @@ internal static class StoryMenuBuilder
             Array.AsReadOnly(ordered),
             Array.AsReadOnly(available),
             Array.AsReadOnly(entries));
+    }
+
+    internal static StoryMenu BuildWithoutHubOffers(IReadOnlyList<VisibleChoice> choices)
+    {
+        var ordered = new VisibleChoice[choices.Count];
+        var entries = new ChoiceMenuEntry[choices.Count];
+        var available = new ChoiceView[choices.Count];
+        var availableCount = 0;
+        for (var index = 0; index < choices.Count; index++)
+        {
+            var choice = ordered[index] = choices[index];
+            entries[index] = new ChoiceMenuEntry(index + 1, choice.View.Key, choice.View.Label,
+                choice.IsAvailable);
+            if (choice.IsAvailable)
+            {
+                available[availableCount++] = choice.View;
+            }
+        }
+
+        if (availableCount != available.Length)
+        {
+            Array.Resize(ref available, availableCount);
+        }
+
+        return new(Array.AsReadOnly(ordered), Array.AsReadOnly(available), Array.AsReadOnly(entries));
     }
 }

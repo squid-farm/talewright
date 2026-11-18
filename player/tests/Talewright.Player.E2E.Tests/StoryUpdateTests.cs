@@ -563,6 +563,7 @@ public sealed partial class StoryUpdateTests(WebHostFixture host, ITestOutputHel
     private async Task ImportSaveAsync(string name, byte[] bytes)
     {
         var input = Page.GetByLabel("Import save file", new() { Exact = true });
+        await Expect(input).ToBeEnabledAsync();
         var previous = await input.ElementHandleAsync();
         await input.SetInputFilesAsync(new FilePayload
         {

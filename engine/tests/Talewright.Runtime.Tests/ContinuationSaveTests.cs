@@ -130,6 +130,47 @@ public sealed class ContinuationSaveTests
     }
 
     [Fact]
+    public void Incompatible_replay_executes_its_valid_prefix_once_before_checkpoint_fallback()
+    {
+        var original = PlayToSquare(Compile(new()));
+        var updated = Compile(new() { Version = "2", ChangedHaggleOutcome = true });
+        var replayed = new List<ReplayTransitionKind>();
+
+        var restored = StoryHistory.Restore(updated, original.Save(), replayed.Add);
+
+        Assert.NotNull(restored.Continuation);
+        Assert.Equal([ReplayTransitionKind.SavedChoice], replayed);
+        Assert.Equal(Snapshot(original), Snapshot(restored));
+    }
+
+    [Fact]
+    public void Continuation_base_replay_executes_redo_once_and_keeps_the_middle_cursor()
+    {
+        var original = PlayToSquare(Compile(new()));
+        var updated = Compile(new() { Version = "2", HpLoss = true });
+        var continued = Restore(updated, original.Save());
+        continued.Choose(KeyOf(continued.Current, "Back to market"));
+        continued.Back();
+        var bytes = continued.Save();
+        var save = SaveFormat.Read(bytes);
+        Assert.NotNull(save.Continuation!.Payload.Base);
+        Assert.Equal(0, save.Cursor);
+
+        var replayed = new List<ReplayTransitionKind>();
+        var restored = StoryHistory.Restore(updated, bytes, replayed.Add);
+
+        Assert.Equal(save.Choices.Count, replayed.Count);
+        Assert.All(replayed, kind => Assert.Equal(ReplayTransitionKind.SavedChoice, kind));
+        Assert.Equal(continued.Events, restored.Events);
+        Assert.Equal(continued.Current.Scene, restored.Current.Scene);
+        Assert.Equal(0, restored.Cursor);
+        Assert.True(restored.CanForward);
+        restored.Forward();
+        continued.Forward();
+        Assert.Equal(Snapshot(continued), Snapshot(restored));
+    }
+
+    [Fact]
     public void Conditional_prose_alone_keeps_replay_and_complete_undo()
     {
         var original = PlayToSquare(Compile(new()));
@@ -752,6 +793,7 @@ public sealed class ContinuationSaveTests
         public bool RemoveSquare { get; init; }
         public bool IncludeRope { get; init; } = true;
         public int RopeInitial { get; init; }
+        public bool ChangedHaggleOutcome { get; init; }
         public bool ChangedChoiceEffect { get; init; }
         public bool AddPotion { get; init; }
         public bool RemoveArrived { get; init; }
@@ -808,7 +850,7 @@ public sealed class ContinuationSaveTests
         if (options.HpLoss) lines.Add(EffectFaker.Line(EffectFaker.Decrease(TaleCharacterRef.Player.Field("hp"), 5)));
         lines.Add("The market.");
         if (options.ConditionalProse) lines.Add(IfFaker.Inline(met, "You remember the market."));
-        lines.Add(SkillCheckFaker.Choice("Haggle", "athletics", 12, square, square,
+        lines.Add(SkillCheckFaker.Choice("Haggle", "athletics", options.ChangedHaggleOutcome ? 13 : 12, square, square,
             EffectFaker.Increase(gold, 2), EffectFaker.Increase(gold, 1)));
         lines.Add(ChoiceFaker.Create("END", "Leave"));
         if (!options.RemoveSquare)

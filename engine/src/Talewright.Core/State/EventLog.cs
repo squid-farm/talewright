@@ -18,6 +18,13 @@ public sealed class EventLog
         State = GameState.CreateInitial(world, seed);
     }
 
+    private EventLog(WorldDefinition world, GameState state, IEnumerable<GameEvent> events)
+    {
+        World = world;
+        State = state;
+        _events.AddRange(events);
+    }
+
     public WorldDefinition World { get; }
 
     public GameState State { get; private set; }
@@ -58,6 +65,8 @@ public sealed class EventLog
 
         return log;
     }
+
+    internal EventLog Fork() => new(World, State.Fork(), _events);
 
     /// <summary>Rewinds to the first <paramref name="count"/> events (undo / time travel).</summary>
     public void Truncate(int count)

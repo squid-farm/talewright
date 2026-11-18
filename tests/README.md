@@ -90,6 +90,38 @@ tests or require downloaded browsers.
 [Talewright.E2E.slnx](../player/tests/Talewright.E2E.slnx) is a separate,
 opt-in solution under `player/tests`.
 
+### Replay traversal regression gates
+
+```bash
+MSBUILDDISABLENODEREUSE=1 dotnet test engine/tests/Talewright.Runtime.Tests -c Release \
+  --filter FullyQualifiedName~ReplayAllocationTests
+```
+
+`StoryHistoryTests` and `ContinuationSaveTests` count transitions through the shared replay path:
+exact restore traverses the full saved timeline, including redo, once even when the visible cursor
+is in the middle; stored and inserted automatic transitions are distinguished; continuation-base
+restore replays its suffix once; and an incompatible exact replay falls back to the checkpoint.
+These assertions make duplicate full or cursor-prefix replay observable independently of final-state
+equivalence. In a separate test worktree, deliberately replaying the full four-transition save made
+the middle-cursor assertion observe eight transitions; replaying its three-transition cursor prefix
+made it observe seven. Neither mutation is part of the implementation.
+
+`ReplayAllocationTests` keeps fixture compilation and history construction outside the measured
+operation, warms each synchronous save or restore once, then checks current-thread managed
+allocation and the resulting cursor/history. The 10,000-choice historical `PerformanceCorpus` loop
+has a 64 MiB ceiling for exact and continuation restores at both end and redo cursors. A smaller
+independent loop also covers legacy and continuation-base restore under the same ceiling. Save ceilings are 12 MiB for
+the independent loop and 32 MiB for the realistic fixture. The 20-chapter realistic story exercises
+automatic transitions and has 896 MiB exact-replay and 768 MiB continuation ceilings; these
+allow about 48% and 25% above the current measured work, respectively, while
+keeping the deterministic gate below the historical allocations. The test also reports (but does
+not gate) one ordinary next-choice allocation and elapsed time at depth 9,999.
+
+These are cumulative managed allocations for one operation, not retained heap, peak memory, or
+browser/WebAssembly measurements. The Release-only test intentionally does no measurement in Debug.
+For wider scale, cursor, timing and environment comparisons, see the
+[performance scorecard](../docs/developer/performance-scorecard.md).
+
 Save coverage includes optional metadata, unsupported-format rejection and canonical replay identity in the runtime
 suite, plus modal focus/escape, narrow light/dark layout, summaries, redo-aware discard protection,
 failed writes, failed loads and reload/process-restart persistence in the player suite.
@@ -220,7 +252,7 @@ check; it is not presented as BenchmarkDotNet evidence.
 The deterministic corpus generator counts `story.talewright.yaml` within the file total and
 creates exact expanded-byte totals. The four named tiers are 10 / 100 / 500 / 1,000
 files, 100 / 1,000 / 10,000 / 50,000 scenes, 0.5 / 5 / 25 / 50 MiB, and
-100 / 1,000 / 5,000 / 10,000 choice-history depth. Scene IDs and references are
+100 / 1,000 / 5,000 / 10,000 / 100,000 choice-history depth. Scene IDs and references are
 unique/valid; generated story content includes substitutions, effects, conditions,
 tags, priorities and bounded hub selection. Only the generator is stored in git.
 It records the seed, counts, byte totals, archive size and a SHA-256 content

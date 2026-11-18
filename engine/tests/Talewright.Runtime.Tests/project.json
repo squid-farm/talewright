@@ -12,6 +12,7 @@
         "{workspaceRoot}/Directory.Build.props",
         "{workspaceRoot}/global.json",
         "testWorkflow",
+        "{workspaceRoot}/engine/tests/Talewright.TestStories/**/*",
         "{workspaceRoot}/examples/CSharpStory/Story/StoryExtensions.cs",
         "{workspaceRoot}/examples/CSharpStory/Story/Content/**/*"
       ]

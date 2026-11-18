@@ -58,14 +58,14 @@ public class RealisticStoryBenchmarksSaves
     private StoryDefinition _story = null!;
     private StoryDefinition _changedStory = null!;
     private StoryHistory _history = null!;
+    private StoryHistory _redoHistory = null!;
     private byte[] _save = [];
+    private byte[] _redoSave = [];
+    private int _redoCursor;
     private int _restartCount;
     private int _completedActions;
 
-    // Playthroughs are unlimited; stopping at the former 10,000-choice cap keeps rows comparable with the scorecard.
-    private const int SavedChoiceStop = 10_000;
-
-    [Params(1_000, 5_000, 10_000)]
+    [Params(1_000, 5_000, 10_000, 100_000)]
     public int RequestedActions { get; set; }
 
     [GlobalSetup]
@@ -75,14 +75,18 @@ public class RealisticStoryBenchmarksSaves
         var source = realistic.ToSource();
         _story = Compile(source);
         _changedStory = AddStartEffect(source);
-        (_history, _restartCount, _completedActions) = Play(_story, RequestedActions);
+        (_history, _restartCount, _completedActions) = Play(_story, RequestedActions, SavedChoiceStop);
         _save = _history.Save();
-        if (RequestedActions == SavedChoiceStop && _history.PlaythroughLength != SavedChoiceStop)
+        var savedChoiceStop = SavedChoiceStop;
+        if (RequestedActions >= savedChoiceStop && _history.PlaythroughLength != savedChoiceStop)
         {
             throw new InvalidOperationException(
-                $"The realistic route saved {_history.PlaythroughLength:N0} choices instead of stopping at {SavedChoiceStop:N0}.");
+                $"The realistic route saved {_history.PlaythroughLength:N0} choices instead of stopping at {savedChoiceStop:N0}.");
         }
 
+        _redoCursor = _history.PlaythroughLength / 2;
+        _redoHistory = StoryHistory.Restore(_story, MakeRedoSave(_save, _redoCursor));
+        _redoSave = _redoHistory.Save();
         if (StoryHistory.Restore(_story, _save).Continuation is not null)
         {
             throw new InvalidOperationException("The unchanged realistic story did not use replay.");
@@ -99,6 +103,7 @@ public class RealisticStoryBenchmarksSaves
             requestedActions = RequestedActions,
             completedActions = _completedActions,
             savedChoices = _history.PlaythroughLength,
+            redoCursor = _redoCursor,
             restarts = _restartCount,
             encodedSaveBytes = _save.Length,
             decodedSaveBytes = DecodedSaveBytes(_save),
@@ -109,20 +114,53 @@ public class RealisticStoryBenchmarksSaves
     public byte[] Save() => _history.Save();
 
     [Benchmark]
+    public byte[] SaveAtRedoCursor() => _redoHistory.Save();
+
+    [Benchmark]
+    [InvocationCount(1)]
+    public void NextChoiceAtConfiguredDepth() => _history.Choose(_history.Current.Choices[0].Key);
+
+    [Benchmark]
     public StoryHistory RestoreReplay() => StoryHistory.Restore(_story, _save);
+
+    [Benchmark]
+    public StoryHistory RestoreReplayAtRedoCursor()
+    {
+        var restored = StoryHistory.Restore(_story, _redoSave);
+        if (restored.Cursor != _redoCursor)
+        {
+            throw new InvalidOperationException("Restore did not reproduce the configured redo cursor.");
+        }
+
+        return restored;
+    }
 
     [Benchmark]
     public StoryHistory RestoreContinue() => StoryHistory.Restore(_changedStory, _save);
 
+    [Benchmark]
+    public StoryHistory RestoreContinueAtRedoCursor()
+    {
+        var restored = StoryHistory.Restore(_changedStory, _redoSave);
+        if (restored.Continuation is null || restored.Cursor != 0 || !restored.Continuation.RedoDiscarded)
+        {
+            throw new InvalidOperationException("Continuation did not discard redo at the configured checkpoint.");
+        }
+
+        return restored;
+    }
+
+    private int SavedChoiceStop => RequestedActions == 100_000 ? 100_000 : 10_000;
+
     private static (StoryHistory History, int Restarts, int CompletedActions) Play(
-        StoryDefinition story, int requestedActions)
+        StoryDefinition story, int requestedActions, int savedChoiceStop)
     {
         var history = new StoryHistory(story, story.Seed);
         var restarts = 0;
         var completedActions = 0;
         for (var index = 0; index < requestedActions; index++)
         {
-            if (history.PlaythroughLength >= SavedChoiceStop)
+            if (history.PlaythroughLength >= savedChoiceStop)
             {
                 break;
             }
@@ -140,6 +178,18 @@ public class RealisticStoryBenchmarksSaves
         }
 
         return (history, restarts, completedActions);
+    }
+
+    private static byte[] MakeRedoSave(byte[] endSave, int cursor)
+    {
+        var save = SaveFormat.Read(endSave) with
+        {
+            Cursor = cursor,
+            ReplayEvidence = null,
+            ReplayChoiceIdentities = null,
+            Continuation = null,
+        };
+        return SaveFormat.Write(save);
     }
 
     private static StoryDefinition AddStartEffect(StorySource source)

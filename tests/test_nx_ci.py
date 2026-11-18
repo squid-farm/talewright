@@ -117,6 +117,18 @@ class CiRoutingTests(unittest.TestCase):
                     make_plan(affected_graph(changed))["unit"],
                 )
 
+    def test_replay_runtime_gate_and_fixture_inputs_select_runtime_units(self):
+        for changed in (
+            "engine/src/Talewright.Runtime/StoryHistory.cs",
+            "engine/tests/Talewright.Runtime.Tests/ReplayAllocationTests.cs",
+            "engine/tests/Talewright.TestStories/RealisticStory.cs",
+        ):
+            with self.subTest(changed=changed):
+                self.assertIn(
+                    {"project": "Talewright.Runtime.Tests", "target": "test"},
+                    make_plan(affected_graph(changed))["unit"],
+                )
+
     def test_editor_and_documentation_plans_select_expected_groups(self):
         for changed, expected in [
             ("tooling/vscode-talewright/syntaxes/tale.tmLanguage.json", {"editor"}),

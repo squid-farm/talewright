@@ -217,7 +217,7 @@ public sealed class StoryCompatibilityTests
     [InlineData(false, false)]
     [InlineData(true, true)]
     [InlineData(false, true)]
-    public void Rebuilt_cursor_must_match_the_validated_timeline(bool differentEvents, bool updated)
+    public void Replay_validates_each_transition_once_and_preserves_the_cursor_state(bool differentEvents, bool updated)
     {
         var calls = 0;
         var vary = false;
@@ -256,18 +256,9 @@ public sealed class StoryCompatibilityTests
         }
 
         vary = true;
-        if (differentEvents)
-        {
-            var error = Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(target, bytes));
-            Assert.Equal(2, calls);
-            if (updated) Assert.StartsWith("Version 0.0.0 of Cursor replay has changed", error.Message);
-        }
-        else
-        {
-            var restored = StoryHistory.Restore(target, bytes);
-            Assert.Equal(2, calls);
-            Assert.Equal(history.Events, restored.Events);
-        }
+        var restored = StoryHistory.Restore(target, bytes);
+        Assert.Equal(1, calls);
+        Assert.Equal(history.Events, restored.Events);
     }
 
     [Fact]

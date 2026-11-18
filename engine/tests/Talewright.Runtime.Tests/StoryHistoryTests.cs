@@ -376,6 +376,30 @@ public class StoryHistoryTests
         Assert.False(history.Current.IsEnded);
         Assert.Empty(history.Current.Choices);
         Assert.DoesNotContain(history.Events.OfType<SceneEntered>(), entry => entry.Scene.Value == "scene-1001");
+
+        var restored = StoryHistory.Restore(story, history.Save());
+
+        Assert.Equal(history.Cursor, restored.Cursor);
+        Assert.Equal(history.Current.Scene, restored.Current.Scene);
+        Assert.Equal(history.AutomaticContinuationError, restored.AutomaticContinuationError);
+    }
+
+    [Fact]
+    public void Restore_rejects_saved_choices_after_the_automatic_transition_budget()
+    {
+        var story = Compile(yaml: BuildManifest(declareVariables: true).Build(),
+            tale: BareDivertChain(StoryHistory.MaxAutomaticTransitions + 1));
+        var history = new StoryHistory(story, 42);
+        var invalidSave = Mutate(history.Save(), save => save with
+        {
+            Choices = [.. save.Choices, "invalid"],
+            Cursor = save.Choices.Count + 1,
+            ReplayEvidence = null,
+            ReplayChoiceIdentities = null,
+            Continuation = null,
+        });
+
+        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(story, invalidSave));
     }
 
     [Theory]
@@ -472,13 +496,57 @@ public class StoryHistoryTests
             ReplayChoiceIdentities = [],
         });
 
-        var restored = StoryHistory.Restore(story, oldSave);
+        var inserted = new List<ReplayTransitionKind>();
+        var restored = StoryHistory.Restore(story, oldSave, inserted.Add);
 
         Assert.Equal("final", restored.Current.Scene!.Value.Value);
         Assert.Equal(["a", "middle", "final"],
             restored.Transcript.Select(frame => frame.Frame.Scene!.Value.Value));
         Assert.Equal(2, restored.Cursor);
         Assert.False(restored.CanBack);
+        Assert.Equal([
+            ReplayTransitionKind.InsertedAutomaticTransition,
+            ReplayTransitionKind.InsertedAutomaticTransition,
+        ], inserted);
+
+        var stored = new StoryHistory(story, 42);
+        var replayed = new List<ReplayTransitionKind>();
+        StoryHistory.Restore(story, stored.Save(), replayed.Add);
+        Assert.Equal([
+            ReplayTransitionKind.StoredAutomaticTransition,
+            ReplayTransitionKind.StoredAutomaticTransition,
+        ], replayed);
+    }
+
+    [Fact]
+    public void Restore_captures_a_cursor_inside_stored_automatic_transitions_before_redo()
+    {
+        var story = Compile(yaml: BuildManifest(declareVariables: true).Build(), tale: """
+            === a
+            -> middle
+            === middle
+            -> final
+            === final
+            * [Finish] -> END
+            """);
+        var history = new StoryHistory(story, 42);
+        history.Choose("c0");
+        var save = SaveFormat.Read(history.Save()) with
+        {
+            Cursor = 1,
+            ReplayEvidence = null,
+            ReplayChoiceIdentities = null,
+            Continuation = null,
+        };
+
+        var restored = StoryHistory.Restore(story, SaveFormat.Write(save));
+
+        Assert.Equal(2, restored.Cursor);
+        Assert.Equal("final", restored.Current.Scene!.Value.Value);
+        Assert.False(restored.Current.IsEnded);
+        Assert.True(restored.CanForward);
+        restored.Forward();
+        Assert.True(restored.Current.IsEnded);
     }
 
     [Fact]
@@ -645,6 +713,27 @@ public class StoryHistoryTests
         restored.Forward();
         AssertEquivalent(history, restored);
         Assert.True(restored.Current.IsEnded);
+    }
+
+    [Fact]
+    public void Restore_executes_each_saved_transition_once_including_redo_after_a_middle_cursor()
+    {
+        var history = new StoryHistory(Compile(), 42);
+        history.Choose("c0");
+        history.Choose("c0");
+        history.Choose("c0");
+        history.Choose("c1");
+        history.Back();
+        var save = SaveFormat.Read(history.Save()) with { Continuation = null };
+        var executed = new List<ReplayTransitionKind>();
+
+        var restored = StoryHistory.Restore(history.Story, SaveFormat.Write(save), executed.Add);
+
+        Assert.Equal(save.Choices.Count, executed.Count);
+        Assert.All(executed, kind => Assert.Equal(ReplayTransitionKind.SavedChoice, kind));
+        Assert.Equal(history.Cursor, restored.Cursor);
+        Assert.Equal(history.Events, restored.Events);
+        Assert.True(restored.CanForward);
     }
 
     [Theory]

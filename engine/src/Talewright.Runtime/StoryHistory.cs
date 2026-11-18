@@ -16,6 +16,13 @@ public sealed record HistoryFrame(StoryFrame Frame, IReadOnlyList<RenderedInline
     public bool ChosenAutomatically { get; init; }
 }
 
+internal enum ReplayTransitionKind
+{
+    SavedChoice,
+    StoredAutomaticTransition,
+    InsertedAutomaticTransition,
+}
+
 /// <summary>Deterministic choice history. Restores are built separately before replacing a live session.</summary>
 public sealed partial class StoryHistory
 {
@@ -340,6 +347,10 @@ public sealed partial class StoryHistory
     }
 
     private static StoryHistory RestoreByReplay(StoryDefinition story, SavedGame save)
+        => RestoreByReplay(story, save, replayTransitionObserved: null);
+
+    private static StoryHistory RestoreByReplay(StoryDefinition story, SavedGame save,
+        Action<ReplayTransitionKind>? replayTransitionObserved)
     {
         if (save.StoryId != story.Id)
         {
@@ -371,83 +382,30 @@ public sealed partial class StoryHistory
             if (changed) throw Incompatible(story, save, ex);
             throw new InvalidDataException($"Invalid saved character: {ex.Message}", ex);
         }
-        var timeline = new ReplayCursor(save.Cursor, save.Choices.Count);
-        StorySession session;
-        List<HistoryFrame> frames;
-        List<byte[]>? evidence;
-        List<byte[]>? replayChoiceIdentities;
+        AutomaticReplay replay;
         try
         {
-            (session, frames, evidence, replayChoiceIdentities) = Replay(story, save.Seed,
-                save.Choices, save.ReplayChoiceIdentities, character, recordEvidence: true);
+            replay = ReplayWithAutomaticContinuations(story, save.Seed, save.Choices,
+                save.ReplayChoiceIdentities, character, recordEvidence: true,
+                requestedCursor: save.Cursor, replayTransitionObserved: replayTransitionObserved);
         }
         catch (InvalidDataException ex) when (changed)
         {
             throw Incompatible(story, save, ex);
         }
 
-        var requiresNormalization = frames.Any(frame => frame.Frame.AutomaticallyContinue);
-        if (timeline.CanForward)
-        {
-            List<byte[]>? prefixEvidence;
-            try
-            {
-                (session, frames, prefixEvidence, _) = Replay(story, save.Seed,
-                    save.Choices.Take(timeline.Position).ToArray(),
-                    save.ReplayChoiceIdentities?.Take(timeline.Position).ToArray(),
-                    character, recordEvidence: evidence is not null);
-            }
-            catch (InvalidDataException ex) when (changed)
-            {
-                throw Incompatible(story, save, ex);
-            }
-
-            if (evidence is not null && (prefixEvidence is null
-                || !CryptographicOperations.FixedTimeEquals(evidence[timeline.Position], prefixEvidence[^1])))
-            {
-                throw ReplayMismatch(story, save, changed);
-            }
-        }
-
         if (save.ReplayEvidence is { } savedEvidence
-            && (evidence is null || !ReplayEvidence.Matches(savedEvidence, evidence[^1], save.Cursor)))
+            && (replay.SavedEvidence is null
+                || !ReplayEvidence.Matches(savedEvidence, replay.SavedEvidence, save.Cursor)))
         {
             throw ReplayMismatch(story, save, changed);
         }
 
-        if (!requiresNormalization)
-        {
-            return new StoryHistory(story, character, session, frames, save.Choices, timeline, evidence,
-                replayChoiceIdentities, Enumerable.Repeat(false, save.Choices.Count), KeyOf(save), null);
-        }
-
-        var normalized = ReplayWithAutomaticContinuations(story, save.Seed, save.Choices,
-            save.ReplayChoiceIdentities, character, recordEvidence: true);
-        var normalizedCursor = normalized.CursorPositions[save.Cursor];
-        var currentSession = normalized.Session;
-        var currentFrames = normalized.Frames;
-        var currentError = normalized.AutomaticContinuationError;
-        if (normalizedCursor < normalized.Choices.Count)
-        {
-            var prefix = ReplayWithAutomaticContinuations(story, save.Seed,
-                normalized.Choices.Take(normalizedCursor).ToArray(),
-                normalized.ReplayChoiceIdentities?.Take(normalizedCursor).ToArray(), character,
-                recordEvidence: normalized.Evidence is not null);
-            if (normalized.Evidence is not null && (prefix.Evidence is null
-                || !CryptographicOperations.FixedTimeEquals(
-                    normalized.Evidence[normalizedCursor], prefix.Evidence[^1])))
-            {
-                throw ReplayMismatch(story, save, changed);
-            }
-            currentSession = prefix.Session;
-            currentFrames = prefix.Frames;
-            currentError = prefix.AutomaticContinuationError;
-        }
-
-        var normalizedTimeline = new ReplayCursor(normalizedCursor, normalized.Choices.Count);
-        return new StoryHistory(story, character, currentSession, currentFrames, normalized.Choices,
-            normalizedTimeline, normalized.Evidence, normalized.ReplayChoiceIdentities,
-            normalized.AutomaticChoices, KeyOf(save), currentError);
+        var normalizedCursor = replay.CursorPositions[save.Cursor];
+        return new StoryHistory(story, character, replay.CursorSession, replay.CursorFrames, replay.Choices,
+            new ReplayCursor(normalizedCursor, replay.Choices.Count), replay.Evidence,
+            replay.ReplayChoiceIdentities, replay.AutomaticChoices, KeyOf(save),
+            replay.CursorAutomaticContinuationError);
     }
 
     private static bool CanRecordEvidence(StoryDefinition story) =>
@@ -470,64 +428,6 @@ public sealed partial class StoryHistory
     private static InvalidDataException ReplayFailure() =>
         new("This saved game cannot continue because the story has changed or the save is damaged. It is no longer compatible.");
 
-    private static (StorySession Session, List<HistoryFrame> Frames, List<byte[]>? Evidence,
-        List<byte[]>? ReplayChoiceIdentities) Replay(StoryDefinition story, ulong seed,
-        IReadOnlyList<string> choices, IReadOnlyList<byte[]>? replayChoiceIdentities, CharacterSelection? character,
-        bool recordEvidence = false, List<string?>? liveKeys = null)
-    {
-        var session = new StorySession(story, seed, character: character);
-        var initialState = ReplayEvidence.InitialState(story, session.State);
-        var frames = new List<HistoryFrame> { new(session.Start()) };
-        var evidence = recordEvidence && CanRecordEvidence(story)
-            ? new List<byte[]> { ReplayEvidence.Start(story, session, character, initialState) } : null;
-        var replayedIdentities = evidence is null ? null : new List<byte[]>();
-        for (var index = 0; index < choices.Count; index++)
-        {
-            var key = choices[index];
-            var previousFrame = session.Current!;
-            var eventStart = session.Events.Count;
-            ChoiceView? choice;
-            ReadOnlyMemory<byte>? identity;
-            if (replayChoiceIdentities is not null)
-            {
-                if (!session.ChooseReplay(replayChoiceIdentities[index], out choice) || choice is null)
-                {
-                    throw ReplayFailure();
-                }
-                identity = replayChoiceIdentities[index];
-                // Replay may select an equivalent choice that live play would not offer here.
-                var selectedKey = choice.Key;
-                liveKeys?.Add(previousFrame.Choices.Any(offered => offered.Key == selectedKey) ? selectedKey : null);
-            }
-            else
-            {
-                choice = previousFrame.Choices.FirstOrDefault(c => c.Key == key);
-                if (choice is null)
-                {
-                    throw ReplayFailure();
-                }
-                identity = choice.ReplayIdentity;
-                session.Choose(key);
-                liveKeys?.Add(key);
-            }
-
-            frames[^1] = frames[^1] with { Chosen = choice.Label };
-            frames.Add(new HistoryFrame(session.Current!));
-            if (identity is not null && evidence is not null && replayedIdentities is not null)
-            {
-                evidence.Add(ReplayEvidence.Next(evidence[^1], previousFrame, identity.Value, session.Events, eventStart));
-                replayedIdentities.Add(identity.Value.ToArray());
-            }
-            else
-            {
-                evidence = null;
-                replayedIdentities = null;
-            }
-        }
-
-        return (session, frames, evidence, replayedIdentities);
-    }
-
     private sealed record AutomaticReplay(
         StorySession Session,
         List<HistoryFrame> Frames,
@@ -536,33 +436,48 @@ public sealed partial class StoryHistory
         List<byte[]>? Evidence,
         List<byte[]>? ReplayChoiceIdentities,
         int[] CursorPositions,
-        string? AutomaticContinuationError);
+        string? AutomaticContinuationError,
+        StorySession CursorSession,
+        List<HistoryFrame> CursorFrames,
+        string? CursorAutomaticContinuationError,
+        byte[]? SavedEvidence);
 
     private static AutomaticReplay ReplayWithAutomaticContinuations(StoryDefinition story, ulong seed,
         IReadOnlyList<string> choices, IReadOnlyList<byte[]>? replayChoiceIdentities,
         CharacterSelection? character, bool recordEvidence = false, List<string?>? liveKeys = null,
-        ContinuationCheckpoint? origin = null, int baseTranscriptLength = 0)
+        ContinuationCheckpoint? origin = null, int baseTranscriptLength = 0, int? requestedCursor = null,
+        Action<ReplayTransitionKind>? replayTransitionObserved = null)
     {
         var session = origin is null ? new StorySession(story, seed, character: character)
             : origin.Resume(story, seed, character);
         var initialState = origin is null ? ReplayEvidence.InitialState(story, session.State) : [];
-        var frames = new List<HistoryFrame> { new(origin is null ? session.Start() : session.Current!) };
+        var frames = new List<HistoryFrame>(choices.Count + 1) { new(origin is null ? session.Start() : session.Current!) };
         var evidence = recordEvidence && origin is null && CanRecordEvidence(story)
-            ? new List<byte[]> { ReplayEvidence.Start(story, session, character, initialState) } : null;
-        var replayedIdentities = evidence is null ? null : new List<byte[]>();
-        var replayedChoices = new List<string>();
-        var automaticChoices = new List<bool>();
+            ? new List<byte[]>(choices.Count + 1) { ReplayEvidence.Start(story, session, character, initialState) } : null;
+        byte[]? savedEvidence = evidence is null ? null : evidence[0];
+        var replayedIdentities = evidence is null ? null : new List<byte[]>(choices.Count);
+        using var evidenceHashContext = evidence is null ? null : ReplayEvidence.CreateHashContext();
+        var replayedChoices = new List<string>(choices.Count);
+        var automaticChoices = new List<bool>(choices.Count);
         var cursorPositions = new int[choices.Count + 1];
         var savedIndex = 0;
         string? automaticContinuationError = null;
+        StorySession? cursorSession = null;
+        List<HistoryFrame>? cursorFrames = null;
+        string? cursorAutomaticContinuationError = null;
 
-        void Record(string key, ChoiceView choice, StoryFrame previousFrame, StoryFrame nextFrame,
-            int eventStart, ReadOnlyMemory<byte>? identity, bool automatically)
+        void AdvanceEvidence(StoryFrame previousFrame, ReadOnlyMemory<byte>? identity,
+            int eventStart, bool fromSavedTimeline)
         {
+            var previousEvidence = evidence is { Count: > 0 } ? evidence[^1] : null;
+            var evidenceMatchesSaved = previousEvidence is not null
+                && ReferenceEquals(previousEvidence, savedEvidence);
+            byte[]? nextEvidence = null;
             if (identity is { } replayIdentity && evidence is not null && replayedIdentities is not null)
             {
-                evidence.Add(ReplayEvidence.Next(evidence[^1], previousFrame, replayIdentity,
-                    session.Events, eventStart));
+                nextEvidence = ReplayEvidence.Next(evidenceHashContext!, previousEvidence!, previousFrame,
+                    replayIdentity, session.Events, eventStart);
+                evidence.Add(nextEvidence);
                 replayedIdentities.Add(replayIdentity.ToArray());
             }
             else
@@ -571,11 +486,41 @@ public sealed partial class StoryHistory
                 replayedIdentities = null;
             }
 
+            if (fromSavedTimeline && savedEvidence is not null && identity is { } savedIdentity)
+            {
+                savedEvidence = evidenceMatchesSaved && nextEvidence is not null
+                    ? nextEvidence
+                    : ReplayEvidence.Next(savedEvidence, previousFrame, savedIdentity, session.Events, eventStart);
+            }
+            else if (fromSavedTimeline)
+            {
+                savedEvidence = null;
+            }
+        }
+
+        void Record(string key, ChoiceView choice, StoryFrame previousFrame, StoryFrame nextFrame,
+            int eventStart, ReadOnlyMemory<byte>? identity, bool automatically,
+            bool fromSavedTimeline, ReplayTransitionKind transitionKind)
+        {
+            AdvanceEvidence(previousFrame, identity, eventStart, fromSavedTimeline);
+
             frames[^1] = frames[^1] with { Chosen = choice.Label, ChosenAutomatically = automatically };
             frames.Add(new HistoryFrame(nextFrame));
             replayedChoices.Add(key);
             automaticChoices.Add(automatically);
             liveKeys?.Add(key);
+            replayTransitionObserved?.Invoke(transitionKind);
+        }
+
+        void CaptureRequestedCursor()
+        {
+            if (requestedCursor is { } cursor && cursor < choices.Count && cursor <= savedIndex
+                && cursorPositions[cursor] == replayedChoices.Count && cursorSession is null)
+            {
+                cursorSession = session.ForkForReplayCursor();
+                cursorFrames = [.. frames];
+                cursorAutomaticContinuationError = automaticContinuationError;
+            }
         }
 
         bool IsMatchingStoredAutomaticChoice(int index, ReadOnlyMemory<byte>? identity)
@@ -597,23 +542,30 @@ public sealed partial class StoryHistory
             {
                 if (transitions == MaxAutomaticTransitions)
                 {
+                    if (savedIndex < choices.Count)
+                    {
+                        throw ReplayFailure();
+                    }
                     automaticContinuationError = AutomaticContinuationErrorMessage;
                     session.StopAutomaticContinuation();
                     frames[^1] = frames[^1] with { Frame = session.Current! };
-                    Array.Fill(cursorPositions, replayedChoices.Count);
-                    savedIndex = choices.Count;
                     return;
                 }
 
                 var previousFrame = session.Current!;
                 var choice = previousFrame.Choices.Single(choice => choice.Key == StorySession.ContinueKey);
+                var storedAutomaticChoice = savedIndex < choices.Count
+                    && IsMatchingStoredAutomaticChoice(savedIndex, choice.ReplayIdentity);
                 var eventStart = session.Events.Count;
                 var nextFrame = session.Choose(StorySession.ContinueKey);
                 Record(StorySession.ContinueKey, choice, previousFrame, nextFrame, eventStart,
-                    choice.ReplayIdentity, automatically: true);
+                    choice.ReplayIdentity, automatically: true, fromSavedTimeline: storedAutomaticChoice,
+                    storedAutomaticChoice
+                        ? ReplayTransitionKind.StoredAutomaticTransition
+                        : ReplayTransitionKind.InsertedAutomaticTransition);
                 transitions++;
 
-                if (savedIndex < choices.Count && IsMatchingStoredAutomaticChoice(savedIndex, choice.ReplayIdentity))
+                if (storedAutomaticChoice)
                 {
                     savedIndex++;
                 }
@@ -626,10 +578,12 @@ public sealed partial class StoryHistory
 
         ContinueAutomatically();
         cursorPositions[savedIndex] = replayedChoices.Count;
+        CaptureRequestedCursor();
         while (savedIndex < choices.Count && automaticContinuationError is null)
         {
             ContinueAutomatically();
             cursorPositions[savedIndex] = replayedChoices.Count;
+            CaptureRequestedCursor();
             if (automaticContinuationError is not null || savedIndex >= choices.Count)
             {
                 break;
@@ -662,22 +616,13 @@ public sealed partial class StoryHistory
             }
 
             var next = session.Current!;
-            if (identity is not null && evidence is not null && replayedIdentities is not null)
-            {
-                evidence.Add(ReplayEvidence.Next(evidence[^1], previousFrame, identity.Value,
-                    session.Events, eventStart));
-                replayedIdentities.Add(identity.Value.ToArray());
-            }
-            else
-            {
-                evidence = null;
-                replayedIdentities = null;
-            }
+            AdvanceEvidence(previousFrame, identity, eventStart, fromSavedTimeline: true);
 
             frames[^1] = frames[^1] with { Chosen = choice.Label };
             frames.Add(new HistoryFrame(next));
             replayedChoices.Add(key);
             automaticChoices.Add(false);
+            replayTransitionObserved?.Invoke(ReplayTransitionKind.SavedChoice);
             savedIndex++;
             cursorPositions[savedIndex] = replayedChoices.Count;
         }
@@ -688,7 +633,15 @@ public sealed partial class StoryHistory
             cursorPositions[savedIndex] = replayedChoices.Count;
         }
 
+        cursorPositions[savedIndex] = replayedChoices.Count;
+        CaptureRequestedCursor();
+        cursorSession ??= session;
+        cursorFrames ??= frames;
+
         return new AutomaticReplay(session, frames, replayedChoices, automaticChoices,
-            evidence, replayedIdentities, cursorPositions, automaticContinuationError);
+            evidence, replayedIdentities, cursorPositions, automaticContinuationError,
+            cursorSession, cursorFrames,
+            requestedCursor == choices.Count ? automaticContinuationError : cursorAutomaticContinuationError,
+            savedEvidence);
     }
 }

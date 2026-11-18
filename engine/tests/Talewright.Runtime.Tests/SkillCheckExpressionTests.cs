@@ -218,6 +218,48 @@ public sealed class SkillCheckExpressionTests
     }
 
     [Fact]
+    public void Branching_after_a_restored_redo_cursor_resolves_trigger_checks_in_the_cursor_session()
+    {
+        var manifest = new ManifestFaker("trigger-cursor", "Trigger cursor", "start", 42)
+        {
+            Randomness = "off",
+            BaseRuleset = "rpg",
+        };
+        manifest.Character("player", "Mara", stats: new Dictionary<string, int> { ["perception"] = 1 });
+        manifest.Flag("ready");
+        manifest.Number("total", 0);
+        var yaml = manifest.Build() + """
+
+            triggers:
+              - id: capture-roll
+                once: true
+                when: flag:ready
+                do: "var:total = skill-check perception"
+            """;
+        var story = Compile("""
+            === start
+            * [Enter] -> crossing
+            === crossing
+            * [Roll] { set flag:ready } -> END
+            * [Skip] -> END
+            """, yaml);
+        var savedHistory = new StoryHistory(story, 42);
+        savedHistory.Choose("c0");
+        savedHistory.Choose("c1");
+        savedHistory.Back();
+        var restored = StoryHistory.Restore(story, savedHistory.Save());
+
+        var expected = new StoryHistory(story, 42);
+        expected.Choose("c0");
+        expected.Choose("c0");
+        restored.Choose("c0");
+
+        Assert.Equal(expected.Events, restored.Events);
+        Assert.Equal(expected.State.GetVariable(new VarId("total")), restored.State.GetVariable(new VarId("total")));
+        Assert.Single(restored.Events.OfType<SkillCheckResolved>());
+    }
+
+    [Fact]
     public void Hub_limit_evaluates_only_candidates_until_full_and_revisiting_hub_resolves_a_new_check()
     {
         var story = Compile("""

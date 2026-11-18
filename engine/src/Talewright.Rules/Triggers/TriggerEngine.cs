@@ -31,7 +31,7 @@ public sealed class TriggerEngine
 
     /// <summary>Snapshot of rising-edge memory, without evaluating conditions again.</summary>
     public IReadOnlyList<string> CaptureEdgeMemory() =>
-        Array.AsReadOnly(_currentlyTrue.Order(StringComparer.Ordinal).ToArray());
+        _currentlyTrue.Count == 0 ? [] : Array.AsReadOnly(_currentlyTrue.Order(StringComparer.Ordinal).ToArray());
 
     public TriggerEngine(IReadOnlyList<TriggerDefinition> triggers, NamedPredicateRegistry predicates, IGameStateView initialState)
         : this(triggers, predicates, initialState, observer: null)
@@ -41,12 +41,22 @@ public sealed class TriggerEngine
     public TriggerEngine(IReadOnlyList<TriggerDefinition> triggers, NamedPredicateRegistry predicates,
         IGameStateView initialState, Action<RuleDecision>? observer, int? eventIndex = null,
         Func<SkillCheckExpr, Value>? resolveSkillCheck = null, IReadOnlyList<string>? edgeMemory = null)
+        : this(triggers, predicates, initialState, observer, eventIndex, resolveSkillCheck, edgeMemory, prime: true)
+    {
+    }
+
+    private TriggerEngine(IReadOnlyList<TriggerDefinition> triggers, NamedPredicateRegistry predicates,
+        IGameStateView initialState, Action<RuleDecision>? observer, int? eventIndex,
+        Func<SkillCheckExpr, Value>? resolveSkillCheck, IReadOnlyList<string>? edgeMemory, bool prime)
     {
         _triggers = triggers;
         _predicates = predicates;
         _observer = observer;
         _resolveSkillCheck = resolveSkillCheck;
-        Prime(initialState, eventIndex);
+        if (prime)
+        {
+            Prime(initialState, eventIndex);
+        }
         if (edgeMemory is not null)
         {
             var triggerIds = triggers.Select(trigger => trigger.Id).ToHashSet(StringComparer.Ordinal);
@@ -58,6 +68,10 @@ public sealed class TriggerEngine
             _currentlyTrue.UnionWith(edgeMemory);
         }
     }
+
+    internal TriggerEngine Fork(IGameStateView state, Func<SkillCheckExpr, Value>? resolveSkillCheck) =>
+        new(_triggers, _predicates, state, _observer, eventIndex: null, resolveSkillCheck,
+            CaptureEdgeMemory(), prime: false);
 
     /// <summary>
     /// Records which conditions are already true so they do not fire immediately (e.g. after loading a save).
@@ -83,6 +97,11 @@ public sealed class TriggerEngine
     /// <summary>Fires every trigger whose condition has newly become true. Returns the ids fired, in order.</summary>
     public IReadOnlyList<string> Run(EventLog log)
     {
+        if (_triggers.Count == 0)
+        {
+            return [];
+        }
+
         var fired = new List<string>();
         for (var pass = 0; pass <= MaxPasses; pass++)
         {

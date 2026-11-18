@@ -65,7 +65,24 @@ public sealed record StoryFrame(
     /// <summary>
     /// The complete visible menu, in display order. Numbers remain stable across available and unavailable entries.
     /// </summary>
-    public IReadOnlyList<ChoiceMenuEntry> Menu { get; init; } =
-        Array.AsReadOnly(Choices.Select((choice, index) =>
-            new ChoiceMenuEntry(index + 1, choice.Key, choice.Label, IsAvailable: true)).ToArray());
+    private IReadOnlyList<ChoiceMenuEntry>? _menu;
+    public IReadOnlyList<ChoiceMenuEntry> Menu
+    {
+        get
+        {
+            if (_menu is not null)
+            {
+                return _menu;
+            }
+
+            var entries = new ChoiceMenuEntry[Choices.Count];
+            for (var index = 0; index < Choices.Count; index++)
+            {
+                var choice = Choices[index];
+                entries[index] = new ChoiceMenuEntry(index + 1, choice.Key, choice.Label, IsAvailable: true);
+            }
+            return _menu = Array.AsReadOnly(entries);
+        }
+        init => _menu = value;
+    }
 }

@@ -226,6 +226,23 @@ public class RulesTests
         Assert.Equal(["high", "low"], eligible.Select(s => s.Name));
     }
 
+    [Theory]
+    [InlineData(false, false, false, false)]
+    [InlineData(false, true, false, true)]
+    [InlineData(false, false, true, true)]
+    [InlineData(false, true, true, true)]
+    [InlineData(true, false, false, false)]
+    [InlineData(true, true, false, false)]
+    [InlineData(true, false, true, false)]
+    [InlineData(true, true, true, true)]
+    public void Storylet_tag_queries_match_any_or_all(bool matchAll, bool first, bool second, bool expected)
+    {
+        var tags = new HashSet<string>();
+        if (first) tags.Add("first");
+        if (second) tags.Add("second");
+        Assert.Equal(expected, new StoryletTags(["first", "second"], matchAll).Matches(tags));
+    }
+
     [Fact]
     public void Triggers_fire_on_rising_edge_and_once_triggers_fire_once()
     {

@@ -27,11 +27,15 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
     private readonly List<string> _visits = [];
     private readonly HashSet<string> _settled = new(StringComparer.Ordinal);
     private readonly List<ChoiceStep> _replayChoices = [];
+    private readonly Dictionary<ChoiceStep, ChoiceCandidate> _choiceCandidates =
+        new(ReferenceEqualityComparer.Instance);
     private readonly List<AuthorEntryReplayStep> _entryReplay = [];
     private readonly Func<int, IEnumerable<RenderedBlock>> _notesSince = notesSince;
+    private Func<SkillCheckExpr, Value>? _resolveExpressionCheck;
+    private Func<SkillCheckExpr, Value> ExpressionCheckResolver => _resolveExpressionCheck ??= ResolveExpressionCheck;
     internal EvaluationContext Context => new(log.State, story.Predicates)
     {
-        ResolveSkillCheck = ResolveExpressionCheck,
+        ResolveSkillCheck = ExpressionCheckResolver,
     };
     public IReadOnlyList<ChoiceStep> ReplayChoices => _replayChoices;
     public IReadOnlyList<AuthorEntryReplayStep> EntryReplay => _entryReplay;
@@ -217,7 +221,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
 
     public void ApplyBatch(IReadOnlyList<Effect> effects)
     {
-        EffectExecutor.ExecuteAll(effects, log, story.Predicates, ResolveExpressionCheck);
+        EffectExecutor.ExecuteAll(effects, log, story.Predicates, ExpressionCheckResolver);
         afterBatch();
     }
 
@@ -243,11 +247,18 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
 
     private ChoiceCandidate CreateCandidate(SceneDefinition scene, ChoiceStep step)
     {
+        if (_choiceCandidates.TryGetValue(step, out var cached))
+        {
+            return cached;
+        }
+
         var label = LabelSource(step.Choice);
-        return new(step.Choice.Key, step.Choice.Requires, label,
+        var candidate = new ChoiceCandidate(step.Choice.Key, step.Choice.Requires, label,
             ChoiceAvailability.ShownLabelSource(step.Choice.Shown, label, Render),
             notes => makeChoice(scene, step, notes),
-            _replayIdentities.For(step.Choice));
+            _replayIdentities.For(step.Choice), new ChoiceStepExecution(scene, step));
+        _choiceCandidates.Add(step, candidate);
+        return candidate;
     }
 
     private Func<IReadOnlyList<RenderedInline>> LabelSource(ChoiceDefinition choice)
@@ -290,9 +301,14 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
 
     private void AppendSkillCheckNotes(string stepId, int mark, List<RenderedBlock> blocks)
     {
-        if (!log.Events.Skip(mark).OfType<SkillCheckResolved>().Any())
-            return;
-        AppendNotes(stepId, mark, blocks);
+        for (var index = mark; index < log.Events.Count; index++)
+        {
+            if (log.Events[index] is SkillCheckResolved)
+            {
+                AppendNotes(stepId, mark, blocks);
+                return;
+            }
+        }
     }
 
     private void Observe(DecisionKind kind, string subject, DecisionOutcome outcome, DecisionReason reason,

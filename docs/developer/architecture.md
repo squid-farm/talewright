@@ -638,6 +638,15 @@ Back and Forward use the same replay: `StoryHistory` rebuilds a session from the
 _cursor_ outcome identities. Live choice keys still identify player actions; evidence-backed saves
 use outcome identities for replay compatibility.
 
+Restore, automatic-transition normalization, continuation-base replay, and Back/Forward all use the
+same replay engine. Restore and continuation-base replay walk the complete saved timeline, including
+redo, once; navigation replays only the requested prefix once. When restore requests a cursor, the
+engine retains an independent session and transcript at that point and keeps validating the remaining
+suffix before adopting the captured cursor. Saved automatic transitions remain distinguishable from
+transitions inserted by normalization. If exact replay is incompatible, the required continuation
+fallback is a separate attempt from the saved checkpoint, not a second validation or normalization
+pass. Live choices continue to use the same `StorySession` transition semantics.
+
 **Determinism.** Given the same `StoryDefinition`, seed, snapshotted character selection and sequence of
 keys, a session produces the same events, frames and ending. Saves store those inputs plus cursor,
 format/story versions, source/extension fingerprint, outcome identities and replay evidence. The
@@ -713,7 +722,7 @@ One xUnit test project per engine project, under `engine/tests/` (the RPG rulese
 | `Talewright.Rules.Tests`     | expression evaluation, effects, triggers (once, edge, pass cap), storylet selection, checks                                                                                                 |
 | `Talewright.Narrative.Tests` | substitutions and modifier chains, Chicago possessives, a/an, inline/block conditionals, styles, speech                                                                                     |
 | `Talewright.Talemark.Tests`      | compiler: every construct, every diagnostic family, zip loading                                                                                                                             |
-| `Talewright.Runtime.Tests`   | session loop, deterministic shared player fixtures and transport parity, and sample compilation smoke |
+| `Talewright.Runtime.Tests`   | session loop, deterministic shared player fixtures and transport parity, replay work-count and allocation gates, and sample compilation smoke |
 | `Talewright.Graphs.Tests`    | immutable graph model, iterative graph algorithms, deterministic ordering, and randomized references |
 | `Talewright.Cli.Tests`       | validation output/exit policies, bounded publication and archive contracts |
 | `Talewright.Player.E2E.Tests` | one C#/xUnit suite: production Release web host in Chromium, Firefox, and WebKit plus real Linux Photino; opt-in, outside the root solution |
@@ -727,6 +736,8 @@ failure evidence, and the distinction between Playwright WebKit and system webvi
 
 Run fast engine tests with `dotnet test` from the repo root. Player UI suites are explicit:
 `python3 player/tests/run_e2e.py web` and `python3 player/tests/run_e2e.py linux`.
+The Release-only replay allocation gate and its work-count coverage are documented in the
+[testing guide](../../tests/README.md#replay-traversal-regression-gates).
 
 ---
 

@@ -78,6 +78,36 @@ public sealed class GameState : IGameStateView
         return state;
     }
 
+    internal GameState Fork()
+    {
+        var fork = new GameState(World, Seed)
+        {
+            RollCount = RollCount,
+            CurrentScene = CurrentScene,
+            IsEnded = IsEnded,
+        };
+        foreach (var (id, character) in _characters)
+        {
+            var copy = new CharacterState { Definition = character.Definition };
+            foreach (var (stat, value) in character.Stats)
+                copy.Stats.Add(stat, value);
+            foreach (var (item, quantity) in character.Inventory)
+                copy.Inventory.Add(item, quantity);
+            fork._characters.Add(id, copy);
+        }
+        foreach (var (id, value) in _standings)
+            fork._standings.Add(id, value);
+        fork._flags.UnionWith(_flags);
+        foreach (var (id, value) in _variables)
+            fork._variables.Add(id, value);
+        foreach (var (id, value) in _textVariables)
+            fork._textVariables.Add(id, value);
+        foreach (var (id, value) in _visits)
+            fork._visits.Add(id, value);
+        fork._firedTriggers.UnionWith(_firedTriggers);
+        return fork;
+    }
+
     /// <summary>Applies one event. This is the only mutation path.</summary>
     public void Apply(GameEvent gameEvent)
     {
