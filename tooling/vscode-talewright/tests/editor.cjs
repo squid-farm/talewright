@@ -727,7 +727,7 @@ async function testWhitespaceCompletions() {
     renderer = await openRenderer();
     const diskText = '=== start\n-> missing\n';
     await fs.writeFile(path.join(folder, 'story.talewright.yaml'),
-      'game:\n  id: whitespace\n  title: Whitespace\n  start: start\ncharacters:\n  player: {first-name: Ada}\n');
+      'game:\n  id: whitespace\n  title: Whitespace\n  start: start\n  ruleset: rpg\ncharacters:\n  player: {first-name: Ada}\n  guide: {first-name: Bea}\n');
     const file = path.join(folder, 'start.tale');
     await fs.writeFile(file, diskText);
     const document = await vscode.workspace.openTextDocument(file);
@@ -765,6 +765,17 @@ async function testWhitespaceCompletions() {
         return Array.from(widget.querySelectorAll('.monaco-list-row'))
           .some(row => (row.getAttribute('aria-label') || row.textContent || '').includes('skill-check'));
       })()`), 'Completion must show the entry skill-check keyword');
+    const waitForDifficultySuggestion = async () => waitUntil(async () =>
+      renderer.evaluate(`(() => {
+        const widget = document.querySelector('.suggest-widget');
+        if (!widget) return false;
+        const style = getComputedStyle(widget);
+        const rect = widget.getBoundingClientRect();
+        if (style.display === 'none' || style.visibility === 'hidden' || rect.width === 0 || rect.height === 0)
+          return false;
+        return Array.from(widget.querySelectorAll('.monaco-list-row'))
+          .some(row => (row.getAttribute('aria-label') || row.textContent || '').includes('dc'));
+      })()`), 'Completion must show the skill-check difficulty keyword');
     const replaceStory = async text => {
       const edit = new vscode.WorkspaceEdit();
       edit.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)), text);
@@ -781,6 +792,31 @@ async function testWhitespaceCompletions() {
       await vscode.commands.executeCommand('acceptSelectedSuggestion');
       assert.equal(document.lineAt(1).text, '::: skill-check ',
         'Ctrl+Space acceptance must create a spaced entry skill-check block');
+    };
+    const skillCheckBlock = line => `=== start\n${line}\nsuccess: -> END\nfailure: -> END\n:::\n`;
+    const completeDifficultyAutomatically = async line => {
+      await vscode.commands.executeCommand('hideSuggestWidget');
+      await replaceStory(skillCheckBlock(line));
+      await vscode.window.showTextDocument(document);
+      editor.selection = new vscode.Selection(1, line.length, 1, line.length);
+      await vscode.commands.executeCommand('type', { text: ' ' });
+      await waitForDifficultySuggestion();
+      await vscode.commands.executeCommand('acceptSelectedSuggestion');
+      assert.equal(document.lineAt(1).text, `${line} dc `,
+        'Typing whitespace after a declared stat must automatically offer and accept dc');
+    };
+    const completeDifficultyManually = async line => {
+      await vscode.commands.executeCommand('hideSuggestWidget');
+      const lineWithSpace = `${line} `;
+      await replaceStory(skillCheckBlock(lineWithSpace));
+      await vscode.window.showTextDocument(document);
+      editor.selection = new vscode.Selection(1, lineWithSpace.length, 1, lineWithSpace.length);
+      assert.equal(await renderer.focusEditor(), true, 'Editor input must be focused before Ctrl+Space');
+      await renderer.dispatchKey(' ', 'Space', 32, 2);
+      await waitForDifficultySuggestion();
+      await vscode.commands.executeCommand('acceptSelectedSuggestion');
+      assert.equal(document.lineAt(1).text, `${line} dc `,
+        'Ctrl+Space acceptance must add dc and leave the caret ready for the difficulty expression');
     };
 
     await type('    ');
@@ -820,6 +856,11 @@ async function testWhitespaceCompletions() {
       await vscode.commands.executeCommand('acceptSelectedSuggestion');
       assert.equal(document.lineAt(1).text, '::: skill-check ',
         `Automatic acceptance after ${JSON.stringify(`:::${suffix}`)} must not duplicate whitespace`);
+    }
+
+    for (const line of ['::: skill-check perception', '::: skill-check guide perception']) {
+      await completeDifficultyAutomatically(line);
+      await completeDifficultyManually(line);
     }
 
     const prose = new vscode.WorkspaceEdit();
