@@ -95,7 +95,9 @@ Toggle Italic** commands are also available in the Command Palette. The commands
 text selected, support multiple selections, and can be undone together. They insert `**bold**` and
 `_italic_`; the supported `__bold__` and `*italic*` alternatives also toggle off. When toggling off
 an enclosing style through nested formatting, only that style's delimiters are removed; the inner
-formatting and selected prose are preserved.
+formatting and selected prose are preserved. If a selection crosses a formatting delimiter, the
+commands handle the complete delimiter pair instead of wrapping only the selected fragment; toggling
+another style preserves the existing formatting and uses a non-colliding supported delimiter when needed.
 
 After `{image(`, completion suggests supported files from the story's `images/` folder, including
 subfolders, and inserts the path in quotes. Completion inside an already quoted path inserts only the

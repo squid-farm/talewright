@@ -49,6 +49,9 @@ function planFormattingEdit(text, start, end, style) {
     }
   }
 
+  const boundary = findSelectedFormattingBoundary(text, start, end, formatter);
+  if (boundary) return boundary;
+
   const delimiter = formatter.recommended;
   return {
     start,
@@ -57,6 +60,59 @@ function planFormattingEdit(text, start, end, style) {
     selectionOffset: delimiter.length,
     selectedText,
   };
+}
+
+function findSelectedFormattingBoundary(text, start, end, formatter) {
+  const openingRuns = readDelimiterRunsAtBoundary(text, start);
+  const closingRuns = readDelimiterRunsAtBoundary(text, end);
+  for (const opening of openingRuns) {
+    for (const closing of closingRuns) {
+      if (opening.start > start || opening.end < start
+          || closing.start > end || closing.end < end
+          || (start === opening.end && end === closing.start)
+          || opening.end >= closing.start
+          || opening.delimiter !== closing.delimiter
+          || !ALL_FORMATTING_DELIMITERS.includes(opening.delimiter)
+          || !isCompletePair(text, opening.start, opening.end, closing.start, closing.end, opening.delimiter)) {
+        continue;
+      }
+
+      const selectedText = text.slice(opening.end, closing.start);
+      const edit = {
+        start: opening.start,
+        end: closing.end,
+        selectedText,
+      };
+      if (formatter.delimiters.includes(opening.delimiter)) {
+        return { ...edit, replacement: selectedText, selectionOffset: 0 };
+      }
+
+      const delimiter = formatter.recommended[0] === opening.delimiter[0]
+        ? formatter.delimiters.find(candidate => candidate[0] !== opening.delimiter[0])
+        : formatter.recommended;
+      return {
+        ...edit,
+        replacement: opening.delimiter + delimiter + selectedText + delimiter + closing.delimiter,
+        selectionOffset: opening.delimiter.length + delimiter.length,
+      };
+    }
+  }
+  return null;
+}
+
+function readDelimiterRunsAtBoundary(text, offset) {
+  const runs = [];
+  for (const marker of ['*', '_']) {
+    if (text[offset - 1] !== marker && text[offset] !== marker) continue;
+
+    let start = offset;
+    while (start > 0 && text[start - 1] === marker) start--;
+    let end = offset;
+    while (end < text.length && text[end] === marker) end++;
+    const delimiter = marker.repeat(end - start);
+    if (delimiter.length <= 2) runs.push({ start, end, delimiter });
+  }
+  return runs;
 }
 
 function findEnclosingFormatting(text, start, end, formatter) {
@@ -116,6 +172,10 @@ function readDelimitersAfter(text, offset) {
   }
   return delimiters;
 }
+
+const ALL_FORMATTING_DELIMITERS = [...new Set(
+  Object.values(FORMATTERS).flatMap(formatter => formatter.delimiters),
+)];
 
 function isCompletePair(text, openingStart, contentStart, contentEnd, closingEnd, delimiter) {
   const marker = delimiter[0];

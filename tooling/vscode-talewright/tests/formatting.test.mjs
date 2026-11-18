@@ -84,6 +84,26 @@ test('formatting removes enclosing styles through nested delimiters', () => {
   assert.equal(text.slice(0, plan.start) + plan.replacement + text.slice(plan.end), '_**plain**_');
 });
 
+test('formatting resolves selections that cross complete delimiter boundaries', () => {
+  for (const [text, start, end, style, expected, selectedText, selectionOffset] of [
+    ['**Bold**', 1, 6, 'bold', 'Bold', 'Bold', 0],
+    ['**Bold**', 2, 7, 'bold', 'Bold', 'Bold', 0],
+    ['__Bold__', 1, 6, 'bold', 'Bold', 'Bold', 0],
+    ['__Bold__', 2, 7, 'bold', 'Bold', 'Bold', 0],
+    ['*Italic*', 0, 7, 'italic', 'Italic', 'Italic', 0],
+    ['_Italic_', 1, 8, 'italic', 'Italic', 'Italic', 0],
+    ['**Bold**', 2, 7, 'italic', '**_Bold_**', 'Bold', 3],
+    ['__Bold__', 1, 7, 'italic', '__*Bold*__', 'Bold', 3],
+    ['_Italic_', 1, 8, 'bold', '_**Italic**_', 'Italic', 3],
+  ]) {
+    const plan = planFormattingEdit(text, start, end, style);
+
+    assert.equal(text.slice(0, plan.start) + plan.replacement + text.slice(plan.end), expected);
+    assert.equal(plan.selectedText, selectedText);
+    assert.equal(plan.selectionOffset, selectionOffset);
+  }
+});
+
 test('italic formatting does not match part of a complete bold delimiter run', () => {
   const text = '**bold**';
   const plan = planFormattingEdit(text, 2, 6, 'italic');
@@ -191,4 +211,55 @@ test('nested formatting toggles preserve reversed selections across removal and 
   await commands.get('talewright.toggleBold')();
   assert.equal(documentText, '_**plain**_');
   assert.deepEqual(editor.selections[0], selection('plain'.length + 3, 3));
+});
+
+test('partial-delimiter formatting preserves reversed selections and remains stable when repeated', async () => {
+  const commands = new Map();
+  let documentText = '**Bold**';
+  const selection = (anchor, active) => ({
+    start: Math.min(anchor, active),
+    end: Math.max(anchor, active),
+    isReversed: anchor > active,
+  });
+  const editor = {
+    document: {
+      languageId: 'tale',
+      getText: () => documentText,
+      offsetAt: position => position,
+      positionAt: offset => offset,
+    },
+    selections: [selection(7, 2)],
+    edit: async callback => {
+      const edits = [];
+      callback({ replace: (range, replacement) => edits.push({ ...range, replacement }) });
+      for (const edit of edits.sort((left, right) => right.start - left.start)) {
+        documentText = documentText.slice(0, edit.start) + edit.replacement + documentText.slice(edit.end);
+      }
+      return true;
+    },
+  };
+  const vscode = {
+    commands: {
+      registerCommand: (id, handler) => {
+        commands.set(id, handler);
+        return { dispose() {} };
+      },
+    },
+    Range: function (start, end) { return { start, end }; },
+    Selection: function (anchor, active) { return selection(anchor, active); },
+    window: { activeTextEditor: editor },
+  };
+  registerFormattingCommands({ subscriptions: [] }, vscode);
+
+  await commands.get('talewright.toggleBold')();
+  assert.equal(documentText, 'Bold');
+  assert.deepEqual(editor.selections[0], selection(4, 0));
+
+  await commands.get('talewright.toggleBold')();
+  assert.equal(documentText, '**Bold**');
+  assert.deepEqual(editor.selections[0], selection(6, 2));
+
+  await commands.get('talewright.toggleBold')();
+  assert.equal(documentText, 'Bold');
+  assert.deepEqual(editor.selections[0], selection(4, 0));
 });

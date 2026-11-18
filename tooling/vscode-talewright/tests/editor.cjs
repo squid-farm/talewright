@@ -204,10 +204,32 @@ async function testFormattingCommands(extension, editor, document) {
       && document.getText(editor.selection) === 'shortcut',
     'A second Ctrl+B must restore bold without accumulating delimiters');
     assert.equal(document.getText(editor.selection), 'shortcut');
+
+    await replaceText('**Bold**');
+    editor.selection = select(2, 7);
+    assert.equal(await renderer.focusEditor(), true, 'Editor input must be focused before partial-delimiter Ctrl+B');
+    await renderer.dispatchKey('b', 'KeyB', 66, 2);
+    await waitUntil(() => document.getText() === 'Bold' && document.getText(editor.selection) === 'Bold',
+      'Ctrl+B must remove the complete bold pair when the selection includes only part of its closing delimiter');
+    assert.equal(document.getText(editor.selection), 'Bold');
+    await vscode.commands.executeCommand('undo');
+    assert.equal(document.getText(), '**Bold**', 'Undo must restore the exact original delimiter pair');
+    await vscode.commands.executeCommand('redo');
+    assert.equal(document.getText(), 'Bold', 'Redo must restore the exact delimiter-free text');
+
+    selectText('Bold');
+    for (const [expected, message] of [
+      ['**Bold**', 'A repeated Ctrl+B must restore bold without duplicating delimiter runs'],
+      ['Bold', 'A further Ctrl+B must remove bold without accumulating delimiter runs'],
+    ]) {
+      assert.equal(await renderer.focusEditor(), true, 'Editor input must be focused before repeated Ctrl+B');
+      await renderer.dispatchKey('b', 'KeyB', 66, 2);
+      await waitUntil(() => document.getText() === expected && document.getText(editor.selection) === 'Bold', message);
+    }
   } finally {
     renderer.close();
   }
-  console.log('Installed VSIX formatting smoke passed: bold/italic toggles, alternatives, nesting, multi-selections, selection retention and undo/redo.');
+  console.log('Installed VSIX formatting smoke passed: bold/italic toggles, alternatives, partial delimiters, nesting, multi-selections, selection retention and undo/redo.');
 }
 
 async function testAuthorActions(extension) {
