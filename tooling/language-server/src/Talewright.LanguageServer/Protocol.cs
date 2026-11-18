@@ -6,7 +6,8 @@ namespace Talewright.LanguageServer;
 
 internal sealed class Protocol(Stream input, Stream output)
 {
-    private const int MaxMessageBytes = 16 * 1024 * 1024;
+    // The body is allocated from the declared length, so this bounds a malformed header, not story size.
+    private const int MaxMessageBytes = 1024 * 1024 * 1024;
 
     public async Task<JsonElement?> ReadAsync(CancellationToken cancellationToken)
     {
@@ -27,7 +28,7 @@ internal sealed class Protocol(Stream input, Stream output)
             .Where(line => line.StartsWith("Content-Length:", StringComparison.OrdinalIgnoreCase)).ToArray();
         if (lengths.Length != 1 || !int.TryParse(lengths[0]["Content-Length:".Length..].Trim(),
                 NumberStyles.None, CultureInfo.InvariantCulture, out var length) || length <= 0 || length > MaxMessageBytes)
-            throw new InvalidDataException("Expected one Content-Length between 1 and 16 MiB.");
+            throw new InvalidDataException("Expected one Content-Length between 1 byte and 1 GiB.");
         var body = new byte[length];
         await input.ReadExactlyAsync(body, cancellationToken);
         using var document = JsonDocument.Parse(body);

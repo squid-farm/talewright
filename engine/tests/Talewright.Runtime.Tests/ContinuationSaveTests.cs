@@ -401,25 +401,23 @@ public sealed class ContinuationSaveTests
     }
 
     [Fact]
-    public void Choice_limit_includes_the_transcript_before_the_base()
+    public void Continued_playthroughs_keep_going_past_the_former_10000_choice_cap()
     {
         var original = new StoryHistory(CompileLoop(changed: false), 42);
-        for (var i = 0; i < StoryHistory.MaxChoices - 1; i++)
+        for (var i = 0; i < 9_999; i++)
         {
             original.Choose("c0");
         }
         var restored = Restore(CompileLoop(changed: true), original.Save());
 
         Assert.Equal(9_999, restored.PlaythroughLength);
-        Assert.False(restored.IsAtChoiceLimit);
         restored.Choose("c0");
-        Assert.Equal(10_000, restored.PlaythroughLength);
-        Assert.True(restored.IsAtChoiceLimit);
-        Assert.Equal("A playthrough supports at most 10,000 choices.",
-            Assert.Throws<InvalidOperationException>(() => restored.Choose("c0")).Message);
+        restored.Choose("c0");
+        Assert.Equal(10_001, restored.PlaythroughLength);
         var reloaded = Restore(restored.Story, restored.Save());
-        Assert.True(reloaded.IsAtChoiceLimit);
         Assert.Equal(restored.PlaythroughLength, reloaded.PlaythroughLength);
+        reloaded.Choose("c0");
+        Assert.Equal(10_002, reloaded.PlaythroughLength);
     }
 
     [Fact]
@@ -438,17 +436,6 @@ public sealed class ContinuationSaveTests
         AssertMalformed(oversizedHeader);
         AssertMalformed(map);
 
-        var tooManyFrames = SaveFormat.Read(source);
-        var continuation = tooManyFrames.Continuation!.Payload;
-        var frame = continuation.Transcript![0];
-        continuation.Transcript = Enumerable.Repeat(frame, SaveFormat.MaxChoices + 1).ToList();
-        AssertMalformed(SaveFormat.Write(tooManyFrames));
-
-        var tooManyStats = SaveFormat.Read(source);
-        tooManyStats.Continuation!.Payload.Current!.Characters[0].Stats = Enumerable.Range(0, SaveFormat.MaxCharacterStats + 1)
-            .Select(index => new NamedValuePayload($"stat-{index}", index)).ToList();
-        AssertMalformed(SaveFormat.Write(tooManyStats));
-
         var invalidLength = SaveFormat.Read(source);
         var invalidPayload = invalidLength.Continuation!.Payload;
         invalidPayload.Base = invalidPayload.Current;
@@ -459,14 +446,6 @@ public sealed class ContinuationSaveTests
         var baseWithEvidence = SaveFormat.Read(source);
         baseWithEvidence.Continuation!.Payload.Base = baseWithEvidence.Continuation.Payload.Current;
         AssertMalformed(SaveFormat.Write(baseWithEvidence));
-
-        var totalTooLarge = SaveFormat.Read(source);
-        var largePayload = totalTooLarge.Continuation!.Payload;
-        largePayload.Base = largePayload.Current;
-        largePayload.Transcript = Enumerable.Repeat(largePayload.Transcript![0], SaveFormat.MaxChoices).ToList();
-        largePayload.BaseTranscriptLength = SaveFormat.MaxChoices;
-        totalTooLarge = totalTooLarge with { ReplayEvidence = null, ReplayChoiceIdentities = null };
-        AssertMalformed(SaveFormat.Write(totalTooLarge));
     }
 
     [Theory]

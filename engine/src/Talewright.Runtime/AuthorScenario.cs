@@ -15,15 +15,21 @@ public sealed record AuthorScenarioImport(AuthorSession Session, bool Adopted, I
 public static class AuthorScenario
 {
     public const string FileExtension = ".twscenario";
-    public const int MaxBytes = 2 * 1024 * 1024;
+    // A damaged-file guard, about two million commands; not an author timeline limit.
+    public const int MaxBytes = 64 * 1024 * 1024;
     public const int MaxIdentifierLength = 512;
-    public const int MaxFields = 10_000;
     private const int FormatVersion = 2;
     public static string EngineCompatibility => "author-replay-v3/"
         + typeof(AuthorSession).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0];
 
-    public static byte[] Export(AuthorSession session, string extensionIdentity)
+    public static byte[] Export(AuthorSession session, string extensionIdentity) =>
+        Export(session, extensionIdentity, MaxBytes);
+
+    /// <summary>Exports with a host-chosen size bound; bounds above <see cref="MaxBytes"/> are lowered to it.</summary>
+    public static byte[] Export(AuthorSession session, string extensionIdentity, int maxBytes)
     {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(maxBytes);
+        maxBytes = Math.Min(maxBytes, MaxBytes);
         if (session.HasContinuation)
         {
             throw new InvalidOperationException("Continued author sessions cannot be exported as portable scenarios because their event baseline depends on prior source history.");
@@ -41,7 +47,7 @@ public static class AuthorScenario
             Cursor = session.Cursor, CurrentDigest = Digest(session), EndDigest = Digest(end),
         };
         ValidateShape(data);
-        using var output = new ScenarioOutput();
+        using var output = new ScenarioOutput(maxBytes);
         JsonSerializer.Serialize(output, data, ScenarioJsonContext.Default.ScenarioData);
         return output.ToArray();
     }
@@ -109,7 +115,7 @@ public static class AuthorScenario
     {
         if (bytes.Length is 0 or > MaxBytes)
         {
-            throw new InvalidDataException("Scenario must be nonempty and at most 2 MiB.");
+            throw new InvalidDataException($"Scenario must be nonempty and at most {MaxBytes / 1024 / 1024} MiB.");
         }
         try
         {
@@ -153,7 +159,7 @@ public static class AuthorScenario
             throw new InvalidDataException("Unsupported author scenario format or missing synthetic marker.");
         }
         if (data.Identity is null || data.Setup is null || data.Commands is null
-            || data.Commands.Length > StoryHistory.MaxChoices || data.Cursor < 0 || data.Cursor > data.Commands.Length)
+            || data.Cursor < 0 || data.Cursor > data.Commands.Length)
         {
             throw new InvalidDataException("Scenario identity, setup, commands or cursor are invalid.");
         }
@@ -176,7 +182,7 @@ public static class AuthorScenario
         }
         if (data.Character is { } character)
         {
-            if (character.Stats is null || character.Stats.Count > MaxFields)
+            if (character.Stats is null)
             {
                 throw new InvalidDataException("Invalid scenario character stats.");
             }
@@ -278,7 +284,7 @@ public static class AuthorScenario
     }
 }
 
-internal sealed class ScenarioOutput : MemoryStream
+internal sealed class ScenarioOutput(int maxBytes) : MemoryStream
 {
     public override void Write(byte[] buffer, int offset, int count)
     {
@@ -300,9 +306,9 @@ internal sealed class ScenarioOutput : MemoryStream
 
     private void CheckSize(int count)
     {
-        if (Length + count > AuthorScenario.MaxBytes)
+        if (Length + count > maxBytes)
         {
-            throw new InvalidDataException("Author scenario exceeds 2 MiB.");
+            throw new InvalidDataException($"Author scenario exceeds {maxBytes / 1024 / 1024} MiB.");
         }
     }
 }
@@ -353,10 +359,9 @@ internal sealed class ScenarioValues
 
     public void Validate()
     {
-        if (Flags is null || Variables is null || TextVariables is null || Standings is null || Stats is null || Inventory is null
-            || (long)Flags.Count + Variables.Count + TextVariables.Count + Standings.Count + Stats.Length + Inventory.Length > AuthorScenario.MaxFields)
+        if (Flags is null || Variables is null || TextVariables is null || Standings is null || Stats is null || Inventory is null)
         {
-            throw new InvalidDataException("Scenario value batches must contain at most 10,000 fields and no null collections.");
+            throw new InvalidDataException("Scenario value batches must not contain null collections.");
         }
         foreach (var id in Flags.Keys.Concat(Variables.Keys).Concat(TextVariables.Keys).Concat(Standings.Keys))
         {

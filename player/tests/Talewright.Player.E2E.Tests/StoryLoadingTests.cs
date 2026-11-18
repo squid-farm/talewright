@@ -116,11 +116,11 @@ public sealed class StoryLoadingTests(WebHostFixture host, ITestOutputHelper out
     }
 
     [Fact]
-    public async Task Exactly_twenty_MiB_is_accepted_by_the_upload_layer()
+    public async Task Archives_above_the_former_twenty_MiB_upload_cap_load()
     {
-        var bytes = TestArchives.AtUploadLimit();
-        Assert.Equal(20 * 1024 * 1024, bytes.Length);
-        await UploadBytes("at-limit.zip", bytes);
+        var bytes = TestArchives.AboveFormerUploadCap();
+        Assert.Equal(TestArchives.FormerUploadCapBytes + 1, bytes.Length);
+        await UploadBytes("above-former-cap.zip", bytes);
         await Observe(new(null, "First passage"));
     }
 }

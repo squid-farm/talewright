@@ -561,18 +561,18 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
 
     [Fact]
     [Trait("Host", "Browser")]
-    public async Task Choice_limit_is_visible_and_keeps_save_back_and_restart_usable()
+    public async Task Playthroughs_past_the_former_choice_cap_load_save_navigate_and_keep_playing()
     {
-        var (fixture, story, saved) = CreateChoiceLimitSave();
+        var (fixture, story, saved) = CreateLongSave();
         await Upload(fixture);
-        await WriteBrowserSaveAsync(story.Id, "Limit", saved);
+        await WriteBrowserSaveAsync(story.Id, "Long", saved);
         await Driver.ClickAsync("Saves");
-        await Driver.ClickAsync("Load Limit");
+        await Driver.ClickAsync("Load Long");
         await Driver.ClickAsync("Load save");
         // Replay retains the full playthrough while presentation mounts only its recent window.
-        await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("choice limit", new() { Timeout = 30_000 });
-        await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(21);
-        await Expect(Choices).ToBeDisabledAsync();
+        await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(21, new() { Timeout = 30_000 });
+        await Expect(Choices).ToBeEnabledAsync();
+        await Expect(Page.GetByRole(AriaRole.Alert)).ToHaveCountAsync(0);
         await Driver.ClickAsync("Saves");
         await Driver.ClickAsync("Save game");
         await Expect(Page.Locator(".tw-save-status")).ToContainTextAsync("Saved 'My save'");
@@ -583,18 +583,20 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         await Expect(Page.GetByRole(AriaRole.Alert)).ToHaveCountAsync(0);
         await Driver.ClickAsync("Forward");
         await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(21);
-        await Expect(Choices).ToBeDisabledAsync();
+        await Expect(Choices).ToBeEnabledAsync();
+        await Choose("Again");
+        await Observe(new(null, "Still going."));
+        await Expect(Page.GetByRole(AriaRole.Alert)).ToHaveCountAsync(0);
         await Restart();
         await Expect(Page.Locator(".tw-frame")).ToHaveCountAsync(1);
         await Expect(Choices).ToBeEnabledAsync();
-        await Expect(Page.GetByRole(AriaRole.Alert)).ToHaveCountAsync(0);
-        await Choose("Again");
-        await Observe(new(null, "At the limit."));
     }
 
-    internal static (StoryFixture Fixture, StoryDefinition Story, byte[] Bytes) CreateChoiceLimitSave()
+    internal const int LongSaveChoices = 10_001;
+
+    internal static (StoryFixture Fixture, StoryDefinition Story, byte[] Bytes) CreateLongSave()
     {
-        var fixture = Fixture() with { Tale = "=== start\nAt the limit.\n* [Again] -> start" };
+        var fixture = Fixture() with { Tale = "=== start\nStill going.\n* [Again] -> start" };
         var source = new StorySource(new Dictionary<string, string>
         {
             ["story.talewright.yaml"] = fixture.Yaml,
@@ -604,7 +606,7 @@ public sealed class SaveHistoryTests(WebHostFixture host, ITestOutputHelper outp
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         var story = result.Story!;
         var history = new StoryHistory(story, 7);
-        for (var i = 0; i < StoryHistory.MaxChoices; i++)
+        for (var i = 0; i < LongSaveChoices; i++)
         {
             history.Choose("c0");
         }

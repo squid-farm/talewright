@@ -45,9 +45,9 @@ depth. Save sizes are the container length and decoded MessagePack body length.
 | 10,000 | 53,390 / 932,347 B | 29.479 ms / 9.25 MiB | 168.890 ms / 116.24 MiB | 199.610 ms / 125.10 MiB |
 
 The realistic desktop benchmark uses a generated 20-chapter story. Requested
-actions and saved choices differ because automatic choices also contribute to
-the 10,000-choice cap. The 10,000-action case stops at exactly 10,000 saved
-choices without restarting.
+actions and saved choices differ because automatic choices also count as saved
+choices. The 10,000-action case stops at exactly 10,000 saved choices without
+restarting; playthroughs have no cap, and the stop keeps rows comparable.
 
 | Requested / completed actions | Saved choices | Encoded / decoded | Save mean / allocation | Replay restore mean / allocation | Continuation mean / allocation |
 |---:|---:|---:|---:|---:|---:|

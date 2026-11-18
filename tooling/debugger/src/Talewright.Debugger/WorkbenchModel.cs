@@ -141,13 +141,14 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
     public bool ConfirmOverwrite { get; set; }
     public string PlayerSavePath { get; set; } = "";
     public string? ScenarioStatus { get; private set; }
+    internal int ScenarioExportLimit { get; set; } = AuthorScenario.MaxBytes;
 
     public async Task ExportScenario() => await AttemptFile(async () =>
     {
         var confirmed = ConfirmOverwrite;
         ConfirmOverwrite = false;
         var session = Session ?? throw new InvalidOperationException("Start a scene first.");
-        var bytes = AuthorScenario.Export(session, CompilerOptions.Default.CompatibilityId!);
+        var bytes = AuthorScenario.Export(session, CompilerOptions.Default.CompatibilityId!, ScenarioExportLimit);
         var path = ScenarioPath;
         await AuthorScenarioFiles.ExportAsync(path, bytes, Root, confirmed);
         ScenarioStatus = $"Synthetic scenario exported: {Path.GetFullPath(path)}. No source or player slot was written.";

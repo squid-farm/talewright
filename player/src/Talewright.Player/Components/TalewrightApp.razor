@@ -168,9 +168,9 @@
     [Parameter]
     public bool LibraryEnabled { get; set; } = true;
 
-    /// <summary>Largest upload accepted, in bytes.</summary>
+    /// <summary>Largest upload accepted, in bytes. The default only rejects files the browser can't buffer.</summary>
     [Parameter]
-    public long MaxUploadBytes { get; set; } = 20 * 1024 * 1024;
+    public long MaxUploadBytes { get; set; } = 1024L * 1024 * 1024;
 
     [Parameter]
     public EventCallback<string?> OnTitleChanged { get; set; }
@@ -264,7 +264,8 @@
         try
         {
             // FromZip needs a seekable stream; browser streams aren't, so buffer first.
-            var buffer = new MemoryStream();
+            // Pre-size so large archives don't transiently need twice their size while the buffer grows.
+            var buffer = new MemoryStream((int)Math.Min(Math.Min(e.File.Size, MaxUploadBytes), Array.MaxLength));
             try
             {
                 await using (var upload = e.File.OpenReadStream(MaxUploadBytes))

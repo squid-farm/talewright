@@ -87,7 +87,7 @@
     }
     <StoryStage @ref="_storyStage" Story="Story" Passages="_transcript"
                 PassageWindow="@TranscriptPresentation.PassageWindow" Current="_session.Current" State="_session.State"
-                Identity="_session" Busy="_busy" AtChoiceLimit="_session.IsAtChoiceLimit"
+                Identity="_session" Busy="_busy"
                 ContinuationError="@_session.AutomaticContinuationError" IncludeFromIndex="_presentationStartIndex"
                 RevealPassageIndex="_revealPassageIndex"
                 Hidden="_showHistory" OnChoose="Choose" OnRestart="Restart" />
@@ -587,10 +587,6 @@
 
     private async Task Choose(ChoiceView choice)
     {
-        if (_session.IsAtChoiceLimit)
-        {
-            return;
-        }
         var firstNewPassage = _transcript.Count;
         _session.Choose(choice.Key);
         _continuationNotice = null;

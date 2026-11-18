@@ -29,11 +29,11 @@ public static class SaveFormat
     public const int Version = 5;
     /// <summary>File extension for saves on disk and exported backups.</summary>
     public const string FileExtension = ".twsave";
-    public const int MaxSaveBytes = 10 * 1024 * 1024;
-    public const int MaxDecodedBytes = 16 * 1024 * 1024;
-    public const int MaxChoices = 10_000;
+    // Damaged or hostile-file guards, not playthrough limits. The decoded bound is within 2x of the largest
+    // .NET array; a 1 GiB body holds roughly 1.5 million choices of a prose-heavy story.
+    public const int MaxSaveBytes = 512 * 1024 * 1024;
+    public const int MaxDecodedBytes = 1024 * 1024 * 1024;
     public const int MaxChoiceKeyLength = 512;
-    public const int MaxCharacterStats = 1_000;
 
     private const int HeaderLength = 4 + 1 + sizeof(uint);
     private const int MaxArrayFields = 32;
@@ -45,17 +45,19 @@ public static class SaveFormat
     internal static readonly string TooLargeMessage =
         $"This saved game is too large to load (maximum {MaxSaveBytes / 1024 / 1024} MiB). Choose another save.";
     internal const string EmptyMessage = "This saved game is empty. Choose another save or start a new game.";
-    internal const string HistoryMessage = "This saved game's history is damaged or exceeds the supported length. Choose another save.";
+    internal const string HistoryMessage = "This saved game's history is damaged. Choose another save.";
 
     internal static ReadOnlySpan<byte> Magic => "TWSV"u8;
 
     /// <summary>Encodes and compresses a save. The result is checked against <see cref="MaxSaveBytes"/> by the caller.</summary>
-    public static byte[] Write(SavedGame save)
+    public static byte[] Write(SavedGame save) => Write(save, MaxDecodedBytes);
+
+    internal static byte[] Write(SavedGame save, int maxDecodedBytes)
     {
         var body = EncodeBody(save);
-        if (body.Length > MaxDecodedBytes)
+        if (body.Length > maxDecodedBytes)
         {
-            throw new InvalidOperationException($"This playthrough is too large to save (maximum {MaxDecodedBytes / 1024 / 1024} MiB uncompressed). You can continue playing, but this save could not be created.");
+            throw new InvalidOperationException($"This playthrough is too large to save (maximum {maxDecodedBytes / 1024 / 1024} MiB uncompressed). You can continue playing, but this save could not be created.");
         }
 
         return Pack(body);
@@ -102,7 +104,7 @@ public static class SaveFormat
             throw new InvalidDataException(MalformedMessage);
         }
 
-        if (payload.Choices is null || payload.Choices.Count > MaxChoices
+        if (payload.Choices is null
             || payload.Choices.Any(key => string.IsNullOrEmpty(key) || key.Length > MaxChoiceKeyLength))
         {
             throw new InvalidDataException(HistoryMessage);
@@ -212,7 +214,7 @@ public static class SaveFormat
 
     private static CharacterSelection FromPayload(CharacterPayload payload)
     {
-        if (payload.Stats is null || payload.Stats.Count > MaxCharacterStats)
+        if (payload.Stats is null)
         {
             throw new InvalidDataException(MalformedMessage);
         }
@@ -293,7 +295,6 @@ public static class SaveFormat
             throw new InvalidDataException(MalformedMessage);
         }
 
-        var choiceCount = 0;
         var hasEvidence = false;
         var hasIdentities = false;
         for (var field = 0; field < count; field++)
@@ -315,7 +316,7 @@ public static class SaveFormat
                     ValidateCharacter(ref reader);
                     break;
                 case 6:
-                    choiceCount = ValidateChoices(ref reader);
+                    ValidateChoices(ref reader);
                     break;
                 case 7:
                     if (!reader.TryReadNil())
@@ -337,11 +338,6 @@ public static class SaveFormat
                     if (hasIdentities)
                     {
                         var identityCount = reader.ReadArrayHeader();
-                        if (identityCount > MaxChoices)
-                        {
-                            throw new InvalidDataException(HistoryMessage);
-                        }
-
                         for (var i = 0; i < identityCount; i++)
                         {
                             var identity = reader.ReadBytes();
@@ -354,7 +350,7 @@ public static class SaveFormat
 
                     break;
                 case 10:
-                    ValidateContinuation(ref reader, choiceCount, hasEvidence || hasIdentities);
+                    ValidateContinuation(ref reader, hasEvidence || hasIdentities);
                     break;
                 default:
                     reader.Skip();
@@ -368,7 +364,7 @@ public static class SaveFormat
         }
     }
 
-    private static void ValidateContinuation(ref MessagePackReader reader, int choiceCount, bool hasEvidence)
+    private static void ValidateContinuation(ref MessagePackReader reader, bool hasEvidence)
     {
         if (reader.TryReadNil())
         {
@@ -386,10 +382,6 @@ public static class SaveFormat
 
         ValidateCheckpoint(ref reader);
         var frames = reader.ReadArrayHeader();
-        if (frames > MaxChoices)
-        {
-            throw new InvalidDataException(MalformedMessage);
-        }
         for (var i = 0; i < frames; i++)
         {
             reader.Skip();
@@ -401,7 +393,7 @@ public static class SaveFormat
             ValidateCheckpoint(ref reader);
         }
         var baseLength = reader.ReadInt32();
-        if (baseLength < 0 || baseLength > frames || (long)baseLength + choiceCount > MaxChoices
+        if (baseLength < 0 || baseLength > frames
             || (hasBase && hasEvidence) || (!hasBase && baseLength != 0))
         {
             throw new InvalidDataException(MalformedMessage);
@@ -476,10 +468,6 @@ public static class SaveFormat
             if (field == 4)
             {
                 var stats = reader.ReadArrayHeader();
-                if (stats > MaxCharacterStats)
-                {
-                    throw new InvalidDataException(MalformedMessage);
-                }
                 for (var i = 0; i < stats; i++)
                 {
                     reader.Skip();
@@ -559,10 +547,6 @@ public static class SaveFormat
             else if (field == 4)
             {
                 var stats = reader.ReadArrayHeader();
-                if (stats > MaxCharacterStats)
-                {
-                    throw new InvalidDataException(MalformedMessage);
-                }
 
                 for (var i = 0; i < stats; i++)
                 {
@@ -601,14 +585,9 @@ public static class SaveFormat
         }
     }
 
-    private static int ValidateChoices(ref MessagePackReader reader)
+    private static void ValidateChoices(ref MessagePackReader reader)
     {
         var count = reader.ReadArrayHeader();
-        if (count > MaxChoices)
-        {
-            throw new InvalidDataException(HistoryMessage);
-        }
-
         for (var i = 0; i < count; i++)
         {
             var key = ReadString(ref reader);
@@ -617,8 +596,6 @@ public static class SaveFormat
                 throw new InvalidDataException(HistoryMessage);
             }
         }
-
-        return count;
     }
 
     private static void ValidateSummary(ref MessagePackReader reader)

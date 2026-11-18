@@ -101,7 +101,11 @@ public sealed class AutosaveRecoveryTests : IDisposable
         var fileStore = new FileSaveStore(_directory);
         await fileStore.WriteAutosaveAsync("story", [1]);
         var path = Directory.EnumerateFiles(_directory, "autosave" + SaveFormat.FileExtension, SearchOption.AllDirectories).Single();
-        await File.WriteAllBytesAsync(path, new byte[length]);
+        using (var file = File.Open(path, FileMode.Truncate))
+        {
+            file.SetLength(length);
+        }
+
         var store = new FaultingSaveStore(fileStore);
         var recovery = new AutosaveRecovery(store, "story", rejectedAutosave: null);
 

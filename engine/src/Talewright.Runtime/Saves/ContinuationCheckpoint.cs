@@ -76,7 +76,7 @@ internal sealed class ContinuationCheckpoint
         {
             if (character is null || string.IsNullOrEmpty(character.Id) || !characters.Add(character.Id)
                 || character.FirstName is null || character.LastName is null || character.Stats is null
-                || character.Items is null || character.Stats.Count > SaveFormat.MaxCharacterStats)
+                || character.Items is null)
             {
                 throw new InvalidDataException(SaveFormat.MalformedMessage);
             }

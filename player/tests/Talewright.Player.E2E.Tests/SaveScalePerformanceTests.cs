@@ -15,6 +15,7 @@ namespace Talewright.Player.E2E.Tests;
 [Collection(SerialCollection.Name)]
 public sealed class SaveScalePerformanceTests : PlayerTest
 {
+    private const int MaxMeasuredChoices = 10_000;
     private const string PreparedSlot = "Prepared scale save";
     private const string AutosaveSlot = "Autosave scale save";
     private const string AutosaveStorageKey = "\0autosave";
@@ -103,7 +104,8 @@ public sealed class SaveScalePerformanceTests : PlayerTest
         Assert.Equal(story.Id, Compile(changedSource).Id);
         var history = CreateHistory(story, choices);
         var save = SaveFormat.Write(SaveFormat.Read(history.Save()));
-        var autosaveDepth = Math.Min(choices, StoryHistory.MaxChoices - 50);
+        // Autosave sampling starts 50 choices before the deepest measured save, as it did under the former cap.
+        var autosaveDepth = Math.Min(choices, MaxMeasuredChoices - 50);
         var autosaveSave = autosaveDepth == choices
             ? save
             : SaveFormat.Write(SaveFormat.Read(CreateHistory(story, autosaveDepth).Save()));
@@ -294,9 +296,9 @@ public sealed class SaveScalePerformanceTests : PlayerTest
     private static StoryHistory CreateRealisticHistory(Talewright.Talemark.Model.StoryDefinition story)
     {
         var history = new StoryHistory(story, story.Seed);
-        for (var action = 0; action < StoryHistory.MaxChoices; action++)
+        for (var action = 0; action < MaxMeasuredChoices; action++)
         {
-            if (history.IsAtChoiceLimit)
+            if (history.PlaythroughLength >= MaxMeasuredChoices)
             {
                 break;
             }
@@ -311,7 +313,7 @@ public sealed class SaveScalePerformanceTests : PlayerTest
             history.Choose(firstChoice.Key);
         }
 
-        Assert.Equal(StoryHistory.MaxChoices, history.PlaythroughLength);
+        Assert.Equal(MaxMeasuredChoices, history.PlaythroughLength);
         return history;
     }
 
