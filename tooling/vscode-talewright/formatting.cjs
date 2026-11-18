@@ -28,6 +28,9 @@ function planFormattingEdit(text, start, end, style) {
     }
   }
 
+  const enclosing = findEnclosingFormatting(text, start, end, formatter);
+  if (enclosing) return enclosing;
+
   for (const delimiter of formatter.delimiters) {
     const innerStart = start + delimiter.length;
     const innerEnd = end - delimiter.length;
@@ -54,6 +57,64 @@ function planFormattingEdit(text, start, end, style) {
     selectionOffset: delimiter.length,
     selectedText,
   };
+}
+
+function findEnclosingFormatting(text, start, end, formatter) {
+  const opening = readDelimitersBefore(text, start);
+  const closing = readDelimitersAfter(text, end);
+  if (opening.length === 0 || opening.length !== closing.length
+      || opening.some((item, index) => item.delimiter !== closing[closing.length - 1 - index].delimiter)) {
+    return null;
+  }
+
+  const styleDelimiter = opening.findLastIndex(item => formatter.delimiters.includes(item.delimiter));
+  if (styleDelimiter < 0) return null;
+
+  const openingDelimiter = opening[styleDelimiter];
+  const closingDelimiter = closing[closing.length - 1 - styleDelimiter];
+  const editStart = opening[0].start;
+  const editEnd = closing[closing.length - 1].end;
+  return {
+    start: editStart,
+    end: editEnd,
+    replacement: text.slice(editStart, openingDelimiter.start)
+      + text.slice(openingDelimiter.end, closingDelimiter.start)
+      + text.slice(closingDelimiter.end, editEnd),
+    selectionOffset: start - editStart - openingDelimiter.delimiter.length,
+    selectedText: text.slice(start, end),
+  };
+}
+
+function readDelimitersBefore(text, offset) {
+  const delimiters = [];
+  let cursor = offset;
+  while (cursor > 0) {
+    const marker = text[cursor - 1];
+    if (marker !== '*' && marker !== '_') break;
+    let runStart = cursor - 1;
+    while (runStart > 0 && text[runStart - 1] === marker) runStart--;
+    const length = cursor - runStart;
+    if ((length !== 1 && length !== 2) || text[cursor] === marker) break;
+    delimiters.push({ start: runStart, end: cursor, delimiter: marker.repeat(length) });
+    cursor = runStart;
+  }
+  return delimiters.reverse();
+}
+
+function readDelimitersAfter(text, offset) {
+  const delimiters = [];
+  let cursor = offset;
+  while (cursor < text.length) {
+    const marker = text[cursor];
+    if (marker !== '*' && marker !== '_') break;
+    let runEnd = cursor + 1;
+    while (runEnd < text.length && text[runEnd] === marker) runEnd++;
+    const length = runEnd - cursor;
+    if ((length !== 1 && length !== 2) || text[cursor - 1] === marker) break;
+    delimiters.push({ start: cursor, end: runEnd, delimiter: marker.repeat(length) });
+    cursor = runEnd;
+  }
+  return delimiters;
 }
 
 function isCompletePair(text, openingStart, contentStart, contentEnd, closingEnd, delimiter) {

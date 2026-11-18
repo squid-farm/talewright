@@ -192,6 +192,18 @@ async function testFormattingCommands(extension, editor, document) {
       && document.getText(editor.selection) === 'shortcut',
     'Ctrl+I must dispatch in the installed Talemark editor and restore the selected text');
     assert.equal(document.getText(editor.selection), 'shortcut');
+    assert.equal(await renderer.focusEditor(), true, 'Editor input must be focused before nested Ctrl+B');
+    await renderer.dispatchKey('b', 'KeyB', 66, 2);
+    await waitUntil(() => document.getText() === '_shortcut_'
+      && document.getText(editor.selection) === 'shortcut',
+    'Ctrl+B must remove enclosing bold through italic delimiters and retain the selection');
+    assert.equal(document.getText(editor.selection), 'shortcut');
+    assert.equal(await renderer.focusEditor(), true, 'Editor input must be focused before restoring Ctrl+B');
+    await renderer.dispatchKey('b', 'KeyB', 66, 2);
+    await waitUntil(() => document.getText() === '_**shortcut**_'
+      && document.getText(editor.selection) === 'shortcut',
+    'A second Ctrl+B must restore bold without accumulating delimiters');
+    assert.equal(document.getText(editor.selection), 'shortcut');
   } finally {
     renderer.close();
   }

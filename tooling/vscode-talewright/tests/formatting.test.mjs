@@ -60,6 +60,30 @@ test('formatting toggles delimiters included in the selection and preserves nest
   assert.equal(planFormattingEdit('_italic_', 1, 7, 'bold').replacement, '**italic**');
 });
 
+test('formatting removes enclosing styles through nested delimiters', () => {
+  for (const [text, style, expected, selectionOffset] of [
+    ['**_plain_**', 'bold', '_plain_', 1],
+    ['__*plain*__', 'bold', '*plain*', 1],
+    ['_**plain**_', 'italic', '**plain**', 2],
+    ['*__plain__*', 'italic', '__plain__', 2],
+  ]) {
+    const start = text.indexOf('plain');
+    const plan = planFormattingEdit(text, start, start + 'plain'.length, style);
+
+    assert.deepEqual(plan, {
+      start: 0,
+      end: text.length,
+      replacement: expected,
+      selectionOffset,
+      selectedText: 'plain',
+    });
+  }
+
+  const text = '_plain_';
+  const plan = planFormattingEdit(text, 1, 6, 'bold');
+  assert.equal(text.slice(0, plan.start) + plan.replacement + text.slice(plan.end), '_**plain**_');
+});
+
 test('italic formatting does not match part of a complete bold delimiter run', () => {
   const text = '**bold**';
   const plan = planFormattingEdit(text, 2, 6, 'italic');
@@ -118,4 +142,53 @@ test('overlapping multi-selection edits leave the document unchanged and notify 
 
   assert.equal(editCalls, 0);
   assert.deepEqual(warnings, ['Selected ranges overlap; no formatting changes were made.']);
+});
+
+test('nested formatting toggles preserve reversed selections across removal and restoration', async () => {
+  const commands = new Map();
+  const text = '**_plain_**';
+  const start = text.indexOf('plain');
+  let documentText = text;
+  const selection = (anchor, active) => ({
+    start: Math.min(anchor, active),
+    end: Math.max(anchor, active),
+    isReversed: anchor > active,
+  });
+  const editor = {
+    document: {
+      languageId: 'tale',
+      getText: () => documentText,
+      offsetAt: position => position,
+      positionAt: offset => offset,
+    },
+    selections: [selection(start + 'plain'.length, start)],
+    edit: async callback => {
+      const edits = [];
+      callback({ replace: (range, replacement) => edits.push({ ...range, replacement }) });
+      for (const edit of edits.sort((left, right) => right.start - left.start)) {
+        documentText = documentText.slice(0, edit.start) + edit.replacement + documentText.slice(edit.end);
+      }
+      return true;
+    },
+  };
+  const vscode = {
+    commands: {
+      registerCommand: (id, handler) => {
+        commands.set(id, handler);
+        return { dispose() {} };
+      },
+    },
+    Range: function (start, end) { return { start, end }; },
+    Selection: function (anchor, active) { return selection(anchor, active); },
+    window: { activeTextEditor: editor },
+  };
+  registerFormattingCommands({ subscriptions: [] }, vscode);
+
+  await commands.get('talewright.toggleBold')();
+  assert.equal(documentText, '_plain_');
+  assert.deepEqual(editor.selections[0], selection('plain'.length + 1, 1));
+
+  await commands.get('talewright.toggleBold')();
+  assert.equal(documentText, '_**plain**_');
+  assert.deepEqual(editor.selections[0], selection('plain'.length + 3, 3));
 });
