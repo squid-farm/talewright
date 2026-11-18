@@ -69,7 +69,7 @@ public sealed class PerformanceCorpus : IDisposable
         if (tier.StoryFileCount is < 2 or > 1_000 ||
             tier.SceneCount <= 0 ||
             tier.ExpandedBytes is <= 0 or > MaxExpandedBytes ||
-            tier.HistoryDepth is < 0 or > 10_000)
+            tier.HistoryDepth < 0)
         {
             throw new ArgumentOutOfRangeException(nameof(tier), "Corpus dimensions exceed the supported story limits.");
         }

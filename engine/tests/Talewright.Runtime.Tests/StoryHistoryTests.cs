@@ -472,13 +472,26 @@ public class StoryHistoryTests
             ReplayChoiceIdentities = [],
         });
 
-        var restored = StoryHistory.Restore(story, oldSave);
+        var inserted = new List<ReplayTransitionKind>();
+        var restored = StoryHistory.Restore(story, oldSave, inserted.Add);
 
         Assert.Equal("final", restored.Current.Scene!.Value.Value);
         Assert.Equal(["a", "middle", "final"],
             restored.Transcript.Select(frame => frame.Frame.Scene!.Value.Value));
         Assert.Equal(2, restored.Cursor);
         Assert.False(restored.CanBack);
+        Assert.Equal([
+            ReplayTransitionKind.InsertedAutomaticTransition,
+            ReplayTransitionKind.InsertedAutomaticTransition,
+        ], inserted);
+
+        var stored = new StoryHistory(story, 42);
+        var replayed = new List<ReplayTransitionKind>();
+        StoryHistory.Restore(story, stored.Save(), replayed.Add);
+        Assert.Equal([
+            ReplayTransitionKind.StoredAutomaticTransition,
+            ReplayTransitionKind.StoredAutomaticTransition,
+        ], replayed);
     }
 
     [Fact]
@@ -645,6 +658,27 @@ public class StoryHistoryTests
         restored.Forward();
         AssertEquivalent(history, restored);
         Assert.True(restored.Current.IsEnded);
+    }
+
+    [Fact]
+    public void Restore_executes_each_saved_transition_once_including_redo_after_a_middle_cursor()
+    {
+        var history = new StoryHistory(Compile(), 42);
+        history.Choose("c0");
+        history.Choose("c0");
+        history.Choose("c0");
+        history.Choose("c1");
+        history.Back();
+        var save = SaveFormat.Read(history.Save()) with { Continuation = null };
+        var executed = new List<ReplayTransitionKind>();
+
+        var restored = StoryHistory.Restore(history.Story, SaveFormat.Write(save), executed.Add);
+
+        Assert.Equal(save.Choices.Count, executed.Count);
+        Assert.All(executed, kind => Assert.Equal(ReplayTransitionKind.SavedChoice, kind));
+        Assert.Equal(history.Cursor, restored.Cursor);
+        Assert.Equal(history.Events, restored.Events);
+        Assert.True(restored.CanForward);
     }
 
     [Theory]

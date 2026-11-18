@@ -36,12 +36,13 @@ public sealed class StorySession : IStorySession
     private readonly TriggerEngine _triggers;
     private readonly SceneExecutor _executor;
     private readonly ReplayIdentityTable _replayIdentities;
+    private readonly CharacterSelection? _character;
     private readonly bool _captureEntry;
     private readonly Action<RuleDecision>? _observer;
     private readonly Action<SceneEntryBoundary, IReadOnlyList<GameEvent>>? _beforeEntry;
     private readonly Action<SceneId, IReadOnlyList<AuthorEntryReplayStep>>? _afterEntry;
     private readonly Dictionary<string,
-        (Action<List<RenderedBlock>> Execute, ReadOnlyMemory<byte>? ReplayIdentity)> _actions = new(StringComparer.Ordinal);
+        (Action<List<RenderedBlock>> Execute, ReadOnlyMemory<byte>? ReplayIdentity, ChoiceExecution Execution)> _actions = new(StringComparer.Ordinal);
     private IReadOnlyList<RenderedBlock> _pendingNotes = [];
     private IReadOnlyList<RenderedBlock> _entryPrelude = [];
     private readonly List<RenderedBlock> _editNotes = [];
@@ -72,14 +73,26 @@ public sealed class StorySession : IStorySession
         Action<SceneEntryBoundary, IReadOnlyList<GameEvent>>? beforeEntry = null,
         Action<SceneId, IReadOnlyList<AuthorEntryReplayStep>>? afterEntry = null,
         IReadOnlyList<GameEvent>? initialEvents = null, IReadOnlyList<string>? triggerEdges = null,
-        bool? captureEntry = null)
+        bool? captureEntry = null, EventLog? eventLog = null,
+        IReadOnlyList<bool?>? statVisibilityBeforeEvents = null, TriggerEngine? triggerEngine = null)
     {
         Seed = DeterministicDice.ResolveSeed(seed, story.Seed);
         character = CharacterSelection.Validate(story, character, Seed);
+        _character = character;
         _replayIdentities = story.ReplayIdentities;
         Story = story;
-        _log = initialEvents is null ? new EventLog(story.World, Seed) : EventLog.Replay(story.World, Seed, initialEvents);
-        if (initialEvents is not null)
+        _log = eventLog ?? (initialEvents is null
+            ? new EventLog(story.World, Seed)
+            : EventLog.Replay(story.World, Seed, initialEvents));
+        if (eventLog is not null)
+        {
+            if (statVisibilityBeforeEvents is null || statVisibilityBeforeEvents.Count != _log.Events.Count)
+            {
+                throw new ArgumentException("A forked session must preserve event visibility state.", nameof(statVisibilityBeforeEvents));
+            }
+            _statVisibilityBeforeEvents.AddRange(statVisibilityBeforeEvents);
+        }
+        else if (initialEvents is not null)
         {
             var visibilityState = GameState.CreateInitial(story.World, Seed);
             foreach (var gameEvent in initialEvents)
@@ -102,7 +115,7 @@ public sealed class StorySession : IStorySession
             _statVisibilityBeforeEvents.Add(_nextStatVisibility);
             _nextStatVisibility = null;
         };
-        if (initialEvents is null && character is not null)
+        if (initialEvents is null && eventLog is null && character is not null)
         {
             var player = story.World.Characters[EntityId.Player];
             _log.Append(new CharacterIdentityChanged(EntityId.Player,
@@ -133,8 +146,8 @@ public sealed class StorySession : IStorySession
         _observer = observer;
         _beforeEntry = beforeEntry;
         _afterEntry = afterEntry;
-        _triggers = new TriggerEngine(story.Triggers, story.Predicates, _log.State, observer, _log.Events.Count,
-            ResolveTriggerSkillCheck, triggerEdges);
+        _triggers = triggerEngine ?? new TriggerEngine(story.Triggers, story.Predicates, _log.State, observer,
+            _log.Events.Count, ResolveTriggerSkillCheck, triggerEdges);
         var renderer = new TemplateRenderer(grammar ?? new EnglishGrammar(), story.Predicates);
         _executor = new SceneExecutor(story, _log, renderer, AfterBatch, observer, _captureEntry, MakeChoice, NotesSince);
     }
@@ -194,6 +207,22 @@ public sealed class StorySession : IStorySession
     {
         var session = new StorySession(story, seed, null, character, null, null, null, null, events, triggerEdges,
             captureEntry: false);
+        return Resume(session, story, target, pending);
+    }
+
+    internal static StorySession Resume(StoryDefinition story, ulong seed, CharacterSelection? character,
+        EventLog eventLog, IReadOnlyList<bool?> statVisibilityBeforeEvents, IReadOnlyList<string> triggerEdges,
+        DivertTarget target, IReadOnlyList<RenderedBlock> pending)
+    {
+        var session = new StorySession(story, seed, null, character, null, null, null, null,
+            triggerEdges: triggerEdges, captureEntry: false, eventLog: eventLog,
+            statVisibilityBeforeEvents: statVisibilityBeforeEvents);
+        return Resume(session, story, target, pending);
+    }
+
+    private static StorySession Resume(StorySession session, StoryDefinition story, DivertTarget target,
+        IReadOnlyList<RenderedBlock> pending)
+    {
         if (target.IsEnd && session.State.CurrentScene is { } sourceId)
         {
             // A direct ending normally inherits the frame it was chosen from.
@@ -209,6 +238,37 @@ public sealed class StorySession : IStorySession
 
     /// <summary>The state boundary immediately before the current frame's scene (or ending) was entered.</summary>
     internal PlayerEntryBoundary? LastEntry { get; private set; }
+
+    internal StorySession ForkForReplayCursor()
+    {
+        var eventLog = _log.Fork();
+        var fork = new StorySession(Story, Seed, grammar: null, _character, setup: null, observer: null,
+            initialEvents: null, triggerEdges: _triggers.CaptureEdgeMemory(), captureEntry: _captureEntry,
+            eventLog: eventLog, statVisibilityBeforeEvents: _statVisibilityBeforeEvents,
+            triggerEngine: _triggers.Fork(eventLog.State))
+        {
+            Current = Current,
+            LastEntry = LastEntry,
+            _pendingNotes = _pendingNotes,
+            _entryPrelude = _entryPrelude,
+        };
+        foreach (var (key, action) in _actions)
+        {
+            fork._actions.Add(key, (fork.Bind(action.Execution), action.ReplayIdentity, action.Execution));
+        }
+        return fork;
+    }
+
+    private Action<List<RenderedBlock>> Bind(ChoiceExecution execution) => execution switch
+    {
+        ChoiceStepExecution choice => notes => MakeChoice(choice.Scene, choice.Step, notes),
+        DivertExecution divert => notes =>
+        {
+            _log.Append(new ChoiceMade(divert.Scene.Id, divert.Key));
+            Enter(divert.Target, notes);
+        },
+        _ => throw new NotSupportedException($"Unknown choice execution '{execution.GetType().Name}'."),
+    };
 
     internal void EditAuthorState(AuthorSetup values)
     {
@@ -289,7 +349,15 @@ public sealed class StorySession : IStorySession
                 continue;
             }
 
-            selected = _executor.View(step.Choice);
+            foreach (var offered in Current.Choices)
+            {
+                if (offered.Key == step.Choice.Key)
+                {
+                    selected = offered;
+                    break;
+                }
+            }
+            selected ??= _executor.View(step.Choice);
             MakeChoice(scene, step, []);
             return true;
         }
@@ -425,7 +493,7 @@ public sealed class StorySession : IStorySession
                 _log.Append(new ChoiceMade(scene.Id, key));
                 Enter(target, notes);
             },
-            _replayIdentities.ForDivert(scene.Id, target));
+            _replayIdentities.ForDivert(scene.Id, target), new DivertExecution(scene, key, target));
     }
 
     private Func<IReadOnlyList<RenderedInline>> HubLabelSource(SceneDefinition storylet) =>
@@ -442,7 +510,7 @@ public sealed class StorySession : IStorySession
                 _log.Append(new ChoiceMade(source.Id, ContinueKey));
                 Enter(target, notes);
             },
-            _replayIdentities.ForDivert(source.Id, target));
+            _replayIdentities.ForDivert(source.Id, target), new DivertExecution(source, ContinueKey, target));
         return [new(candidate, ChoiceAvailability.CreateView(candidate), IsAvailable: true)];
     }
 
@@ -505,8 +573,19 @@ public sealed class StorySession : IStorySession
 
     private IEnumerable<RenderedBlock> NotesSince(int mark)
     {
-        var events = _log.Events.Skip(mark).ToArray();
-        var visibility = _statVisibilityBeforeEvents.Skip(mark).Take(events.Length).ToArray();
+        var count = _log.Events.Count - mark;
+        if (count == 0)
+        {
+            return [];
+        }
+
+        var events = new GameEvent[count];
+        var visibility = new bool?[count];
+        for (var index = 0; index < count; index++)
+        {
+            events[index] = _log.Events[mark + index];
+            visibility[index] = _statVisibilityBeforeEvents[mark + index];
+        }
         return EventNarrator.Describe(events, _log.State, visibility);
     }
 
@@ -519,7 +598,10 @@ public sealed class StorySession : IStorySession
         _actions.Clear();
         foreach (var choice in menu.Choices.Where(choice => choice.IsAvailable))
         {
-            _actions[choice.Candidate.Key] = (choice.Candidate.Destination, choice.View.ReplayIdentity);
+            var execution = choice.Candidate.Execution
+                ?? throw new InvalidOperationException($"Choice '{choice.Candidate.Key}' has no replayable execution.");
+            _actions[choice.Candidate.Key] =
+                (choice.Candidate.Destination, choice.View.ReplayIdentity, execution);
         }
 
         Current = new StoryFrame(scene.Id, scene.Title, new RenderedDocument(blocks),

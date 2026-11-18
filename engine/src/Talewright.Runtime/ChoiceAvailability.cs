@@ -12,7 +12,12 @@ internal sealed record ChoiceCandidate(
     Func<IReadOnlyList<RenderedInline>> LabelSource,
     Func<IReadOnlyList<RenderedInline>>? ShownLabelSource,
     Action<List<RenderedBlock>> Destination,
-    ReadOnlyMemory<byte>? ReplayIdentity);
+    ReadOnlyMemory<byte>? ReplayIdentity,
+    ChoiceExecution? Execution = null);
+
+internal abstract record ChoiceExecution;
+internal sealed record ChoiceStepExecution(SceneDefinition Scene, ChoiceStep Step) : ChoiceExecution;
+internal sealed record DivertExecution(SceneDefinition Scene, string Key, DivertTarget Target) : ChoiceExecution;
 
 internal sealed record VisibleChoice(ChoiceCandidate Candidate, ChoiceView View, bool IsAvailable);
 

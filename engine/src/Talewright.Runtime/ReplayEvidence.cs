@@ -81,6 +81,49 @@ internal static class ReplayEvidence
             WriteEvents(writer, events, eventStart, choiceIdentity.Span);
         });
 
+    internal sealed class HashContext : IDisposable
+    {
+        private readonly IncrementalHash _hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        private readonly HashBufferWriter _buffer;
+        private readonly Utf8JsonWriter _writer;
+
+        public HashContext()
+        {
+            _buffer = new HashBufferWriter(_hash);
+            _writer = new Utf8JsonWriter(_buffer);
+        }
+
+        public byte[] Hash(Action<Utf8JsonWriter> write)
+        {
+            _writer.WriteStartArray();
+            write(_writer);
+            _writer.WriteEndArray();
+            _writer.Flush();
+            var digest = _hash.GetHashAndReset();
+            _writer.Reset(_buffer);
+            return digest;
+        }
+
+        public void Dispose()
+        {
+            _writer.Dispose();
+            _hash.Dispose();
+        }
+    }
+
+    internal static HashContext CreateHashContext() => new();
+
+    internal static byte[] Next(HashContext context, byte[] previous, StoryFrame frame,
+        ReadOnlyMemory<byte> choiceIdentity, IReadOnlyList<GameEvent> events, int eventStart) =>
+        context.Hash(writer =>
+        {
+            writer.WriteStringValue("choice");
+            writer.WriteBase64StringValue(previous);
+            writer.WriteStringValue(frame.Scene?.Value);
+            writer.WriteBase64StringValue(choiceIdentity.Span);
+            WriteEvents(writer, events, eventStart, choiceIdentity.Span);
+        });
+
     private static byte[] Hash(Action<Utf8JsonWriter> write)
     {
         using var hash = SHA256.Create();
@@ -93,6 +136,47 @@ internal static class ReplayEvidence
         }
         stream.FlushFinalBlock();
         return hash.Hash ?? throw new InvalidOperationException("Replay evidence could not be calculated.");
+    }
+
+    private sealed class HashBufferWriter(IncrementalHash hash) : IBufferWriter<byte>
+    {
+        private byte[] _buffer = new byte[256];
+
+        public void Advance(int count)
+        {
+            if ((uint)count > (uint)_buffer.Length)
+            {
+                throw new ArgumentOutOfRangeException(nameof(count));
+            }
+            if (count > 0)
+            {
+                hash.AppendData(_buffer.AsSpan(0, count));
+            }
+        }
+
+        public Memory<byte> GetMemory(int sizeHint = 0)
+        {
+            EnsureCapacity(sizeHint);
+            return _buffer;
+        }
+
+        public Span<byte> GetSpan(int sizeHint = 0)
+        {
+            EnsureCapacity(sizeHint);
+            return _buffer;
+        }
+
+        private void EnsureCapacity(int sizeHint)
+        {
+            if (sizeHint < 0)
+            {
+                throw new ArgumentOutOfRangeException(nameof(sizeHint));
+            }
+            if (sizeHint > _buffer.Length)
+            {
+                Array.Resize(ref _buffer, sizeHint);
+            }
+        }
     }
 
     private static byte[] Input(Action<Utf8JsonWriter> write)

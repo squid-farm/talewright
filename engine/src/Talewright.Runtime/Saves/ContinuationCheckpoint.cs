@@ -18,7 +18,7 @@ internal sealed class ContinuationCheckpoint
 {
     private ContinuationCheckpoint(CheckpointPayload payload, IReadOnlyList<GameEvent> events,
         IReadOnlyList<string> triggerEdges, DivertTarget target, IReadOnlyList<RenderedBlock> pending,
-        CheckpointPayload retained)
+        CheckpointPayload retained, EventLog eventLog, IReadOnlyList<bool?> statVisibilityBeforeEvents)
     {
         Payload = payload;
         Retained = retained;
@@ -26,6 +26,8 @@ internal sealed class ContinuationCheckpoint
         TriggerEdges = triggerEdges;
         Target = target;
         Pending = pending;
+        EventLog = eventLog;
+        StatVisibilityBeforeEvents = statVisibilityBeforeEvents;
     }
 
     /// <summary>The checkpoint as stored, normalised to the story it was rebuilt for, including retained values.</summary>
@@ -34,11 +36,14 @@ internal sealed class ContinuationCheckpoint
     public IReadOnlyList<string> TriggerEdges { get; }
     public DivertTarget Target { get; }
     public IReadOnlyList<RenderedBlock> Pending { get; }
+    private EventLog EventLog { get; }
+    private IReadOnlyList<bool?> StatVisibilityBeforeEvents { get; }
     /// <summary>Saved values the story no longer declares; written back into later checkpoints.</summary>
     public CheckpointPayload Retained { get; }
 
     public StorySession Resume(StoryDefinition story, ulong seed, CharacterSelection? character) =>
-        StorySession.Resume(story, seed, character, Events, TriggerEdges, Target, Pending);
+        StorySession.Resume(story, seed, character, EventLog.Fork(), StatVisibilityBeforeEvents, TriggerEdges,
+            Target, Pending);
 
     public static void ValidatePayload(ContinuationPayload continuation)
     {
@@ -145,6 +150,12 @@ internal sealed class ContinuationCheckpoint
         PlayerEntryBoundary boundary, CheckpointPayload? retained)
     {
         var state = EventLog.Replay(story.World, seed, events.Take(boundary.EventCount)).State;
+        return Capture(story, state, boundary, retained);
+    }
+
+    private static CheckpointPayload Capture(StoryDefinition story, GameState state,
+        PlayerEntryBoundary boundary, CheckpointPayload? retained)
+    {
         var world = story.World;
         var payload = new CheckpointPayload
         {
@@ -375,7 +386,17 @@ internal sealed class ContinuationCheckpoint
             }
         }
 
-        var state = EventLog.Replay(world, seed, events).State;
+        var eventLog = new EventLog(world, seed);
+        var statVisibilityBeforeEvents = new List<bool?>(events.Count);
+        eventLog.Appending += gameEvent =>
+        {
+            var stat = StatDisclosureVisibility.StatFor(gameEvent, world.Ruleset);
+            statVisibilityBeforeEvents.Add(stat is { } id
+                ? story.IsStatVisible(id, eventLog.State)
+                : null);
+        };
+        eventLog.AppendRange(events);
+        var state = eventLog.State;
         var known = saved.KnownTriggers.ToHashSet(StringComparer.Ordinal);
         var savedEdges = saved.TriggerEdges.ToHashSet(StringComparer.Ordinal);
         // New triggers are primed against the loaded state, so an update alone never fires one.
@@ -387,9 +408,10 @@ internal sealed class ContinuationCheckpoint
             .Order(StringComparer.Ordinal).ToArray();
 
         var pending = TranscriptCodec.Decode(saved.Pending);
-        var normalized = Capture(story, seed, events,
-            new PlayerEntryBoundary(target, events.Count, edges, pending), retained);
-        return new ContinuationCheckpoint(normalized, events.AsReadOnly(), edges, target, pending, retained);
+        var normalized = Capture(story, state, new PlayerEntryBoundary(target, events.Count, edges, pending),
+            retained);
+        return new ContinuationCheckpoint(normalized, events.AsReadOnly(), edges, target, pending, retained,
+            eventLog, statVisibilityBeforeEvents.AsReadOnly());
     }
 
     private static void Merge(CheckpointPayload payload, CheckpointPayload retained)

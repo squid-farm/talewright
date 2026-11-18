@@ -35,27 +35,31 @@ public sealed partial class StoryHistory
     });
 
     public static StoryHistory Restore(StoryDefinition story, ReadOnlySpan<byte> data)
+        => Restore(story, data, replayTransitionObserved: null);
+
+    internal static StoryHistory Restore(StoryDefinition story, ReadOnlySpan<byte> data,
+        Action<ReplayTransitionKind>? replayTransitionObserved)
     {
         var save = SaveFormat.Read(data);
         RequireSameStory(story, save);
         if (save.Continuation?.Payload is not { } continuation)
         {
-            return RestoreByReplay(story, save);
+            return RestoreByReplay(story, save, replayTransitionObserved);
         }
 
         var changed = save.StoryVersion != story.Version || save.ContentFingerprint != story.ContentFingerprint;
         if (!changed)
         {
             return continuation.Base is null
-                ? RestoreByReplay(story, save)
-                : ReplayFromBase(story, continuation, save);
+                ? RestoreByReplay(story, save, replayTransitionObserved)
+                : ReplayFromBase(story, continuation, save, replayTransitionObserved);
         }
 
         if (continuation.Base is null)
         {
             try
             {
-                return RestoreByReplay(story, save);
+                return RestoreByReplay(story, save, replayTransitionObserved);
             }
             catch (InvalidDataException)
             {
@@ -99,21 +103,20 @@ public sealed partial class StoryHistory
         }
     }
 
-    private static StoryHistory ReplayFromBase(StoryDefinition story, ContinuationPayload saved, SavedGame save)
+    private static StoryHistory ReplayFromBase(StoryDefinition story, ContinuationPayload saved, SavedGame save,
+        Action<ReplayTransitionKind>? replayTransitionObserved)
     {
         try
         {
             var character = ValidateCharacter(story, save, changed: false);
             var origin = ContinuationCheckpoint.Rebuild(story, save.Seed, character, saved.Base!, []);
             var all = ReplayWithAutomaticContinuations(story, save.Seed, save.Choices, null, character,
-                origin: origin, baseTranscriptLength: saved.BaseTranscriptLength);
+                origin: origin, baseTranscriptLength: saved.BaseTranscriptLength, requestedCursor: save.Cursor,
+                replayTransitionObserved: replayTransitionObserved);
             var cursor = all.CursorPositions[save.Cursor];
-            var current = cursor == all.Choices.Count ? all
-                : ReplayWithAutomaticContinuations(story, save.Seed, all.Choices.Take(cursor).ToArray(), null,
-                    character, origin: origin, baseTranscriptLength: saved.BaseTranscriptLength);
-            return new StoryHistory(story, character, current.Session, current.Frames, all.Choices,
+            return new StoryHistory(story, character, all.CursorSession, all.CursorFrames, all.Choices,
                 new ReplayCursor(cursor, all.Choices.Count), null, null, all.AutomaticChoices, KeyOf(save),
-                current.AutomaticContinuationError)
+                all.CursorAutomaticContinuationError)
             {
                 _origin = origin,
                 _prefix = saved.Transcript!.Take(saved.BaseTranscriptLength).Select(TranscriptCodec.Decode).ToArray(),

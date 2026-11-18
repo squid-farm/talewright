@@ -18,6 +18,8 @@ public class IndependentDimensionBenchmarks
     private StoryDefinition _changedStory = null!;
     private StoryHistory _history = null!;
     private byte[] _save = [];
+    private byte[] _redoSave = [];
+    private int _redoCursor;
 
     [ParamsSource(nameof(Cases))]
     public string CorpusCase { get; set; } = "";
@@ -27,7 +29,7 @@ public class IndependentDimensionBenchmarks
         "files-10", "files-100", "files-500", "files-1000",
         "bytes-512KiB", "bytes-5MiB", "bytes-25MiB", "bytes-50MiB",
         "scenes-100", "scenes-1000", "scenes-10000", "scenes-50000",
-        "history-100", "history-1000", "history-5000", "history-10000",
+        "history-100", "history-1000", "history-5000", "history-10000", "history-100000",
         "layout-few-files", "layout-many-files",
     ];
 
@@ -54,6 +56,8 @@ public class IndependentDimensionBenchmarks
 
         _history = history;
         _save = history.Save();
+        _redoCursor = history.PlaythroughLength / 2;
+        _redoSave = MakeRedoSave(_save, _redoCursor);
         _changedStory = AddStartEffect(_source);
         if (StoryHistory.Restore(_changedStory, _save).Continuation is null)
         {
@@ -91,6 +95,18 @@ public class IndependentDimensionBenchmarks
         if (restored.Cursor != GetTier(CorpusCase).HistoryDepth)
         {
             throw new InvalidOperationException("Restore did not reproduce the configured history depth.");
+        }
+
+        return restored;
+    }
+
+    [Benchmark]
+    public StoryHistory RestoreAtRedoCursor()
+    {
+        var restored = StoryHistory.Restore(_story, _redoSave);
+        if (restored.Cursor != _redoCursor)
+        {
+            throw new InvalidOperationException("Restore did not reproduce the configured redo cursor.");
         }
 
         return restored;
@@ -190,4 +206,16 @@ public class IndependentDimensionBenchmarks
     }
 
     private static int DecodedSaveBytes(ReadOnlySpan<byte> save) => SaveFormat.DecodedBodyLength(save);
+
+    private static byte[] MakeRedoSave(byte[] endSave, int cursor)
+    {
+        var save = SaveFormat.Read(endSave) with
+        {
+            Cursor = cursor,
+            ReplayEvidence = null,
+            ReplayChoiceIdentities = null,
+            Continuation = null,
+        };
+        return SaveFormat.Write(save);
+    }
 }

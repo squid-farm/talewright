@@ -44,6 +44,89 @@ depth. Save sizes are the container length and decoded MessagePack body length.
 | 5,000 | 28,125 / 461,698 B | 12.106 ms / 4.63 MiB | 95.140 ms / 58.74 MiB | 104.680 ms / 62.07 MiB |
 | 10,000 | 53,390 / 932,347 B | 29.479 ms / 9.25 MiB | 168.890 ms / 116.24 MiB | 199.610 ms / 125.10 MiB |
 
+### Replay consolidation: Release comparison and PR gates
+
+The table above is the pre-consolidation 10,000-history baseline. This comparison
+uses the same generated `PerformanceCorpus` `history-10000` case, end cursor,
+BenchmarkDotNet 0.15.2 out-of-process job, one launch, five warmups and thirty
+iterations. Allocations are BDN managed bytes (its `MB` display uses 1,024-based
+units). The save is 53,390 encoded / 932,347 decoded bytes.
+
+| `history-10000` operation | Before mean / allocation | After mean / allocation |
+|---|---:|---:|
+| Save | 29.479 ms / 9.25 MiB | 22.328 ms / 9.25 MiB |
+| Exact restore | 168.890 ms / 116.24 MiB | 116.310 ms / 78.26 MiB |
+| Changed-story continuation | 199.610 ms / 125.10 MiB | 130.852 ms / 85.21 MiB |
+
+The deterministic CI gate uses a separate, smaller two-choice independent loop
+and enforces the issue's 64 MiB ceiling on a 10,000-choice exact replay,
+continuation fallback and continuation-base restore. Its warmed Release
+measurements on this host were:
+
+| Operation | Measured allocation / time | Ceiling |
+|---|---:|---:|
+| Independent save, end / redo cursor 5,000 | 5.44 / 3.25 MiB; 24.6 / 10.4 ms | 12 MiB |
+| Independent restore, end / redo cursor 5,000 | 52.24 / 46.34 MiB; 172.5 / 107.0 ms | 64 MiB |
+| Independent changed-story continuation fallback | 63.43 MiB; 187.4 ms | 64 MiB |
+| Independent continuation-base restore | 8.89 MiB; 45.8 ms | 64 MiB |
+| Ordinary next choice at depth 9,999 | 0.01 MiB; 0.2 ms | Report-only |
+
+The continuation fallback has about 0.57 MiB (0.9%) of headroom under the
+required ceiling, so this is a tight regression gate rather than a broad
+performance budget. The focused test warms once, constructs fixtures outside
+the measurement, and validates cursor and playthrough length after each
+operation. The separate save ceiling intentionally allows about 2.2x the
+independent end-save allocation.
+
+The realistic gate uses `RealisticStory` with 20 chapters (946 scenes, 22 files,
+about 693 KB of source), 10,000 requested actions and 10,000 saved transitions;
+the existing playthrough limit stops the route after 6,665 completed actions.
+It contains automatic transitions and checks both end and redo cursors:
+
+| Operation | End allocation / time | Redo allocation / time | Ceiling |
+|---|---:|---:|---:|
+| Save | 23.31 MiB / 65.6 ms | 12.30 MiB / 31.6 ms | 32 MiB |
+| Exact restore | 1,021.51 MiB / 736.4 ms | 874.65 MiB / 514.4 ms | 1,536 MiB |
+| Changed-story continuation | 1,035.72 MiB / 769.6 ms | — | 1,280 MiB |
+
+The realistic save ceiling is 37% above the measured end save; exact restore
+and continuation ceilings are about 50% and 24% above their measured rows.
+The 10,000-action save is 65,365 encoded / 7,033,682 decoded bytes. These are
+per-operation cumulative managed allocations, not retained heap or peak RSS.
+The focused gate's wall times are single warmed observations, not timing
+budgets. The BenchmarkDotNet comparison above is the timing evidence for the
+independent history fixture.
+
+The same BenchmarkDotNet job measured the realistic 20-chapter fixture at
+10,000 requested actions (6,665 completed; 10,000 saved choices) after
+consolidation:
+
+| Operation | Before mean / allocation | After mean / allocation |
+|---|---:|---:|
+| Save | 83.626 ms / 23.31 MiB | 68.488 ms / 23.31 MiB |
+| Exact restore | 1,600.231 ms / 2,071.45 MiB | 705.675 ms / 1,021.2 MiB |
+| Changed-story continuation | 720.166 ms / 1,078.12 MiB | 864.774 ms / 1.01 GiB |
+
+Exact replay allocation fell by about half. This continuation timing did not
+improve in the recorded run: its P95 was 1,024.7 ms, with several high outliers.
+The managed allocation was about 1.01 GiB, slightly below the historical
+1,078.12 MiB. This noisy result is reported rather than presented as a speedup.
+
+Measurements used Linux Mint 22.3 x64, AMD Ryzen 9 7940HS (16 logical / 8
+physical cores), .NET 10.0.15 / SDK 10.0.115, BenchmarkDotNet 0.15.2 and
+Concurrent Workstation GC. The ordinary next-choice observation is separate
+from save/restore. Allocation stacks and live/peak memory are not measured;
+browser/WebAssembly headroom remains unknown. Full-history per-choice autosave
+is still cumulative quadratic work and is not changed here.
+
+The 100,000-transition Release comparison is not yet available: this branch's
+base still enforces the existing 10,000-choice limit. Issue #768, which removes
+that limit, is open; its Debug measurements are not substitutes for the
+required comparable Release results. Re-run the 100,000 saved-transition,
+end/redo and continuation rows after coordinating the combined implementation
+with #768. Do not raise any limit or infer 100,000-transition cost from these
+10,000-transition measurements.
+
 The realistic desktop benchmark uses a generated 20-chapter story. Requested
 actions and saved choices differ because automatic choices also contribute to
 the 10,000-choice cap. The 10,000-action case stops at exactly 10,000 saved
@@ -324,6 +407,10 @@ From the repository root:
 # Save, replay-restore and continuation-restore at each independent history depth.
 MSBUILDDISABLENODEREUSE=1 dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
   --filter '*IndependentDimensionBenchmarks.*AtConfiguredDepth*history-*' --artifacts artifacts/scorecard/saves
+
+# Normal-PR work-count and warmed Release allocation gates.
+MSBUILDDISABLENODEREUSE=1 dotnet test engine/tests/Talewright.Runtime.Tests -c Release \
+  --filter FullyQualifiedName~ReplayAllocationTests
 
 # All realistic-story benchmarks, including 20-chapter save, replay and continuation cases.
 MSBUILDDISABLENODEREUSE=1 dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \

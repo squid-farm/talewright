@@ -27,6 +27,8 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
     private readonly List<string> _visits = [];
     private readonly HashSet<string> _settled = new(StringComparer.Ordinal);
     private readonly List<ChoiceStep> _replayChoices = [];
+    private readonly Dictionary<ChoiceStep, ChoiceCandidate> _choiceCandidates =
+        new(ReferenceEqualityComparer.Instance);
     private readonly List<AuthorEntryReplayStep> _entryReplay = [];
     private readonly Func<int, IEnumerable<RenderedBlock>> _notesSince = notesSince;
     internal EvaluationContext Context => new(log.State, story.Predicates)
@@ -243,11 +245,18 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
 
     private ChoiceCandidate CreateCandidate(SceneDefinition scene, ChoiceStep step)
     {
+        if (_choiceCandidates.TryGetValue(step, out var cached))
+        {
+            return cached;
+        }
+
         var label = LabelSource(step.Choice);
-        return new(step.Choice.Key, step.Choice.Requires, label,
+        var candidate = new ChoiceCandidate(step.Choice.Key, step.Choice.Requires, label,
             ChoiceAvailability.ShownLabelSource(step.Choice.Shown, label, Render),
             notes => makeChoice(scene, step, notes),
-            _replayIdentities.For(step.Choice));
+            _replayIdentities.For(step.Choice), new ChoiceStepExecution(scene, step));
+        _choiceCandidates.Add(step, candidate);
+        return candidate;
     }
 
     private Func<IReadOnlyList<RenderedInline>> LabelSource(ChoiceDefinition choice)
