@@ -930,6 +930,8 @@ internal sealed partial class TaleBinder
                 }
             }
 
+            AddDifficultyCompletion(analysis, spec, clauses);
+
             // A known actor needs a stat slot both before and after a following dc clause.
             if (words.Count == 1 &&
                 (spec.DifficultyWord == 0 && difficultyClause is null ||
@@ -987,6 +989,70 @@ internal sealed partial class TaleBinder
         var identity = CreateSkillCheckIdentity(actor, skill);
         return (new SkillCheck(actor, skill, dc, hidden), identity);
     }
+
+    private void AddDifficultyCompletion(AnalysisCollector analysis, TaleClause spec,
+        ReadOnlySpan<TaleClause> clauses)
+    {
+        if (spec.DifficultyWord > 0)
+            return;
+        foreach (var clause in clauses[1..])
+            if (clause.Kind == TaleClauseKind.CheckHidden)
+                return;
+
+        var specEnd = spec.ValueStart + spec.ValueLength;
+        var words = new List<(int Start, int End)>();
+        for (var position = spec.ValueStart; position < specEnd;)
+        {
+            while (position < specEnd && _text[_lineStart + position] == ' ')
+                position++;
+            if (position == specEnd)
+                break;
+
+            var end = position;
+            while (end < specEnd && _text[_lineStart + end] != ' ')
+                end++;
+            words.Add((position, end));
+            position = end;
+        }
+
+        if (words.Count == 0)
+            return;
+
+        var last = words[^1];
+        var lastText = _text[(_lineStart + last.Start)..(_lineStart + last.End)];
+        var isPartialDifficulty = lastText.Length < SceneVocabulary.Difficulty.Length &&
+            SceneVocabulary.Difficulty.StartsWith(lastText, StringComparison.OrdinalIgnoreCase);
+        if (isPartialDifficulty && last.End == specEnd)
+        {
+            var statBeforeDifficulty = words.Count == 2 && IsStatWord(words[0]) ||
+                words.Count == 3 && IsCharacterWord(words[0]) && IsStatWord(words[1]);
+            if (statBeforeDifficulty)
+                analysis.KeywordCompletion(lastText, At(last.Start), SceneVocabulary.Difficulty,
+                    completionSuffix: " ");
+            return;
+        }
+
+        var hasStat = words.Count == 1 && IsStatWord(words[0]) ||
+            words.Count == 2 && IsCharacterWord(words[0]) && IsStatWord(words[1]);
+        if (!hasStat)
+            return;
+
+        var completionPosition = specEnd;
+        while (completionPosition < _lineLength && char.IsWhiteSpace(_text[_lineStart + completionPosition]))
+            completionPosition++;
+        if (completionPosition != _lineLength)
+            return;
+
+        var prefix = completionPosition == last.End ? " " : "";
+        analysis.KeywordCompletion("", At(completionPosition), SceneVocabulary.Difficulty, prefix, " ");
+    }
+
+    private bool IsStatWord((int Start, int End) word) =>
+        _symbols.World.Ruleset.HasStat(new StatId(_text[(_lineStart + word.Start)..(_lineStart + word.End)]));
+
+    private bool IsCharacterWord((int Start, int End) word) =>
+        _symbols.World.Characters.ContainsKey(
+            new EntityId(_text[(_lineStart + word.Start)..(_lineStart + word.End)]));
 
     private SkillCheckIdentity CreateSkillCheckIdentity(EntityId actor, StatId skill)
     {
