@@ -1113,6 +1113,86 @@ public class StoryHistoryTests
         }
     }
 
+    // A producer that builds the model itself supplies the fingerprint and the choice key; the compiler no longer does.
+    private static StoryDefinition BuildProgrammaticStory(string? fingerprint, string choiceKey)
+    {
+        var compiled = Compile(Yaml, "=== a
+~ var:visits += 1
+* [Again] -> a");
+        var scene = compiled.GetScene(compiled.Start);
+        return new StoryDefinition
+        {
+            Id = compiled.Id,
+            Title = compiled.Title,
+            Version = compiled.Version,
+            ContentFingerprint = fingerprint,
+            UndoEnabled = compiled.UndoEnabled,
+            Creation = compiled.Creation,
+            Start = compiled.Start,
+            Randomness = compiled.Randomness,
+            Seed = compiled.Seed,
+            World = compiled.World,
+            Triggers = compiled.Triggers,
+            Predicates = compiled.Predicates,
+            Scenes =
+            [
+                new SceneDefinition
+                {
+                    Id = scene.Id,
+                    Title = scene.Title,
+                    Requires = scene.Requires,
+                    Tags = scene.Tags,
+                    Priority = scene.Priority,
+                    Once = scene.Once,
+                    Hub = scene.Hub,
+                    HubLimit = scene.HubLimit,
+                    Steps =
+                    [
+                        new ChoiceStep("step:2:1", scene.Steps[0].Source, new ChoiceDefinition
+                        {
+                            Key = choiceKey,
+                            Label = scene.Choices[0].Label,
+                            Divert = new DivertTarget(compiled.Start),
+                        }),
+                    ],
+                },
+            ],
+        };
+    }
+
+    [Fact]
+    public void Programmatic_story_with_an_explicit_fingerprint_and_stable_choice_key_saves_and_restores()
+    {
+        var fingerprint = new string('A', 64);
+        var story = BuildProgrammaticStory(fingerprint, "take-the-lantern");
+        var history = new StoryHistory(story, 7);
+        history.Choose("take-the-lantern");
+        history.Choose("take-the-lantern");
+
+        var save = history.Save();
+        var saved = SaveFormat.Read(save);
+        Assert.Equal(fingerprint, saved.ContentFingerprint);
+        Assert.Equal(["take-the-lantern", "take-the-lantern"], saved.Choices);
+
+        var restored = StoryHistory.Restore(BuildProgrammaticStory(fingerprint, "take-the-lantern"), save);
+        Assert.Equal(history.Cursor, restored.Cursor);
+        Assert.True(history.TryProgressKey(out var progress));
+        Assert.True(restored.TryProgressKey(out var restoredProgress));
+        Assert.Equal(progress, restoredProgress);
+    }
+
+    [Theory]
+    [InlineData(null)]
+    [InlineData("")]
+    public void Programmatic_story_without_a_fingerprint_cannot_be_saved(string? fingerprint)
+    {
+        var history = new StoryHistory(BuildProgrammaticStory(fingerprint, "take-the-lantern"), 7);
+        history.Choose("take-the-lantern");
+
+        Assert.Throws<InvalidOperationException>(() => history.Save());
+        Assert.False(history.TryProgressKey(out _));
+    }
+
     [Fact]
     public void One_hundred_thousand_choice_playthroughs_save_restore_and_keep_playing()
     {

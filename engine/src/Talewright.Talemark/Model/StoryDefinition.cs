@@ -21,6 +21,20 @@ public sealed class StoryDefinition
     public required string Id { get; init; }
     public required string Title { get; init; }
     public required string Version { get; init; }
+    /// <summary>
+    /// Identifies the exact story revision a save belongs to. Saving requires a non-empty value: without one,
+    /// <c>StoryHistory.Save</c> throws and <c>StoryHistory.Restore</c> rejects every save. A save stores this string
+    /// beside <see cref="Version"/> and a restore compares them for equality, so a producer that builds this model
+    /// directly must supply a value that is the same every time it produces the same story and that changes when the
+    /// story or its extension behavior changes. The engine cannot detect a change the value does not reflect.
+    /// <para>
+    /// The Talemark compiler supplies an uppercase hexadecimal SHA-256 of its replay version, the
+    /// <c>CompilerOptions.CompatibilityId</c> and every source file path and text (null, so no saving, when the
+    /// compatibility id is blank). Replay against an updated story also needs a 64-character hexadecimal value and a
+    /// <see cref="ReplayCompatibilityId"/>. This does not make arbitrary story updates compatible; see
+    /// docs/developer/save-format.md.
+    /// </para>
+    /// </summary>
     public string? ContentFingerprint { get; init; }
     /// <summary>Identity of the replay semantics and registered extensions, independent of story content.</summary>
     public string? ReplayCompatibilityId { get; init; }
@@ -202,7 +216,13 @@ public sealed class ChoiceDefinition
     /// <summary>Default text for an omitted choice label and for an automatic scene continuation.</summary>
     public const string ContinueLabelText = "Continue";
 
-    /// <summary>Stable key within the scene (declaration index), recorded in <c>ChoiceMade</c> events.</summary>
+    /// <summary>
+    /// Identifies this choice among those offered in a scene. It is recorded in <c>ChoiceMade</c> events and
+    /// persisted in saves (1 to 512 characters), and a lookup by key picks the first offered choice with that key, so
+    /// keys must be distinct within a scene. The compiler uses the declaration index (<c>c0</c>, <c>c1</c>, ...),
+    /// which changes meaning when choices are added, removed or reordered; a producer should use keys that keep
+    /// naming the same choice across edits. <c>continue</c> and the <c>storylet:</c> prefix are used by the engine.
+    /// </summary>
     public required string Key { get; init; }
 
     /// <summary>Compiled identity of this choice's gameplay outcome, independent of presentation and position.</summary>
