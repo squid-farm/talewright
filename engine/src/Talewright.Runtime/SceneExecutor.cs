@@ -31,9 +31,11 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
         new(ReferenceEqualityComparer.Instance);
     private readonly List<AuthorEntryReplayStep> _entryReplay = [];
     private readonly Func<int, IEnumerable<RenderedBlock>> _notesSince = notesSince;
+    private Func<SkillCheckExpr, Value>? _resolveExpressionCheck;
+    private Func<SkillCheckExpr, Value> ExpressionCheckResolver => _resolveExpressionCheck ??= ResolveExpressionCheck;
     internal EvaluationContext Context => new(log.State, story.Predicates)
     {
-        ResolveSkillCheck = ResolveExpressionCheck,
+        ResolveSkillCheck = ExpressionCheckResolver,
     };
     public IReadOnlyList<ChoiceStep> ReplayChoices => _replayChoices;
     public IReadOnlyList<AuthorEntryReplayStep> EntryReplay => _entryReplay;
@@ -219,7 +221,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
 
     public void ApplyBatch(IReadOnlyList<Effect> effects)
     {
-        EffectExecutor.ExecuteAll(effects, log, story.Predicates, ResolveExpressionCheck);
+        EffectExecutor.ExecuteAll(effects, log, story.Predicates, ExpressionCheckResolver);
         afterBatch();
     }
 
@@ -299,9 +301,14 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
 
     private void AppendSkillCheckNotes(string stepId, int mark, List<RenderedBlock> blocks)
     {
-        if (!log.Events.Skip(mark).OfType<SkillCheckResolved>().Any())
-            return;
-        AppendNotes(stepId, mark, blocks);
+        for (var index = mark; index < log.Events.Count; index++)
+        {
+            if (log.Events[index] is SkillCheckResolved)
+            {
+                AppendNotes(stepId, mark, blocks);
+                return;
+            }
+        }
     }
 
     private void Observe(DecisionKind kind, string subject, DecisionOutcome outcome, DecisionReason reason,

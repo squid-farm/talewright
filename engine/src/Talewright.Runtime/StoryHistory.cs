@@ -451,14 +451,14 @@ public sealed partial class StoryHistory
         var session = origin is null ? new StorySession(story, seed, character: character)
             : origin.Resume(story, seed, character);
         var initialState = origin is null ? ReplayEvidence.InitialState(story, session.State) : [];
-        var frames = new List<HistoryFrame> { new(origin is null ? session.Start() : session.Current!) };
+        var frames = new List<HistoryFrame>(choices.Count + 1) { new(origin is null ? session.Start() : session.Current!) };
         var evidence = recordEvidence && origin is null && CanRecordEvidence(story)
-            ? new List<byte[]> { ReplayEvidence.Start(story, session, character, initialState) } : null;
+            ? new List<byte[]>(choices.Count + 1) { ReplayEvidence.Start(story, session, character, initialState) } : null;
         byte[]? savedEvidence = evidence is null ? null : evidence[0];
-        var replayedIdentities = evidence is null ? null : new List<byte[]>();
+        var replayedIdentities = evidence is null ? null : new List<byte[]>(choices.Count);
         using var evidenceHashContext = evidence is null ? null : ReplayEvidence.CreateHashContext();
-        var replayedChoices = new List<string>();
-        var automaticChoices = new List<bool>();
+        var replayedChoices = new List<string>(choices.Count);
+        var automaticChoices = new List<bool>(choices.Count);
         var cursorPositions = new int[choices.Count + 1];
         var savedIndex = 0;
         string? automaticContinuationError = null;

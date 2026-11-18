@@ -92,7 +92,7 @@ internal static class StoryMenuBuilder
             Array.AsReadOnly(entries));
     }
 
-    private static StoryMenu BuildWithoutHubOffers(IReadOnlyList<VisibleChoice> choices)
+    internal static StoryMenu BuildWithoutHubOffers(IReadOnlyList<VisibleChoice> choices)
     {
         var ordered = new VisibleChoice[choices.Count];
         var entries = new ChoiceMenuEntry[choices.Count];

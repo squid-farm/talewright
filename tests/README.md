@@ -108,11 +108,12 @@ made it observe seven. Neither mutation is part of the implementation.
 
 `ReplayAllocationTests` keeps fixture compilation and history construction outside the measured
 operation, warms each synchronous save or restore once, then checks current-thread managed
-allocation and the resulting cursor/history. The 10,000-choice independent loop has a 64 MiB ceiling
-for exact, redo-cursor, continuation and continuation-base restore. Save ceilings are 12 MiB for
+allocation and the resulting cursor/history. The 10,000-choice historical `PerformanceCorpus` loop
+has a 64 MiB ceiling for exact and continuation restores at both end and redo cursors. A smaller
+independent loop also covers legacy and continuation-base restore under the same ceiling. Save ceilings are 12 MiB for
 the independent loop and 32 MiB for the realistic fixture. The 20-chapter realistic story exercises
-automatic transitions and has 1,536 MiB exact-replay and 1,280 MiB continuation ceilings; these
-allow about 50% and 24% above the current measured continuation-scale work, respectively, while
+automatic transitions and has 896 MiB exact-replay and 768 MiB continuation ceilings; these
+allow about 48% and 25% above the current measured work, respectively, while
 keeping the deterministic gate below the historical allocations. The test also reports (but does
 not gate) one ordinary next-choice allocation and elapsed time at depth 9,999.
 

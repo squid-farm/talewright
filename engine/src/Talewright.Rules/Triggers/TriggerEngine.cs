@@ -31,7 +31,7 @@ public sealed class TriggerEngine
 
     /// <summary>Snapshot of rising-edge memory, without evaluating conditions again.</summary>
     public IReadOnlyList<string> CaptureEdgeMemory() =>
-        Array.AsReadOnly(_currentlyTrue.Order(StringComparer.Ordinal).ToArray());
+        _currentlyTrue.Count == 0 ? [] : Array.AsReadOnly(_currentlyTrue.Order(StringComparer.Ordinal).ToArray());
 
     public TriggerEngine(IReadOnlyList<TriggerDefinition> triggers, NamedPredicateRegistry predicates, IGameStateView initialState)
         : this(triggers, predicates, initialState, observer: null)
@@ -97,6 +97,11 @@ public sealed class TriggerEngine
     /// <summary>Fires every trigger whose condition has newly become true. Returns the ids fired, in order.</summary>
     public IReadOnlyList<string> Run(EventLog log)
     {
+        if (_triggers.Count == 0)
+        {
+            return [];
+        }
+
         var fired = new List<string>();
         for (var pass = 0; pass <= MaxPasses; pass++)
         {

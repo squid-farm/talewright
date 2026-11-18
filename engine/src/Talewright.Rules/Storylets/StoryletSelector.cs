@@ -43,7 +43,16 @@ public sealed class StoryletTags
 
     public IReadOnlyList<string> Tags { get; }
     public bool MatchAll { get; }
-    public bool Matches(IReadOnlySet<string> tags) => MatchAll ? Tags.All(tags.Contains) : Tags.Any(tags.Contains);
+    public bool Matches(IReadOnlySet<string> tags)
+    {
+        for (var index = 0; index < Tags.Count; index++)
+        {
+            var matches = tags.Contains(Tags[index]);
+            if (MatchAll && !matches) return false;
+            if (!MatchAll && matches) return true;
+        }
+        return MatchAll;
+    }
 }
 
 /// <summary>
@@ -138,7 +147,7 @@ public static class StoryletSelector
         }
 
         var candidates = new List<(T Storylet, int Index)>();
-        var metadataExcluded = new List<(T Storylet, DecisionReason Reason)>();
+        var metadataExcluded = observer is null ? null : new List<(T Storylet, DecisionReason Reason)>();
         var index = 0;
         foreach (var storylet in storylets)
         {
@@ -150,7 +159,7 @@ public static class StoryletSelector
             }
             if (excludedReason is { } reason)
             {
-                metadataExcluded.Add((storylet, reason));
+                metadataExcluded?.Add((storylet, reason));
             }
             else
             {
@@ -159,11 +168,14 @@ public static class StoryletSelector
             index++;
         }
 
-        foreach (var (storylet, reason) in metadataExcluded)
-            observer?.Invoke(new RuleDecision(DecisionKind.Storylet, storylet.Id.Value, context.State.CurrentScene,
-                DecisionOutcome.Excluded, reason,
-                storylet.Requires is { } expr ? ExpressionTrace.NotEvaluated(expr) : null,
-                eventIndex, eventIndex, Priority: storylet.Priority, Limit: limit));
+        if (observer is not null && metadataExcluded is not null)
+        {
+            foreach (var (storylet, reason) in metadataExcluded)
+                observer(new RuleDecision(DecisionKind.Storylet, storylet.Id.Value, context.State.CurrentScene,
+                    DecisionOutcome.Excluded, reason,
+                    storylet.Requires is { } expr ? ExpressionTrace.NotEvaluated(expr) : null,
+                    eventIndex, eventIndex, Priority: storylet.Priority, Limit: limit));
+        }
 
         var prioritized = candidates.OrderByDescending(x => x.Storylet.Priority).ThenBy(x => x.Index).ToArray();
         var evaluated = new List<(T Storylet, int Index, bool Available, bool ShowWhenUnavailable,

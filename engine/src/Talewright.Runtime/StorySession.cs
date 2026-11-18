@@ -415,7 +415,7 @@ public sealed class StorySession : IStorySession
     {
         BeforeTransition();
         LastEntry = new PlayerEntryBoundary(target, _log.Events.Count, _triggers.CaptureEdgeMemory(),
-            Array.AsReadOnly(pending.ToArray()));
+            pending.Count == 0 ? [] : Array.AsReadOnly(pending.ToArray()));
         if (target.IsEnd)
         {
             return EndStory(pending, scene: null);
@@ -479,8 +479,10 @@ public sealed class StorySession : IStorySession
 
     private StoryMenu BuildMenu(SceneDefinition scene, IReadOnlyList<VisibleChoice> choices,
         bool includeHubOffers = true) =>
-        StoryMenuBuilder.Build(Story, scene, choices, Context,
-            storylet => CreateHubCandidate(scene, storylet), _observer, _log.Events.Count, includeHubOffers);
+        !includeHubOffers || scene.Hub is null
+            ? StoryMenuBuilder.BuildWithoutHubOffers(choices)
+            : StoryMenuBuilder.Build(Story, scene, choices, Context,
+                storylet => CreateHubCandidate(scene, storylet), _observer, _log.Events.Count);
 
     private ChoiceCandidate CreateHubCandidate(SceneDefinition scene, SceneDefinition storylet)
     {
@@ -538,6 +540,12 @@ public sealed class StorySession : IStorySession
     /// <summary>Runs triggers, then applies any level-ups, after any batch of changes.</summary>
     private void AfterBatch()
     {
+        if (Story.World.Ruleset.LevelingRule is null)
+        {
+            _triggers.Run(_log);
+            return;
+        }
+
         for (var pass = 0; pass < TriggerEngine.MaxPasses; pass++)
         {
             _triggers.Run(_log);
@@ -575,7 +583,16 @@ public sealed class StorySession : IStorySession
     private IEnumerable<RenderedBlock> NotesSince(int mark)
     {
         var count = _log.Events.Count - mark;
-        if (count == 0)
+        var hasNarratableEvent = false;
+        for (var index = mark; index < _log.Events.Count; index++)
+        {
+            if (EventNarrator.MayDescribe(_log.Events[index]))
+            {
+                hasNarratableEvent = true;
+                break;
+            }
+        }
+        if (!hasNarratableEvent)
         {
             return [];
         }

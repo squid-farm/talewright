@@ -36,6 +36,14 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
 
     public IReadOnlyList<RenderedInline> RenderInlines(IEnumerable<TemplateInline> inlines, EvaluationContext context)
     {
+        if (inlines is IReadOnlyList<TemplateInline> { Count: 1 } single && single[0] is TextTemplate text)
+        {
+            if (string.IsNullOrWhiteSpace(text.Text))
+                return [];
+            var normalized = CollapseSpaces(text.Text).Trim();
+            return [new RenderedText(normalized, TextStyle.None)];
+        }
+
         var output = new List<RenderedInline>();
         RenderInlines(inlines, TextStyle.None, context, output);
         return Normalize(output, preserveWhitespace: false);
@@ -133,6 +141,9 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
     {
         var evaluated = ExpressionEvaluator.Evaluate(substitution.Value, context);
         var text = evaluated.ToString();
+        if (substitution.Modifiers.Count == 0)
+            return text;
+
         var item = substitution.Value is ItemNameRef itemName ? context.State.World.Items[itemName.Item] : null;
         var isPlural = item is not null
             ? item.NameAgreement == GrammaticalNumber.Plural
@@ -246,6 +257,9 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
 
     private static string CollapseSpaces(string text)
     {
+        if (!text.Contains("  ", StringComparison.Ordinal))
+            return text;
+
         var sb = new StringBuilder(text.Length);
         var lastWasSpace = false;
         foreach (var c in text)

@@ -558,9 +558,14 @@ internal static class TranscriptCodec
         _ => throw new NotSupportedException($"Rendered inline '{inline.GetType().Name}' cannot be saved."),
     }).ToList();
 
-    public static IReadOnlyList<RenderedBlock> Decode(IEnumerable<BlockPayload>? blocks) =>
-        Array.AsReadOnly((blocks ?? throw new InvalidDataException(SaveFormat.MalformedMessage))
-            .Select(DecodeBlock).ToArray());
+    public static IReadOnlyList<RenderedBlock> Decode(IReadOnlyList<BlockPayload>? blocks)
+    {
+        if (blocks is null) throw new InvalidDataException(SaveFormat.MalformedMessage);
+        var result = new RenderedBlock[blocks.Count];
+        for (var index = 0; index < result.Length; index++)
+            result[index] = DecodeBlock(blocks[index]);
+        return Array.AsReadOnly(result);
+    }
 
     private static RenderedBlock DecodeBlock(BlockPayload? block)
     {
@@ -580,9 +585,14 @@ internal static class TranscriptCodec
         };
     }
 
-    public static IReadOnlyList<RenderedInline> Decode(IEnumerable<InlinePayload>? inlines) =>
-        Array.AsReadOnly((inlines ?? throw new InvalidDataException(SaveFormat.MalformedMessage))
-            .Select(DecodeInline).ToArray());
+    public static IReadOnlyList<RenderedInline> Decode(IReadOnlyList<InlinePayload>? inlines)
+    {
+        if (inlines is null) throw new InvalidDataException(SaveFormat.MalformedMessage);
+        var result = new RenderedInline[inlines.Count];
+        for (var index = 0; index < result.Length; index++)
+            result[index] = DecodeInline(inlines[index]);
+        return Array.AsReadOnly(result);
+    }
 
     private static RenderedInline DecodeInline(InlinePayload? inline)
     {

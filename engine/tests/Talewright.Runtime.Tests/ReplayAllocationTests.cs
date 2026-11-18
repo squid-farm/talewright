@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Talewright.Core.Identity;
 using Talewright.Runtime;
 using Talewright.Runtime.Saves;
 using Talewright.Talemark.Compilation;
@@ -16,8 +17,61 @@ public sealed class ReplayAllocationTests(ITestOutputHelper output)
     private const long IndependentRestoreCeiling = 64 * MiB;
     private const long IndependentSaveCeiling = 12 * MiB;
     private const long RealisticSaveCeiling = 32 * MiB;
-    private const long RealisticReplayCeiling = 1_536 * MiB;
-    private const long RealisticContinuationCeiling = 1_280 * MiB;
+    private const long RealisticReplayCeiling = 896 * MiB;
+    private const long RealisticContinuationCeiling = 768 * MiB;
+
+    [Fact]
+    public void Release_historical_independent_corpus_restores_within_the_64_mib_ceiling()
+    {
+#if DEBUG
+        return;
+#endif
+        var root = Path.Combine(Path.GetTempPath(), $"talewright-replay-allocation-{Guid.NewGuid():N}");
+        using var corpus = PerformanceCorpus.Create(
+            new PerformanceCorpusTier("history-10000", 10, 100, 512 * 1024, ChoiceCount), root);
+        var source = StorySource.FromDirectory(corpus.Root);
+        var story = Compile(source);
+        var history = new StoryHistory(story, (ulong)corpus.Metadata.Seed);
+        for (var index = 0; index < ChoiceCount; index++)
+            history.Choose(history.Current.Choices[0].Key);
+        var save = history.Save();
+        var redoHistory = StoryHistory.Restore(story, MakeRedoSave(save, RedoCursor));
+        var redoSave = redoHistory.Save();
+        var visits = new VarId("visits");
+        var endVisits = history.State.GetVariable(visits);
+        var redoVisits = redoHistory.State.GetVariable(visits);
+        var endContinuationVisits = endVisits + (history.Current.Scene == new SceneId("scene.0") ? 1 : 0);
+        var redoContinuationVisits = redoVisits + (redoHistory.Current.Scene == new SceneId("scene.0") ? 1 : 0);
+
+        var files = source.Files.ToDictionary(pair => pair.Key, pair => pair.Value, StringComparer.Ordinal);
+        const string header = "=== scene.0";
+        var path = files.First(pair => pair.Key.EndsWith(".tale", StringComparison.Ordinal)
+            && pair.Value.Contains(header, StringComparison.Ordinal)).Key;
+        files[path] = InsertAfterMetadata(files[path], header,
+            EffectFaker.Line(EffectFaker.Increase(new TaleVariableRef("visits"), 1)));
+        var changed = Compile(new StorySource(files));
+
+        Measure("historical independent restore end", () => StoryHistory.Restore(story, save),
+            IndependentRestoreCeiling, ChoiceCount, ChoiceCount,
+            validate: restored => Assert.Equal(endVisits, restored.State.GetVariable(visits)));
+        Measure("historical independent restore redo", () => StoryHistory.Restore(story, redoSave),
+            IndependentRestoreCeiling, RedoCursor, RedoCursor,
+            validate: restored =>
+            {
+                Assert.True(restored.CanForward);
+                Assert.Equal(redoVisits, restored.State.GetVariable(visits));
+            });
+        Measure("historical independent continuation", () => StoryHistory.Restore(changed, save),
+            IndependentRestoreCeiling, 0, ChoiceCount, expectedContinuation: true,
+            validate: restored => Assert.Equal(endContinuationVisits, restored.State.GetVariable(visits)));
+        Measure("historical independent continuation redo", () => StoryHistory.Restore(changed, redoSave),
+            IndependentRestoreCeiling, 0, RedoCursor, expectedContinuation: true,
+            validate: restored =>
+            {
+                Assert.True(restored.Continuation!.RedoDiscarded);
+                Assert.Equal(redoContinuationVisits, restored.State.GetVariable(visits));
+            });
+    }
 
     [Fact]
     public void Release_save_and_restore_allocations_stay_within_measured_ceilings()
@@ -107,7 +161,7 @@ public sealed class ReplayAllocationTests(ITestOutputHelper output)
     }
 
     private void Measure(string name, Func<StoryHistory> operation, long ceiling, int expectedCursor,
-        int expectedPlaythroughLength, bool expectedContinuation = false)
+        int expectedPlaythroughLength, bool expectedContinuation = false, Action<StoryHistory>? validate = null)
     {
         var warm = operation();
         Validate(warm);
@@ -129,6 +183,7 @@ public sealed class ReplayAllocationTests(ITestOutputHelper output)
             Assert.Equal(expectedCursor, history.Cursor);
             Assert.Equal(expectedPlaythroughLength, history.PlaythroughLength);
             Assert.Equal(expectedContinuation, history.Continuation is not null);
+            validate?.Invoke(history);
         }
     }
 
@@ -200,14 +255,23 @@ public sealed class ReplayAllocationTests(ITestOutputHelper output)
         const string path = "chapters/c000.tale";
         if (!files.TryGetValue(path, out var text) || !text.Contains(header, StringComparison.Ordinal))
             throw new InvalidOperationException("The realistic story start scene was not found.");
-        var insertion = text.IndexOf('\n', text.IndexOf(header, StringComparison.Ordinal) + header.Length) + 1;
+        files[path] = InsertAfterMetadata(text, header, EffectFaker.Line(EffectFaker.Increase(TaleCast.Chapter, 1)));
+        return new StorySource(files);
+    }
+
+    private static string InsertAfterMetadata(string text, string header, string effect)
+    {
+        var headerIndex = text.IndexOf(header, StringComparison.Ordinal);
+        var lineEnd = headerIndex < 0 ? -1 : text.IndexOf('\n', headerIndex + header.Length);
+        if (lineEnd < 0)
+            throw new InvalidOperationException("The fixture start scene header is incomplete.");
+        var insertion = lineEnd + 1;
         while (insertion < text.Length && text[insertion] == '@')
         {
             var end = text.IndexOf('\n', insertion);
             insertion = end < 0 ? text.Length : end + 1;
         }
-        files[path] = text.Insert(insertion, EffectFaker.Line(EffectFaker.Increase(TaleCast.Chapter, 1)) + "\n");
-        return new StorySource(files);
+        return text.Insert(insertion, effect + "\n");
     }
 
     private static StoryDefinition Compile(StorySource source) =>

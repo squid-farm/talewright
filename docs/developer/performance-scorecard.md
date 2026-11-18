@@ -52,7 +52,8 @@ BenchmarkDotNet 0.15.2 out-of-process job, one launch, five warmups and thirty
 iterations. Allocations are BDN managed bytes (its `MB` display uses 1,024-based
 units). The save is 53,390 encoded / 932,347 decoded bytes. The historical
 baseline was measured before replay consolidation on `f690ee5a`; the
-after measurements used the replay changes based on that revision.
+after measurements used the replay changes based on that revision, before the
+subsequent allocation reductions measured by the PR gate below.
 
 | `history-10000` operation | Before mean / allocation | After mean / allocation |
 |---|---:|---:|
@@ -60,28 +61,42 @@ after measurements used the replay changes based on that revision.
 | Exact restore | 168.890 ms / 116.24 MiB | 116.310 ms / 78.26 MiB |
 | Changed-story continuation | 199.610 ms / 125.10 MiB | 130.852 ms / 85.21 MiB |
 
-The deterministic CI gate uses a separate, smaller two-choice independent loop
-and enforces the issue's 64 MiB ceiling on a 10,000-choice exact replay,
-continuation fallback and continuation-base restore. Its warmed Release
-measurements on this host were:
+The deterministic CI gate enforces the issue's 64 MiB ceiling on the historical
+`PerformanceCorpus` `history-10000` fixture, including its 100 scenes, prose,
+effects and hub offers. The fixture makes 10,000 player choices and stores
+10,000 transitions. On the implementation based on `757aa17c`, plus the
+subsequent allocation changes, its warmed Release observations were:
+
+| Historical independent operation | Allocation / time | Ceiling |
+|---|---:|---:|
+| Exact restore, end / redo cursor 5,000 | 53.36 / 49.76 MiB; 127.7 / 96.2 ms | 64 MiB |
+| Changed-story continuation, end / redo cursor 5,000 | 58.22 / 52.20 MiB; 116.3 / 156.5 ms | 64 MiB |
+
+The largest row has 5.78 MiB (9.0%) of headroom. The gate checks restored
+variable state, cursor and playthrough length, forward availability for redo,
+and redo discard on continuation. Before these allocation reductions, the same
+new gate failed at 79.57 MiB for exact restore. Temporary per-stage
+current-thread counters in that build attributed 53.55 MiB to scene entry,
+including 12.74 MiB for prose rendering, 11.67 MiB for choice processing and
+11.02 MiB for menu construction; these nested figures overlap. Save decoding
+accounted for 12.17 MiB. The changes reduce repeated allocation in rendering,
+silent-event narration, triggers, menus, replay evidence and transcript decoding
+without changing the persisted evidence. These figures are allocation
+attribution by instrumented stages, not allocation stacks or peak memory.
+
+The gate also uses a smaller two-choice independent loop to cover legacy saves
+and continuation-base restore. Its warmed Release measurements were:
 
 | Operation | Measured allocation / time | Ceiling |
 |---|---:|---:|
-| Independent save, end / redo cursor 5,000 | 5.44 / 3.25 MiB; 24.6 / 10.4 ms | 12 MiB |
-| Independent restore, end / redo cursor 5,000 | 52.24 / 46.34 MiB; 172.5 / 107.0 ms | 64 MiB |
-| Independent changed-story continuation fallback | 63.43 MiB; 187.4 ms | 64 MiB |
-| Independent continuation-base restore | 8.89 MiB; 45.8 ms | 64 MiB |
-| Ordinary next choice at depth 9,999 | 0.01 MiB; 0.2 ms | Report-only |
+| Independent save, end / redo cursor 5,000 | 5.29 / 3.17 MiB; 19.7 / 10.5 ms | 12 MiB |
+| Independent restore, end / redo cursor 5,000 | 25.35 / 19.45 MiB; 108.7 / 86.7 ms | 64 MiB |
+| Independent changed-story continuation fallback | 31.20 MiB; 176.3 ms | 64 MiB |
+| Independent continuation-base restore | 7.74 MiB; 22.3 ms | 64 MiB |
+| Ordinary next choice at depth 9,999 | <0.01 MiB; 0.3 ms | Report-only |
 
-The continuation fallback has about 0.57 MiB (0.9%) of headroom under the
-required ceiling, so this is a tight regression gate rather than a broad
-performance budget. The focused test warms once, constructs fixtures outside
-the measurement, and validates cursor and playthrough length after each
-operation. The separate save ceiling intentionally allows about 2.2x the
-independent end-save allocation. This smaller gate does not establish that the
-historical `PerformanceCorpus` independent case meets the same ceiling: that
-case still allocated 78.74 MiB for exact restore and 85.70 MiB for continuation
-in the short comparison below.
+Both fixture tests warm once and construct fixtures outside the measurement.
+The save ceiling allows about 2.3x the independent end-save allocation.
 
 The realistic gate uses `RealisticStory` with 20 chapters (946 scenes, 22 files,
 about 693 KB of source), 10,000 requested actions and 10,000 saved transitions;
@@ -90,17 +105,25 @@ It contains automatic transitions and checks both end and redo cursors:
 
 | Operation | End allocation / time | Redo allocation / time | Ceiling |
 |---|---:|---:|---:|
-| Save | 23.31 MiB / 65.6 ms | 12.30 MiB / 31.6 ms | 32 MiB |
-| Exact restore | 1,021.51 MiB / 736.4 ms | 874.65 MiB / 514.4 ms | 1,536 MiB |
-| Changed-story continuation | 1,035.72 MiB / 769.6 ms | — | 1,280 MiB |
+| Save | 23.26 MiB / 99.1 ms | 12.27 MiB / 40.3 ms | 32 MiB |
+| Exact restore | 606.24 MiB / 823.7 ms | 459.76 MiB / 448.2 ms | 896 MiB |
+| Changed-story continuation | 615.98 MiB / 699.4 ms | — | 768 MiB |
 
-The realistic save ceiling is 37% above the measured end save; exact restore
-and continuation ceilings are about 50% and 24% above their measured rows.
+The realistic save ceiling is 38% above the measured end save; exact restore
+and continuation ceilings are about 48% and 25% above their measured rows.
 The 10,000-action save is 65,365 encoded / 7,033,682 decoded bytes. These are
 per-operation cumulative managed allocations, not retained heap or peak RSS.
 The focused gate's wall times are single warmed observations, not timing
 budgets. The BenchmarkDotNet comparison above is the timing evidence for the
 independent history fixture.
+
+Temporary stage counters on the realistic end restore before the final
+hub-selection optimization attributed 756.07 MiB of a 1,000.36 MiB instrumented
+operation to hub menu construction. These inclusive counters overlap other
+stages and are not allocation stacks. Avoiding unobserved exclusion lists and
+per-scene tag-matching iterators reduced the uninstrumented end restore from
+999.34 to 606.24 MiB. Hub selection still scans the story and constructs its
+menu; no browser or retained-memory inference follows from these totals.
 
 The same BenchmarkDotNet job measured the realistic 20-chapter fixture at
 10,000 requested actions (6,665 completed; 10,000 saved choices) after
@@ -180,9 +203,10 @@ fixtures. Save allocation grows somewhat more (the realistic end row grows
 12.7x). Save builds collection copies and serialized/compressed buffers, but
 allocation-stack attribution for that increase is not available. This is not
 an incremental save algorithm. Wall-time ratios are too noisy to establish
-precise scaling from three iterations. The remaining realistic 100,000-transition
-restore still allocates about 10 GiB per operation; its dominant allocation
-stacks were not identified. Saving still reconstructs boundary state and
+precise scaling from three iterations. The earlier realistic 100,000-transition
+restore allocated about 10 GiB per operation, before the later hub-selection
+optimization; the final implementation's 100,000-transition allocation was
+not remeasured. Saving still reconstructs boundary state and
 serializes the full history, making it a separate hotspot.
 
 Commands (run once on the baseline and once on the implementation, selecting

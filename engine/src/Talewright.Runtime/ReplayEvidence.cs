@@ -72,14 +72,17 @@ internal static class ReplayEvidence
 
     public static byte[] Next(byte[] previous, StoryFrame frame, ReadOnlyMemory<byte> choiceIdentity,
         IReadOnlyList<GameEvent> events, int eventStart) =>
-        Hash(writer =>
-        {
-            writer.WriteStringValue("choice");
-            writer.WriteBase64StringValue(previous);
-            writer.WriteStringValue(frame.Scene?.Value);
-            writer.WriteBase64StringValue(choiceIdentity.Span);
-            WriteEvents(writer, events, eventStart, choiceIdentity.Span);
-        });
+        Hash(writer => WriteNext(writer, previous, frame, choiceIdentity, events, eventStart));
+
+    private static void WriteNext(Utf8JsonWriter writer, byte[] previous, StoryFrame frame,
+        ReadOnlyMemory<byte> choiceIdentity, IReadOnlyList<GameEvent> events, int eventStart)
+    {
+        writer.WriteStringValue("choice");
+        writer.WriteBase64StringValue(previous);
+        writer.WriteStringValue(frame.Scene?.Value);
+        writer.WriteBase64StringValue(choiceIdentity.Span);
+        WriteEvents(writer, events, eventStart, choiceIdentity.Span);
+    }
 
     internal sealed class HashContext : IDisposable
     {
@@ -93,10 +96,11 @@ internal static class ReplayEvidence
             _writer = new Utf8JsonWriter(_buffer);
         }
 
-        public byte[] Hash(Action<Utf8JsonWriter> write)
+        public byte[] Next(byte[] previous, StoryFrame frame, ReadOnlyMemory<byte> choiceIdentity,
+            IReadOnlyList<GameEvent> events, int eventStart)
         {
             _writer.WriteStartArray();
-            write(_writer);
+            WriteNext(_writer, previous, frame, choiceIdentity, events, eventStart);
             _writer.WriteEndArray();
             _writer.Flush();
             var digest = _hash.GetHashAndReset();
@@ -115,14 +119,7 @@ internal static class ReplayEvidence
 
     internal static byte[] Next(HashContext context, byte[] previous, StoryFrame frame,
         ReadOnlyMemory<byte> choiceIdentity, IReadOnlyList<GameEvent> events, int eventStart) =>
-        context.Hash(writer =>
-        {
-            writer.WriteStringValue("choice");
-            writer.WriteBase64StringValue(previous);
-            writer.WriteStringValue(frame.Scene?.Value);
-            writer.WriteBase64StringValue(choiceIdentity.Span);
-            WriteEvents(writer, events, eventStart, choiceIdentity.Span);
-        });
+        context.Next(previous, frame, choiceIdentity, events, eventStart);
 
     private static byte[] Hash(Action<Utf8JsonWriter> write)
     {

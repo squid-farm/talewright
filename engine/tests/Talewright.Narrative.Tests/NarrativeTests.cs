@@ -100,6 +100,22 @@ public class NarrativeTests
         Assert.Equal("The torch sits there.", text);
     }
 
+    [Theory]
+    [InlineData("")]
+    [InlineData("  \t ")]
+    [InlineData("  One   two \t")]
+    [InlineData("\tOne\n two ")]
+    [InlineData("One  \u00a0  two")]
+    public void Single_literal_inline_normalizes_like_adjacent_literal_inlines(string text)
+    {
+        var split = text.Length / 2;
+        var renderer = new TemplateRenderer();
+        var state = State();
+        var single = renderer.RenderInlines([new TextTemplate(text)], state);
+        var adjacent = renderer.RenderInlines([new TextTemplate(text[..split]), new TextTemplate(text[split..])], state);
+        Assert.Equal(adjacent, single);
+    }
+
     [Fact]
     public void Blocks_render_styles_speech_and_conditionals()
     {
