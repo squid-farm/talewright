@@ -1022,13 +1022,20 @@ async function openRenderer() {
     focusEditor: async () => {
       await send('Page.bringToFront', {});
       return send('Runtime.evaluate', {
+        awaitPromise: true,
         returnByValue: true,
-        expression: `(() => {
-          const input = document.querySelector('.monaco-editor.focused .inputarea')
-            || document.querySelector('.monaco-editor .inputarea');
-          if (!input) return false;
-          input.focus();
-          return document.activeElement === input;
+        expression: `(async () => {
+          const deadline = Date.now() + 5000;
+          while (Date.now() < deadline) {
+            const editor = document.querySelector('.monaco-editor.focused');
+            const input = editor?.querySelector('.inputarea');
+            if (input) {
+              input.focus();
+              if (document.hasFocus() && document.activeElement === input) return true;
+            }
+            await new Promise(resolve => requestAnimationFrame(resolve));
+          }
+          return false;
         })()`,
       });
     },
