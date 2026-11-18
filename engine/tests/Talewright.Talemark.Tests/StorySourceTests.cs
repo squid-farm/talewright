@@ -8,6 +8,8 @@ public sealed class StorySourceTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"talewright-source-test-{Guid.NewGuid():N}");
 
+    private static readonly StorySource.ArchiveLimits FormerArchiveLimits = new(1_000, 5L * 1024 * 1024, 50L * 1024 * 1024);
+
     public StorySourceTests() => Directory.CreateDirectory(_root);
 
     [Fact]
@@ -200,7 +202,7 @@ public sealed class StorySourceTests : IDisposable
         }
 
         oversizedFile.Position = 0;
-        Assert.Contains("5 MiB", Assert.Throws<InvalidDataException>(() => StorySource.FromZip(oversizedFile)).Message);
+        Assert.Contains("5 MiB", Assert.Throws<InvalidDataException>(() => StorySource.FromZip(oversizedFile, FormerArchiveLimits)).Message);
 
         using var oversizedTotal = new MemoryStream();
         using (var archive = new ZipArchive(oversizedTotal, ZipArchiveMode.Create, leaveOpen: true))
@@ -214,7 +216,7 @@ public sealed class StorySourceTests : IDisposable
         }
 
         oversizedTotal.Position = 0;
-        Assert.Contains("50 MiB", Assert.Throws<InvalidDataException>(() => StorySource.FromZip(oversizedTotal)).Message);
+        Assert.Contains("50 MiB", Assert.Throws<InvalidDataException>(() => StorySource.FromZip(oversizedTotal, FormerArchiveLimits)).Message);
     }
 
     [Fact]

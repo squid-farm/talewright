@@ -109,7 +109,6 @@ class CiRoutingTests(unittest.TestCase):
         for changed in (
             "examples/CSharpStory/Story/Content/main.tale",
             "examples/CSharpStory/Story/StoryExtensions.cs",
-            "engine/tests/Talewright.TestStories/RealisticStory.cs",
             "engine/tests/Talewright.Runtime.Tests/SaveSamples/golden/lost-relic-slot.twsave",
         ):
             with self.subTest(changed=changed):

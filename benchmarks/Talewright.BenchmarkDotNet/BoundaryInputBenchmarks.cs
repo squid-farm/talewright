@@ -10,6 +10,8 @@ public class BoundaryInputBenchmarks
 {
     private const int MaxFileBytes = 5 * 1024 * 1024;
     private const long MaxExpandedBytes = 50L * 1024 * 1024;
+    // ZIP rows keep the former archive limits so their rejection rows stay comparable across scorecards.
+    private static readonly StorySource.ArchiveLimits FormerZipLimits = new(1_000, MaxFileBytes, MaxExpandedBytes);
     private string _root = null!;
     private string _archivePath = null!;
     private string? _expectedError;
@@ -108,7 +110,7 @@ public class BoundaryInputBenchmarks
             if (Boundary.StartsWith("zip-", StringComparison.Ordinal))
             {
                 using var zip = File.OpenRead(_archivePath);
-                source = StorySource.FromZip(zip);
+                source = StorySource.FromZip(zip, FormerZipLimits);
             }
             else
             {

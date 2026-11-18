@@ -7,7 +7,7 @@
 <div class="scene-stage" data-tw-scene="@Session.Current.Scene?.Value" @ref="_stage">
     <ReaderPresentation>
         <StoryStage Story="Session.Story" Passages="Passages" PassageWindow="1" Current="Session.Current"
-                    State="Session.State" Identity="Session" AtChoiceLimit="AtLimit" Busy="false"
+                    State="Session.State" Identity="Session" Busy="false"
                     OnChoose="OnChoose" OnRestart="OnRestart" />
     </ReaderPresentation>
     <div class="inspect-overlay" aria-hidden="true" hidden></div>
@@ -25,7 +25,6 @@
     private IJSObjectReference? _module;
     private DotNetObjectReference<SceneViewer>? _reference;
     private int? _inspectorId;
-    private bool AtLimit => Session.Cursor >= StoryHistory.MaxChoices;
     private IReadOnlyList<HistoryFrame> Passages => [new(Session.Current)];
 
     protected override async Task OnAfterRenderAsync(bool firstRender)

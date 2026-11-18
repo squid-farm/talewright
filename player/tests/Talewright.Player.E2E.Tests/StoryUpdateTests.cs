@@ -123,7 +123,7 @@ public sealed partial class StoryUpdateTests(WebHostFixture host, ITestOutputHel
         return continued.Save();
     }
 
-    private static StoryFixture ChoiceLimitUpdateFixture(string id, bool updated)
+    private static StoryFixture LongPlaythroughUpdateFixture(string id, bool updated)
     {
         var manifest = new ManifestFaker(id, "Long Playthrough", "start", 7)
         {
@@ -134,7 +134,7 @@ public sealed partial class StoryUpdateTests(WebHostFixture host, ITestOutputHel
         manifest.Number("count", 0);
         var tale = $$"""
             === start
-            At the limit: {var:count}.
+            Looping: {var:count}.
             * [Again] {{(updated ? "{ var:count += 1 }" : "")}} -> start
             """;
         return new StoryFixture(id, manifest.Build(), tale);
@@ -343,28 +343,29 @@ public sealed partial class StoryUpdateTests(WebHostFixture host, ITestOutputHel
 
     [Fact]
     [Trait("Host", "Browser")]
-    public async Task Continued_playthrough_counts_base_transcript_toward_choice_limit()
+    public async Task Continued_playthrough_keeps_playing_past_the_former_choice_cap()
     {
-        var id = $"update-limit-{Guid.NewGuid():N}";
-        var original = ChoiceLimitUpdateFixture(id, updated: false);
+        var id = $"update-long-{Guid.NewGuid():N}";
+        var original = LongPlaythroughUpdateFixture(id, updated: false);
         var history = new StoryHistory(original.Compile(), 7);
-        for (var index = 0; index < StoryHistory.MaxChoices - 1; index++)
+        for (var index = 0; index < 9_999; index++)
         {
             history.Choose("c0");
         }
 
-        var updated = ChoiceLimitUpdateFixture(id, updated: true);
+        var updated = LongPlaythroughUpdateFixture(id, updated: true);
         var continued = StoryHistory.Restore(updated.Compile(), history.Save());
-        Assert.Equal(StoryHistory.MaxChoices - 1, continued.PlaythroughLength);
+        Assert.Equal(9_999, continued.PlaythroughLength);
         await Upload(updated);
-        await WriteBrowserSaveAsync(id, "Limit", continued.Save());
+        await WriteBrowserSaveAsync(id, "Long", continued.Save());
         await Driver.ClickAsync("Saves");
-        await Driver.ClickAsync("Load Limit");
+        await Driver.ClickAsync("Load Long");
         await Driver.ClickAsync("Load save");
         await Expect(Choices).ToBeEnabledAsync();
         await Choose("Again");
-        await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("10,000-choice limit", new() { Timeout = 30_000 });
-        await Expect(Choices).ToBeDisabledAsync();
+        await Choose("Again");
+        await Expect(Choices).ToBeEnabledAsync();
+        await Expect(Page.GetByRole(AriaRole.Alert)).ToHaveCountAsync(0);
     }
 
     [Fact]

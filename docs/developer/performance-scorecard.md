@@ -50,7 +50,9 @@ The table above is the pre-consolidation 10,000-history baseline. This compariso
 uses the same generated `PerformanceCorpus` `history-10000` case, end cursor,
 BenchmarkDotNet 0.15.2 out-of-process job, one launch, five warmups and thirty
 iterations. Allocations are BDN managed bytes (its `MB` display uses 1,024-based
-units). The save is 53,390 encoded / 932,347 decoded bytes.
+units). The save is 53,390 encoded / 932,347 decoded bytes. The historical
+baseline was measured before replay consolidation on `f690ee5a`; the
+after measurements used the replay changes based on that revision.
 
 | `history-10000` operation | Before mean / allocation | After mean / allocation |
 |---|---:|---:|
@@ -76,11 +78,14 @@ required ceiling, so this is a tight regression gate rather than a broad
 performance budget. The focused test warms once, constructs fixtures outside
 the measurement, and validates cursor and playthrough length after each
 operation. The separate save ceiling intentionally allows about 2.2x the
-independent end-save allocation.
+independent end-save allocation. This smaller gate does not establish that the
+historical `PerformanceCorpus` independent case meets the same ceiling: that
+case still allocated 78.74 MiB for exact restore and 85.70 MiB for continuation
+in the short comparison below.
 
 The realistic gate uses `RealisticStory` with 20 chapters (946 scenes, 22 files,
 about 693 KB of source), 10,000 requested actions and 10,000 saved transitions;
-the existing playthrough limit stops the route after 6,665 completed actions.
+the benchmark stops the route after 6,665 completed actions for comparability.
 It contains automatic transitions and checks both end and redo cursors:
 
 | Operation | End allocation / time | Redo allocation / time | Ceiling |
@@ -119,18 +124,86 @@ from save/restore. Allocation stacks and live/peak memory are not measured;
 browser/WebAssembly headroom remains unknown. Full-history per-choice autosave
 is still cumulative quadratic work and is not changed here.
 
-The 100,000-transition Release comparison is not yet available: this branch's
-base still enforces the existing 10,000-choice limit. Issue #768, which removes
-that limit, is open; its Debug measurements are not substitutes for the
-required comparable Release results. Re-run the 100,000 saved-transition,
-end/redo and continuation rows after coordinating the combined implementation
-with #768. Do not raise any limit or infer 100,000-transition cost from these
-10,000-transition measurements.
+### 10,000 and 100,000-transition scale comparison
+
+The following Release probes use #768's merged cap removal. Before is `eebfbfba`
+(the #768 head); after is the replay implementation at `32054029`, integrated
+with #768 and the trigger-session fix. The 100,000 realistic save, end-restore,
+end-continuation and next-choice rows were measured before the subsequent
+automatic-cursor fix. Its redo restore and continuation rows were remeasured
+after that fix; other after rows also include it.
+
+Each BenchmarkDotNet operation ran in a separate process with one launch, one
+warmup, three measured iterations and one invocation per iteration. Rows are
+mean milliseconds / cumulative managed MiB. These short probes have wide
+timing uncertainty, especially for sub-millisecond choices; they are scale
+observations, not latency budgets. They ran sequentially under a 6 GiB
+process-group memory limit on the host described above.
+
+The independent case is the generated `PerformanceCorpus` history dimension:
+10 files, 100 scenes and 512 KiB of source. Each requested action saves one
+transition. The realistic case is the 20-chapter fixture described above:
+10,000 / 100,000 requested actions produced 6,665 / 66,665 completed actions
+and 10,000 / 100,000 transitions, respectively, without restarting. The
+100,000-transition saves were 509,202 encoded / 9,454,983 decoded bytes for
+the independent case and 599,314 / 70,394,211 bytes for the realistic case.
+Redo saves retain the full timeline with cursors 5,000 or 50,000; they were
+constructed by restoring a legacy cursor save and saving it again, so their
+evidence and continuation checkpoints match the cursor. Changed-story
+continuation discards redo and resumes from that checkpoint.
+
+| Independent operation | 10k before | 10k after | 100k before | 100k after |
+|---|---:|---:|---:|---:|
+| Save, end | 37.7 / 9.25 | 50.8 / 9.25 | 554.1 / 90.22 | 362.0 / 90.22 |
+| Save, redo | 19.5 / 5.15 | 22.8 / 5.15 | 194.6 / 50.30 | 175.9 / 50.30 |
+| Exact restore, end | 322.3 / 117.84 | 273.7 / 78.74 | 2,315.3 / 1,177.54 | 2,401.4 / 796.63 |
+| Exact restore, redo | 366.7 / 166.14 | 266.8 / 75.30 | 2,961.2 / 1,668.21 | 1,701.4 / 744.35 |
+| Continuation, end | 305.6 / 125.78 | 339.5 / 85.70 | 2,383.3 / 1,251.75 | 2,770.6 / 864.69 |
+| Continuation, redo | 352.4 / 169.86 | 290.4 / 78.36 | 2,603.8 / 1,696.69 | 1,380.5 / 778.36 |
+| Next choice near end | 0.377 / 0.009 | 0.374 / 0.007 | 0.304 / 0.011 | 0.199 / 0.008 |
+
+| Realistic operation | 10k before | 10k after | 100k before | 100k after |
+|---|---:|---:|---:|---:|
+| Save, end | 93.0 / 23.31 | 93.2 / 23.31 | 881.4 / 295.15 | 1,092.5 / 295.15 |
+| Save, redo | 47.1 / 12.30 | 47.7 / 12.30 | 668.0 / 149.41 | 475.9 / 149.41 |
+| Exact restore, end | 2,252.2 / 2,071.45 | 1,100.8 / 1,021.26 | 16,535.9 / 20,817.37 | 8,700.2 / 10,312.20 |
+| Exact restore, redo | 4,051.9 / 3,052.75 | 1,372.6 / 994.88 | 25,623.3 / 30,583.56 | 11,068.4 / 10,000.09 |
+| Continuation, end | 1,124.6 / 1,078.00 | 1,018.6 / 1,035.47 | 9,388.6 / 10,875.14 | 7,795.9 / 10,449.76 |
+| Continuation, redo | 1,123.3 / 1,548.25 | 877.0 / 1,001.92 | 14,681.8 / 15,532.04 | 8,526.3 / 10,068.42 |
+| Next choice near end | 0.499 / 0.25 | 0.397 / 0.25 | 0.408 / 0.25 | 0.483 / 0.25 |
+
+The next-choice benchmark advances the live history on each invocation, so
+measurements are near, not exactly at, the listed depth. BenchmarkDotNet warned
+that these short iterations were below its recommended duration. Restore
+allocation grows roughly tenfold for ten times as many transitions in both
+fixtures. Save allocation grows somewhat more (the realistic end row grows
+12.7x). Save builds collection copies and serialized/compressed buffers, but
+allocation-stack attribution for that increase is not available. This is not
+an incremental save algorithm. Wall-time ratios are too noisy to establish
+precise scaling from three iterations. The remaining realistic 100,000-transition
+restore still allocates about 10 GiB per operation; its dominant allocation
+stacks were not identified. Saving still reconstructs boundary state and
+serializes the full history, making it a separate hotspot.
+
+Commands (run once on the baseline and once on the implementation, selecting
+the exact desired parameter; `10000)` avoids matching `100000)`):
+
+```bash
+MSBUILDDISABLENODEREUSE=1 dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
+  --filter '*IndependentDimensionBenchmarks.*At*history-10000*' \
+  --warmupCount 1 --iterationCount 3 --invocationCount 1
+MSBUILDDISABLENODEREUSE=1 dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
+  --filter '*RealisticStoryBenchmarksSaves*10000)' \
+  --warmupCount 1 --iterationCount 3 --invocationCount 1
+MSBUILDDISABLENODEREUSE=1 dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
+  --filter '*RealisticStoryBenchmarksSaves*100000*' \
+  --warmupCount 1 --iterationCount 3 --invocationCount 1
+```
 
 The realistic desktop benchmark uses a generated 20-chapter story. Requested
-actions and saved choices differ because automatic choices also contribute to
-the 10,000-choice cap. The 10,000-action case stops at exactly 10,000 saved
-choices without restarting.
+actions and saved choices differ because automatic choices also count as saved
+choices. The 10,000-action case stops at exactly 10,000 saved choices without
+restarting; playthroughs have no cap, and the stop keeps rows comparable.
 
 | Requested / completed actions | Saved choices | Encoded / decoded | Save mean / allocation | Replay restore mean / allocation | Continuation mean / allocation |
 |---:|---:|---:|---:|---:|---:|

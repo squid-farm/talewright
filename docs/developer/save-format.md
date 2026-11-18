@@ -120,30 +120,30 @@ the generated formatter works in desktop and Blazor WebAssembly builds.
 
 | Limit | Value | Enforced |
 |---|---|---|
-| Compressed save | 10 MiB | Writing, storage, import and reading |
-| Decoded body | 16 MiB (declared length checked first; decompression stops one byte past it) | Writing and reading |
-| Choices | 10,000 | Playing and reading; array size checked before deserialization |
+| Compressed save | 512 MiB | Writing, storage, import and reading |
+| Decoded body | 1 GiB (declared length checked first; decompression stops one byte past it) | Writing and reading |
 | Choice key | 1–512 characters | Saving and reading |
-| Character stats | 1,000 | Reading; array size checked before deserialization |
 | Summary UTC offset | ±14 hours | Reading (invalid details are dropped, not fatal) |
 | Replay evidence | 33 bytes, version 4 | Reading; malformed or unsupported evidence rejects the save |
 | Replay choice identity | 8 bytes, or 32 bytes for a colliding scene | Reading; count and encoding are checked before replay |
-| Transcript frames | 10,000 | Reading; base transcript length plus choice count may not exceed 10,000 |
 
-Collection counts are checked with `MessagePackReader` before the generated deserializer allocates
-their lists. Continuation arrays cannot declare more elements than the remaining bytes; maps are
-not allowed. The base transcript length must be between zero and the frame count, each character
-has at most 1,000 stats, and a base cannot carry replay evidence. A checkpoint's total visit count
-cannot exceed its preceding transcript frames (the base transcript length for a base checkpoint).
-Other decoded structures are bounded by the 16 MiB body limit. These limits follow the desktop and
-three-browser measurements in the [performance scorecard](performance-scorecard.md#save-size-and-continuation):
-the largest measured 10,000-choice save is 65,365 compressed bytes and 7,033,682 decoded bytes.
-Doubling the decoded sample is 14,067,364 bytes (13.42 MiB); 16 MiB is the next whole-MiB ceiling
-above that sample. At 10,000 choices, Chromium's `performance.memory` reported 11.9 MB used,
-17.1 MB total and a 3.76 GB V8 JavaScript heap limit, so the decoded ceiling is below that reported
-limit. This API does not measure the WebAssembly managed heap; Firefox and WebKit heap use and
-limits were not measured. The compressed ceiling is the minimum 10 MiB tier and is over 8 times the
-largest measured compressed save.
+There is no limit on choices, transcript frames or character stats. A playthrough can run as long
+as the author's story allows; long playthroughs cost time and memory in proportion to their length
+instead of failing at a count.
+
+Collection shapes are checked with `MessagePackReader` before the generated deserializer allocates
+their lists. Arrays cannot declare more elements than the remaining bytes; maps are not allowed.
+The base transcript length must be between zero and the frame count, and a base cannot carry replay
+evidence. A checkpoint's total visit count cannot exceed its preceding transcript frames (the base
+transcript length for a base checkpoint).
+
+The byte limits reject damaged or hostile files, not long stories. They sit far above real saves:
+the largest measured 10,000-choice save in the
+[performance scorecard](performance-scorecard.md#save-size-and-continuation) is 65,365 compressed
+bytes and 7,033,682 decoded bytes, so the decoded limit allows roughly 150 times that playthrough.
+The decoded limit stays at 1 GiB because .NET arrays top out near 2 GiB; the compressed limit keeps
+the trigger-save encoding within a 32-bit length. Browser storage quota can refuse a save well
+below these limits; the player then reports a storage error and play continues.
 
 ## Compatibility
 
@@ -197,8 +197,7 @@ condition changed keeps its old edge: if that edge was false and the condition i
 fire at the normal evaluation after entering the target. Rebuilding itself does not run triggers
 or level changes.
 
-`PlaythroughLength` is the base transcript length plus cursor; `IsAtChoiceLimit` applies the
-10,000-choice limit to that sum. Progress identity hashes the save without its summary and reduces
+`PlaythroughLength` is the base transcript length plus cursor. Progress identity hashes the save without its summary and reduces
 the continuation to `[nil, nil, base, base transcript length]`. Thus historical rendered text and
 the current checkpoint do not change the key, while different bases do. After continuation,
 `RestoredProgressKey` identifies the original slot until play changes.

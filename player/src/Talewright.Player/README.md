@@ -14,7 +14,7 @@ Story authors don't need it. See [C# extensions and packages](../../../docs/deve
 |---|---|
 | `ReaderPresentation` | Initializes `PlayerPreferencesStore`, then renders its child content with a `PlayerDiagnostics` cascade. Hosts can use it around reader surfaces so preferences and diagnostics are shared consistently. An optional `Diagnostics` parameter preserves a host-owned report instance. |
 | `ReaderSettingsDialog` | Standalone player Settings dialog. `OpenAsync(returnFocus)` opens it and restores focus to the supplied element when it closes. |
-| `TalewrightApp` | Root. Uses `ReaderPresentation` for preference initialization and the diagnostics cascade. Library screen listing `IStoryLibrary` stories plus a `.zip` upload (`InputFile`, buffered to memory because browser streams can't seek). Compiles the chosen story; offers an explicit autosave resume choice before character creation or play; shows `DiagnosticList` on errors, otherwise `StoryPlayer`. Shares one bounded image warmer across keyed player replacements. Parameters: `AutoStartStoryId`, `LibraryEnabled` (true by default), `MaxUploadBytes` (20 MB). |
+| `TalewrightApp` | Root. Uses `ReaderPresentation` for preference initialization and the diagnostics cascade. Library screen listing `IStoryLibrary` stories plus a `.zip` upload (`InputFile`, buffered to memory because browser streams can't seek). Compiles the chosen story; offers an explicit autosave resume choice before character creation or play; shows `DiagnosticList` on errors, otherwise `StoryPlayer`. Shares one bounded image warmer across keyed player replacements. Parameters: `AutoStartStoryId`, `LibraryEnabled` (true by default), `MaxUploadBytes` (1 GiB). |
 | `StoryPlayer` | Composes the play screen and owns `StoryHistory`, save operations, busy/error state and transcript focus. Passes state and callbacks to focused children rather than mixing their markup with session orchestration. Shows a character sheet only when the story declares stats, items or factions that the author's `game.character-sheet` setting doesn't hide, and gives the transcript the full layout column when no sheet is needed. Parameters: `Story`, `Seed`, `Character`, `OnExit`, `Visible`, optional `SaveStore` and `SaveExporter`; direct consumers can pass a validated `ResumeHistory`. |
 | `DiagnosticReport` | Root-level modal with an inspectable session report and optional download control; opened from the library, failed-startup screen, or More actions during play. |
 | `PlayerToolbar` | Sticky themed title/navigation/save header, More actions disclosure for Settings/Diagnostics/Restart/Library, and modal Settings/Restart dialogs. Enabled states and actions come from the parent; Library and Diagnostics are omitted when their callbacks are not supplied. |
@@ -149,11 +149,11 @@ neighboring images remain retained while the current plan needs them.
 ZIP opens use `ArchiveStoryImages.Open`, which takes ownership of the compressed input even
 when loading fails. A loaded story retains one parsed archive, not expanded image copies.
 Source discovery uses the shared configuration/narrative predicates and root mapping.
-Compressed input (including the separate 20 MiB browser upload convenience cap), expanded
+Compressed input (including the separate 1 GiB browser upload guard), expanded
 content, each expanded read, and retained stream/Blob ownership are distinct concerns.
 ZIP images have no combined expanded text/image budget. Each image read is chunked and stops if
 actual expansion exceeds that entry's declared size; only that image fails. Text archives retain
-their separate 1,000-source-file, 5 MiB per-file and 50 MiB total actual-read defenses, including
+their separate 100,000-source-file, 256 MiB per-file and 1 GiB total actual-read defenses, including
 configuration text and BOM bytes. These archive-text defenses are not folder authoring limits.
 Folders have no authored source-count or byte ceilings; path/link/depth checks remain. None of
 these protections certifies a story or bounds retained history memory. Late read/decode failures preserve the adopted narrative
@@ -212,9 +212,7 @@ disable conflicting controls while in flight. Browser saves live only in that or
 clearing browser/site data removes them; no server account or cloud sync exists.
 
 Back/Forward restores state, choices and transcript together. Choosing after Back discards redo.
-At 10,000 choices, an explanatory alert replaces silent failure and disables further
-choices. Save, Back/Forward (when allowed by the story), Restart and Library remain
-usable. Going Back below the cap re-enables choices; returning Forward restores the notice.
+Playthroughs have no choice limit.
 Authors can disable these controls with `undo: false`. Restart starts a fresh playthrough but does not
 delete manual saves or autosave.
 See the [runtime compatibility policy](../../../engine/src/Talewright.Runtime/README.md#history-and-saves).

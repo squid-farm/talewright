@@ -165,7 +165,7 @@ public sealed partial class ServerTests
     }
 
     [Theory]
-    [InlineData("Content-Length: 16777217\r\n\r\n")]
+    [InlineData("Content-Length: 1073741825\r\n\r\n")]
     [InlineData("Content-Length: 2\r\nContent-Length: 2\r\n\r\n")]
     public async Task Invalid_protocol_lengths_fail_explicitly(string header)
     {

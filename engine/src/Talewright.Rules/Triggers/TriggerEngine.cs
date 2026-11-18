@@ -69,8 +69,8 @@ public sealed class TriggerEngine
         }
     }
 
-    internal TriggerEngine Fork(IGameStateView state) =>
-        new(_triggers, _predicates, state, _observer, eventIndex: null, _resolveSkillCheck,
+    internal TriggerEngine Fork(IGameStateView state, Func<SkillCheckExpr, Value>? resolveSkillCheck) =>
+        new(_triggers, _predicates, state, _observer, eventIndex: null, resolveSkillCheck,
             CaptureEdgeMemory(), prime: false);
 
     /// <summary>

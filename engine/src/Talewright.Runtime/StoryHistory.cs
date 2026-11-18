@@ -27,7 +27,6 @@ internal enum ReplayTransitionKind
 public sealed partial class StoryHistory
 {
     public const int MaxAutomaticTransitions = 1_000;
-    public const int MaxChoices = SaveFormat.MaxChoices;
     public const int MaxSaveBytes = SaveFormat.MaxSaveBytes;
     private const string AutomaticContinuationErrorMessage =
         "Stopped after 1,000 automatic scene transitions to prevent a runaway chain. Check the story for a loop of bare diverts.";
@@ -82,7 +81,6 @@ public sealed partial class StoryHistory
     public IReadOnlyList<HistoryFrame> Transcript => _prefix.Count == 0 ? _frames.AsReadOnly() : [.. _prefix, .. _frames];
     public int Cursor => _timeline.Position;
     public int PlaythroughLength => _prefix.Count + Cursor;
-    public bool IsAtChoiceLimit => PlaythroughLength >= MaxChoices;
     public bool CanBack => Story.UndoEnabled && PreviousPlayerChoice(_timeline.Position) is not null;
     public bool CanForward => Story.UndoEnabled && NextPlayerChoice(_timeline.Position) is not null;
     public ContinuationReport? Continuation { get; private set; }
@@ -120,11 +118,6 @@ public sealed partial class StoryHistory
 
     public void Choose(string key)
     {
-        if (IsAtChoiceLimit)
-        {
-            throw new InvalidOperationException($"A playthrough supports at most {MaxChoices:N0} choices.");
-        }
-
         var choice = Current.Choices.FirstOrDefault(c => c.Key == key)
             ?? throw new InvalidOperationException($"'{key}' is not an available choice.");
         var previousFrame = Current;
@@ -217,11 +210,9 @@ public sealed partial class StoryHistory
         var transitions = 0;
         while (_session.Current?.AutomaticallyContinue == true)
         {
-            if (transitions == MaxAutomaticTransitions || IsAtChoiceLimit)
+            if (transitions == MaxAutomaticTransitions)
             {
-                AutomaticContinuationError = transitions == MaxAutomaticTransitions
-                    ? AutomaticContinuationErrorMessage
-                    : $"Stopped because this playthrough reached the {MaxChoices:N0}-choice limit during an automatic scene chain.";
+                AutomaticContinuationError = AutomaticContinuationErrorMessage;
                 _session.StopAutomaticContinuation();
                 _frames[^1] = _frames[^1] with { Frame = _session.Current! };
                 return;
@@ -523,8 +514,8 @@ public sealed partial class StoryHistory
 
         void CaptureRequestedCursor()
         {
-            if (requestedCursor is { } cursor && cursor < choices.Count && cursor == savedIndex
-                && cursorSession is null)
+            if (requestedCursor is { } cursor && cursor < choices.Count && cursor <= savedIndex
+                && cursorPositions[cursor] == replayedChoices.Count && cursorSession is null)
             {
                 cursorSession = session.ForkForReplayCursor();
                 cursorFrames = [.. frames];
@@ -549,11 +540,9 @@ public sealed partial class StoryHistory
             var transitions = 0;
             while (session.Current?.AutomaticallyContinue == true)
             {
-                if (transitions == MaxAutomaticTransitions || baseTranscriptLength + replayedChoices.Count >= MaxChoices)
+                if (transitions == MaxAutomaticTransitions)
                 {
-                    automaticContinuationError = transitions == MaxAutomaticTransitions
-                        ? AutomaticContinuationErrorMessage
-                        : $"Stopped because this playthrough reached the {MaxChoices:N0}-choice limit during an automatic scene chain.";
+                    automaticContinuationError = AutomaticContinuationErrorMessage;
                     session.StopAutomaticContinuation();
                     frames[^1] = frames[^1] with { Frame = session.Current! };
                     Array.Fill(cursorPositions, replayedChoices.Count);
@@ -597,11 +586,6 @@ public sealed partial class StoryHistory
             {
                 break;
             }
-            if (baseTranscriptLength + replayedChoices.Count >= MaxChoices)
-            {
-                throw ReplayFailure();
-            }
-
             var key = choices[savedIndex];
             var previousFrame = session.Current!;
             var eventStart = session.Events.Count;

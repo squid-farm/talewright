@@ -83,8 +83,6 @@ public sealed class SavePortabilityTests(WebHostFixture host, ITestOutputHelper 
             (SaveFormat.Write(decoded with { StoryId = "different" }), "different story"),
             (SaveFormat.Write(decoded with { StoryVersion = "different", Continuation = null }), $"Version different of {story.Title} has changed"),
             (SaveFormat.Write(decoded with { ReplayChoiceIdentities = changedOutcomeIdentities }), "cannot continue"),
-            (new byte[StoryHistory.MaxSaveBytes + 1],
-                $"too large to import (maximum {StoryHistory.MaxSaveBytes / 1024 / 1024:N0} MiB)"),
         };
         foreach (var (bytes, message) in invalid)
         {
@@ -92,6 +90,26 @@ public sealed class SavePortabilityTests(WebHostFixture host, ITestOutputHelper 
             await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync(message);
             Assert.Equal(original, await ReadStoredAsync(story.Id, "My save"));
             await Expect(Page.GetByRole(AriaRole.Region, new() { Name = "Confirm import" })).ToHaveCountAsync(0);
+        }
+
+        // Playwright can't send a buffer this large, so the oversized save is a sparse file on disk.
+        var oversized = Path.Combine(Path.GetTempPath(), $"oversized-{Guid.NewGuid():N}{SaveFormat.FileExtension}");
+        try
+        {
+            using (var file = File.Create(oversized))
+            {
+                file.SetLength(StoryHistory.MaxSaveBytes + 1L);
+            }
+
+            await ImportAsync(oversized);
+            await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync(
+                $"too large to import (maximum {StoryHistory.MaxSaveBytes / 1024 / 1024:N0} MiB)");
+            Assert.Equal(original, await ReadStoredAsync(story.Id, "My save"));
+            await Expect(Page.GetByRole(AriaRole.Region, new() { Name = "Confirm import" })).ToHaveCountAsync(0);
+        }
+        finally
+        {
+            File.Delete(oversized);
         }
 
         await ImportAsync("valid" + SaveFormat.FileExtension, valid);
@@ -114,23 +132,25 @@ public sealed class SavePortabilityTests(WebHostFixture host, ITestOutputHelper 
 
     [Fact]
     [Trait("Host", "Browser")]
-    public async Task Indexeddb_round_trips_a_save_at_the_configured_maximum_size()
+    public async Task Indexeddb_round_trips_a_save_far_larger_than_real_playthroughs()
     {
+        // The configured maximum is a damaged-file guard; browser quota, not Talewright, bounds what IndexedDB
+        // accepts near it. 64 MiB is six times the former cap and far above measured 100,000-choice saves.
+        const int largeSaveBytes = 64 * 1024 * 1024;
         var fixture = Fixture();
         await Upload(fixture);
         var roundTrips = await Page.EvaluateAsync<bool>("""
-            async ({ storyId, maxSaveBytes }) => {
+            async ({ storyId, maxSaveBytes, largeSaveBytes }) => {
                 const store = await import('./_content/Talewright.Player/Saves/IndexedDbSaveStore.js');
                 store.configure(maxSaveBytes);
-                const source = new Uint8Array(maxSaveBytes);
+                const source = new Uint8Array(largeSaveBytes);
                 for (let index = 0; index < source.length; index++) source[index] = index % 251;
-                await store.write(storyId, "Maximum size", source, false);
-                const saved = await store.read(storyId, "Maximum size");
-                return source.length === maxSaveBytes
-                    && saved.length === source.length
+                await store.write(storyId, "Large save", source, false);
+                const saved = await store.read(storyId, "Large save");
+                return saved.length === source.length
                     && source.every((value, index) => value === saved[index]);
             }
-            """, new { storyId = fixture.Compile().Id, maxSaveBytes = StoryHistory.MaxSaveBytes });
+            """, new { storyId = fixture.Compile().Id, maxSaveBytes = StoryHistory.MaxSaveBytes, largeSaveBytes });
         Assert.True(roundTrips);
     }
 
@@ -196,17 +216,22 @@ public sealed class SavePortabilityTests(WebHostFixture host, ITestOutputHelper 
         await Observe(new(null, "Second passage text."));
     }
 
-    private async Task ImportAsync(string name, byte[] bytes)
-    {
-        await Page.GetByLabel("Save name", new() { Exact = true }).BlurAsync();
-        var input = Page.GetByLabel("Import save file", new() { Exact = true });
-        var previous = await input.ElementHandleAsync();
-        await input.SetInputFilesAsync(new FilePayload
+    private Task ImportAsync(string name, byte[] bytes) =>
+        ImportAsync(input => input.SetInputFilesAsync(new FilePayload
         {
             Name = name,
             MimeType = "application/octet-stream",
             Buffer = bytes,
-        });
+        }));
+
+    private Task ImportAsync(string path) => ImportAsync(input => input.SetInputFilesAsync(path));
+
+    private async Task ImportAsync(Func<ILocator, Task> setFiles)
+    {
+        await Page.GetByLabel("Save name", new() { Exact = true }).BlurAsync();
+        var input = Page.GetByLabel("Import save file", new() { Exact = true });
+        var previous = await input.ElementHandleAsync();
+        await setFiles(input);
         await Page.WaitForFunctionAsync("element => !element.isConnected", previous);
     }
 

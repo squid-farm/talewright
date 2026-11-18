@@ -299,10 +299,6 @@ public sealed class AuthorSession
 
     private void Append(AuthorCommand command)
     {
-        if (Cursor >= StoryHistory.MaxChoices)
-        {
-            throw new InvalidOperationException($"An author timeline supports at most {StoryHistory.MaxChoices:N0} commands.");
-        }
         AuthorCommand[] commands = [.. _commands.Take(_timeline.Position), command];
         Adopt(new AuthorSession(Story, StartScene, Setup, Seed, Character, commands,
             _timeline.AfterAppend(), CaptureDecisions, continuation: _continuation));

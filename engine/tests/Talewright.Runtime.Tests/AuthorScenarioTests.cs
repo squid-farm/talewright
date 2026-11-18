@@ -324,20 +324,17 @@ public sealed class AuthorScenarioTests
     }
 
     [Fact]
-    public void Field_count_limit_is_checked_before_declared_id_validation()
+    public void Setup_batches_beyond_the_former_10000_field_cap_reach_declared_id_validation()
     {
         var data = Data();
         var flags = new JsonObject();
-        for (var index = 0; index < AuthorScenario.MaxFields; index++)
+        for (var index = 0; index <= 10_000; index++)
         {
             flags.Add($"flag{index}", true);
         }
         data["setup"] = JsonNode.Parse("""{"flags":{},"variables":{},"textVariables":{},"standings":{},"stats":[],"inventory":[]}""");
         data["setup"]!["flags"] = flags;
         Assert.Contains("Unknown setup flag", Assert.Throws<ArgumentException>(() =>
-            AuthorScenario.Import(Story(), Bytes(data), Extensions)).Message);
-        flags.Add("one-too-many", true);
-        Assert.Contains("10,000", Assert.Throws<InvalidDataException>(() =>
             AuthorScenario.Import(Story(), Bytes(data), Extensions)).Message);
     }
 
@@ -354,7 +351,8 @@ public sealed class AuthorScenarioTests
         var session = AuthorSession.Create(compiled.Story!, new("start"), seed: 42,
             setup: new() { Flags = ids.ToDictionary(id => new FlagId(id), _ => true) });
         var events = session.Events;
-        Assert.Contains("2 MiB", Assert.Throws<InvalidDataException>(() => AuthorScenario.Export(session, Extensions)).Message);
+        Assert.Contains("1 MiB", Assert.Throws<InvalidDataException>(() =>
+            AuthorScenario.Export(session, Extensions, maxBytes: 1024 * 1024)).Message);
         Assert.Same(events, session.Events);
         Assert.Equal(0, session.Cursor);
     }
@@ -398,18 +396,17 @@ public sealed class AuthorScenarioTests
     }
 
     [Fact]
-    public void Command_limit_accepts_10000_replayed_commands_and_rejects_10001()
+    public void Timelines_longer_than_the_former_10000_command_cap_import_and_roundtrip()
     {
+        const int commands = 10_001;
         var data = Data();
-        data["commands"] = new JsonArray(Enumerable.Range(0, StoryHistory.MaxChoices)
+        data["commands"] = new JsonArray(Enumerable.Range(0, commands)
             .Select(_ => (JsonNode)new JsonObject { ["kind"] = "choice", ["key"] = "c1" }).ToArray());
         var changed = Story(Tale + "\n// New source identity");
         var result = AuthorScenario.Import(changed, Bytes(data), Extensions, adoptDifferentSource: true, captureDecisions: false);
-        Assert.Equal(StoryHistory.MaxChoices, result.Session.Commands.Count);
+        Assert.Equal(commands, result.Session.Commands.Count);
         Assert.Equal(0, result.Session.Cursor);
         var roundtrip = AuthorScenario.Import(changed, AuthorScenario.Export(result.Session, Extensions), Extensions, captureDecisions: false);
-        Assert.Equal(StoryHistory.MaxChoices, roundtrip.Session.Commands.Count);
-        data["commands"]!.AsArray().Add(new JsonObject { ["kind"] = "choice", ["key"] = "c1" });
-        Assert.Throws<InvalidDataException>(() => AuthorScenario.Import(changed, Bytes(data), Extensions, adoptDifferentSource: true));
+        Assert.Equal(commands, roundtrip.Session.Commands.Count);
     }
 }

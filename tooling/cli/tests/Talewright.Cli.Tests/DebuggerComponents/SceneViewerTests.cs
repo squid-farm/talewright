@@ -113,24 +113,23 @@ public sealed class SceneViewerTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
-    public void A_run_at_the_command_limit_is_busy_and_explains_how_to_continue()
+    public void A_run_past_the_former_command_cap_keeps_its_choices_enabled()
     {
         using var model = ComponentStory.Start();
         var wait = model.Session!.Current.Choices.Single(choice => choice.Text == "Wait").Key;
-        // Each author command replays the timeline, so build the limit through linear player history and fork it.
+        // Each author command replays the timeline, so build the run through linear player history and fork it.
         var history = new StoryHistory(model.Story!, model.Session.Seed);
-        for (var i = 0; i < StoryHistory.MaxChoices; i++)
+        for (var i = 0; i <= 10_000; i++)
             history.Choose(wait);
         var session = history.ForkAuthor();
-        Assert.Equal(StoryHistory.MaxChoices, session.Cursor);
+        Assert.Equal(10_001, session.Cursor);
 
         var viewer = Show(session);
 
-        Assert.Equal($"This playthrough has reached the {StoryHistory.MaxChoices:N0}-choice limit. You can save, go back, or restart to continue playing.",
-            viewer.Find("p[role=alert]").TextContent);
+        Assert.Empty(viewer.FindAll("p[role=alert]"));
         var choices = viewer.FindAll("ol[aria-label='Story choices'] button");
         Assert.Equal(["1. Explore", "2. Wait"], choices.Select(button => Text(button.TextContent)));
-        Assert.All(choices, button => Assert.True(button.HasAttribute("disabled")));
+        Assert.All(choices, button => Assert.False(button.HasAttribute("disabled")));
     }
 
     private static string Text(string value) => string.Join(' ', value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries));

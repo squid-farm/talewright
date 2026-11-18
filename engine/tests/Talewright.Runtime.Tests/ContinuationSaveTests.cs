@@ -106,16 +106,14 @@ public sealed class ContinuationSaveTests
         var bytes = original.Save();
         var unchanged = bytes.ToArray();
         var replayOnly = SaveFormat.Write(SaveFormat.Read(bytes) with { Continuation = null });
-        var updated = Compile(new() { Version = "2", ChangedHaggleOutcome = true });
+        var updated = Compile(new() { Version = "2", ChangedChoiceEffect = true });
 
         var error = Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(updated, replayOnly));
         Assert.Contains("has changed", error.Message);
 
-        var replayed = new List<ReplayTransitionKind>();
-        var restored = StoryHistory.Restore(updated, bytes, replayed.Add);
+        var restored = StoryHistory.Restore(updated, bytes);
 
         Assert.NotNull(restored.Continuation);
-        Assert.Equal([ReplayTransitionKind.SavedChoice], replayed);
         Assert.False(restored.Continuation.RedoDiscarded);
         Assert.Equal(original.State.GetVariable(Gold), restored.State.GetVariable(Gold));
         Assert.Equal(original.State.GetVariable(Bonus), restored.State.GetVariable(Bonus));
@@ -128,7 +126,21 @@ public sealed class ContinuationSaveTests
         var gold = restored.State.GetVariable(Gold);
         restored.Choose(KeyOf(restored.Current, "Return to the road"));
         restored.Choose(KeyOf(restored.Current, "Go to market"));
-        Assert.Equal(gold + 1, restored.State.GetVariable(Gold));
+        Assert.Equal(gold + 2, restored.State.GetVariable(Gold));
+    }
+
+    [Fact]
+    public void Incompatible_replay_executes_its_valid_prefix_once_before_checkpoint_fallback()
+    {
+        var original = PlayToSquare(Compile(new()));
+        var updated = Compile(new() { Version = "2", ChangedHaggleOutcome = true });
+        var replayed = new List<ReplayTransitionKind>();
+
+        var restored = StoryHistory.Restore(updated, original.Save(), replayed.Add);
+
+        Assert.NotNull(restored.Continuation);
+        Assert.Equal([ReplayTransitionKind.SavedChoice], replayed);
+        Assert.Equal(Snapshot(original), Snapshot(restored));
     }
 
     [Fact]
@@ -430,25 +442,23 @@ public sealed class ContinuationSaveTests
     }
 
     [Fact]
-    public void Choice_limit_includes_the_transcript_before_the_base()
+    public void Continued_playthroughs_keep_going_past_the_former_10000_choice_cap()
     {
         var original = new StoryHistory(CompileLoop(changed: false), 42);
-        for (var i = 0; i < StoryHistory.MaxChoices - 1; i++)
+        for (var i = 0; i < 9_999; i++)
         {
             original.Choose("c0");
         }
         var restored = Restore(CompileLoop(changed: true), original.Save());
 
         Assert.Equal(9_999, restored.PlaythroughLength);
-        Assert.False(restored.IsAtChoiceLimit);
         restored.Choose("c0");
-        Assert.Equal(10_000, restored.PlaythroughLength);
-        Assert.True(restored.IsAtChoiceLimit);
-        Assert.Equal("A playthrough supports at most 10,000 choices.",
-            Assert.Throws<InvalidOperationException>(() => restored.Choose("c0")).Message);
+        restored.Choose("c0");
+        Assert.Equal(10_001, restored.PlaythroughLength);
         var reloaded = Restore(restored.Story, restored.Save());
-        Assert.True(reloaded.IsAtChoiceLimit);
         Assert.Equal(restored.PlaythroughLength, reloaded.PlaythroughLength);
+        reloaded.Choose("c0");
+        Assert.Equal(10_002, reloaded.PlaythroughLength);
     }
 
     [Fact]
@@ -467,17 +477,6 @@ public sealed class ContinuationSaveTests
         AssertMalformed(oversizedHeader);
         AssertMalformed(map);
 
-        var tooManyFrames = SaveFormat.Read(source);
-        var continuation = tooManyFrames.Continuation!.Payload;
-        var frame = continuation.Transcript![0];
-        continuation.Transcript = Enumerable.Repeat(frame, SaveFormat.MaxChoices + 1).ToList();
-        AssertMalformed(SaveFormat.Write(tooManyFrames));
-
-        var tooManyStats = SaveFormat.Read(source);
-        tooManyStats.Continuation!.Payload.Current!.Characters[0].Stats = Enumerable.Range(0, SaveFormat.MaxCharacterStats + 1)
-            .Select(index => new NamedValuePayload($"stat-{index}", index)).ToList();
-        AssertMalformed(SaveFormat.Write(tooManyStats));
-
         var invalidLength = SaveFormat.Read(source);
         var invalidPayload = invalidLength.Continuation!.Payload;
         invalidPayload.Base = invalidPayload.Current;
@@ -488,14 +487,6 @@ public sealed class ContinuationSaveTests
         var baseWithEvidence = SaveFormat.Read(source);
         baseWithEvidence.Continuation!.Payload.Base = baseWithEvidence.Continuation.Payload.Current;
         AssertMalformed(SaveFormat.Write(baseWithEvidence));
-
-        var totalTooLarge = SaveFormat.Read(source);
-        var largePayload = totalTooLarge.Continuation!.Payload;
-        largePayload.Base = largePayload.Current;
-        largePayload.Transcript = Enumerable.Repeat(largePayload.Transcript![0], SaveFormat.MaxChoices).ToList();
-        largePayload.BaseTranscriptLength = SaveFormat.MaxChoices;
-        totalTooLarge = totalTooLarge with { ReplayEvidence = null, ReplayChoiceIdentities = null };
-        AssertMalformed(SaveFormat.Write(totalTooLarge));
     }
 
     [Theory]
@@ -803,6 +794,7 @@ public sealed class ContinuationSaveTests
         public bool IncludeRope { get; init; } = true;
         public int RopeInitial { get; init; }
         public bool ChangedHaggleOutcome { get; init; }
+        public bool ChangedChoiceEffect { get; init; }
         public bool AddPotion { get; init; }
         public bool RemoveArrived { get; init; }
         public bool ChangedTrigger { get; init; }
@@ -853,7 +845,7 @@ public sealed class ContinuationSaveTests
         var lines = new List<string> { SceneFaker.Header("start"), "The road." };
         if (legacy is not null) lines.Add(EffectFaker.Line(EffectFaker.Increase(legacy, 2)));
         lines.Add(ChoiceFaker.Create("market", "Go to market",
-            effect: EffectFaker.Increase(gold, 1)));
+            effect: EffectFaker.Increase(gold, options.ChangedChoiceEffect ? 2 : 1)));
         lines.Add(SceneFaker.Header("market"));
         if (options.HpLoss) lines.Add(EffectFaker.Line(EffectFaker.Decrease(TaleCharacterRef.Player.Field("hp"), 5)));
         lines.Add("The market.");

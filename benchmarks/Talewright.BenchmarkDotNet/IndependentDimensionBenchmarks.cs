@@ -17,6 +17,7 @@ public class IndependentDimensionBenchmarks
     private StoryDefinition _story = null!;
     private StoryDefinition _changedStory = null!;
     private StoryHistory _history = null!;
+    private StoryHistory _redoHistory = null!;
     private byte[] _save = [];
     private byte[] _redoSave = [];
     private int _redoCursor;
@@ -57,7 +58,8 @@ public class IndependentDimensionBenchmarks
         _history = history;
         _save = history.Save();
         _redoCursor = history.PlaythroughLength / 2;
-        _redoSave = MakeRedoSave(_save, _redoCursor);
+        _redoHistory = StoryHistory.Restore(_story, MakeRedoSave(_save, _redoCursor));
+        _redoSave = _redoHistory.Save();
         _changedStory = AddStartEffect(_source);
         if (StoryHistory.Restore(_changedStory, _save).Continuation is null)
         {
@@ -116,7 +118,26 @@ public class IndependentDimensionBenchmarks
     public byte[] SaveAtConfiguredDepth() => _history.Save();
 
     [Benchmark]
+    public byte[] SaveAtRedoCursor() => _redoHistory.Save();
+
+    [Benchmark]
+    [InvocationCount(1)]
+    public void NextChoiceAtConfiguredDepth() => _history.Choose(_history.Current.Choices[0].Key);
+
+    [Benchmark]
     public StoryHistory ContinueAtConfiguredDepth() => StoryHistory.Restore(_changedStory, _save);
+
+    [Benchmark]
+    public StoryHistory ContinueAtRedoCursor()
+    {
+        var restored = StoryHistory.Restore(_changedStory, _redoSave);
+        if (restored.Continuation is null || restored.Cursor != 0 || !restored.Continuation.RedoDiscarded)
+        {
+            throw new InvalidOperationException("Continuation did not discard redo at the configured checkpoint.");
+        }
+
+        return restored;
+    }
 
     [GlobalCleanup]
     public void Cleanup()

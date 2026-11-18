@@ -146,8 +146,9 @@ public sealed class StorySession : IStorySession
         _observer = observer;
         _beforeEntry = beforeEntry;
         _afterEntry = afterEntry;
-        _triggers = triggerEngine ?? new TriggerEngine(story.Triggers, story.Predicates, _log.State, observer,
-            _log.Events.Count, ResolveTriggerSkillCheck, triggerEdges);
+        _triggers = triggerEngine?.Fork(_log.State, ResolveTriggerSkillCheck)
+            ?? new TriggerEngine(story.Triggers, story.Predicates, _log.State, observer,
+                _log.Events.Count, ResolveTriggerSkillCheck, triggerEdges);
         var renderer = new TemplateRenderer(grammar ?? new EnglishGrammar(), story.Predicates);
         _executor = new SceneExecutor(story, _log, renderer, AfterBatch, observer, _captureEntry, MakeChoice, NotesSince);
     }
@@ -245,7 +246,7 @@ public sealed class StorySession : IStorySession
         var fork = new StorySession(Story, Seed, grammar: null, _character, setup: null, observer: null,
             initialEvents: null, triggerEdges: _triggers.CaptureEdgeMemory(), captureEntry: _captureEntry,
             eventLog: eventLog, statVisibilityBeforeEvents: _statVisibilityBeforeEvents,
-            triggerEngine: _triggers.Fork(eventLog.State))
+            triggerEngine: _triggers)
         {
             Current = Current,
             LastEntry = LastEntry,

@@ -58,6 +58,7 @@ public class RealisticStoryBenchmarksSaves
     private StoryDefinition _story = null!;
     private StoryDefinition _changedStory = null!;
     private StoryHistory _history = null!;
+    private StoryHistory _redoHistory = null!;
     private byte[] _save = [];
     private byte[] _redoSave = [];
     private int _redoCursor;
@@ -84,7 +85,8 @@ public class RealisticStoryBenchmarksSaves
         }
 
         _redoCursor = _history.PlaythroughLength / 2;
-        _redoSave = MakeRedoSave(_save, _redoCursor);
+        _redoHistory = StoryHistory.Restore(_story, MakeRedoSave(_save, _redoCursor));
+        _redoSave = _redoHistory.Save();
         if (StoryHistory.Restore(_story, _save).Continuation is not null)
         {
             throw new InvalidOperationException("The unchanged realistic story did not use replay.");
@@ -112,6 +114,13 @@ public class RealisticStoryBenchmarksSaves
     public byte[] Save() => _history.Save();
 
     [Benchmark]
+    public byte[] SaveAtRedoCursor() => _redoHistory.Save();
+
+    [Benchmark]
+    [InvocationCount(1)]
+    public void NextChoiceAtConfiguredDepth() => _history.Choose(_history.Current.Choices[0].Key);
+
+    [Benchmark]
     public StoryHistory RestoreReplay() => StoryHistory.Restore(_story, _save);
 
     [Benchmark]
@@ -128,6 +137,18 @@ public class RealisticStoryBenchmarksSaves
 
     [Benchmark]
     public StoryHistory RestoreContinue() => StoryHistory.Restore(_changedStory, _save);
+
+    [Benchmark]
+    public StoryHistory RestoreContinueAtRedoCursor()
+    {
+        var restored = StoryHistory.Restore(_changedStory, _redoSave);
+        if (restored.Continuation is null || restored.Cursor != 0 || !restored.Continuation.RedoDiscarded)
+        {
+            throw new InvalidOperationException("Continuation did not discard redo at the configured checkpoint.");
+        }
+
+        return restored;
+    }
 
     private int SavedChoiceStop => RequestedActions == 100_000 ? 100_000 : 10_000;
 

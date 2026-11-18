@@ -12,10 +12,16 @@ namespace Talewright.Talemark.Compilation;
 /// </summary>
 public sealed class StorySource
 {
-    private const int MaxStoryFiles = 1_000;
-    private const long MaxStoryFileBytes = 5L * 1024 * 1024;
+    // These bound damaged or hostile archives (ZIP bombs), not story size, so they sit far above any real story.
+    private const int MaxStoryFiles = 100_000;
+    private const long MaxStoryFileBytes = 256L * 1024 * 1024;
     /// <summary>Defensive expanded-text bound for story archives; not a folder or archive-image budget.</summary>
-    public const long MaxArchiveExpandedBytes = 50L * 1024 * 1024;
+    public const long MaxArchiveExpandedBytes = 1024L * 1024 * 1024;
+
+    internal readonly record struct ArchiveLimits(int MaxFiles, long MaxFileBytes, long MaxTotalBytes)
+    {
+        public static ArchiveLimits Default { get; } = new(MaxStoryFiles, MaxStoryFileBytes, MaxArchiveExpandedBytes);
+    }
 
     /// <summary>Name of the manifest file every story must contain at its root.</summary>
     public const string ManifestFileName = "story.talewright.yaml";
@@ -87,13 +93,15 @@ public sealed class StorySource
 
     /// <summary>
     /// Loads a zipped story. If <c>story.talewright.yaml</c> is not at the archive root but inside a single top-level folder
-    /// (the usual result of "compress folder"), that folder is treated as the root. At most 1,000 story files,
-    /// 5 MiB per file and 50 MiB total expanded text are read.
+    /// (the usual result of "compress folder"), that folder is treated as the root. At most 100,000 story files,
+    /// 256 MiB per file and 1 GiB total expanded text are read.
     /// </summary>
-    public static StorySource FromZip(Stream zip)
+    public static StorySource FromZip(Stream zip) => FromZip(zip, ArchiveLimits.Default);
+
+    internal static StorySource FromZip(Stream zip, ArchiveLimits limits)
     {
         using var archive = new ZipArchive(zip, ZipArchiveMode.Read, leaveOpen: true);
-        return FromZip(archive, out _);
+        return FromZip(archive, out _, out _, limits);
     }
 
     /// <summary>
@@ -110,7 +118,10 @@ public sealed class StorySource
     /// This count is not a combined text/image budget. Mapping lifetime matches the archive.
     /// </summary>
     public static StorySource FromZip(ZipArchive archive, out IReadOnlyDictionary<string, ZipArchiveEntry> imageEntries,
-        out long expandedTextBytes)
+        out long expandedTextBytes) => FromZip(archive, out imageEntries, out expandedTextBytes, ArchiveLimits.Default);
+
+    private static StorySource FromZip(ZipArchive archive, out IReadOnlyDictionary<string, ZipArchiveEntry> imageEntries,
+        out long expandedTextBytes, ArchiveLimits limits)
     {
         foreach (var entry in archive.Entries)
         {
@@ -131,9 +142,9 @@ public sealed class StorySource
         var storyEntries = entries
             .Where(entry => entry.FullName.Replace('\\', '/').StartsWith(root, StringComparison.Ordinal))
             .ToList();
-        if (storyEntries.Count > MaxStoryFiles)
+        if (storyEntries.Count > limits.MaxFiles)
         {
-            throw new InvalidDataException($"A story archive may contain at most {MaxStoryFiles:N0} story files.");
+            throw new InvalidDataException($"A story archive may contain at most {limits.MaxFiles:N0} story files.");
         }
 
         var files = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -160,7 +171,7 @@ public sealed class StorySource
         {
             var path = entry.FullName.Replace('\\', '/');
             using var input = entry.Open();
-            files[path[root.Length..]] = ReadText(input, path, ref totalBytes);
+            files[path[root.Length..]] = ReadText(input, path, ref totalBytes, limits);
         }
 
         imageEntries = new ReadOnlyDictionary<string, ZipArchiveEntry>(images);
@@ -168,16 +179,23 @@ public sealed class StorySource
         return new StorySource(files, images.Keys);
     }
 
-    private static string ReadText(Stream input, string path, ref long totalBytes)
+    private static string ReadText(Stream input, string path, ref long totalBytes, ArchiveLimits limits)
     {
-        using var bounded = new LimitedReadStream(input, path, totalBytes);
+        using var bounded = new LimitedReadStream(input, path, totalBytes, limits);
         using var reader = new StreamReader(bounded, detectEncodingFromByteOrderMarks: true, bufferSize: 4096, leaveOpen: true);
         var text = reader.ReadToEnd();
         totalBytes += bounded.BytesRead;
         return text;
     }
 
-    private sealed class LimitedReadStream(Stream input, string path, long initialTotalBytes) : Stream
+    private static string FormatBytes(long bytes) => bytes switch
+    {
+        _ when bytes % (1024L * 1024 * 1024) == 0 => $"{bytes / 1024 / 1024 / 1024:N0} GiB",
+        _ when bytes % (1024L * 1024) == 0 => $"{bytes / 1024 / 1024:N0} MiB",
+        _ => $"{bytes:N0}-byte",
+    };
+
+    private sealed class LimitedReadStream(Stream input, string path, long initialTotalBytes, ArchiveLimits limits) : Stream
     {
         public long BytesRead { get; private set; }
 
@@ -203,18 +221,18 @@ public sealed class StorySource
                 return 0;
             }
 
-            var fileRemaining = MaxStoryFileBytes - BytesRead;
-            var totalRemaining = MaxArchiveExpandedBytes - initialTotalBytes - BytesRead;
+            var fileRemaining = limits.MaxFileBytes - BytesRead;
+            var totalRemaining = limits.MaxTotalBytes - initialTotalBytes - BytesRead;
             var requested = (int)Math.Min(buffer.Length, Math.Min(fileRemaining, totalRemaining) + 1);
             var bytesRead = input.Read(buffer[..requested]);
             if (bytesRead > fileRemaining)
             {
-                throw new InvalidDataException($"Story file '{path}' exceeds the 5 MiB expanded-size limit.");
+                throw new InvalidDataException($"Story file '{path}' exceeds the {FormatBytes(limits.MaxFileBytes)} expanded-size limit.");
             }
 
             if (bytesRead > totalRemaining)
             {
-                throw new InvalidDataException("The story exceeds the 50 MiB total expanded-text limit.");
+                throw new InvalidDataException($"The story exceeds the {FormatBytes(limits.MaxTotalBytes)} total expanded-text limit.");
             }
 
             BytesRead += bytesRead;
