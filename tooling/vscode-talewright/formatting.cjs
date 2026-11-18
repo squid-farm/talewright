@@ -87,11 +87,13 @@ function findSelectedFormattingBoundary(text, start, end, formatter) {
         return { ...edit, replacement: selectedText, selectionOffset: 0 };
       }
 
+      const delimiter = formatter.recommended[0] === opening.delimiter[0]
+        ? formatter.delimiters.find(candidate => candidate[0] !== opening.delimiter[0])
+        : formatter.recommended;
       return {
         ...edit,
-        replacement: opening.delimiter + formatter.recommended + selectedText
-          + formatter.recommended + closing.delimiter,
-        selectionOffset: opening.delimiter.length + formatter.recommended.length,
+        replacement: opening.delimiter + delimiter + selectedText + delimiter + closing.delimiter,
+        selectionOffset: opening.delimiter.length + delimiter.length,
       };
     }
   }

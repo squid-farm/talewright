@@ -93,6 +93,7 @@ test('formatting resolves selections that cross complete delimiter boundaries', 
     ['*Italic*', 0, 7, 'italic', 'Italic', 'Italic', 0],
     ['_Italic_', 1, 8, 'italic', 'Italic', 'Italic', 0],
     ['**Bold**', 2, 7, 'italic', '**_Bold_**', 'Bold', 3],
+    ['__Bold__', 1, 7, 'italic', '__*Bold*__', 'Bold', 3],
     ['_Italic_', 1, 8, 'bold', '_**Italic**_', 'Italic', 3],
   ]) {
     const plan = planFormattingEdit(text, start, end, style);
