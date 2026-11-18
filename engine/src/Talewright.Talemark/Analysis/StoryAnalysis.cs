@@ -309,6 +309,7 @@ public static class StoryAnalyzer
                 currentScenes.Add(id);
                 collector.Scene(id, location);
             }, DiscoverEffects, cancellationToken);
+            collector.SkillCheckOutcomeSites(file, syntax);
 
             var previousFileSymbols = previousSymbols
                 .Where(symbol => symbol.Declaration?.Start.File == file).ToArray();
@@ -442,6 +443,96 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal StorySymbols? SymbolContext { get; set; }
 
     private void AddSite(CompletionSite site) => CompletionSites.Add(CompletionSiteSource.Of(site));
+
+    internal void SkillCheckOutcomeSites(string file, TaleFileSyntax syntax)
+    {
+        foreach (var scene in syntax.Scenes)
+        {
+            var inEntryCheck = false;
+            var hasSuccess = false;
+            var hasFailure = false;
+            foreach (var line in scene.Lines)
+            {
+                var raw = syntax.RawText(scene, line);
+                if (line.Kind == TaleLineKind.SkillCheckBlock)
+                {
+                    if (line.IsBareFence && line.IsAttached)
+                    {
+                        inEntryCheck = false;
+                        continue;
+                    }
+
+                    var content = raw.Trim();
+                    var spec = content[SceneVocabulary.SkillCheckFence.Length..].TrimStart();
+                    inEntryCheck = spec.StartsWith(SceneVocabulary.SkillCheck, StringComparison.Ordinal);
+                    hasSuccess = false;
+                    hasFailure = false;
+                    continue;
+                }
+
+                if (!inEntryCheck)
+                    continue;
+
+                if (line.IsAttached && line.Kind == TaleLineKind.SuccessOutcome)
+                {
+                    hasSuccess = true;
+                    continue;
+                }
+
+                if (line.IsAttached && line.Kind == TaleLineKind.FailureOutcome)
+                {
+                    hasFailure = true;
+                    continue;
+                }
+
+                if (line.IsAttached && line.Kind == TaleLineKind.Comment)
+                    continue;
+
+                if (line.IsAttached && line.Kind == TaleLineKind.Blank)
+                {
+                    AddOutcomeSite(file, scene, line, raw, hasSuccess, hasFailure);
+                    continue;
+                }
+
+                if (line.Kind == TaleLineKind.Prose &&
+                    AddOutcomeSite(file, scene, line, raw, hasSuccess, hasFailure))
+                    continue;
+
+                inEntryCheck = false;
+            }
+        }
+    }
+
+    private bool AddOutcomeSite(string file, TaleSceneSyntax scene, TaleLineSyntax line, ReadOnlySpan<char> raw,
+        bool hasSuccess, bool hasFailure)
+    {
+        var candidates = new List<string>(2);
+        if (!hasSuccess) candidates.Add(SceneVocabulary.SuccessOutcome);
+        if (!hasFailure) candidates.Add(SceneVocabulary.FailureOutcome);
+        if (candidates.Count == 0) return false;
+
+        var start = line.Indent;
+        var end = start;
+        while (end < raw.Length && !char.IsWhiteSpace(raw[end]))
+            end++;
+        var text = raw[start..end].ToString();
+        var prefix = text.EndsWith(ExpressionVocabulary.Separator) ? text[..^1] : text;
+        if (prefix.Length > 0 &&
+            !candidates.Any(candidate => candidate.StartsWith(prefix, StringComparison.OrdinalIgnoreCase)))
+            return false;
+
+        var location = new SourceLocation(file, scene.FileLine(line.Line) + 1, start + 1);
+        var range = new SourceRange(location, location.Offset(end - start));
+        var prefixLength = prefix.Length;
+        var replacementEnd = end;
+        var site = new CompletionSite(prefix, range, [], candidates,
+            Enumerable.Range(0, prefixLength + 1).Select(location.Offset).ToArray())
+        {
+            ReplacementRange = new(location, location.Offset(replacementEnd - start))
+        };
+        AddSite(site);
+        return true;
+    }
 
     internal void ImagePath(string path, SourceRange range, IReadOnlyList<SourceLocation> positions)
     {

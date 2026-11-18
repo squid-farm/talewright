@@ -139,6 +139,39 @@ public sealed class StoryCompletionTests
     }
 
     [Theory]
+    [InlineData("::: skill-check perception dc 12\n    suc| { set flag:ready } -> END", "success:",
+        "    success: { set flag:ready } -> END")]
+    [InlineData("::: skill-check perception dc 12\n  success: -> END\n    fai| -> END", "failure:",
+        "    failure: -> END")]
+    [InlineData("::: skill-check perception dc 12\n  success: -> END\n    |", "failure:",
+        "    failure:")]
+    public void Entry_skill_check_outcomes_complete_only_missing_keywords_and_preserve_line_text(
+        string marked, string expectedKeyword, string expectedLine)
+    {
+        var (analysis, position) = Analyze("=== first\n" + marked);
+        var completions = StoryCompletion.Complete(analysis, position);
+        var completion = Assert.Single(completions, item => item.Label == expectedKeyword);
+        var sourceLine = marked.Split('\n')[^1].Replace("|", "");
+
+        Assert.Equal(expectedKeyword, completion.NewText);
+        Assert.Equal(expectedLine, Apply(sourceLine, completion.Range.Start.Column,
+            completion.Range.End.Column, completion.NewText));
+        var otherKeyword = expectedKeyword == "success:" ? "failure:" : "success:";
+        Assert.DoesNotContain(completions, item => item.Label == otherKeyword);
+    }
+
+    [Theory]
+    [InlineData("suc|")]
+    [InlineData("::: skill-check perception dc 12\n:::\nsuc|")]
+    [InlineData("::: skill-check perception dc 12\nordinary prose|")]
+    public void Skill_check_outcome_keywords_are_not_completed_outside_the_open_entry_block(string marked)
+    {
+        var (analysis, position) = Analyze("=== first\n" + marked);
+        Assert.DoesNotContain(StoryCompletion.Complete(analysis, position),
+            item => item.Label is "success:" or "failure:");
+    }
+
+    [Theory]
     [InlineData("::: skill-check guide | dc 10", "::: skill-check guide hp dc 10")]
     [InlineData("::: skill-check guide |dc 10", "::: skill-check guide hp dc 10")]
     [InlineData("::: skill-check guide  | dc 10", "::: skill-check guide  hp dc 10")]
