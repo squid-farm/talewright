@@ -934,7 +934,11 @@ async function testSkillCheckTabFlow() {
         return Array.from(widget.querySelectorAll('.monaco-list-row'))
           .some(row => (row.getAttribute('aria-label') || row.textContent || '').includes(${JSON.stringify(label)}));
       })()`), `Completion must show ${label}`);
-    const acceptWithTab = async () => vscode.commands.executeCommand('acceptSelectedSuggestion');
+    const acceptWithTab = async expectedLine => {
+      await renderer.dispatchKey('Tab', 'Tab', 9, 0);
+      await waitUntil(() => document.lineAt(1).text === expectedLine,
+        `Tab must complete the skill-check line as ${JSON.stringify(expectedLine)}`);
+    };
 
     editor.selection = new vscode.Selection(1, 0, 1, 0);
     await type(':::');
@@ -942,7 +946,7 @@ async function testSkillCheckTabFlow() {
     await vscode.commands.executeCommand('hideSuggestWidget');
     await type(' s');
     await waitForSuggestion('skill-check');
-    await acceptWithTab();
+    await acceptWithTab('::: skill-check ');
     assert.equal(document.lineAt(1).text, '::: skill-check ');
 
     await vscode.commands.executeCommand('hideSuggestWidget');
@@ -951,7 +955,7 @@ async function testSkillCheckTabFlow() {
 
     await type(' con ');
     await waitForSuggestion('dc');
-    await acceptWithTab();
+    await acceptWithTab('::: skill-check player con dc ');
     assert.equal(document.lineAt(1).text, '::: skill-check player con dc ');
     await type('10');
     assert.equal(document.lineAt(1).text, '::: skill-check player con dc 10');
