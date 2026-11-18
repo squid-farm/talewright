@@ -311,28 +311,31 @@ public class SaveFormatTests
     }
 
     [Fact]
-    public void Choice_and_stat_collection_limits_are_checked_before_deserialization()
+    public void Choice_and_stat_collections_are_not_capped()
     {
-        var tooManyChoices = SaveFormat.ToPayload(Sample);
-        tooManyChoices.Choices = Enumerable.Repeat("c0", SaveFormat.MaxChoices + 1).ToList();
-        Assert.Equal(SaveFormat.HistoryMessage,
-            Assert.Throws<InvalidDataException>(() => SaveFormat.DecodeBody(SaveFormat.EncodeBody(tooManyChoices), out _)).Message);
-
-        var tooManyStats = SaveFormat.ToPayload(Sample);
-        tooManyStats.Character!.Stats = Enumerable.Range(0, SaveFormat.MaxCharacterStats + 1)
+        var manyChoices = SaveFormat.ToPayload(Sample);
+        manyChoices.Choices = Enumerable.Repeat("c0", 100_001).ToList();
+        manyChoices.Cursor = manyChoices.Choices.Count;
+        manyChoices.ReplayEvidence = null;
+        manyChoices.ReplayChoiceIdentities = null;
+        manyChoices.Character!.Stats = Enumerable.Range(0, 1_001)
             .Select(i => new StatPayload { Id = $"stat-{i}", Value = i })
             .ToList();
-        Assert.Throws<InvalidDataException>(() => SaveFormat.DecodeBody(SaveFormat.EncodeBody(tooManyStats), out _));
+
+        var decoded = SaveFormat.DecodeBody(SaveFormat.EncodeBody(manyChoices), out _);
+        Assert.Equal(100_001, decoded.Choices.Count);
+        Assert.Equal(1_001, decoded.Character!.Stats.Count);
     }
+
+    // The real 1 GiB bound can't be reached by an in-test string, so the boundary uses a smaller write limit.
+    private const int SmallDecodedLimit = 1024 * 1024;
 
     [Fact]
     public void Write_rejects_bodies_over_the_decoded_size_limit()
     {
-        var tooLarge = Sample with { StoryId = new string('s', SaveFormat.MaxDecodedBytes + 1) };
-        var error = Assert.Throws<InvalidOperationException>(() => SaveFormat.Write(tooLarge));
-        Assert.Contains(
-            $"maximum {SaveFormat.MaxDecodedBytes / 1024 / 1024} MiB uncompressed",
-            error.Message);
+        var tooLarge = Sample with { StoryId = new string('s', SmallDecodedLimit + 1) };
+        var error = Assert.Throws<InvalidOperationException>(() => SaveFormat.Write(tooLarge, SmallDecodedLimit));
+        Assert.Contains("maximum 1 MiB uncompressed", error.Message);
     }
 
     [Fact]
@@ -340,12 +343,12 @@ public class SaveFormatTests
     {
         var emptyStoryIdBodyLength = SaveFormat.EncodeBody(Sample with { StoryId = "" }).Length;
         // The large story id uses a five-byte str32 header instead of the empty string's one-byte fixstr.
-        var storyIdLength = SaveFormat.MaxDecodedBytes - emptyStoryIdBodyLength - 4;
+        var storyIdLength = SmallDecodedLimit - emptyStoryIdBodyLength - 4;
         var atLimit = Sample with { StoryId = new string('s', storyIdLength) };
         var body = SaveFormat.EncodeBody(atLimit);
 
-        Assert.Equal(SaveFormat.MaxDecodedBytes, body.Length);
-        Assert.Equal(atLimit.StoryId, SaveFormat.Read(SaveFormat.Write(atLimit)).StoryId);
+        Assert.Equal(SmallDecodedLimit, body.Length);
+        Assert.Equal(atLimit.StoryId, SaveFormat.Read(SaveFormat.Write(atLimit, SmallDecodedLimit)).StoryId);
     }
 
     [Fact]

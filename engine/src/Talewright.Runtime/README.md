@@ -114,7 +114,7 @@ scene entry has no checkpoint.
 Replay requires the same unchanged compiled story and deterministic, side-effect-free
 extensions, just like ordinary choice replay. Session isolation cannot undo
 external effects performed by custom C# delegates. Rebuilding costs time
-proportional to the selected path; author commands are bounded by `StoryHistory.MaxChoices`.
+proportional to the selected path; there is no command-count limit.
 Player-save compatibility is never bypassed. Portable author recipes are described below.
 
 ### Portable author scenarios
@@ -154,7 +154,7 @@ be forked. Normal save bytes, rules and slots are untouched.
 Value batches require every collection, including `textVariables` when empty; replay evidence includes
 empty text-variable state. Previous scenario formats are unsupported, not migrated.
 The format rejects unknown members/commands/versions, duplicate JSON keys, null collections and
-invalid character/setup/command IDs. Limits: 2 MiB, 10,000 commands, 10,000 fields per value batch,
+invalid character/setup/command IDs. Limits: 64 MiB per scenario file (about two million commands),
 512-character identifiers, JSON depth 32, 32-bit integer values and unsigned 64-bit seed.
 Stat values and inventory quantities must be present explicitly; missing numeric members are not zero.
 Character names retain the normal 80-character bounds. Export with pending redo replays it before
@@ -332,8 +332,8 @@ replay payload and any base, excluding summary, current checkpoint and rendered 
 loaded original slot until the timeline changes, including after loading into a changed story. The player
 checks those keys against actual persisted slots before replacing a session; timestamps do not
 influence load protection.
-The save limits are 10 MiB compressed, 16 MiB decoded, 10,000 choices across continuation
-boundaries and 512 characters per choice key. Unsupported formats and incompatible stories fail
+The save limits are 512 MiB compressed, 1 GiB decoded and 512 characters per choice key. These
+reject damaged files; playthrough length is not limited. Unsupported formats and incompatible stories fail
 explicitly. Saves are never migrated.
 
 Built-in compiler options provide a compatibility identity. Custom C# hosts must set

@@ -742,7 +742,7 @@ Run fast engine tests with `dotnet test` from the repo root. Player UI suites ar
 - **Open world.** No locations/time yet, but nothing assumes linear flow: scenes request moves, hubs select
   storylets by state, and movement is an event. Locations will be another kind of storylet source.
 - **One language.** `EnglishGrammar` only; the `IGrammar` seam is there.
-- **Event log growth.** No snapshots yet; histories are bounded to 10,000 choices. Generated load/replay
+- **Event log growth.** No snapshots yet; history length is unbounded, so restore cost grows with playthrough length. Generated load/replay
   workloads have explicit Release budgets; see [testing](../../tests/README.md). Real complex stories and
   constrained devices may need further profiling before snapshots or a precompiled bundle format.
 - **Development hosts embed samples.** `publish -a` instead includes only the selected story.

@@ -319,8 +319,7 @@ enough disk space and time to build and write. A disk or write failure is report
 replacing an existing good output with a partial archive.
 
 Hosting-size warnings are advisory and do not prevent publication. Check your chosen host's
-limits before uploading. Publication does not relax the separate protections on ZIPs opened
-by the player: source text is limited to 1,000 files, 5 MiB per file and 50 MiB total expanded
-text, and browser uploads have a 20 MiB compressed-input limit. A successfully published
-large story ZIP may exceed those import limits; use an all-in-one publication to distribute
-a standalone game instead.
+limits before uploading. ZIPs opened by the player keep separate damaged-archive protections
+(100,000 source files, 256 MiB per file and 1 GiB total expanded text, and a 1 GiB browser upload)
+that sit far above real stories. Browser memory, not these limits, is the practical ceiling for very
+large stories; use an all-in-one publication to distribute a standalone game.

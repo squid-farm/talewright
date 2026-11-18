@@ -62,6 +62,9 @@ public class RealisticStoryBenchmarksSaves
     private int _restartCount;
     private int _completedActions;
 
+    // Playthroughs are unlimited; stopping at the former 10,000-choice cap keeps rows comparable with the scorecard.
+    private const int SavedChoiceStop = 10_000;
+
     [Params(1_000, 5_000, 10_000)]
     public int RequestedActions { get; set; }
 
@@ -74,11 +77,10 @@ public class RealisticStoryBenchmarksSaves
         _changedStory = AddStartEffect(source);
         (_history, _restartCount, _completedActions) = Play(_story, RequestedActions);
         _save = _history.Save();
-        if (RequestedActions == StoryHistory.MaxChoices
-            && _history.PlaythroughLength != StoryHistory.MaxChoices)
+        if (RequestedActions == SavedChoiceStop && _history.PlaythroughLength != SavedChoiceStop)
         {
             throw new InvalidOperationException(
-                $"The realistic route saved {_history.PlaythroughLength:N0} choices instead of reaching the {StoryHistory.MaxChoices:N0}-choice limit.");
+                $"The realistic route saved {_history.PlaythroughLength:N0} choices instead of stopping at {SavedChoiceStop:N0}.");
         }
 
         if (StoryHistory.Restore(_story, _save).Continuation is not null)
@@ -120,7 +122,7 @@ public class RealisticStoryBenchmarksSaves
         var completedActions = 0;
         for (var index = 0; index < requestedActions; index++)
         {
-            if (history.IsAtChoiceLimit)
+            if (history.PlaythroughLength >= SavedChoiceStop)
             {
                 break;
             }

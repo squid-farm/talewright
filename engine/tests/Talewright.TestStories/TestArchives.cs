@@ -27,11 +27,6 @@ public static class TestArchives
         "yaml" => Create([new("story.talewright.yaml", "title: [broken"), new("main.tale", "=== start\n-> END")]),
         "tale" => Create([new("story.talewright.yaml", TestStories.DefaultYaml),
             new("chapters/main.tale", "=== start\n@hub missing-hub\n* [Missing destination] -> missing\n=== orphan\n-> END")]),
-        "file-limit" => Create([new("huge.tale", new string('x', 5 * 1024 * 1024 + 1))]),
-        "count-limit" => Create(Enumerable.Range(0, 1001).Select(i => new KeyValuePair<string, string>($"{i}.tale", ""))),
-        "total-limit" => Create(Enumerable.Range(0, 10).Select(i => new KeyValuePair<string, string>($"{i}.tale",
-            new string('x', 5 * 1024 * 1024))).Append(new("extra.tale", "x"))),
-        "upload-limit" => new byte[20 * 1024 * 1024 + 1],
         _ => throw new ArgumentOutOfRangeException(nameof(kind), kind, "Unknown invalid archive fixture."),
     };
 
@@ -41,13 +36,12 @@ public static class TestArchives
         ["manifest"] = "TW4002",
         ["yaml"] = "TW4001",
         ["tale"] = "TW2002",
-        ["file-limit"] = "5 MiB",
-        ["count-limit"] = "1,000 story files",
-        ["total-limit"] = "50 MiB",
-        ["upload-limit"] = "20971520",
     };
 
-    public static byte[] AtUploadLimit()
+    public const int FormerUploadCapBytes = 20 * 1024 * 1024;
+
+    /// <summary>A playable archive one byte larger than the former 20 MiB browser upload cap.</summary>
+    public static byte[] AboveFormerUploadCap()
     {
         byte[] Build(int padding)
         {
@@ -67,6 +61,6 @@ public static class TestArchives
             return buffer.ToArray();
         }
 
-        return Build(20 * 1024 * 1024 - Build(0).Length);
+        return Build(FormerUploadCapBytes + 1 - Build(0).Length);
     }
 }

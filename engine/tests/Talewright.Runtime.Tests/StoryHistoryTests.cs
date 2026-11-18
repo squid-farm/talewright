@@ -1025,36 +1025,23 @@ public class StoryHistoryTests
     }
 
     [Fact]
-    public void Choice_limit_accepts_exact_boundary_and_rejects_the_next_choice()
+    public void One_hundred_thousand_choice_playthroughs_save_restore_and_keep_playing()
     {
+        const int choices = 100_000;
         var history = new StoryHistory(Compile(BuildManifest(declareVariables: true).Build(),
             string.Join('\n', SceneFaker.Header("a"), ChoiceFaker.Create("a", "Again"))), 7);
-        for (var i = 0; i < StoryHistory.MaxChoices; i++)
+        for (var i = 0; i < choices; i++)
         {
             history.Choose("c0");
         }
 
-        Assert.Equal(StoryHistory.MaxChoices, history.Cursor);
-        Assert.Equal(StoryHistory.MaxChoices + 1, history.Transcript.Count);
-        var saved = history.Save();
-        Assert.Throws<InvalidOperationException>(() => history.Choose("c0"));
-        Assert.Equal(saved, history.Save());
-        var restored = StoryHistory.Restore(history.Story, saved);
-        Assert.Equal(StoryHistory.MaxChoices, restored.Cursor);
-        Assert.Equal(StoryHistory.MaxChoices + 1, restored.Transcript.Count);
-    }
-
-    [Fact]
-    public void Oversized_choice_history_is_rejected()
-    {
-        var history = new StoryHistory(Compile(), 7);
-        history.Choose("c0");
-        var oversized = Mutate(history.Save(), save => save with
-        {
-            Choices = Enumerable.Repeat("c0", StoryHistory.MaxChoices + 1).ToArray(),
-        });
-        var error = Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(history.Story, oversized));
-        Assert.Equal(SaveFormat.HistoryMessage, error.Message);
+        Assert.Equal(choices, history.Cursor);
+        Assert.Equal(choices + 1, history.Transcript.Count);
+        var restored = StoryHistory.Restore(history.Story, history.Save());
+        Assert.Equal(choices, restored.Cursor);
+        Assert.Equal(choices + 1, restored.Transcript.Count);
+        restored.Choose("c0");
+        Assert.Equal(choices + 1, restored.Cursor);
     }
 
     [Fact]

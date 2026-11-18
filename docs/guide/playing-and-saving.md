@@ -157,6 +157,8 @@ save switches to the character in that save.
 
 ## Very long playthroughs
 
-Each save file is limited to 10 MiB compressed (16 MiB decoded). A playthrough supports 10,000
-choices total; choices made before a story update count toward that limit. At the limit, the player
-explains why it cannot accept another choice. Saving, Back, Restart and Library still work.
+There is no limit on how many choices a playthrough can contain. Very long playthroughs take longer
+to save and to load: at 100,000 choices, loading a save can take seconds on desktop and longer in a
+browser. Save files are only rejected when they are implausibly large (over 512 MiB compressed or
+1 GiB decoded), which protects against damaged files. A browser can also run out of storage space
+before that; the player reports the storage error and you can keep playing.

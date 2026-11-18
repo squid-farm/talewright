@@ -19,8 +19,8 @@ var session = new StorySession(result.Story!);
 
 The root `story.talewright.yaml` keeps core settings under `game:`; world declarations sit at the root.
 Folder loading has no file-count or size limit, but rejects symbolic links inside the story and paths
-deeper than 64 directories. ZIP loading limits text to 1,000 source files, 5 MiB per file and 50 MiB
-in total, checked against the bytes actually read. Images are not counted toward those limits; each
+deeper than 64 directories. ZIP loading limits text to 100,000 source files, 256 MiB per file and 1 GiB
+in total, checked against the bytes actually read. These guard against ZIP bombs, not story size. Images are not counted toward those limits; each
 image read stops at its declared entry size. Neither source kind is trusted.
 The root manifest, supporting `.talewright.yaml` fragments and `.tale` files are loaded as text;
 images have a separate path catalogue. Unrelated files are not published as story content.

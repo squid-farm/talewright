@@ -126,7 +126,7 @@ python3 player/tests/run_e2e.py web --filter FullyQualifiedName~PerformanceTests
 The console workload generates 100/1,000/10,000-scene stories with substitutions,
 effects and choices. It measures in-memory compilation and authoring analysis,
 ZIP load+compile, startup, save serialization, full restore and Back+Forward at
-100/1,000/10,000 choices (the save format's upper limit). Restore verifies cursor
+100/1,000/10,000 choices. Restore verifies cursor
 and event counts. It also compiles and analyzes a 20-chapter `RealisticStory`.
 
 Each operation warms once, then reports median, nearest-rank p95 (the maximum
@@ -279,11 +279,12 @@ startup/first frame, directory and ZIP loading, compilation, choices, serializat
 real `FileSaveStore` write/read, restore, Back/Forward and story-only CLI publication.
 The warmed hub-choice case separately measures selection from the generated bounded
 hub, which offers at most 20 storylets. `BoundaryInputBenchmarks` times exact and
-immediately-over former directory ceilings (now accepted) and retained ZIP text file-size,
-expanded-size and file-count defenses, plus directory nesting depth. The runtime suite also checks
-save-size and choice-key limits; compressed saves are capped at 10 MiB. Existing
+immediately-over former directory ceilings (now accepted) and the ZIP text file-size,
+expanded-size and file-count defenses at their former 5 MiB / 50 MiB / 1,000-file values (the
+defaults are now far higher), plus directory nesting depth. The runtime suite also checks
+save-size and choice-key limits and plays, saves and restores a 100,000-choice playthrough. Existing
 compiler/runtime/CLI/player tests provide matching ZIP, UTF-16/BOM, upload, save-store,
-10,000-choice and failed-publication safety checks. Those hard correctness/limit assertions
+past-the-former-choice-cap and failed-publication safety checks. Those hard correctness/limit assertions
 remain separate from noisy performance comparisons.
 
 The corpus tiers measure size and limits, not story structure: each scene has one real
@@ -737,8 +738,8 @@ and deliberate DCs. A dedicated seeded fixture tests replay; no test retries unt
 | Transcript history, restart/replay, library/resume/replacement | Engine state only | Yes | Yes |
 | Strong/emphasis/code/line breaks, speech, non-ASCII, inert HTML | Compiler/renderer | DOM assertions | Rendered text scenarios; not DOM-style assertions |
 | Multi-file/root/wrapped ZIPs and errors/recovery | Yes | Yes | Generated fixtures and native chooser/CLI |
-| 20 MiB upload acceptance/rejection | N/A | Exact boundary and +1 byte | Same boundary and invalid uploads |
-| ZIP 1,000-file / 5 MiB-file / 50 MiB-total limits | Exact boundaries and rejection | Visible rejection/recovery | Visible rejection/recovery |
+| Upload above the former 20 MiB cap | N/A | Plays | Invalid uploads |
+| ZIP file-count / per-file / total text limits | Exact boundaries and rejection through a limits seam | Not reachable from a browser fixture | Not reachable from a native fixture |
 | Folder above former count/file/total ceilings | CLI validates and publishes | Not a browser folder source | Compiles and plays |
 | ZIP image above former combined 50 MiB budget | Declared-size reads, repeat reads, cancellation | Real 51 MiB JPEG decodes and plays | Real 51 MiB JPEG decodes and plays |
 | Keyboard, latest-frame focus, long-transcript scroll | N/A | Yes | Yes |

@@ -1662,6 +1662,23 @@ public class CompilerTests
         Assert.True(StoryCompiler.Compile(source).Success);
     }
 
+    // Archive limit enforcement is pinned at the former 1,000-file / 5 MiB / 50 MiB bounds; the defaults are far higher.
+    private static readonly StorySource.ArchiveLimits FormerArchiveLimits = new(1_000, 5L * 1024 * 1024, 50L * 1024 * 1024);
+
+    [Fact]
+    public void Default_archive_limits_accept_stories_past_the_former_bounds()
+    {
+        var files = Enumerable.Range(0, 1_001)
+            .Select(index => new KeyValuePair<string, string>($"chapter-{index}.tale", string.Empty))
+            .Append(new("large.tale", new string('x', 5 * 1024 * 1024 + 1)));
+        using var stream = CreateZip(files);
+
+        var source = StorySource.FromZip(stream);
+
+        Assert.Equal(1_002, source.Files.Count);
+        Assert.Equal(5 * 1024 * 1024 + 1, source.Files["large.tale"].Length);
+    }
+
     [Fact]
     public void Rejects_a_compressible_story_file_over_the_expanded_file_limit()
     {
@@ -1669,7 +1686,7 @@ public class CompilerTests
         using var stream = CreateZip([new("chapter.tale", oversizedText)]);
 
         Assert.True(stream.Length < 100 * 1024);
-        var error = Assert.Throws<InvalidDataException>(() => StorySource.FromZip(stream));
+        var error = Assert.Throws<InvalidDataException>(() => StorySource.FromZip(stream, FormerArchiveLimits));
 
         Assert.Contains("chapter.tale", error.Message);
         Assert.Contains("5 MiB", error.Message);
@@ -1683,7 +1700,7 @@ public class CompilerTests
             .Select(index => new KeyValuePair<string, string>($"chapter-{index}.tale", textAtFileLimit));
         using var stream = CreateZip(files);
 
-        Assert.Throws<InvalidDataException>(() => StorySource.FromZip(stream));
+        Assert.Throws<InvalidDataException>(() => StorySource.FromZip(stream, FormerArchiveLimits));
     }
 
     [Fact]
@@ -1693,7 +1710,7 @@ public class CompilerTests
             .Select(index => new KeyValuePair<string, string>($"chapter-{index}.tale", string.Empty));
         using var stream = CreateZip(files);
 
-        var error = Assert.Throws<InvalidDataException>(() => StorySource.FromZip(stream));
+        var error = Assert.Throws<InvalidDataException>(() => StorySource.FromZip(stream, FormerArchiveLimits));
 
         Assert.Contains("1,000 story files", error.Message);
     }
@@ -1720,7 +1737,7 @@ public class CompilerTests
         var text = new string('x', 5 * 1024 * 1024);
         using var zip = CreateZip(Enumerable.Range(0, 10)
             .Select(i => new KeyValuePair<string, string>($"{i}.tale", text)));
-        var source = StorySource.FromZip(zip);
+        var source = StorySource.FromZip(zip, FormerArchiveLimits);
         Assert.Equal(10, source.Files.Count);
         Assert.Equal(50L * 1024 * 1024, source.Files.Values.Sum(value => (long)value.Length));
     }
@@ -1732,7 +1749,7 @@ public class CompilerTests
         using var zip = CreateZip(Enumerable.Range(0, 10)
             .Select(i => new KeyValuePair<string, string>($"{i}.tale", text))
             .Append(new("extra.tale", "x")));
-        Assert.Contains("50 MiB", Assert.Throws<InvalidDataException>(() => StorySource.FromZip(zip)).Message);
+        Assert.Contains("50 MiB", Assert.Throws<InvalidDataException>(() => StorySource.FromZip(zip, FormerArchiveLimits)).Message);
     }
 
     [Fact]
@@ -1740,6 +1757,6 @@ public class CompilerTests
     {
         using var zip = CreateZip(Enumerable.Range(0, 1_000)
             .Select(i => new KeyValuePair<string, string>($"{i}.tale", "")));
-        Assert.Equal(1_000, StorySource.FromZip(zip).Files.Count);
+        Assert.Equal(1_000, StorySource.FromZip(zip, FormerArchiveLimits).Files.Count);
     }
 }

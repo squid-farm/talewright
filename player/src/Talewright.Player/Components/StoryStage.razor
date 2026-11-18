@@ -30,7 +30,7 @@
 
         @if (Current is { } current)
         {
-            <StoryChoices Current="current" Busy="Busy" AtChoiceLimit="AtChoiceLimit" ContinuationError="@ContinuationError"
+            <StoryChoices Current="current" Busy="Busy" ContinuationError="@ContinuationError"
                           OnChoose="OnChoose" OnRestart="OnRestart" />
         }
     </main>
@@ -49,7 +49,6 @@
     [Parameter, EditorRequired] public IGameStateView State { get; set; } = default!;
     [Parameter, EditorRequired] public object Identity { get; set; } = default!;
     [Parameter] public bool Busy { get; set; }
-    [Parameter] public bool AtChoiceLimit { get; set; }
     [Parameter] public string? ContinuationError { get; set; }
     [Parameter] public int? IncludeFromIndex { get; set; }
     [Parameter] public int RevealPassageIndex { get; set; } = -1;

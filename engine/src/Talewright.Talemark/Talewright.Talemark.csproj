@@ -18,6 +18,7 @@
     <InternalsVisibleTo Include="Talewright.Authoring" />
     <InternalsVisibleTo Include="Talewright.Authoring.Tests" />
     <InternalsVisibleTo Include="Talewright.Benchmarks" />
+    <InternalsVisibleTo Include="Talewright.BenchmarkDotNet" />
   </ItemGroup>
 
   <PropertyGroup>

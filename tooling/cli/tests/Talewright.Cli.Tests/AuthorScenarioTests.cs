@@ -152,8 +152,9 @@ public sealed class AuthorScenarioTests : IDisposable
         Assert.Null(model.Error);
         var session = model.Session;
         model.ConfirmOverwrite = true;
+        model.ScenarioExportLimit = 1024 * 1024;
         await model.ExportScenario();
-        Assert.Contains("2 MiB", model.Error);
+        Assert.Contains("1 MiB", model.Error);
         Assert.False(model.ConfirmOverwrite);
         Assert.Same(session, model.Session);
         Assert.Equal(original, await File.ReadAllBytesAsync(_output));
@@ -332,7 +333,7 @@ public sealed class AuthorScenarioTests : IDisposable
                 file.SetLength(size);
             }
             await model.ImportScenario();
-            Assert.Contains("2 MiB", model.Error);
+            Assert.Contains("64 MiB", model.Error);
             Assert.Same(session, model.Session);
         }
     }

@@ -25,7 +25,7 @@ foreach (var kind in TestArchives.Errors.Keys)
 }
 
 File.WriteAllText(Path.Combine(output, "errors.json"), JsonSerializer.Serialize(TestArchives.Errors));
-File.WriteAllBytes(Path.Combine(output, "at-upload-limit.zip"), TestArchives.AtUploadLimit());
+File.WriteAllBytes(Path.Combine(output, "above-former-upload-cap.zip"), TestArchives.AboveFormerUploadCap());
 File.WriteAllBytes(Path.Combine(output, "histoire café.zip"), TestStories.Linear.Zip());
 Console.WriteLine($"Exported {TestStories.All.Count} fixtures and {TestStories.Scenarios.Count} scenarios to {output}.");
 return 0;

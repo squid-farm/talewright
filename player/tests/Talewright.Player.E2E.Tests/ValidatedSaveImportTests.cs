@@ -13,25 +13,27 @@ public sealed class ValidatedSaveImportTests : IDisposable
     private readonly string _directory = Path.Combine(Path.GetTempPath(), $"talewright-import-{Guid.NewGuid():N}");
 
     [Fact]
-    public void Browser_choice_limit_fixture_has_valid_evidence_and_restores_at_the_exact_boundary()
+    public void Browser_long_save_fixture_has_valid_evidence_and_keeps_playing_past_the_former_cap()
     {
-        var (_, story, bytes) = SaveHistoryTests.CreateChoiceLimitSave();
+        const int choices = SaveHistoryTests.LongSaveChoices;
+        var (_, story, bytes) = SaveHistoryTests.CreateLongSave();
         var saved = SaveFormat.Read(bytes);
         Assert.NotNull(saved.ReplayEvidence);
-        Assert.Equal(StoryHistory.MaxChoices, saved.Choices.Count);
-        Assert.Equal(StoryHistory.MaxChoices, saved.Cursor);
+        Assert.Equal(choices, saved.Choices.Count);
+        Assert.Equal(choices, saved.Cursor);
 
         var history = StoryHistory.Restore(story, bytes);
-        Assert.Equal(StoryHistory.MaxChoices, history.Cursor);
-        Assert.Equal(StoryHistory.MaxChoices + 1, history.Transcript.Count);
-        Assert.Throws<InvalidOperationException>(() => history.Choose("c0"));
+        Assert.Equal(choices, history.Cursor);
+        Assert.Equal(choices + 1, history.Transcript.Count);
         Assert.Equal(bytes, history.Save());
 
         history.Back();
-        Assert.Equal(StoryHistory.MaxChoices - 1, history.Cursor);
+        Assert.Equal(choices - 1, history.Cursor);
         history.Forward();
-        Assert.Equal(StoryHistory.MaxChoices, history.Cursor);
+        Assert.Equal(choices, history.Cursor);
         Assert.Equal(bytes, history.Save());
+        history.Choose("c0");
+        Assert.Equal(choices + 1, history.Cursor);
     }
 
     [Fact]
