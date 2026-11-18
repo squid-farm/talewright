@@ -93,7 +93,9 @@ Select text in a writable `.tale` file and press **Ctrl+B** (**Cmd+B** on macOS)
 **Ctrl+I** (**Cmd+I** on macOS) to toggle italic. The **Talewright: Toggle Bold** and **Talewright:
 Toggle Italic** commands are also available in the Command Palette. The commands keep the selected
 text selected, support multiple selections, and can be undone together. They insert `**bold**` and
-`_italic_`; the supported `__bold__` and `*italic*` alternatives also toggle off.
+`_italic_`; the supported `__bold__` and `*italic*` alternatives also toggle off. When toggling off
+an enclosing style through nested formatting, only that style's delimiters are removed; the inner
+formatting and selected prose are preserved.
 
 After `{image(`, completion suggests supported files from the story's `images/` folder, including
 subfolders, and inserts the path in quotes. Completion inside an already quoted path inserts only the
