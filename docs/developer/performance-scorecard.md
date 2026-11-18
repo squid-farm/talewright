@@ -186,7 +186,9 @@ stacks were not identified. Saving still reconstructs boundary state and
 serializes the full history, making it a separate hotspot.
 
 Commands (run once on the baseline and once on the implementation, selecting
-the exact desired parameter; `10000)` avoids matching `100000)`):
+the exact desired parameter; `10000)` avoids matching `100000)`). On this host,
+each command was also run inside a `systemd-run --user --scope -p MemoryMax=6G
+-p MemorySwapMax=0` scope:
 
 ```bash
 MSBUILDDISABLENODEREUSE=1 dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
