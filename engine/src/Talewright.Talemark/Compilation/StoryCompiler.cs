@@ -91,6 +91,7 @@ public static class StoryCompiler
             var syntax = parseSyntax(path, text, cancellationToken);
             syntaxes.Add((path, syntax));
             analysis?.ClassificationSources.Add((path, syntax));
+            analysis?.SkillCheckOutcomeSites(path, syntax);
             TaleDeclarations.Collect(path, syntax, (id, location) =>
             {
                 analysis?.Scene(id, location);

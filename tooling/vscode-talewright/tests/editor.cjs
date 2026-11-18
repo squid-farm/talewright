@@ -83,6 +83,7 @@ exports.run = async () => {
   await testYamlSchema();
   await testLiveDiagnostics();
   await testWhitespaceCompletions();
+  await testSkillCheckOutcomeCompletions();
   await testRename();
   assert.equal((await bundledServerProcesses(extension)).length, 1,
     'The installed extension must run exactly its own bundled server executable');
@@ -960,6 +961,80 @@ async function testSkillCheckTabFlow() {
     await type('10');
     assert.equal(document.lineAt(1).text, '::: skill-check player con dc 10');
     console.log('Installed VSIX skill-check Tab flow passed: entry keyword, actor, dc, and difficulty value.');
+  } finally {
+    renderer?.close();
+    await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+    await fs.rm(folder, { recursive: true, force: true });
+  }
+}
+
+async function testSkillCheckOutcomeCompletions() {
+  const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'talewright-skill-check-outcomes-'));
+  let renderer;
+  try {
+    renderer = await openRenderer();
+    await fs.writeFile(path.join(folder, 'story.talewright.yaml'),
+      'game:\n  id: skill-check-outcomes\n  title: Skill check outcomes\n  start: start\n  ruleset: rpg\ncharacters:\n  player: {first-name: Ada}\n');
+    const file = path.join(folder, 'start.tale');
+    await fs.writeFile(file,
+      '=== start\n::: skill-check player perception dc 12\n     { set flag:ready } -> END\n');
+    const document = await vscode.workspace.openTextDocument(file);
+    const editor = await vscode.window.showTextDocument(document);
+    await waitForCompiler(document, items => items.length > 0);
+
+    const waitForOutcome = async label => waitUntil(async () =>
+      renderer.evaluate(`(() => {
+        const widget = document.querySelector('.suggest-widget');
+        if (!widget) return false;
+        const style = getComputedStyle(widget);
+        const rect = widget.getBoundingClientRect();
+        if (style.display === 'none' || style.visibility === 'hidden' || rect.width === 0 || rect.height === 0)
+          return false;
+        return Array.from(widget.querySelectorAll('.monaco-list-row'))
+          .some(row => (row.getAttribute('aria-label') || row.textContent || '').includes(${JSON.stringify(label)}));
+      })()`), `Completion must show ${label}`);
+    const type = async text => {
+      for (const character of text) await vscode.commands.executeCommand('type', { text: character });
+    };
+
+    editor.selection = new vscode.Selection(2, 4, 2, 4);
+    await type('suc');
+    await waitForOutcome('success:');
+    await vscode.commands.executeCommand('acceptSelectedSuggestion');
+    assert.equal(document.lineAt(2).text, '    success: { set flag:ready } -> END',
+      'Typing and accepting success must preserve indentation, effects, and divert');
+
+    const block = new vscode.WorkspaceEdit();
+    block.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
+      '=== start\n::: skill-check player perception dc 12\n  success: -> END\n    \n:::\n');
+    assert.equal(await vscode.workspace.applyEdit(block), true);
+    editor.selection = new vscode.Selection(3, 4, 3, 4);
+    await waitUntil(async () => {
+      const completions = await vscode.commands.executeCommand(
+        'vscode.executeCompletionItemProvider', document.uri, editor.selection.active);
+      return completions.items.some(item => item.label === 'failure:');
+    }, 'The missing failure outcome must be available before invoking Ctrl+Space');
+    assert.equal(await renderer.focusEditor(), true, 'Editor input must be focused before Ctrl+Space');
+    await renderer.dispatchKey(' ', 'Space', 32, 2);
+    await waitForOutcome('failure:');
+    await vscode.commands.executeCommand('acceptSelectedSuggestion');
+    assert.equal(document.lineAt(3).text, '    failure:',
+      'Ctrl+Space acceptance must insert the missing failure keyword and colon');
+    assert.equal(document.getText().includes('success: -> END\n    failure:\n:::'), true);
+
+    const outside = new vscode.WorkspaceEdit();
+    outside.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
+      '=== start\nsuc\n-> END');
+    assert.equal(await vscode.workspace.applyEdit(outside), true);
+    await waitForCompiler(document, items => items.length === 0);
+    editor.selection = new vscode.Selection(1, 3, 1, 3);
+    assert.equal(await renderer.focusEditor(), true);
+    await renderer.dispatchKey(' ', 'Space', 32, 2);
+    await new Promise(resolve => setTimeout(resolve, 500));
+    assert.equal(await renderer.evaluate(`Array.from(document.querySelectorAll('.suggest-widget .monaco-list-row'))
+      .some(row => /success:|failure:/.test(row.getAttribute('aria-label') || row.textContent || ''))`), false,
+    'Outcome keywords must not be suggested outside an entry skill-check block');
+    console.log('Installed VSIX outcome smoke passed: automatic success completion, Ctrl+Space failure completion, preserved line content, and no completion outside the block.');
   } finally {
     renderer?.close();
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');

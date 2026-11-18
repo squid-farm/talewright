@@ -133,6 +133,59 @@ public sealed partial class ServerTests
     }
 
     [Theory]
+    [InlineData("::: skill-check perception dc 12\n    suc| { set flag:ready } -> END",
+        "success:", "    success: { set flag:ready } -> END", 4, 7)]
+    [InlineData("::: skill-check perception dc 12\n  success: -> END\n    fai| -> END",
+        "failure:", "    failure: -> END", 4, 7)]
+    [InlineData("::: skill-check perception dc 12\n  success: -> END\n    |",
+        "failure:", "    failure:", 4, 4)]
+    public async Task Entry_skill_check_outcomes_complete_missing_keywords_with_exact_ranges(
+        string source, string expectedLabel, string expectedLine, int expectedStart, int expectedEnd)
+    {
+        await using var client = new Client();
+        DeclareRpg(client);
+        await client.Initialize();
+        var marked = "=== start\n" + source;
+        await client.Open("start.tale", marked.Replace("|", ""), 1);
+
+        var completions = Items(await Completion(client, "start.tale", marked));
+        var item = Assert.Single(completions, HasLabel(expectedLabel));
+        var edit = item.GetProperty("textEdit");
+        Assert.Equal(expectedLabel, edit.GetProperty("newText").GetString());
+        var range = edit.GetProperty("range");
+        var start = range.GetProperty("start");
+        var end = range.GetProperty("end");
+        var completionLine = source.Split('\n').Length;
+        Assert.Equal(completionLine, start.GetProperty("line").GetInt32());
+        Assert.Equal(completionLine, end.GetProperty("line").GetInt32());
+        Assert.Equal(expectedStart, start.GetProperty("character").GetInt32());
+        Assert.Equal(expectedEnd, end.GetProperty("character").GetInt32());
+
+        var sourceLine = source.Split('\n')[^1].Replace("|", "");
+        Assert.Equal(expectedLine, sourceLine[..expectedStart] + edit.GetProperty("newText").GetString() +
+            sourceLine[expectedEnd..]);
+        var otherLabel = expectedLabel == "success:" ? "failure:" : "success:";
+        Assert.DoesNotContain(completions, HasLabel(otherLabel));
+    }
+
+    [Theory]
+    [InlineData("suc|")]
+    [InlineData("::: skill-check perception dc 12\n:::\nsuc|")]
+    [InlineData("::: skill-check perception dc 12\nordinary prose|")]
+    public async Task Entry_skill_check_outcomes_are_not_completed_outside_the_open_block(string source)
+    {
+        await using var client = new Client();
+        DeclareRpg(client);
+        await client.Initialize();
+        var marked = "=== start\n" + source;
+        await client.Open("start.tale", marked.Replace("|", ""), 1);
+
+        var completions = Items(await Completion(client, "start.tale", marked));
+        Assert.DoesNotContain(completions, item =>
+            item.GetProperty("label").GetString() is "success:" or "failure:");
+    }
+
+    [Theory]
     [InlineData("::: skill-check guide | dc 10", "::: skill-check guide hp dc 10", "hp")]
     [InlineData("::: skill-check guide |dc 10", "::: skill-check guide hp dc 10", "hp ")]
     [InlineData("::: skill-check guide  | dc 10", "::: skill-check guide  hp dc 10", "hp")]
