@@ -183,6 +183,13 @@ public sealed class StoryCompletionTests
         Assert.DoesNotContain(StoryCompletion.Complete(analysis, position), item => item.Label == "dc");
     }
 
+    [Fact]
+    public void Difficulty_keyword_completion_is_not_offered_for_choice_skill_checks()
+    {
+        var (analysis, position) = Analyze("=== first\n* [Try] skill-check perception |");
+        Assert.DoesNotContain(StoryCompletion.Complete(analysis, position), item => item.Label == "dc");
+    }
+
     [Theory]
     [InlineData(">|", "player", "> player: ")]
     [InlineData(">pl|", "player", "> player: ")]
