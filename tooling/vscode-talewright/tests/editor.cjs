@@ -83,6 +83,7 @@ exports.run = async () => {
   await testYamlSchema();
   await testLiveDiagnostics();
   await testWhitespaceCompletions();
+  await testImageCompletions();
   await testSkillCheckOutcomeCompletions();
   await testRename();
   assert.equal((await bundledServerProcesses(extension)).length, 1,
@@ -897,6 +898,105 @@ async function testWhitespaceCompletions() {
     assert.equal(document.isDirty, true, 'The acceptance scenario must remain unsaved');
     assert.equal(await fs.readFile(file, 'utf8'), diskText);
     console.log('Installed VSIX completion smoke passed: automatic/manual skill-check entry acceptance, repeated-space suggestions, deletion/retyping, quiet prose/speech, unsaved buffer.');
+  } finally {
+    renderer?.close();
+    await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+    await fs.rm(folder, { recursive: true, force: true });
+  }
+}
+
+async function testImageCompletions() {
+  const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'talewright-image-completion-'));
+  let renderer;
+  try {
+    renderer = await openRenderer();
+    await fs.mkdir(path.join(folder, 'images/maps'), { recursive: true });
+    await fs.writeFile(path.join(folder, 'images/maps/camp.png'), []);
+    await fs.writeFile(path.join(folder, 'story.talewright.yaml'),
+      'game:\n  id: image-completion\n  title: Image completion\n  start: start\n');
+    const file = path.join(folder, 'start.tale');
+    await fs.writeFile(file, '=== start\n-> missing\n');
+    const document = await vscode.workspace.openTextDocument(file);
+    let editor = await vscode.window.showTextDocument(document);
+    await waitForCompiler(document, items => items.some(item => item.code === 'TW2002'));
+
+    const replaceStory = async text => {
+      const edit = new vscode.WorkspaceEdit();
+      edit.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)), text);
+      assert.equal(await vscode.workspace.applyEdit(edit), true);
+      editor = await vscode.window.showTextDocument(document);
+    };
+    const waitForImageSuggestion = async () => waitUntil(async () =>
+      renderer.evaluate(`(() => {
+        const widget = document.querySelector('.suggest-widget');
+        if (!widget) return false;
+        const style = getComputedStyle(widget);
+        const rect = widget.getBoundingClientRect();
+        if (style.display === 'none' || style.visibility === 'hidden' || rect.width === 0 || rect.height === 0)
+          return false;
+        return Array.from(widget.querySelectorAll('.monaco-list-row'))
+          .some(row => (row.getAttribute('aria-label') || row.textContent || '').includes('maps/camp.png'));
+      })()`), 'Image completion must show maps/camp.png');
+    const typeOpenParen = async () => {
+      const line = 'Before {image)}. After.';
+      await replaceStory(`=== start\n${line}\n-> END\n`);
+      const cursor = line.indexOf(')');
+      editor.selection = new vscode.Selection(1, cursor, 1, cursor);
+      await vscode.commands.executeCommand('type', { text: '(' });
+    };
+    const expected = '=== start\nBefore {image("maps/camp.png")}. After.\n-> END\n';
+
+    await typeOpenParen();
+    await waitForImageSuggestion();
+    await vscode.commands.executeCommand('acceptSelectedSuggestion');
+    assert.equal(document.getText(), expected,
+      'Automatic completion after ( must insert one quoted path and preserve surrounding text');
+
+    await vscode.commands.executeCommand('hideSuggestWidget');
+    await typeOpenParen();
+    await waitForImageSuggestion();
+    await vscode.commands.executeCommand('hideSuggestWidget');
+    assert.equal(await renderer.focusEditor(), true, 'Editor input must be focused before Ctrl+Space');
+    await renderer.dispatchKey(' ', 'Space', 32, 2);
+    await waitForImageSuggestion();
+    await vscode.commands.executeCommand('acceptSelectedSuggestion');
+    assert.equal(document.getText(), expected,
+      'Ctrl+Space completion before a quote must insert one quoted path and preserve surrounding text');
+
+    await vscode.commands.executeCommand('hideSuggestWidget');
+    await replaceStory('=== start\nBefore {image("maps/old.png", "Map")}. After.\n-> END\n');
+    const beforeQuoteLine = document.lineAt(1).text;
+    const beforeQuoteCursor = beforeQuoteLine.indexOf('"');
+    editor.selection = new vscode.Selection(1, beforeQuoteCursor, 1, beforeQuoteCursor);
+    assert.equal(await renderer.focusEditor(), true, 'Editor input must be focused before completion at a quote');
+    await renderer.dispatchKey(' ', 'Space', 32, 2);
+    await waitForImageSuggestion();
+    await vscode.commands.executeCommand('acceptSelectedSuggestion');
+    assert.equal(document.getText(), '=== start\nBefore {image("maps/camp.png", "Map")}. After.\n-> END\n',
+      'Completion before an opening quote must replace the quoted path without duplicating either quote');
+
+    await vscode.commands.executeCommand('hideSuggestWidget');
+    await replaceStory('=== start\nBefore {image("")}. After.\n-> END\n');
+    const quotedLine = document.lineAt(1).text;
+    const quotedCursor = quotedLine.indexOf('""') + 1;
+    editor.selection = new vscode.Selection(1, quotedCursor, 1, quotedCursor);
+    assert.equal(await renderer.focusEditor(), true, 'Editor input must be focused before quoted-path Ctrl+Space');
+    await renderer.dispatchKey(' ', 'Space', 32, 2);
+    await waitForImageSuggestion();
+    await vscode.commands.executeCommand('acceptSelectedSuggestion');
+    assert.equal(document.getText(), expected,
+      'Completion inside an already quoted path must not insert duplicate quotes');
+
+    await replaceStory('=== start\nBefore {image("maps/camp.png", "")}. After.\n-> END\n');
+    const altLine = document.lineAt(1).text;
+    const altCursor = altLine.indexOf('""') + 1;
+    editor.selection = new vscode.Selection(1, altCursor, 1, altCursor);
+    const altCompletions = await vscode.commands.executeCommand(
+      'vscode.executeCompletionItemProvider', document.uri, editor.selection.active);
+    assert.ok(!altCompletions?.items?.some(item =>
+      item.kind === vscode.CompletionItemKind.File || item.label === 'maps/camp.png'),
+    'Alt-text arguments must not suggest image paths');
+    console.log('Installed VSIX image completion smoke passed: automatic and Ctrl+Space acceptance, quoted-path insertion and alt-text exclusion.');
   } finally {
     renderer?.close();
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');

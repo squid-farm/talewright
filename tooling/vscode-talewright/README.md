@@ -95,9 +95,11 @@ Toggle Italic** commands are also available in the Command Palette. The commands
 text selected, support multiple selections, and can be undone together. They insert `**bold**` and
 `_italic_`; the supported `__bold__` and `*italic*` alternatives also toggle off.
 
-Inside `image("`, completion suggests supported files from the story's `images/` folder, including
-subfolders. Paths are case-sensitive. Adding, renaming or deleting images refreshes suggestions and
-diagnostics without reopening the story.
+After `{image(`, completion suggests supported files from the story's `images/` folder, including
+subfolders, and inserts the path in quotes. Completion inside an already quoted path inserts only the
+path; invoking completion immediately before its opening quote replaces the whole path. Paths are
+case-sensitive. Adding, renaming or deleting images refreshes suggestions and diagnostics without
+reopening the story.
 
 ### Find and rename
 
