@@ -150,11 +150,8 @@ is still cumulative quadratic work and is not changed here.
 ### 10,000 and 100,000-transition scale comparison
 
 The following Release probes use #768's merged cap removal. Before is `eebfbfba`
-(the #768 head); after is the replay implementation at `32054029`, integrated
-with #768 and the trigger-session fix. The 100,000 realistic save, end-restore,
-end-continuation and next-choice rows were measured before the subsequent
-automatic-cursor fix. Its redo restore and continuation rows were remeasured
-after that fix; other after rows also include it.
+(the #768 head); after is `17ca4104`, including replay consolidation and the
+subsequent allocation reductions.
 
 Each BenchmarkDotNet operation ran in a separate process with one launch, one
 warmup, three measured iterations and one invocation per iteration. Rows are
@@ -177,23 +174,23 @@ continuation discards redo and resumes from that checkpoint.
 
 | Independent operation | 10k before | 10k after | 100k before | 100k after |
 |---|---:|---:|---:|---:|
-| Save, end | 37.7 / 9.25 | 50.8 / 9.25 | 554.1 / 90.22 | 362.0 / 90.22 |
-| Save, redo | 19.5 / 5.15 | 22.8 / 5.15 | 194.6 / 50.30 | 175.9 / 50.30 |
-| Exact restore, end | 322.3 / 117.84 | 273.7 / 78.74 | 2,315.3 / 1,177.54 | 2,401.4 / 796.63 |
-| Exact restore, redo | 366.7 / 166.14 | 266.8 / 75.30 | 2,961.2 / 1,668.21 | 1,701.4 / 744.35 |
-| Continuation, end | 305.6 / 125.78 | 339.5 / 85.70 | 2,383.3 / 1,251.75 | 2,770.6 / 864.69 |
-| Continuation, redo | 352.4 / 169.86 | 290.4 / 78.36 | 2,603.8 / 1,696.69 | 1,380.5 / 778.36 |
-| Next choice near end | 0.377 / 0.009 | 0.374 / 0.007 | 0.304 / 0.011 | 0.199 / 0.008 |
+| Save, end | 37.7 / 9.25 | 45.7 / 9.10 | 554.1 / 90.22 | 379.3 / 88.71 |
+| Save, redo | 19.5 / 5.15 | 39.7 / 5.08 | 194.6 / 50.30 | 221.3 / 49.55 |
+| Exact restore, end | 322.3 / 117.84 | 247.3 / 54.13 | 2,315.3 / 1,177.54 | 1,709.8 / 546.15 |
+| Exact restore, redo | 366.7 / 166.14 | 209.4 / 51.17 | 2,961.2 / 1,668.21 | 1,107.8 / 493.87 |
+| Continuation, end | 305.6 / 125.78 | 307.4 / 58.99 | 2,383.3 / 1,251.75 | 1,766.1 / 593.25 |
+| Continuation, redo | 352.4 / 169.86 | 278.4 / 54.37 | 2,603.8 / 1,696.69 | 2,301.2 / 517.23 |
+| Next choice near end | 0.377 / 0.009 | 0.306 / 0.005 | 0.304 / 0.011 | 0.322 / 0.006 |
 
 | Realistic operation | 10k before | 10k after | 100k before | 100k after |
 |---|---:|---:|---:|---:|
-| Save, end | 93.0 / 23.31 | 93.2 / 23.31 | 881.4 / 295.15 | 1,092.5 / 295.15 |
-| Save, redo | 47.1 / 12.30 | 47.7 / 12.30 | 668.0 / 149.41 | 475.9 / 149.41 |
-| Exact restore, end | 2,252.2 / 2,071.45 | 1,100.8 / 1,021.26 | 16,535.9 / 20,817.37 | 8,700.2 / 10,312.20 |
-| Exact restore, redo | 4,051.9 / 3,052.75 | 1,372.6 / 994.88 | 25,623.3 / 30,583.56 | 11,068.4 / 10,000.09 |
-| Continuation, end | 1,124.6 / 1,078.00 | 1,018.6 / 1,035.47 | 9,388.6 / 10,875.14 | 7,795.9 / 10,449.76 |
-| Continuation, redo | 1,123.3 / 1,548.25 | 877.0 / 1,001.92 | 14,681.8 / 15,532.04 | 8,526.3 / 10,068.42 |
-| Next choice near end | 0.499 / 0.25 | 0.397 / 0.25 | 0.408 / 0.25 | 0.483 / 0.25 |
+| Save, end | 93.0 / 23.31 | 196.7 / 23.26 | 881.4 / 295.15 | 1,056.7 / 294.64 |
+| Save, redo | 47.1 / 12.30 | 51.9 / 12.27 | 668.0 / 149.41 | 520.2 / 149.15 |
+| Exact restore, end | 2,252.2 / 2,071.45 | 1,165.7 / 606.87 | 16,535.9 / 20,817.37 | 9,054.5 / 6,168.25 |
+| Exact restore, redo | 4,051.9 / 3,052.75 | 835.8 / 580.37 | 25,623.3 / 30,583.56 | 8,485.8 / 5,856.14 |
+| Continuation, end | 1,124.6 / 1,078.00 | 1,057.5 / 616.62 | 9,388.6 / 10,875.14 | 9,465.8 / 6,263.47 |
+| Continuation, redo | 1,123.3 / 1,548.25 | 953.6 / 585.35 | 14,681.8 / 15,532.04 | 7,867.4 / 5,902.72 |
+| Next choice near end | 0.499 / 0.25 | 0.334 / 0.12 | 0.408 / 0.25 | 0.295 / 0.12 |
 
 The next-choice benchmark advances the live history on each invocation, so
 measurements are near, not exactly at, the listed depth. BenchmarkDotNet warned
@@ -203,20 +200,22 @@ fixtures. Save allocation grows somewhat more (the realistic end row grows
 12.7x). Save builds collection copies and serialized/compressed buffers, but
 allocation-stack attribution for that increase is not available. This is not
 an incremental save algorithm. Wall-time ratios are too noisy to establish
-precise scaling from three iterations. The earlier realistic 100,000-transition
-restore allocated about 10 GiB per operation, before the later hub-selection
-optimization; the final implementation's 100,000-transition allocation was
-not remeasured. Saving still reconstructs boundary state and
+precise scaling from three iterations. The realistic 100,000-transition
+end restore still allocates about 6 GiB per operation. Saving still reconstructs boundary state and
 serializes the full history, making it a separate hotspot.
 
 Commands (run once on the baseline and once on the implementation, selecting
-the exact desired parameter; `10000)` avoids matching `100000)`). On this host,
+the exact desired parameter; the closing quote and parenthesis avoid matching
+`100000`). On this host,
 each command was also run inside a `systemd-run --user --scope -p MemoryMax=6G
 -p MemorySwapMax=0` scope:
 
 ```bash
 MSBUILDDISABLENODEREUSE=1 dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
-  --filter '*IndependentDimensionBenchmarks.*At*history-10000*' \
+  --filter '*IndependentDimensionBenchmarks.*At*history-10000")' \
+  --warmupCount 1 --iterationCount 3 --invocationCount 1
+MSBUILDDISABLENODEREUSE=1 dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
+  --filter '*IndependentDimensionBenchmarks.*At*history-100000*' \
   --warmupCount 1 --iterationCount 3 --invocationCount 1
 MSBUILDDISABLENODEREUSE=1 dotnet run --project benchmarks/Talewright.BenchmarkDotNet -c Release -- \
   --filter '*RealisticStoryBenchmarksSaves*10000)' \
