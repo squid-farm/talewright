@@ -41,6 +41,7 @@ exports.run = async () => {
   assert.equal(vscode.workspace.isTrusted, true);
   await vscode.workspace.getConfiguration('files').update('autoSave', 'off', vscode.ConfigurationTarget.Global);
   await vscode.workspace.getConfiguration('files').update('refactoring.autoSave', false, vscode.ConfigurationTarget.Global);
+  await testSkillCheckTabFlow();
   const snippets = JSON.parse(await fs.readFile(path.join(extension.extensionPath, 'snippets/tale.json'), 'utf8'));
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'talewright-editor-'));
   try {
@@ -895,6 +896,66 @@ async function testWhitespaceCompletions() {
     assert.equal(document.isDirty, true, 'The acceptance scenario must remain unsaved');
     assert.equal(await fs.readFile(file, 'utf8'), diskText);
     console.log('Installed VSIX completion smoke passed: automatic/manual skill-check entry acceptance, repeated-space suggestions, deletion/retyping, quiet prose/speech, unsaved buffer.');
+  } finally {
+    renderer?.close();
+    await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
+    await fs.rm(folder, { recursive: true, force: true });
+  }
+}
+
+async function testSkillCheckTabFlow() {
+  const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'talewright-skill-check-tab-'));
+  let renderer;
+  try {
+    renderer = await openRenderer();
+    await fs.writeFile(path.join(folder, 'story.talewright.yaml'),
+      'game:\n  id: skill-check-tab\n  title: Skill check tab\n  start: start\n  ruleset: rpg\ncharacters:\n  player: {first-name: Ada}\n');
+    const file = path.join(folder, 'start.tale');
+    await fs.writeFile(file, '=== start\n-> missing\n');
+    const document = await vscode.workspace.openTextDocument(file);
+    const editor = await vscode.window.showTextDocument(document);
+    await waitForCompiler(document, items => items.some(item => item.code === 'TW2002'));
+    const reset = new vscode.WorkspaceEdit();
+    reset.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),
+      '=== start\n');
+    assert.equal(await vscode.workspace.applyEdit(reset), true);
+    await waitForCompiler(document, items => !items.some(item => item.code === 'TW2002'));
+    const type = async text => {
+      for (const character of text) await vscode.commands.executeCommand('type', { text: character });
+    };
+    const waitForSuggestion = async label => waitUntil(async () =>
+      renderer.evaluate(`(() => {
+        const widget = document.querySelector('.suggest-widget');
+        if (!widget) return false;
+        const style = getComputedStyle(widget);
+        const rect = widget.getBoundingClientRect();
+        if (style.display === 'none' || style.visibility === 'hidden' || rect.width === 0 || rect.height === 0)
+          return false;
+        return Array.from(widget.querySelectorAll('.monaco-list-row'))
+          .some(row => (row.getAttribute('aria-label') || row.textContent || '').includes(${JSON.stringify(label)}));
+      })()`), `Completion must show ${label}`);
+    const acceptWithTab = async () => vscode.commands.executeCommand('acceptSelectedSuggestion');
+
+    editor.selection = new vscode.Selection(1, 0, 1, 0);
+    await type(':::');
+    await waitForSuggestion('skill-check');
+    await vscode.commands.executeCommand('hideSuggestWidget');
+    await type(' s');
+    await waitForSuggestion('skill-check');
+    await acceptWithTab();
+    assert.equal(document.lineAt(1).text, '::: skill-check ');
+
+    await vscode.commands.executeCommand('hideSuggestWidget');
+    await type('player');
+    assert.equal(document.lineAt(1).text, '::: skill-check player');
+
+    await type(' con ');
+    await waitForSuggestion('dc');
+    await acceptWithTab();
+    assert.equal(document.lineAt(1).text, '::: skill-check player con dc ');
+    await type('10');
+    assert.equal(document.lineAt(1).text, '::: skill-check player con dc 10');
+    console.log('Installed VSIX skill-check Tab flow passed: entry keyword, actor, dc, and difficulty value.');
   } finally {
     renderer?.close();
     await vscode.commands.executeCommand('workbench.action.revertAndCloseActiveEditor');
