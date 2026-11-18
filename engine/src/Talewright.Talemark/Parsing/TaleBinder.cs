@@ -745,7 +745,7 @@ internal sealed partial class TaleBinder
                     break;
                 case TaleClauseKind.SkillCheck:
                     // The spec's clauses are the last on the line.
-                    var spec = BindCheckSpec(syntax, clauses[index..], completeDifficultyWord: false);
+                    var spec = BindCheckSpec(syntax, clauses[index..]);
                     var (success, failure) = BindOutcomes();
                     if (spec is not null && success is not null && failure is not null)
                         check = new CheckBranch(spec.Value.Check, success, failure, spec.Value.Identity);
@@ -834,7 +834,7 @@ internal sealed partial class TaleBinder
         if (syntax.IsInvalid)
             return;
         var location = At(syntax.Indent);
-        var boundCheck = BindCheckSpec(syntax, Clauses(syntax), completeDifficultyWord: true);
+        var boundCheck = BindCheckSpec(syntax, Clauses(syntax));
         var (success, failure) = BindOutcomes();
         if (boundCheck is { } check && success is not null && failure is not null)
         {
@@ -880,7 +880,7 @@ internal sealed partial class TaleBinder
     /// and difficulty. The actor, stat and difficulty are checked independently so each mistake is reported.
     /// </summary>
     private (SkillCheck Check, SkillCheckIdentity Identity)? BindCheckSpec(
-        TaleLineSyntax syntax, ReadOnlySpan<TaleClause> clauses, bool completeDifficultyWord)
+        TaleLineSyntax syntax, ReadOnlySpan<TaleClause> clauses)
     {
         var spec = clauses[0];
         var column = spec.ValueStart;
@@ -930,8 +930,7 @@ internal sealed partial class TaleBinder
                 }
             }
 
-            if (completeDifficultyWord)
-                AddDifficultyCompletion(analysis, spec, clauses);
+            AddDifficultyCompletion(analysis, spec, clauses);
 
             // A known actor needs a stat slot both before and after a following dc clause.
             if (words.Count == 1 &&
