@@ -48,6 +48,36 @@ public sealed class ImageCompletionTests
     }
 
     [Fact]
+    public void Empty_first_argument_completes_with_quotes_and_preserves_surrounding_text()
+    {
+        const string marked = "=== start\nBefore {image(|)} After.";
+        var (analysis, position) = Analyze(marked);
+        var item = Assert.Single(StoryCompletion.Complete(analysis, position), item => item.Label == "maps/camp.png");
+        Assert.Equal("\"maps/camp.png\"", item.NewText);
+        Assert.Equal(position, item.Range.Start);
+        Assert.Equal(position, item.Range.End);
+
+        var source = marked.Replace("|", "");
+        var line = source.Split('\n')[1];
+        var updated = line[..(item.Range.Start.Column - 1)] + item.NewText + line[(item.Range.End.Column - 1)..];
+        Assert.Equal("Before {image(\"maps/camp.png\")} After.", updated);
+    }
+
+    [Fact]
+    public void Completion_before_an_existing_quote_replaces_the_whole_path_without_duplicate_quotes()
+    {
+        const string marked = "=== start\n{image(|\"maps/old.png\", \"Map\")}\n-> END";
+        var (analysis, position) = Analyze(marked);
+        var item = Assert.Single(StoryCompletion.Complete(analysis, position), item => item.Label == "maps/camp.png");
+        Assert.Equal("\"maps/camp.png\"", item.NewText);
+
+        var source = marked.Replace("|", "");
+        var line = source.Split('\n')[1];
+        var updated = line[..(item.Range.Start.Column - 1)] + item.NewText + line[(item.Range.End.Column - 1)..];
+        Assert.Equal("{image(\"maps/camp.png\", \"Map\")}", updated);
+    }
+
+    [Fact]
     public void Replaces_the_entire_path_content_preserving_quotes_alt_and_utf16_positions()
     {
         const string marked = "=== start\r\n🦑 {image(\"maps/ca|mp.png\", \"Alt\")}";

@@ -116,6 +116,11 @@ internal static class ImageSyntax
         i++;
         SkipSpace();
         var pathOffset = i;
+        if (i == end || text[i] == ExpressionVocabulary.CloseParen)
+        {
+            var location = source.Locate(pathOffset);
+            symbols.Analysis?.ImagePath("", new(location, location), [location], includeQuotes: true);
+        }
         if (!ReadString(out var path)) return null;
         if (string.IsNullOrWhiteSpace(path))
         {
@@ -223,6 +228,9 @@ internal static class ImageSyntax
             symbols.Analysis?.ImagePath(literal.Value,
                 new(source.Locate(quote + 1), source.Locate(literal.Closed ? i - 1 : i)),
                 offsets.Select(source.Locate).ToArray());
+            var quoteLocation = source.Locate(quote);
+            symbols.Analysis?.ImagePath("", new(quoteLocation, quoteLocation), [quoteLocation],
+                includeQuotes: true, replacementRange: new(quoteLocation, source.Locate(i)));
             if (literal.Error is not null)
             {
                 Error("The image argument is missing its closing double quote.", quote);
