@@ -546,6 +546,20 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         });
     }
 
+    internal int ImagePathCompletionLength(string path)
+    {
+        var longestMatch = 0;
+        foreach (var candidate in _imageCandidates)
+        {
+            var name = candidate.Name;
+            var length = 0;
+            while (length < path.Length && length < name.Length && path[length] == name[length])
+                length++;
+            longestMatch = Math.Max(longestMatch, length);
+        }
+        return longestMatch;
+    }
+
     internal void Reference(string text, SourceLocation location, AuthoringSymbolKind kind, params string[] keywords)
         => ReferenceCore(text, location, kind, keywords);
 

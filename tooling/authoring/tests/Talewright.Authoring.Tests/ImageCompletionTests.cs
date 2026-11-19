@@ -78,6 +78,65 @@ public sealed class ImageCompletionTests
     }
 
     [Fact]
+    public void Empty_unclosed_image_path_completes_after_open_paren_without_replacing_prose()
+    {
+        const string marked = "=== start\nBefore {image(|) After.\n-> END";
+        var (analysis, position) = Analyze(marked);
+        var item = Assert.Single(StoryCompletion.Complete(analysis, position), item => item.Label == "maps/camp.png");
+        Assert.Equal(position, item.Range.Start);
+        Assert.Equal(position, item.Range.End);
+        Assert.Equal("\"maps/camp.png\"", item.NewText);
+
+        var source = marked.Replace("|", "");
+        var line = source.Split('\n')[1];
+        var updated = line[..(item.Range.Start.Column - 1)] + item.NewText + line[(item.Range.End.Column - 1)..];
+        Assert.Equal("Before {image(\"maps/camp.png\") After.", updated);
+    }
+
+    [Fact]
+    public void Unclosed_image_path_replacement_stops_before_trailing_prose()
+    {
+        const string marked = "=== start\nBefore {image(\"maps/ca| After.\n-> END";
+        var (analysis, position) = Analyze(marked);
+        var item = Assert.Single(StoryCompletion.Complete(analysis, position), item => item.Label == "maps/camp.png");
+        Assert.Equal(new SourceLocation("main.tale", 2, 23), item.Range.End);
+
+        var source = marked.Replace("|", "");
+        var line = source.Split('\n')[1];
+        var updated = line[..(item.Range.Start.Column - 1)] + item.NewText + line[(item.Range.End.Column - 1)..];
+        Assert.Equal("Before {image(\"maps/camp.png After.", updated);
+    }
+
+    [Fact]
+    public void Unclosed_image_path_completion_preserves_catalogued_spaces_and_trailing_prose()
+    {
+        const string marked = "=== start\nBefore {image(\"maps/camp w| After.\n-> END";
+        var (_, position) = Analyze(marked);
+        var analysis = StoryAnalyzer.Analyze(Source(marked.Replace("|", ""), ["images/maps/camp with space.png"]));
+        var item = Assert.Single(StoryCompletion.Complete(analysis, position), item => item.Label == "maps/camp with space.png");
+
+        var source = marked.Replace("|", "");
+        var line = source.Split('\n')[1];
+        var updated = line[..(item.Range.Start.Column - 1)] + item.NewText + line[(item.Range.End.Column - 1)..];
+        Assert.Equal("Before {image(\"maps/camp with space.png After.", updated);
+    }
+
+    [Fact]
+    public void Unclosed_image_path_completion_after_open_paren_preserves_trailing_prose()
+    {
+        const string marked = "=== start\nBefore {image(|\"maps/ca After.\n-> END";
+        var (analysis, position) = Analyze(marked);
+        var item = Assert.Single(StoryCompletion.Complete(analysis, position), item => item.Label == "maps/camp.png");
+        Assert.Equal("\"maps/camp.png\"", item.NewText);
+        Assert.Equal(new SourceLocation("main.tale", 2, 23), item.Range.End);
+
+        var source = marked.Replace("|", "");
+        var line = source.Split('\n')[1];
+        var updated = line[..(item.Range.Start.Column - 1)] + item.NewText + line[(item.Range.End.Column - 1)..];
+        Assert.Equal("Before {image(\"maps/camp.png After.", updated);
+    }
+
+    [Fact]
     public void Replaces_the_entire_path_content_preserving_quotes_alt_and_utf16_positions()
     {
         const string marked = "=== start\r\n🦑 {image(\"maps/ca|mp.png\", \"Alt\")}";

@@ -998,6 +998,29 @@ async function testImageCompletions() {
       'Ctrl+Space completion before a quote must insert one quoted path and preserve surrounding text');
 
     await vscode.commands.executeCommand('hideSuggestWidget');
+    const unclosedInsertionLine = 'Before {image) After.';
+    await replaceStory(`=== start\n${unclosedInsertionLine}\n-> END\n`);
+    const unclosedInsertionCursor = unclosedInsertionLine.indexOf(')');
+    editor.selection = new vscode.Selection(1, unclosedInsertionCursor, 1, unclosedInsertionCursor);
+    await vscode.commands.executeCommand('type', { text: '(' });
+    await waitForImageSuggestion();
+    await vscode.commands.executeCommand('acceptSelectedSuggestion');
+    assert.equal(document.getText(), '=== start\nBefore {image("maps/camp.png") After.\n-> END\n',
+      'Automatic completion after ( in an unclosed image call must preserve trailing prose');
+
+    await vscode.commands.executeCommand('hideSuggestWidget');
+    await replaceStory('=== start\nBefore {image("maps/ca After.\n-> END\n');
+    const unclosedLine = document.lineAt(1).text;
+    const unclosedCursor = unclosedLine.indexOf('"');
+    editor.selection = new vscode.Selection(1, unclosedCursor, 1, unclosedCursor);
+    assert.equal(await renderer.focusEditor(), true, 'Editor input must be focused before completion in an unclosed image call');
+    await renderer.dispatchKey(' ', 'Space', 32, 2);
+    await waitForImageSuggestion();
+    await vscode.commands.executeCommand('acceptSelectedSuggestion');
+    assert.equal(document.getText(), '=== start\nBefore {image("maps/camp.png" After.\n-> END\n',
+      'Completion in an unclosed image call must preserve trailing prose');
+
+    await vscode.commands.executeCommand('hideSuggestWidget');
     await replaceStory('=== start\nBefore {image("maps/old.png", "Map")}. After.\n-> END\n');
     const beforeQuoteLine = document.lineAt(1).text;
     const beforeQuoteCursor = beforeQuoteLine.indexOf('"');
