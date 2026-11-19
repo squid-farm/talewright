@@ -16,6 +16,7 @@ This is a direction, not a schedule. Day-to-day progress is on the
 - **What my own story needs.** Writing a real story is turning up gaps. Fixing them comes first.
 - **A story language you can rely on.** Once the preview ships, stories you write won't break in later 1.x
   releases.
+- **Saves that survive story updates.** Saves continue cleanly across story changes and scene renames (completed).
 
 ## In progress
 
@@ -27,9 +28,9 @@ This is a direction, not a schedule. Day-to-day progress is on the
 ## Later
 
 - **Stories with their own look.** Themes, fonts, speaker styles and custom end screens.
+- **Audio, video, and rich media.** Background music, sound effects, video support, and additional image formats (like GIF).
 - **Living worlds.** Places, travel, time and events that move on as the player acts.
-- **Saves that survive story updates,** even after scenes are changed or renamed.
-- **Optional combat** for stories that want it.
+- **Optional combat.** Dedicated battle systems, encounter loops, and spell/skill mechanics for stories that want automated combat beyond narrative skill checks.
 - **Plugins** for things Talewright doesn't handle on its own.
 
 ## Someday, if people want it

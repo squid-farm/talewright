@@ -93,6 +93,29 @@ install the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (th
 runtime), then open a new terminal. See [which .NET version you need](getting-started.md#which-net-version-do-i-need)
 for the portable CLI and player requirements.
 
+## Can I add audio, background music or video?
+
+Not in the initial release. Talewright currently supports still images (PNG, JPEG, WebP)
+via `{image("path", "alt text")}` (animated WebP and APNG also render in modern browsers).
+GIF format support, sound effects, background audio, and video files (like MP4) are planned
+for post-1.0 releases as media systems expand.
+
+## Why didn't my Markdown heading or bullet list format?
+
+Talemark is designed specifically for interactive prose and game state, not general-purpose Markdown:
+- Headings use `@title Scene Title` directly after the scene declaration `=== scene-id`.
+- The `#` character in Talemark introduces text manipulators such as `#capitalize` and `#the`, not Markdown headings.
+- Choices use `* [Choice text] -> target`. Bulleted lists (`- item`), Markdown links (`[text](url)`),
+  and HTML tags are not interpreted and render as plain text.
+
+## Can I build dedicated turn-based combat?
+
+Talewright is built for narrative, stat-driven RPGs (similar to *Disco Elysium* or *Choice of Games*),
+where combat encounters are resolved through narrative choices, skill checks against DCs, health
+adjustments (`~ player:hp -= 3`), and item requirements. Dedicated battle systems (such as
+automated round-based combat screens, spell/feat managers, and enemy encounter loops) are planned
+as optional extensions post-1.0.
+
 ## Collecting diagnostics
 
 In the browser or desktop player, choose **Diagnostics** beside the build identity on the library
