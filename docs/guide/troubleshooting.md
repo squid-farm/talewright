@@ -108,12 +108,13 @@ Talemark is designed specifically for interactive prose and game state, not gene
 - Choices use `* [Choice text] -> target`. Bulleted lists (`- item`), Markdown links (`[text](url)`),
   and HTML tags are not interpreted and render as plain text.
 
-## Can I build turn-based tactical combat?
+## Can I build dedicated turn-based combat?
 
 Talewright is built for narrative, stat-driven RPGs (similar to *Disco Elysium* or *Choice of Games*),
 where combat encounters are resolved through narrative choices, skill checks against DCs, health
-adjustments (`~ player:hp -= 3`), and item requirements. Turn-based grid or tactical battle modules
-are planned as optional extensions post-1.0.
+adjustments (`~ player:hp -= 3`), and item requirements. Dedicated battle systems (such as
+automated round-based combat screens, spell/feat managers, and enemy encounter loops) are planned
+as optional extensions post-1.0.
 
 ## Collecting diagnostics
 
