@@ -114,6 +114,12 @@ tooling. Shared build settings and Nx orchestration remain at the repository roo
 3. Work on a branch, ideally in its own `git worktree`.
 4. Open a PR with `Closes #N` (or `Refs #N` for partial work) and test evidence.
 
+To keep reviews focused and respect CI resources, please follow these baseline requirements before opening a pull request:
+
+* **Build and test locally:** Your environment must be set up to compile the project and run the test suite. Do not use GitHub Actions CI as your compiler or test runner.
+* **Verify AI-assisted code:** You are welcome to use AI tools to help write code or documentation, provided you review, compile, and test the output yourself. Unverified, uncompiled, or "drive-by" AI-generated PRs will be closed immediately without review.
+* **Claiming issues:** Only comment to claim an issue if you have a working local build environment and are ready to actively work on it. Stale or unverified claims may be removed so others can pick up the task.
+
 Contributors, agents and multi-worker sessions: follow the full [issue workflow](docs/developer/issues.md),
 including its [project decision-making policy](docs/developer/issues.md#project-decision-making).
 
