@@ -28,7 +28,7 @@ This is a direction, not a schedule. Day-to-day progress is on the
 ## Later
 
 - **Stories with their own look.** Themes, fonts, speaker styles and custom end screens.
-- **Audio and video.** Background music, sound effects, and video support beyond images and GIFs.
+- **Audio, video, and rich media.** Background music, sound effects, video support, and additional image formats (like GIF).
 - **Living worlds.** Places, travel, time and events that move on as the player acts.
 - **Optional combat** for stories that want turn-based tactical combat beyond narrative skill checks.
 - **Plugins** for things Talewright doesn't handle on its own.

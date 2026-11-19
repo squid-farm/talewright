@@ -95,7 +95,7 @@ choices, choice-only conditions, comments or blank lines.
 Other manipulators: `#upper`, `#lower`, `#possessive`, `#a`, `#this`, `#that`, `#italic`.
 Put text manipulators before `#bold` or `#italic`. `#one-many` selects text for a number,
 pronoun or item name; it does not print that name. Image paths are relative to `images/`
-(PNG, JPEG, WebP, and GIF supported; audio and video are planned post-1.0).
+(PNG, JPEG, and WebP supported; animated WebP works for animations; GIF, audio and video are planned post-1.0).
 Line breaks render as written; backticks are ordinary text.
 Talemark is not Markdown: headings use `@title` (not `#`), choices use `* [label]`
 (not `- ` lists), and general HTML/Markdown tags are not supported.

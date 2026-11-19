@@ -95,9 +95,10 @@ for the portable CLI and player requirements.
 
 ## Can I add audio, background music or video?
 
-Not in the initial release. Talewright currently supports still images (PNG, JPEG, WebP) and
-animated GIFs via `{image("path", "alt text")}`. Sound effects, background audio, and video files
-(like MP4) are planned for post-1.0 releases as media systems expand.
+Not in the initial release. Talewright currently supports still images (PNG, JPEG, WebP)
+via `{image("path", "alt text")}` (animated WebP and APNG also render in modern browsers).
+GIF format support, sound effects, background audio, and video files (like MP4) are planned
+for post-1.0 releases as media systems expand.
 
 ## Why didn't my Markdown heading or bullet list format?
 
