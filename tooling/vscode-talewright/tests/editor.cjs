@@ -1008,17 +1008,19 @@ async function testImageCompletions() {
     assert.equal(document.getText(), '=== start\nBefore {image("maps/camp.png") After.\n-> END\n',
       'Automatic completion after ( in an unclosed image call must preserve trailing prose');
 
-    await vscode.commands.executeCommand('hideSuggestWidget');
-    await replaceStory('=== start\nBefore {image("maps/ca After.\n-> END\n');
-    const unclosedLine = document.lineAt(1).text;
-    const unclosedCursor = unclosedLine.indexOf('"');
-    editor.selection = new vscode.Selection(1, unclosedCursor, 1, unclosedCursor);
-    assert.equal(await renderer.focusEditor(), true, 'Editor input must be focused before completion in an unclosed image call');
-    await renderer.dispatchKey(' ', 'Space', 32, 2);
-    await waitForImageSuggestion();
-    await vscode.commands.executeCommand('acceptSelectedSuggestion');
-    assert.equal(document.getText(), '=== start\nBefore {image("maps/camp.png" After.\n-> END\n',
-      'Completion in an unclosed image call must preserve trailing prose');
+    for (const prefix of ['', '"', '"maps/ca']) {
+      await vscode.commands.executeCommand('hideSuggestWidget');
+      await replaceStory('=== start\nBefore {image("maps/ca After.\n-> END\n');
+      const unclosedLine = document.lineAt(1).text;
+      const unclosedCursor = unclosedLine.indexOf('"') + prefix.length;
+      editor.selection = new vscode.Selection(1, unclosedCursor, 1, unclosedCursor);
+      assert.equal(await renderer.focusEditor(), true, 'Editor input must be focused before completion in an unclosed image call');
+      await renderer.dispatchKey(' ', 'Space', 32, 2);
+      await waitForImageSuggestion();
+      await vscode.commands.executeCommand('acceptSelectedSuggestion');
+      assert.equal(document.getText(), '=== start\nBefore {image("maps/camp.png" After.\n-> END\n',
+        `Completion at quote offset ${prefix.length} must close the image path and preserve trailing prose`);
+    }
 
     await vscode.commands.executeCommand('hideSuggestWidget');
     await replaceStory('=== start\nBefore {image("maps/old.png", "Map")}. After.\n-> END\n');

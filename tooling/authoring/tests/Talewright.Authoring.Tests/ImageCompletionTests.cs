@@ -34,17 +34,17 @@ public sealed class ImageCompletionTests
     }
 
     [Theory]
-    [InlineData("""{image("maps/ca|mp.png", "Map")}""")]
-    [InlineData("""{image("maps/ca|""")]
-    [InlineData("""> player: {image("maps/ca|")}""")]
-    [InlineData("""* [Pick {image("maps/ca|")}] -> END""")]
-    [InlineData("""**{image("maps/ca|")}**""")]
-    public void Completes_only_case_sensitive_supported_paths_in_narrative_contexts(string line)
+    [InlineData("""{image("maps/ca|mp.png", "Map")}""", false)]
+    [InlineData("""{image("maps/ca|""", true)]
+    [InlineData("""> player: {image("maps/ca|")}""", false)]
+    [InlineData("""* [Pick {image("maps/ca|")}] -> END""", false)]
+    [InlineData("""**{image("maps/ca|")}**""", false)]
+    public void Completes_only_case_sensitive_supported_paths_in_narrative_contexts(string line, bool closesQuote)
     {
         var (analysis, position) = Analyze("=== start\n" + line + "\n-> END");
         var items = StoryCompletion.Complete(analysis, position);
         Assert.Equal(new[] { "maps/camp.jpg", "maps/camp.png" }, items.Select(item => item.Label));
-        Assert.All(items, item => Assert.Equal(item.Label, item.NewText));
+        Assert.All(items, item => Assert.Equal(item.Label + (closesQuote ? "\"" : ""), item.NewText));
     }
 
     [Fact]
@@ -93,18 +93,20 @@ public sealed class ImageCompletionTests
         Assert.Equal("Before {image(\"maps/camp.png\") After.", updated);
     }
 
-    [Fact]
-    public void Unclosed_image_path_replacement_stops_before_trailing_prose()
+    [Theory]
+    [InlineData("")]
+    [InlineData("maps/ca")]
+    public void Unclosed_image_path_replacement_stops_before_trailing_prose(string prefix)
     {
-        const string marked = "=== start\nBefore {image(\"maps/ca| After.\n-> END";
+        var marked = "=== start\nBefore {image(\"" + prefix + "| After.\n-> END";
         var (analysis, position) = Analyze(marked);
         var item = Assert.Single(StoryCompletion.Complete(analysis, position), item => item.Label == "maps/camp.png");
-        Assert.Equal(new SourceLocation("main.tale", 2, 23), item.Range.End);
+        Assert.Equal(position, item.Range.End);
 
         var source = marked.Replace("|", "");
         var line = source.Split('\n')[1];
         var updated = line[..(item.Range.Start.Column - 1)] + item.NewText + line[(item.Range.End.Column - 1)..];
-        Assert.Equal("Before {image(\"maps/camp.png After.", updated);
+        Assert.Equal("Before {image(\"maps/camp.png\" After.", updated);
     }
 
     [Fact]
@@ -118,7 +120,7 @@ public sealed class ImageCompletionTests
         var source = marked.Replace("|", "");
         var line = source.Split('\n')[1];
         var updated = line[..(item.Range.Start.Column - 1)] + item.NewText + line[(item.Range.End.Column - 1)..];
-        Assert.Equal("Before {image(\"maps/camp with space.png After.", updated);
+        Assert.Equal("Before {image(\"maps/camp with space.png\" After.", updated);
     }
 
     [Fact]
