@@ -232,7 +232,7 @@ internal static class ImageSyntax
             var completionPositions = offsets.Take(completionLength + 1).Select(source.Locate).ToArray();
             symbols.Analysis?.ImagePath(literal.Value[..completionLength],
                 new(source.Locate(quote + 1), source.Locate(completionEnd)),
-                completionPositions, closeQuote: !literal.Closed);
+                completionPositions);
             var quoteLocation = source.Locate(quote);
             symbols.Analysis?.ImagePath("", new(quoteLocation, quoteLocation), [quoteLocation],
                 includeQuotes: true,
