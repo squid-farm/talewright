@@ -133,7 +133,7 @@ public sealed class ImageCompletionTests
         var source = marked.Replace("|", "");
         var line = source.Split('\n')[1];
         var updated = line[..(item.Range.Start.Column - 1)] + item.NewText + line[(item.Range.End.Column - 1)..];
-        Assert.Equal("Before {image(\"maps/camp.png After.", updated);
+        Assert.Equal("Before {image(\"maps/camp.png\" After.", updated);
     }
 
     [Fact]
