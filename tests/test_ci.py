@@ -515,12 +515,14 @@ class PackageBoundaryTests(unittest.TestCase):
 class DesktopArchiveTests(unittest.TestCase):
     def write_archive(self, path, *, missing=None, executable=True, self_contained=True):
         files = {name: "" for name in ["start.sh", "start.command", "start.cmd",
-                                       "ENGINE-LICENSE.txt", "DEPLOYMENT.txt"]}
+                                       "Story Name.sh", "Story Name.command", "Story Name.cmd",
+                                       "ENGINE-LICENSE.txt", "DEPLOYMENT.txt",
+                                       "story/story.talewright.yaml"]}
         for os_name, native, runtime in [("linux", "Photino.Native.so", "libcoreclr.so"),
                                         ("win", "Photino.Native.dll", "coreclr.dll"),
                                         ("osx", "Photino.Native.dylib", "libcoreclr.dylib")]:
             for cpu in ["x64", "arm64"]:
-                prefix = f"{os_name}-{cpu}/"
+                prefix = f"internal/{os_name}-{cpu}/"
                 for name in ["Talewright.Host.Desktop" + (".exe" if os_name == "win" else ""),
                              "Talewright.Host.Desktop.dll", native, runtime, "THIRD-PARTY-NOTICES.txt",
                              "wwwroot/index.html",
@@ -549,10 +551,10 @@ class DesktopArchiveTests(unittest.TestCase):
             self.write_archive(path)
             verify_desktop_archive(path)
             for change, error in [
-                    ({"missing": "win-arm64/coreclr.dll"}, "missing"),
-                    ({"missing": "win-x64/nfd.dll"}, "missing"),
-                    ({"missing": "osx-arm64/libnfd.dylib"}, "missing"),
-                    ({"missing": "linux-x64/THIRD-PARTY-NOTICES.txt"}, "missing"),
+                    ({"missing": "internal/win-arm64/coreclr.dll"}, "missing"),
+                    ({"missing": "internal/win-x64/nfd.dll"}, "missing"),
+                    ({"missing": "internal/osx-arm64/libnfd.dylib"}, "missing"),
+                    ({"missing": "internal/linux-x64/THIRD-PARTY-NOTICES.txt"}, "missing"),
                     ({"self_contained": False}, "installed .NET"),
                     ({"executable": False}, "executable permissions")]:
                 with self.subTest(change=change):

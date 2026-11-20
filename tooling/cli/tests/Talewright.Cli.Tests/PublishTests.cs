@@ -325,6 +325,29 @@ public sealed class PublishTests : IDisposable
     }
 
     [Fact]
+    public void Real_split_linux_archive_has_story_named_launcher_and_internal_layout()
+    {
+        var result = RunSplitControlled(new UnreadableInput(), inputRedirected: true);
+
+        Assert.Equal(0, result.Code);
+        foreach (var runtime in PublishCommand.DesktopRuntimes)
+        {
+            using var archive = ZipFile.OpenRead(Path.Combine(SplitDirectory, $"publish-{runtime}.zip"));
+            var launcher = runtime.StartsWith("win-", StringComparison.Ordinal)
+                ? "Publish.cmd"
+                : runtime.StartsWith("osx-", StringComparison.Ordinal)
+                    ? "Publish.command"
+                    : "Publish.sh";
+            Assert.NotNull(archive.GetEntry(launcher));
+            var executable = runtime.StartsWith("win-", StringComparison.Ordinal)
+                ? "Talewright.Host.Desktop.exe"
+                : "Talewright.Host.Desktop";
+            Assert.NotNull(archive.GetEntry($"internal/{runtime}/{executable}"));
+            Assert.NotNull(archive.GetEntry("internal/story/story.talewright.yaml"));
+        }
+    }
+
+    [Fact]
     public void Single_runtime_desktop_publication_keeps_root_apphost_without_universal_launchers()
     {
         var builds = new List<string>();
