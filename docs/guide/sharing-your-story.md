@@ -81,13 +81,16 @@ This makes one ZIP that runs on Windows, macOS and Linux. Players extract **the 
 
 | System | Run |
 |---|---|
-| Windows | `start.cmd` |
-| macOS | `start.command` |
-| Linux | `start.sh` (or `sh start.sh`) |
+| Windows | The story-named `.cmd` file, such as `My Story.cmd` |
+| macOS | The story-named `.command` file, such as `My Story.command` |
+| Linux | The story-named `.sh` file, such as `My Story.sh` (or `sh "My Story.sh"`) |
 
 Players don't need to install .NET; the game includes it. Linux players do need WebKitGTK 4.1 and
 libnotify, so share the [Linux desktop setup commands](getting-started.md#linux-desktop-setup) with
 them. A web game avoids this.
+
+Runtime libraries and other implementation files are kept in an `internal/` folder. Keep extracting
+the whole ZIP, but players can start the game directly from the story-named launcher at the ZIP root.
 
 That ZIP is large because it contains versions for six kinds of computer. To make smaller,
 separate downloads instead, use `--split` with a folder for `--output`:
@@ -98,7 +101,8 @@ talewright publish my-story -a --target desktop --split --output desktop-builds/
 
 This makes one ZIP per kind of computer, such as `my-story-linux-x64.zip` and
 `my-story-win-arm64.zip`. Upload them as separate downloads and label each one. In these ZIPs,
-players run `Talewright.Host.Desktop` (`.exe` on Windows). To build just one, use `--runtime` with
+players run the story-named `.sh`, `.command` or `.cmd` launcher at the archive root. Supporting
+runtime and story files stay in `internal/`. To build just one, use `--runtime` with
 an ID such as `win-x64`; see the [CLI reference](../reference/cli.md#publish).
 
 **Good to know:** desktop games aren't installers and aren't signed, so Windows and macOS may warn

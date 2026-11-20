@@ -43,34 +43,46 @@ PLAYER_ASSETS = ("player-assets/player.html",
 def verify_desktop_archive(path):
     with ZipFile(path) as archive:
         names = set(archive.namelist())
-        required = {"start.sh", "start.cmd", "start.command", "ENGINE-LICENSE.txt", "DEPLOYMENT.txt"}
+        story_launchers = [name for name in names
+                           if "/" not in name and name not in {"start.sh", "start.cmd", "start.command"}
+                           and (name.endswith(".sh") or name.endswith(".command") or name.endswith(".cmd"))]
+        if len(story_launchers) < 3:
+            raise ValueError("Universal desktop archive is missing story-named launchers")
+        if not (any(name.endswith(".sh") for name in story_launchers)
+                and any(name.endswith(".command") for name in story_launchers)
+                and any(name.endswith(".cmd") for name in story_launchers)):
+            raise ValueError("Universal desktop archive is missing a story-named launcher for every platform")
+        required = {"start.sh", "start.cmd", "start.command", "ENGINE-LICENSE.txt", "DEPLOYMENT.txt",
+                    "story/story.talewright.yaml", *story_launchers}
         for os_name, native, runtime in [("linux", "Photino.Native.so", "libcoreclr.so"),
                                         ("win", "Photino.Native.dll", "coreclr.dll"),
                                         ("osx", "Photino.Native.dylib", "libcoreclr.dylib")]:
             for cpu in ["x64", "arm64"]:
                 rid = f"{os_name}-{cpu}"
+                prefix = f"internal/{rid}/"
                 executable = "Talewright.Host.Desktop" + (".exe" if os_name == "win" else "")
-                required.update(f"{rid}/{name}" for name in [
+                required.update(prefix + name for name in [
                     executable, native, runtime, "Talewright.Host.Desktop.dll",
                     "THIRD-PARTY-NOTICES.txt",
                     "wwwroot/index.html", "wwwroot/_content/Talewright.Player/talewright.css",
                     "wwwroot/_content/Talewright.Player/Components/StoryPlayer.razor.js",
                     "wwwroot/_content/Talewright.Player/Saves/IndexedDbSaveStore.js"])
                 if os_name == "win":
-                    required.add(f"{rid}/WebView2Loader.dll")
-                    required.add(f"{rid}/nfd.dll")
+                    required.add(prefix + "WebView2Loader.dll")
+                    required.add(prefix + "nfd.dll")
                 elif os_name == "osx":
-                    required.add(f"{rid}/libnfd.dylib")
-                config = json.loads(archive.read(f"{rid}/Talewright.Host.Desktop.runtimeconfig.json"))["runtimeOptions"]
+                    required.add(prefix + "libnfd.dylib")
+                config = json.loads(archive.read(prefix + "Talewright.Host.Desktop.runtimeconfig.json"))["runtimeOptions"]
                 frameworks = config.get("includedFrameworks", [])
                 if "framework" in config or "frameworks" in config or not any(
                         framework["name"] == "Microsoft.NETCore.App" for framework in frameworks):
                     raise ValueError(f"{rid}: desktop output requires an installed .NET runtime")
         if not required <= names:
             raise ValueError(f"Universal desktop archive is missing {sorted(required - names)}")
-        for name in ["start.sh", "start.command", *(
-                f"{os_name}-{cpu}/Talewright.Host.Desktop" for os_name in ["linux", "osx"]
-                for cpu in ["x64", "arm64"])]:
+        executable_names = [name for name in story_launchers if name.endswith((".sh", ".command"))]
+        executable_names.extend("internal/" + rid + "/Talewright.Host.Desktop"
+                                for rid in ["linux-x64", "linux-arm64", "osx-x64", "osx-arm64"])
+        for name in ["start.sh", "start.command", *executable_names]:
             if not (archive.getinfo(name).external_attr >> 16) & 0o111:
                 raise ValueError(f"Missing executable permissions: {name}")
     print("Verified six self-contained desktop builds and launchers", flush=True)
@@ -379,12 +391,12 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
             for name in ["chapter.fr.tale", "characters/player.talewright.yaml"]:
                 if published.read("story/" + name) != (story / name).read_bytes():
                     raise ValueError(f"Published desktop story lost source file {name}")
-            if any(name.startswith(tuple(f"{rid}/story/" for rid in
+            if any(name.startswith(tuple(f"internal/{rid}/story/" for rid in
                        ["linux-x64", "linux-arm64", "win-x64", "win-arm64", "osx-x64", "osx-arm64"]))
                    for name in published.namelist()):
                 raise ValueError("Universal desktop repeats story files per runtime")
             host = root / "PublishedHost.dll"
-            host.write_bytes(published.read("linux-x64/Talewright.Host.Desktop.dll"))
+            host.write_bytes(published.read("internal/linux-x64/Talewright.Host.Desktop.dll"))
         subprocess.run(["dotnet", "run", "--project", str(root / "EngineConsumer"), "-c", "Release",
                         "--no-build", "--", str(host)], cwd=root, env=environment, check=True)
         example = root / "CSharpStory"

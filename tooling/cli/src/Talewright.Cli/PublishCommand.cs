@@ -155,7 +155,7 @@ public sealed class PublishCommand : Command<PublishSettings>
 
         if (split)
         {
-            return PublishSplit(final, result.Story!.Id, source, writers, settings, publication);
+            return PublishSplit(final, result.Story!.Id, result.Story.Title, source, writers, settings, publication);
         }
 
         string? working = null;
@@ -171,11 +171,25 @@ public sealed class PublishCommand : Command<PublishSettings>
             if (allInOne)
             {
                 content = universalDesktop
-                    ? BuildUniversalDesktop(working, story, output, error, publication)
+                    ? BuildUniversalDesktop(working, story, result.Story!.Title, result.Story.Id, output, error, publication)
                     : publication.BuildHost(working, target, runtime, story, output, error);
-                if (!universalDesktop) StageExternalStory(story, content, target);
+                if (!universalDesktop)
+                {
+                    if (target == "desktop")
+                    {
+                        MoveDesktopRuntimeToInternal(content, runtime!);
+                        var internalStory = Path.Combine(content, "internal", "story");
+                        Directory.CreateDirectory(internalStory);
+                        CopyDirectory(story, internalStory);
+                        CreateSplitLauncher(content, result.Story!.Title, result.Story.Id, runtime);
+                    }
+                    else
+                    {
+                        StageExternalStory(story, content, target);
+                    }
+                }
                 File.Copy(Path.Combine(AssetsRoot, "ENGINE-LICENSE.txt"), Path.Combine(content, "ENGINE-LICENSE.txt"));
-                File.WriteAllText(Path.Combine(content, "DEPLOYMENT.txt"), DeploymentInstructions(target, runtime));
+                File.WriteAllText(Path.Combine(content, "DEPLOYMENT.txt"), DeploymentInstructions(target, runtime, result.Story!.Title));
             }
 
             if (allInOne && target == "web")
@@ -217,7 +231,7 @@ public sealed class PublishCommand : Command<PublishSettings>
         }
     }
 
-    private static int PublishSplit(string destination, string storyId, StorySource source, CommandWriters writers,
+    private static int PublishSplit(string destination, string storyId, string storyTitle, StorySource source, CommandWriters writers,
         PublishSettings settings, Operations publication)
     {
         var (output, error, input, _) = writers;
@@ -281,9 +295,13 @@ public sealed class PublishCommand : Command<PublishSettings>
             foreach (var runtime in DesktopRuntimes)
             {
                 var built = BuildDesktopRuntime(working, runtime, story, output, error, publication);
-                StageExternalStory(story, built, "desktop");
+                MoveDesktopRuntimeToInternal(built, runtime);
+                var internalStory = Path.Combine(built, "internal", "story");
+                Directory.CreateDirectory(internalStory);
+                CopyDirectory(story, internalStory);
+                CreateSplitLauncher(built, storyTitle, storyId, runtime);
                 File.Copy(Path.Combine(AssetsRoot, "ENGINE-LICENSE.txt"), Path.Combine(built, "ENGINE-LICENSE.txt"));
-                File.WriteAllText(Path.Combine(built, "DEPLOYMENT.txt"), DeploymentInstructions("desktop", runtime));
+                File.WriteAllText(Path.Combine(built, "DEPLOYMENT.txt"), DeploymentInstructions("desktop", runtime, storyTitle));
                 var temporary = Path.Combine(destination, $".talewright-{Guid.NewGuid():N}.zip.tmp");
                 staged.Add((runtime, temporary, targets[runtime]));
                 publication.CreateZip(built, temporary);
@@ -454,19 +472,26 @@ public sealed class PublishCommand : Command<PublishSettings>
 
     private static string AssetsRoot => Path.Combine(Path.GetDirectoryName(typeof(PublishCommand).Assembly.Location)!, "publish-assets");
 
-    private static string DeploymentInstructions(string target, string? runtime)
+    private static string DeploymentInstructions(string target, string? runtime, string? storyTitle = null)
     {
         if (target == "web")
         {
             return "Extract and serve this directory with a static HTTP(S) host, or upload the ZIP as an itch.io HTML5 game. No .NET runtime or backend server is required. Saves use this origin's IndexedDB.";
         }
 
-        var launch = "Universal self-contained desktop package for Windows, Linux and macOS, x64 and ARM64. Extract the entire ZIP; start start.cmd on Windows, start.sh on Linux or start.command on macOS. Launchers select the matching platform directory. If executable permissions were lost during extraction, use sh start.sh on Linux/macOS.";
+        var launcherName = string.IsNullOrWhiteSpace(storyTitle)
+            ? "the story-named launcher"
+            : $"'{SafeDesktopName(storyTitle, "Story")}'";
+        var launch = $"Universal self-contained desktop package for Windows, Linux and macOS, x64 and ARM64. Extract the entire ZIP; use {launcherName}.cmd on Windows, {launcherName}.sh on Linux or {launcherName}.command on macOS. Launchers select the matching platform directory.";
         if (runtime is not null)
         {
-            var executable = runtime.StartsWith("win-", StringComparison.Ordinal)
-                ? "Talewright.Host.Desktop.exe" : "Talewright.Host.Desktop";
-            launch = $"Self-contained {runtime} desktop build. Start {executable}.";
+            var name = SafeDesktopName(storyTitle ?? "Story", "Story");
+            var launcher = runtime.StartsWith("win-", StringComparison.Ordinal)
+                ? name + ".cmd"
+                : runtime.StartsWith("osx-", StringComparison.Ordinal)
+                    ? name + ".command"
+                    : name + ".sh";
+            launch = $"Self-contained {runtime} desktop build. Start {launcher}.";
         }
 
         return launch + " The .NET runtime is included. Platform webview prerequisite: WebKitGTK 4.1 on Linux, WebView2 on Windows, built-in WKWebView on macOS. Linux x64 is automated here; other OS/CPU combinations require runtime verification. This ZIP is not a signed installer or macOS .app bundle.";
@@ -501,19 +526,22 @@ public sealed class PublishCommand : Command<PublishSettings>
         }
     }
 
-    private static string BuildUniversalDesktop(string working, string story, TextWriter output, TextWriter error,
+    private static string BuildUniversalDesktop(string working, string story, string storyTitle, string storyId,
+        TextWriter output, TextWriter error,
         Operations publication)
     {
         var bundle = Path.Combine(working, "bundle");
         Directory.CreateDirectory(bundle);
+        var internalDirectory = Path.Combine(bundle, "internal");
+        Directory.CreateDirectory(internalDirectory);
         foreach (var runtime in DesktopRuntimes)
         {
             var built = BuildDesktopRuntime(working, runtime, story, output, error, publication);
-            Directory.Move(built, Path.Combine(bundle, runtime));
+            Directory.Move(built, Path.Combine(internalDirectory, runtime));
         }
 
         CopyDirectory(story, Path.Combine(bundle, "story"));
-        CopyDirectory(Path.Combine(AssetsRoot, "launchers"), bundle);
+        CreateUniversalLaunchers(bundle, storyTitle, storyId);
         return bundle;
     }
 
@@ -622,6 +650,94 @@ public sealed class PublishCommand : Command<PublishSettings>
         }
     }
 
+    internal static string SafeDesktopName(string title, string fallback)
+    {
+        var name = title.Trim();
+        foreach (var character in name)
+        {
+            if (character is '<' or '>' or ':' or '"' or '/' or '\\' or '|' or '?' or '*' ||
+                character is '&' or ';' or '\'' or '`' or '$' or '%' or '!' or '#' or '(' or ')' ||
+                char.IsControl(character))
+            {
+                name = name.Replace(character.ToString(), "-", StringComparison.Ordinal);
+            }
+        }
+
+        name = name.TrimEnd('.', ' ');
+        if (string.IsNullOrWhiteSpace(name) || name is "." or "..")
+            name = fallback.Trim();
+
+        if (name.Length > 100)
+            name = name[..100].TrimEnd('.', ' ');
+
+        var upper = name.Split('.', 2)[0].TrimEnd(' ').ToUpperInvariant();
+        if (upper is "CON" or "PRN" or "AUX" or "NUL" ||
+            (upper.Length == 4 && upper[3] >= '1' && upper[3] <= '9' &&
+             upper.StartsWith("COM", StringComparison.Ordinal)) ||
+            (upper.Length == 4 && upper[3] >= '1' && upper[3] <= '9' &&
+             upper.StartsWith("LPT", StringComparison.Ordinal)))
+        {
+            name = "_" + name;
+        }
+
+        return name;
+    }
+
+    private static void MoveDesktopRuntimeToInternal(string content, string runtime)
+    {
+        var runtimeDirectory = Path.Combine(content, "internal", runtime);
+        Directory.CreateDirectory(runtimeDirectory);
+        foreach (var file in Directory.EnumerateFiles(content, "*", SearchOption.TopDirectoryOnly))
+        {
+            var target = Path.Combine(runtimeDirectory, Path.GetFileName(file));
+            Directory.Move(file, target);
+        }
+        foreach (var directory in Directory.EnumerateDirectories(content, "*", SearchOption.TopDirectoryOnly))
+        {
+            if (Path.GetFileName(directory) == "internal")
+                continue;
+            Directory.Move(directory, Path.Combine(runtimeDirectory, Path.GetFileName(directory)));
+        }
+    }
+
+    private static void CreateSplitLauncher(string content, string storyTitle, string storyId, string? runtime)
+    {
+        var name = SafeDesktopName(storyTitle, storyId);
+        if (runtime?.StartsWith("win-", StringComparison.Ordinal) == true)
+        {
+            File.WriteAllText(Path.Combine(content, name + ".cmd"),
+                "@echo off\r\nsetlocal\r\n\"%~dp0internal\\" + runtime + "\\Talewright.Host.Desktop.exe\" --no-library \"%~dp0internal\\story\" %*\r\nexit /b %errorlevel%\r\n");
+        }
+        else if (runtime?.StartsWith("osx-", StringComparison.Ordinal) == true)
+        {
+            File.WriteAllText(Path.Combine(content, name + ".command"),
+                "#!/bin/sh\nset -eu\nbase=$(CDPATH= cd -P \"$(dirname \"$0\")\" && pwd)\nexec \"$base/internal/" + runtime + "/Talewright.Host.Desktop\" --no-library \"$base/internal/story\" \"$@\"\n");
+        }
+        else
+        {
+            File.WriteAllText(Path.Combine(content, name + ".sh"),
+                "#!/bin/sh\nset -eu\nbase=$(CDPATH= cd -P \"$(dirname \"$0\")\" && pwd)\nexec \"$base/internal/" + runtime + "/Talewright.Host.Desktop\" --no-library \"$base/internal/story\" \"$@\"\n");
+        }
+    }
+
+    private static void CreateUniversalLaunchers(string bundle, string storyTitle, string storyId)
+    {
+        var name = SafeDesktopName(storyTitle, storyId);
+        File.WriteAllText(Path.Combine(bundle, name + ".cmd"),
+            "@echo off\r\nsetlocal\r\nset \"RID=\"\r\nset \"ARCH=%PROCESSOR_ARCHITECTURE%\"\r\nif defined PROCESSOR_ARCHITEW6432 set \"ARCH=%PROCESSOR_ARCHITEW6432%\"\r\nif /i \"%ARCH%\"==\"AMD64\" set \"RID=win-x64\"\r\nif /i \"%ARCH%\"==\"ARM64\" set \"RID=win-arm64\"\r\nif not defined RID (echo Unsupported Windows architecture. 1>&2 & exit /b 1)\r\n\"%~dp0internal\\%RID%\\Talewright.Host.Desktop.exe\" --no-library \"%~dp0story\" %*\r\nexit /b %errorlevel%\r\n");
+        File.WriteAllText(Path.Combine(bundle, name + ".sh"),
+            "#!/bin/sh\nset -eu\nbase=$(CDPATH= cd -P \"$(dirname \"$0\")\" && pwd)\ncase \"$(uname -s):$(uname -m)\" in\n  Linux:x86_64) rid=linux-x64 ;; Linux:aarch64|Linux:arm64) rid=linux-arm64 ;; Darwin:x86_64) rid=osx-x64 ;; Darwin:arm64) rid=osx-arm64 ;; *) printf '%s\\n' 'Unsupported platform.' >&2; exit 1 ;; esac\nexec \"$base/internal/$rid/Talewright.Host.Desktop\" --no-library \"$base/story\" \"$@\"\n");
+        File.WriteAllText(Path.Combine(bundle, name + ".command"),
+            "#!/bin/sh\nset -eu\nbase=$(CDPATH= cd -P \"$(dirname \"$0\")\" && pwd)\nexec sh \"$base/" + name + ".sh\" \"$@\"\n");
+        CopyDirectory(Path.Combine(AssetsRoot, "launchers"), bundle);
+        File.WriteAllText(Path.Combine(bundle, "start.sh"),
+            "#!/bin/sh\nset -eu\nbase=$(CDPATH= cd -P \"$(dirname \"$0\")\" && pwd)\nexec sh \"$base/" + name + ".sh\" \"$@\"\n");
+        File.WriteAllText(Path.Combine(bundle, "start.command"),
+            "#!/bin/sh\nset -eu\nbase=$(CDPATH= cd -P \"$(dirname \"$0\")\" && pwd)\nexec sh \"$base/" + name + ".sh\" \"$@\"\n");
+        File.WriteAllText(Path.Combine(bundle, "start.cmd"),
+            "@echo off\r\nsetlocal\r\ncall \"%~dp0" + name + ".cmd\" %*\r\nexit /b %errorlevel%\r\n");
+    }
+
     private static void CreateZip(string directory, string path)
     {
         using var zip = ZipFile.Open(path, ZipArchiveMode.Create);
@@ -631,7 +747,10 @@ public sealed class PublishCommand : Command<PublishSettings>
             var mode = OperatingSystem.IsWindows()
                 ? UnixFileMode.UserRead | UnixFileMode.UserWrite | UnixFileMode.GroupRead | UnixFileMode.OtherRead
                 : File.GetUnixFileMode(file);
-            if (Path.GetFileName(file) is "Talewright.Host.Desktop" or "start.sh" or "start.command")
+            var fileName = Path.GetFileName(file);
+            if (fileName is "Talewright.Host.Desktop" or "start.sh" or "start.command" ||
+                fileName.EndsWith(".sh", StringComparison.Ordinal) ||
+                fileName.EndsWith(".command", StringComparison.Ordinal))
             {
                 mode |= UnixFileMode.UserExecute | UnixFileMode.GroupExecute | UnixFileMode.OtherExecute;
             }

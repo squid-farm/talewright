@@ -230,9 +230,10 @@ talewright publish path/to/story -a --target desktop --split --output desktop-bu
 
 This builds each of the six supported RIDs once and writes six ZIPs, such as
 `desktop-builds/my-story-linux-x64.zip` and `desktop-builds/my-story-osx-arm64.zip`.
-Each contains only its runtime-specific self-contained apphost and files, the published story,
-the engine license and deployment instructions. The universal `start.cmd`, `start.sh` and
-`start.command` launchers are not included. PDB inclusion is unchanged. These are unsigned
+Each contains a story-named launcher at the archive root (`.sh`, `.command` or `.cmd`, depending on
+the platform), plus that runtime's apphost and supporting files under `internal/`. The published
+story, engine license and deployment instructions remain inside the package. PDB inclusion is unchanged.
+The universal `start.*` launchers are not included. These are unsigned
 standalone ZIPs, not installers or macOS app bundles.
 
 If any output already exists, an interactive terminal lists the existing paths and asks once
@@ -284,9 +285,11 @@ across operating systems and filesystems.
 itch.io as an HTML5 game. Players need no backend or .NET.
 
 **Desktop output** is one universal zip with self-contained .NET for Windows, Linux and macOS on x64 and
-ARM64. Extract everything, then run `start.cmd` (Windows), `start.sh` (Linux) or `start.command` (macOS);
-the launcher picks the right platform. If extraction dropped execute permissions, use `sh start.sh`. A
-single-runtime zip is smaller; run `Talewright.Host.Desktop` (`.exe` on Windows). Photino supplies the
+ARM64. Extract everything, then run the story-named `.cmd` (Windows), `.sh` (Linux) or `.command`
+(macOS) launcher; the universal launchers pick the right platform. Runtime and story support files
+remain under `internal/`; the launchers resolve them from their own location, so the launcher's working
+directory does not need to be the package root. A single-runtime or split zip is smaller and uses only
+the matching story-named `.cmd`, `.sh` or `.command` launcher. Photino supplies the
 native binaries, so any platform can be built from any machine. Linux x64 is runtime-verified; Windows,
 macOS and ARM64 builds are unverified. Players need the OS webview (WebKitGTK 4.1, WebView2 or
 WKWebView). Output isn't an installer, signed, notarized or a macOS `.app` bundle.

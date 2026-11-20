@@ -75,8 +75,10 @@ public sealed class StandaloneDiagnosticsTests(WebHostFixture host, ITestOutputH
             ?? throw new InvalidOperationException("Run native tests through player/tests/run_e2e.py.");
         var root = Path.GetDirectoryName(executable)!;
         var runtime = RuntimeInformation.ProcessArchitecture == Architecture.Arm64 ? "linux-arm64" : "linux-x64";
-        var runtimeDirectory = Path.Combine(root, runtime);
-        var source = File.Exists(Path.Combine(runtimeDirectory, "Talewright.Host.Desktop")) ? runtimeDirectory : root;
+        var internalRuntimeDirectory = Path.Combine(root, "internal", runtime);
+        var legacyRuntimeDirectory = Path.Combine(root, runtime);
+        var source = Directory.Exists(internalRuntimeDirectory) ? internalRuntimeDirectory
+            : Directory.Exists(legacyRuntimeDirectory) ? legacyRuntimeDirectory : root;
         var copy = Path.Combine(Path.GetTempPath(), $"talewright-broken-published-{Guid.NewGuid():N}");
         try
         {

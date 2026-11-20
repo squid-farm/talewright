@@ -608,7 +608,7 @@ TALEWRIGHT_STANDALONE=1 TALEWRIGHT_WEB_ROOT="$PWD/artifacts/game-web" \
 dotnet run --project tooling/cli/src/Talewright.Cli -c Release -- \
   publish samples/LostRelic -a --target desktop --output artifacts/game-desktop.zip
 unzip artifacts/game-desktop.zip -d artifacts/game-desktop
-TALEWRIGHT_STANDALONE=1 TALEWRIGHT_DESKTOP_EXECUTABLE="$PWD/artifacts/game-desktop/start.sh" \
+TALEWRIGHT_STANDALONE=1 TALEWRIGHT_DESKTOP_EXECUTABLE="$PWD/artifacts/game-desktop/The Lost Relic.sh" \
   TALEWRIGHT_STANDALONE_CREATION=1 TALEWRIGHT_PUBLISHED_CHARACTER=Mara \
   python3 player/tests/run_e2e.py linux --filter Artifact=Standalone
 ```

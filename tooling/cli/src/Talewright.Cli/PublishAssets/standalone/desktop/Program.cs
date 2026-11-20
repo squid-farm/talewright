@@ -17,6 +17,10 @@ internal static class Program
         var story = Path.Combine(AppContext.BaseDirectory, "story");
         if (!Directory.Exists(story))
             story = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "story"));
+        if (!Directory.Exists(story))
+            story = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "story"));
+        if (!Directory.Exists(story))
+            story = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "story"));
         var builder = PhotinoBlazorAppBuilder.CreateDefault(args);
         builder.Services.AddSingleton<IStoryLibrary>(new FileSystemStoryLibrary([story]));
         var options = new DesktopOptions(story);
