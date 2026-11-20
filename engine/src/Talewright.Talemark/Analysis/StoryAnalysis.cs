@@ -535,15 +535,29 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     }
 
     internal void ImagePath(string path, SourceRange range, IReadOnlyList<SourceLocation> positions,
-        bool includeQuotes = false, SourceRange? replacementRange = null)
+        bool includeQuotes = false, SourceRange? replacementRange = null, bool closeQuote = false)
     {
         AddSite(new CompletionSite(path, range, [AuthoringSymbolKind.Image], [], positions,
             Candidates: _imageCandidates, IsImagePath: true)
         {
             ReplacementRange = replacementRange,
             CompletionPrefix = includeQuotes ? TextVocabulary.QuoteMark.ToString() : string.Empty,
-            CompletionSuffix = includeQuotes ? TextVocabulary.QuoteMark.ToString() : null
+            CompletionSuffix = includeQuotes || closeQuote ? TextVocabulary.QuoteMark.ToString() : null
         });
+    }
+
+    internal int ImagePathCompletionLength(string path)
+    {
+        var longestMatch = 0;
+        foreach (var candidate in _imageCandidates)
+        {
+            var name = candidate.Name;
+            var length = 0;
+            while (length < path.Length && length < name.Length && path[length] == name[length])
+                length++;
+            longestMatch = Math.Max(longestMatch, length);
+        }
+        return longestMatch;
     }
 
     internal void Reference(string text, SourceLocation location, AuthoringSymbolKind kind, params string[] keywords)

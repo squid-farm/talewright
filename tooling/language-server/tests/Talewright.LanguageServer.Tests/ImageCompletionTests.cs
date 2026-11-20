@@ -76,8 +76,8 @@ public sealed partial class ServerTests
 
     [Theory]
     [InlineData("""{image("maps/a\"|b.jpeg", "Literal {player:name}")}""", "maps/a\\\"b.jpeg")]
-    [InlineData("""{image("maps/|""", "maps/a\\\"b.jpeg")]
-    [InlineData("""* [Choose {image("maps/|""", "maps/a\\\"b.jpeg")]
+    [InlineData("""{image("maps/|""", "maps/a\\\"b.jpeg\"")]
+    [InlineData("""* [Choose {image("maps/|""", "maps/a\\\"b.jpeg\"")]
     [InlineData("""> player: {image("maps/|", "Alt")}""", "maps/a\\\"b.jpeg")]
     public async Task Image_completions_escape_paths_and_support_incomplete_narrative_templates(string line, string expected)
     {

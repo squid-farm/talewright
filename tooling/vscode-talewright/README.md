@@ -101,7 +101,8 @@ another style preserves the existing formatting and uses a non-colliding support
 
 After `{image(`, completion suggests supported files from the story's `images/` folder, including
 subfolders, and inserts the path in quotes. Completion inside an already quoted path inserts only the
-path; invoking completion immediately before its opening quote replaces the whole path. Paths are
+path, adding a missing closing quote without removing following prose; invoking completion immediately
+before its opening quote replaces the whole path. Paths are
 case-sensitive. Adding, renaming or deleting images refreshes suggestions and diagnostics without
 reopening the story.
 
