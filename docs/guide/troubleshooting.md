@@ -82,7 +82,8 @@ administrator.
 ## A published desktop game won't start
 
 - Extract the **whole** zip first; don't run files from inside it.
-- On Linux or macOS, if double-clicking does nothing, run `sh start.sh` from a terminal in that folder.
+- Run the story-named launcher at the zip root. On Linux or macOS, if double-clicking does nothing,
+  run `sh "Story Name.sh"` or `sh "Story Name.command"` from a terminal in that folder.
 - Windows SmartScreen and macOS Gatekeeper may warn about an unsigned app. Players can choose
   **Run anyway** (Windows) or right-click → **Open** (macOS).
 
