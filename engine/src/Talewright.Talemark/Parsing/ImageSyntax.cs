@@ -179,7 +179,7 @@ internal static class ImageSyntax
 
         if (!closed)
         {
-            Error("The image call is missing its closing '}'.", end);
+            Error("The image call is missing its closing '}'. Close it with '}'.", end);
             return null;
         }
 
