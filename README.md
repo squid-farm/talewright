@@ -82,8 +82,8 @@ Once the first 1.0 preview ships, this promise applies:
 
 ## Thanks
 
-Talewright wouldn't exist without [Twine](https://twinery.org/), [Ren'Py](https://www.renpy.org/) and
-[ChoiceScript](https://www.choiceofgames.com/make-your-own-games/choicescript-intro/).
+Talewright wouldn't exist without [Twine](https://twinery.org/), [ink](https://www.inklestudios.com/ink/),
+[Ren'Py](https://www.renpy.org/) and [ChoiceScript](https://www.choiceofgames.com/make-your-own-games/choicescript-intro/).
 [Here's how they compare](docs/inspirations.md), and when one of them might suit your story better.
 
 ## License

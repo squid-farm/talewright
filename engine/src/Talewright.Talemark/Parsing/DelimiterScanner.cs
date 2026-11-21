@@ -322,6 +322,13 @@ internal static class DelimiterScanner
         {
             if (braceDepth > 0)
             {
+                if (character == SceneVocabulary.CloseBracket)
+                {
+                    kind = DelimiterKind.Bracket;
+                    isOpen = false;
+                    return true;
+                }
+
                 kind = DelimiterKind.Brace;
                 isOpen = character == SceneVocabulary.InlineOpen;
                 return character is SceneVocabulary.InlineOpen or SceneVocabulary.InlineClose;
