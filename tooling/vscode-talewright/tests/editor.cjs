@@ -327,8 +327,6 @@ async function testAuthorActions(extension) {
 async function testStandalonePublish(extension) {
   assert.equal(vscode.workspace.isTrusted, true);
   const root = vscode.workspace.workspaceFolders[0].uri.fsPath;
-  await extension.activate();
-
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'talewright-publish-smoke-'));
   const executable = path.join(folder, 'talewright');
   const invocationLog = path.join(folder, 'invocations.jsonl');
@@ -345,25 +343,17 @@ if (args.includes('web')) {
 }
 `);
   await fs.chmod(executable, 0o755);
+  await vscode.workspace.getConfiguration('talewright').update(
+    'cli.executablePath', executable, vscode.ConfigurationTarget.Global);
+  await extension.activate();
+  const renderer = await openRenderer();
 
   const runPublish = async target => {
     const name = `Publish Standalone ${target[0].toUpperCase()}${target.slice(1)} Game`;
-    const args = [
-      'publish', root, '-a', '--target', target, '--output', path.join(folder, `published-${target}.zip`),
-    ];
-    const task = new vscode.Task(
-      { type: 'talewright', command: 'publish', story: root, target },
-      vscode.workspace.workspaceFolders[0],
-      name,
-      'Talewright',
-      new vscode.ProcessExecution(executable, args, { cwd: root }),
-      [],
-    );
-    task.presentationOptions = {
-      reveal: vscode.TaskRevealKind.Always,
-      panel: vscode.TaskPanelKind.Dedicated,
-      focus: true,
-    };
+    const destination = path.join(folder, `published-${target}.zip`);
+    // The matching directory proves the picker has loaded the chosen parent before Enter.
+    const marker = `${path.basename(destination)}-option`;
+    await fs.mkdir(path.join(folder, marker));
 
     let timeout;
     let end;
@@ -378,8 +368,31 @@ if (args.includes('web')) {
       });
     });
     try {
-      await vscode.tasks.executeTask(task);
-      return await completed;
+      const command = vscode.commands.executeCommand(`talewright.publishStandalone${target[0].toUpperCase()}${target.slice(1)}`);
+      const defaultDestination = path.join(root, `${path.basename(root)}-${target}.zip`);
+      await waitUntil(() => renderer.evaluate(`(() => {
+        const input = document.querySelector('.quick-input-widget input');
+        return !!input?.offsetParent && input.value === ${JSON.stringify(defaultDestination)};
+      })()`),
+        `Standalone ${target} destination picker must open`);
+      await renderer.evaluate(`(() => {
+        const input = document.querySelector('.quick-input-widget input');
+        input.focus();
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+        setter.call(input, ${JSON.stringify(destination)});
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      })()`);
+      await waitUntil(() => renderer.evaluate(`(() => {
+        const widget = document.querySelector('.quick-input-widget');
+        return widget?.querySelector('input')?.value === ${JSON.stringify(destination)} &&
+          widget.querySelector('.quick-input-progress')?.classList.contains('done') &&
+          [...widget.querySelectorAll('.quick-input-list .monaco-list-row')].some(row =>
+            row.textContent.includes(${JSON.stringify(marker)}));
+      })()`), `Standalone ${target} destination picker must finish loading`);
+      await renderer.dispatchKey('Enter', 'Enter', 13, 0);
+      const result = await completed;
+      await command;
+      return result;
     } finally {
       clearTimeout(timeout);
       end.dispose();
@@ -420,6 +433,7 @@ if (args.includes('web')) {
       'The failed CLI output must be visible in the standalone publish task terminal');
     console.log('Installed VSIX standalone publish task smoke passed: real task arguments and surfaced CLI failure output.');
   } finally {
+    renderer.close();
     await fs.rm(folder, { recursive: true, force: true });
   }
 }
