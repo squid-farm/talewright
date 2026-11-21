@@ -180,15 +180,22 @@ public sealed class PublishTests : IDisposable
         var desktop = RunWithoutDotnet("-a", "--target", "desktop", "--runtime", "linux-x64", "--force");
         Assert.True(desktop.Code == 0, desktop.Error + desktop.Output);
         using var desktopArchive = ZipFile.OpenRead(Zip);
-        Assert.Equal("linux-x64", ReadEntry(desktopArchive, "internal/linux-x64/Talewright.Host.Desktop"));
-        Assert.Equal("prebuilt desktop runtime", ReadEntry(desktopArchive, "internal/linux-x64/runtime.json"));
-        Assert.NotNull(desktopArchive.GetEntry("Publish.sh"));
+        AssertDesktopRoot(desktopArchive, "Publish");
+        Assert.Equal("linux-x64", ReadEntry(desktopArchive, "Publish/internal/linux-x64/Talewright.Host.Desktop"));
+        Assert.Equal("prebuilt desktop runtime", ReadEntry(desktopArchive, "Publish/internal/linux-x64/runtime.json"));
+        Assert.NotNull(desktopArchive.GetEntry("Publish/Publish.sh"));
     }
 
     private static string ReadEntry(ZipArchive archive, string name)
     {
         using var reader = new StreamReader(archive.GetEntry(name)!.Open());
         return reader.ReadToEnd();
+    }
+
+    private static void AssertDesktopRoot(ZipArchive archive, string folder)
+    {
+        Assert.NotEmpty(archive.Entries);
+        Assert.All(archive.Entries, entry => Assert.StartsWith(folder + "/", entry.FullName));
     }
 
     private (int Code, string Output, string Error) RunSplitControlled(TextReader input,
@@ -236,14 +243,15 @@ public sealed class PublishTests : IDisposable
             var path = Path.Combine(directory, $"publish-{runtime}.zip");
             Assert.True(File.Exists(path), $"Missing archive for {runtime}.");
             using var archive = ZipFile.OpenRead(path);
-            var names = archive.Entries.Select(entry => entry.FullName).ToArray();
+            AssertDesktopRoot(archive, "Publish");
+            var names = archive.Entries.Select(entry => entry.FullName["Publish/".Length..]).ToArray();
             Assert.Contains($"internal/{runtime}/Talewright.Host.Desktop.pdb", names);
             Assert.Contains("DEPLOYMENT.txt", names);
             Assert.Contains("ENGINE-LICENSE.txt", names);
             Assert.DoesNotContain(names, name => name.StartsWith("start.", StringComparison.Ordinal));
             Assert.DoesNotContain(names, name => PublishCommand.DesktopRuntimes.Any(other =>
                 other != runtime && name.Contains(other, StringComparison.Ordinal)));
-            using var deployment = new StreamReader(archive.GetEntry("DEPLOYMENT.txt")!.Open());
+            using var deployment = new StreamReader(archive.GetEntry("Publish/DEPLOYMENT.txt")!.Open());
             Assert.Contains(runtime, deployment.ReadToEnd());
             var executable = runtime.StartsWith("win-", StringComparison.Ordinal)
                 ? "Publish.cmd"
@@ -251,7 +259,7 @@ public sealed class PublishTests : IDisposable
                     ? "Publish.command"
                     : "Publish.sh";
             Assert.Contains(executable, names);
-            using var reader = new StreamReader(archive.GetEntry($"internal/{runtime}/Talewright.Host.Desktop" +
+            using var reader = new StreamReader(archive.GetEntry($"Publish/internal/{runtime}/Talewright.Host.Desktop" +
                 (runtime.StartsWith("win-", StringComparison.Ordinal) ? ".exe" : ""))!.Open());
             Assert.Equal(runtime, reader.ReadToEnd());
         }
@@ -297,12 +305,13 @@ public sealed class PublishTests : IDisposable
             publication: publication, args: ["-a", "--target", "desktop"]).Code);
         using (var zip = ZipFile.OpenRead(Zip))
         {
+            AssertDesktopRoot(zip, "Publish");
             Assert.Single(zip.Entries, entry => entry.FullName.EndsWith("story.talewright.yaml", StringComparison.Ordinal));
-            Assert.NotNull(zip.GetEntry("story/story.talewright.yaml"));
-            Assert.NotNull(zip.GetEntry("story/chapters/main.tale"));
+            Assert.NotNull(zip.GetEntry("Publish/story/story.talewright.yaml"));
+            Assert.NotNull(zip.GetEntry("Publish/story/chapters/main.tale"));
             Assert.DoesNotContain(zip.Entries, entry => PublishCommand.DesktopRuntimes.Any(runtime =>
-                entry.FullName.StartsWith(runtime + "/story/", StringComparison.Ordinal)));
-            using var stream = zip.GetEntry("story/images/maps/camp.PNG")!.Open();
+                entry.FullName.StartsWith("Publish/internal/" + runtime + "/story/", StringComparison.Ordinal)));
+            using var stream = zip.GetEntry("Publish/story/images/maps/camp.PNG")!.Open();
             using var buffer = new MemoryStream();
             stream.CopyTo(buffer);
             Assert.Equal(image, buffer.ToArray());
@@ -311,8 +320,9 @@ public sealed class PublishTests : IDisposable
         foreach (var runtime in PublishCommand.DesktopRuntimes)
         {
             using var zip = ZipFile.OpenRead(Path.Combine(SplitDirectory, $"publish-{runtime}.zip"));
-            Assert.NotNull(zip.GetEntry("internal/story/story.talewright.yaml"));
-            Assert.NotNull(zip.GetEntry("internal/story/images/maps/camp.PNG"));
+            AssertDesktopRoot(zip, "Publish");
+            Assert.NotNull(zip.GetEntry("Publish/internal/story/story.talewright.yaml"));
+            Assert.NotNull(zip.GetEntry("Publish/internal/story/images/maps/camp.PNG"));
         }
     }
 
@@ -362,7 +372,7 @@ public sealed class PublishTests : IDisposable
         else
             Assert.Contains("Advisory only", result.Error);
         using var archive = ZipFile.OpenRead(Zip);
-        var prefix = universal ? "internal/" + PublishCommand.DesktopRuntimes[0] + "/" : "";
+        var prefix = universal ? "Publish/internal/" + PublishCommand.DesktopRuntimes[0] + "/" : "";
         var payload = archive.Entries.Where(entry => entry.FullName.StartsWith(prefix + "payload-", StringComparison.Ordinal)).ToArray();
         Assert.Equal(files, payload.Length);
         Assert.All(payload, entry => Assert.Equal(bytes, entry.Length));
@@ -378,7 +388,7 @@ public sealed class PublishTests : IDisposable
         }
         Assert.Equal(bytes, read);
         Assert.Equal(0x7f, last);
-        Assert.NotNull(archive.GetEntry("story/story.talewright.yaml"));
+        Assert.NotNull(archive.GetEntry((universal ? "Publish/" : "") + "story/story.talewright.yaml"));
         Assert.Empty(Directory.GetFiles(_root, "*.tmp"));
     }
 
@@ -428,7 +438,8 @@ public sealed class PublishTests : IDisposable
         Assert.Equal(0, result.Code);
         Assert.Equal(PublishCommand.DesktopRuntimes, builds);
         using var archive = ZipFile.OpenRead(Zip);
-        var names = archive.Entries.Select(entry => entry.FullName).ToArray();
+        AssertDesktopRoot(archive, "Publish");
+        var names = archive.Entries.Select(entry => entry.FullName["Publish/".Length..]).ToArray();
         Assert.Contains("start.cmd", names);
         Assert.Contains("start.sh", names);
         Assert.Contains("start.command", names);
@@ -452,24 +463,25 @@ public sealed class PublishTests : IDisposable
 
         Assert.Equal(0, result.Code);
         using var archive = ZipFile.OpenRead(Zip);
-        Assert.NotNull(archive.GetEntry("Publish.sh"));
-        Assert.NotNull(archive.GetEntry("internal/linux-x64/Talewright.Host.Desktop"));
-        Assert.NotNull(archive.GetEntry("internal/story/story.talewright.yaml"));
-        Assert.NotNull(archive.GetEntry("DEPLOYMENT.txt"));
-        Assert.DoesNotContain(archive.Entries, entry => entry.FullName == "Talewright.Host.Desktop");
+        AssertDesktopRoot(archive, "Publish");
+        Assert.NotNull(archive.GetEntry("Publish/Publish.sh"));
+        Assert.NotNull(archive.GetEntry("Publish/internal/linux-x64/Talewright.Host.Desktop"));
+        Assert.NotNull(archive.GetEntry("Publish/internal/story/story.talewright.yaml"));
+        Assert.NotNull(archive.GetEntry("Publish/DEPLOYMENT.txt"));
+        Assert.Null(archive.GetEntry("Publish/Talewright.Host.Desktop"));
 
         var extracted = Path.Combine(_root, "real-extracted");
         archive.ExtractToDirectory(extracted);
         using var shell = Process.Start(new ProcessStartInfo("sh")
         {
-            ArgumentList = { "-n", Path.Combine(extracted, "Publish.sh") },
+            ArgumentList = { "-n", Path.Combine(extracted, "Publish", "Publish.sh") },
             WorkingDirectory = _root,
             RedirectStandardError = true,
         });
         Assert.NotNull(shell);
         shell.WaitForExit();
         Assert.Equal(0, shell.ExitCode);
-        Assert.True(File.Exists(Path.Combine(extracted, "internal", "linux-x64", "Talewright.Host.Desktop")));
+        Assert.True(File.Exists(Path.Combine(extracted, "Publish", "internal", "linux-x64", "Talewright.Host.Desktop")));
     }
 
     [Fact]
@@ -481,17 +493,18 @@ public sealed class PublishTests : IDisposable
         foreach (var runtime in PublishCommand.DesktopRuntimes)
         {
             using var archive = ZipFile.OpenRead(Path.Combine(SplitDirectory, $"publish-{runtime}.zip"));
+            AssertDesktopRoot(archive, "Publish");
             var launcher = runtime.StartsWith("win-", StringComparison.Ordinal)
                 ? "Publish.cmd"
                 : runtime.StartsWith("osx-", StringComparison.Ordinal)
                     ? "Publish.command"
                     : "Publish.sh";
-            Assert.NotNull(archive.GetEntry(launcher));
+            Assert.NotNull(archive.GetEntry("Publish/" + launcher));
             var executable = runtime.StartsWith("win-", StringComparison.Ordinal)
                 ? "Talewright.Host.Desktop.exe"
                 : "Talewright.Host.Desktop";
-            Assert.NotNull(archive.GetEntry($"internal/{runtime}/{executable}"));
-            Assert.NotNull(archive.GetEntry("internal/story/story.talewright.yaml"));
+            Assert.NotNull(archive.GetEntry($"Publish/internal/{runtime}/{executable}"));
+            Assert.NotNull(archive.GetEntry("Publish/internal/story/story.talewright.yaml"));
         }
     }
 
@@ -506,13 +519,82 @@ public sealed class PublishTests : IDisposable
         Assert.Equal(0, result.Code);
         Assert.Equal(["linux-x64"], builds);
         using var archive = ZipFile.OpenRead(Zip);
-        var names = archive.Entries.Select(entry => entry.FullName).ToArray();
+        AssertDesktopRoot(archive, "Publish");
+        var names = archive.Entries.Select(entry => entry.FullName["Publish/".Length..]).ToArray();
         Assert.Contains("Publish.sh", names);
         Assert.Contains("internal/linux-x64/Talewright.Host.Desktop", names);
         Assert.Contains("internal/linux-x64/Talewright.Host.Desktop.pdb", names);
         Assert.Contains("internal/story/story.talewright.yaml", names);
         Assert.DoesNotContain(names, name => name == "Talewright.Host.Desktop");
         Assert.DoesNotContain(names, name => name.StartsWith("start.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void Desktop_archives_extract_into_separate_safe_story_named_folders()
+    {
+        var destination = Path.Combine(_root, "games");
+        Directory.CreateDirectory(destination);
+        File.WriteAllText(Path.Combine(destination, "keep.txt"), "existing");
+        foreach (var (title, folder) in new[] { ("First Game", "First Game"), ("Second/Game", "Second-Game") })
+        {
+            var manifest = new ManifestFaker("publish", title, "a");
+            manifest.Character("player", "Tester");
+            File.WriteAllText(Path.Combine(Story, "story.talewright.yaml"), manifest.Build(trailingNewline: true));
+            var result = RunControlled(new UnreadableInput(), inputRedirected: true,
+                publication: SplitBuilds(), args: ["-a", "--target", "desktop", "--runtime", "linux-x64", "--force"]);
+            Assert.True(result.Code == 0, result.Error + result.Output);
+            using var archive = ZipFile.OpenRead(Zip);
+            AssertDesktopRoot(archive, folder);
+            archive.ExtractToDirectory(destination);
+            Assert.True(File.Exists(Path.Combine(destination, folder, folder + ".sh")));
+            Assert.True(File.Exists(Path.Combine(destination, folder, "internal", "story", "story.talewright.yaml")));
+        }
+        Assert.Equal("existing", File.ReadAllText(Path.Combine(destination, "keep.txt")));
+        Assert.Single(Directory.GetFiles(destination));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Extracted_linux_launcher_resolves_story_from_a_different_working_directory(bool universal)
+    {
+        if (!OperatingSystem.IsLinux()) return;
+
+        var manifest = new ManifestFaker("publish", "A Game", "a");
+        manifest.Character("player", "Tester");
+        File.WriteAllText(Path.Combine(Story, "story.talewright.yaml"), manifest.Build(trailingNewline: true));
+        var publication = SplitBuilds((runtime, output) =>
+        {
+            if (runtime.StartsWith("linux-", StringComparison.Ordinal))
+                File.WriteAllText(Path.Combine(output, "Talewright.Host.Desktop"), "#!/bin/sh\nprintf '%s\\n' \"$@\"\n");
+        });
+        var args = universal
+            ? new[] { "-a", "--target", "desktop" }
+            : ["-a", "--target", "desktop", "--runtime", "linux-x64"];
+        var result = RunControlled(new UnreadableInput(), inputRedirected: true, publication: publication, args: args);
+        Assert.True(result.Code == 0, result.Error + result.Output);
+        var extracted = Path.Combine(_root, "games");
+        using (var archive = ZipFile.OpenRead(Zip))
+        {
+            AssertDesktopRoot(archive, "A Game");
+            archive.ExtractToDirectory(extracted);
+        }
+
+        using var process = Process.Start(new ProcessStartInfo("sh")
+        {
+            ArgumentList = { Path.Combine(extracted, "A Game", "A Game.sh"), "test-argument" },
+            WorkingDirectory = _root,
+            RedirectStandardOutput = true,
+            RedirectStandardError = true,
+        });
+        Assert.NotNull(process);
+        var output = process.StandardOutput.ReadToEnd();
+        var error = process.StandardError.ReadToEnd();
+        process.WaitForExit();
+        Assert.True(process.ExitCode == 0, error);
+        var storyPath = universal ? Path.Combine(extracted, "A Game", "story")
+            : Path.Combine(extracted, "A Game", "internal", "story");
+        Assert.Equal($"--no-library\n{storyPath}\ntest-argument\n", output);
     }
 
     [Fact]
@@ -537,7 +619,7 @@ public sealed class PublishTests : IDisposable
         AssertSplitSet(SplitDirectory);
         Assert.Contains("publish-linux-x64.zip", result.Output);
         using var linux = ZipFile.OpenRead(Path.Combine(SplitDirectory, "publish-linux-x64.zip"));
-        Assert.DoesNotContain("start.sh", linux.Entries.Select(entry => entry.FullName));
+        Assert.Null(linux.GetEntry("Publish/start.sh"));
     }
 
     [Theory]
@@ -1303,8 +1385,9 @@ public sealed class PublishTests : IDisposable
         using var web = ZipFile.OpenRead(Path.Combine(AllDirectory, "web", "publish-web.zip"));
         Assert.NotNull(web.GetEntry("story/story.talewright.yaml"));
         using var desktop = ZipFile.OpenRead(Path.Combine(AllDirectory, "desktop", "publish-desktop.zip"));
-        Assert.NotNull(desktop.GetEntry("Publish.sh"));
-        Assert.NotNull(desktop.GetEntry("internal/linux-x64/host.txt"));
+        AssertDesktopRoot(desktop, "Publish");
+        Assert.NotNull(desktop.GetEntry("Publish/Publish.sh"));
+        Assert.NotNull(desktop.GetEntry("Publish/internal/linux-x64/host.txt"));
         Assert.Empty(Directory.GetFiles(_root, "*.tmp"));
     }
 
@@ -1358,7 +1441,8 @@ public sealed class PublishTests : IDisposable
         foreach (var runtime in PublishCommand.DesktopRuntimes)
         {
             using var archive = ZipFile.OpenRead(Path.Combine(desktop, $"publish-{runtime}.zip"));
-            Assert.NotNull(archive.GetEntry($"internal/{runtime}/host.txt"));
+            AssertDesktopRoot(archive, "Publish");
+            Assert.NotNull(archive.GetEntry($"Publish/internal/{runtime}/host.txt"));
         }
     }
 
@@ -1386,22 +1470,24 @@ public sealed class PublishTests : IDisposable
             foreach (var runtime in PublishCommand.DesktopRuntimes)
             {
                 using var desktop = ZipFile.OpenRead(Path.Combine(desktopDirectory, $"publish-{runtime}.zip"));
+                AssertDesktopRoot(desktop, "Publish");
                 var executable = runtime.StartsWith("win-", StringComparison.Ordinal)
                     ? "Talewright.Host.Desktop.exe" : "Talewright.Host.Desktop";
-                Assert.Equal(runtime, ReadEntry(desktop, $"internal/{runtime}/{executable}"));
-                Assert.NotNull(desktop.GetEntry("internal/story/story.talewright.yaml"));
+                Assert.Equal(runtime, ReadEntry(desktop, $"Publish/internal/{runtime}/{executable}"));
+                Assert.NotNull(desktop.GetEntry("Publish/internal/story/story.talewright.yaml"));
             }
         }
         else
         {
             using var desktop = ZipFile.OpenRead(Path.Combine(desktopDirectory, "publish-desktop.zip"));
-            Assert.NotNull(desktop.GetEntry("Publish.sh"));
-            Assert.NotNull(desktop.GetEntry("story/story.talewright.yaml"));
+            AssertDesktopRoot(desktop, "Publish");
+            Assert.NotNull(desktop.GetEntry("Publish/Publish.sh"));
+            Assert.NotNull(desktop.GetEntry("Publish/story/story.talewright.yaml"));
             foreach (var runtime in PublishCommand.DesktopRuntimes)
             {
                 var executable = runtime.StartsWith("win-", StringComparison.Ordinal)
                     ? "Talewright.Host.Desktop.exe" : "Talewright.Host.Desktop";
-                Assert.Equal(runtime, ReadEntry(desktop, $"internal/{runtime}/{executable}"));
+                Assert.Equal(runtime, ReadEntry(desktop, $"Publish/internal/{runtime}/{executable}"));
             }
         }
     }
@@ -1473,7 +1559,7 @@ public sealed class PublishTests : IDisposable
             Assert.NotNull(webArchive.GetEntry("story/story.talewright.yaml"));
             Assert.False(File.Exists(Path.Combine(web, "keep")));
             using var desktopArchive = ZipFile.OpenRead(Path.Combine(AllDirectory, "desktop", "publish-desktop.zip"));
-            Assert.NotNull(desktopArchive.GetEntry("Publish.sh"));
+            Assert.NotNull(desktopArchive.GetEntry("Publish/Publish.sh"));
         }
         else
         {

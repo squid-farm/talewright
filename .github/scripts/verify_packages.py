@@ -45,7 +45,13 @@ PLAYER_ASSETS = ("player-assets/player.html",
 
 def verify_desktop_archive(path):
     with ZipFile(path) as archive:
-        names = set(archive.namelist())
+        entries = set(archive.namelist())
+        roots = {name.split("/", 1)[0] for name in entries}
+        if len(roots) != 1 or any("/" not in name for name in entries):
+            raise ValueError("Universal desktop archive must contain one game folder and no root files")
+        folder = next(iter(roots))
+        archive_prefix = folder + "/"
+        names = {name[len(archive_prefix):] for name in entries}
         story_launchers = [name for name in names
                            if "/" not in name and name not in {"start.sh", "start.cmd", "start.command"}
                            and (name.endswith(".sh") or name.endswith(".command") or name.endswith(".cmd"))]
@@ -75,7 +81,7 @@ def verify_desktop_archive(path):
                     required.add(prefix + "nfd.dll")
                 elif os_name == "osx":
                     required.add(prefix + "libnfd.dylib")
-                config = json.loads(archive.read(prefix + "Talewright.Host.Desktop.runtimeconfig.json"))["runtimeOptions"]
+                config = json.loads(archive.read(archive_prefix + prefix + "Talewright.Host.Desktop.runtimeconfig.json"))["runtimeOptions"]
                 frameworks = config.get("includedFrameworks", [])
                 if "framework" in config or "frameworks" in config or not any(
                         framework["name"] == "Microsoft.NETCore.App" for framework in frameworks):
@@ -86,9 +92,10 @@ def verify_desktop_archive(path):
         executable_names.extend("internal/" + rid + "/Talewright.Host.Desktop"
                                 for rid in ["linux-x64", "linux-arm64", "osx-x64", "osx-arm64"])
         for name in ["start.sh", "start.command", *executable_names]:
-            if not (archive.getinfo(name).external_attr >> 16) & 0o111:
+            if not (archive.getinfo(archive_prefix + name).external_attr >> 16) & 0o111:
                 raise ValueError(f"Missing executable permissions: {name}")
     print("Verified six self-contained desktop builds and launchers", flush=True)
+    return archive_prefix
 
 
 def verify_web_identity(identity, version):
@@ -395,7 +402,7 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
         desktop = root / "desktop.zip"
         subprocess.run([str(tool_path / "talewright"), "publish", str(story), "-a",
                         "--target", "desktop", "--output", str(desktop)], cwd=root, env=environment, check=True)
-        verify_desktop_archive(desktop)
+        desktop_prefix = verify_desktop_archive(desktop)
         with ZipFile(desktop) as published:
             if any("Debugger" in name or "debug-assets/" in name or any(
                     asset in name for asset in ("d3-zoom.bundle.min.js", "elk-api.js", "elk-worker.min.js",
@@ -403,14 +410,14 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
                    for name in published.namelist()):
                 raise ValueError("Published game includes author-only tooling")
             for name in ["chapter.fr.tale", "characters/player.talewright.yaml"]:
-                if published.read("story/" + name) != (story / name).read_bytes():
+                if published.read(desktop_prefix + "story/" + name) != (story / name).read_bytes():
                     raise ValueError(f"Published desktop story lost source file {name}")
-            if any(name.startswith(tuple(f"internal/{rid}/story/" for rid in
+            if any(name.startswith(tuple(f"{desktop_prefix}internal/{rid}/story/" for rid in
                        ["linux-x64", "linux-arm64", "win-x64", "win-arm64", "osx-x64", "osx-arm64"]))
                    for name in published.namelist()):
                 raise ValueError("Universal desktop repeats story files per runtime")
             host = root / "PublishedHost.dll"
-            host.write_bytes(published.read("internal/linux-x64/Talewright.Host.Desktop.dll"))
+            host.write_bytes(published.read(desktop_prefix + "internal/linux-x64/Talewright.Host.Desktop.dll"))
         subprocess.run(["dotnet", "run", "--project", str(root / "EngineConsumer"), "-c", "Release",
                         "--no-build", "--", str(host)], cwd=root, env=environment, check=True)
         example = root / "CSharpStory"

@@ -193,6 +193,8 @@ public sealed class PublishCommand : Command<PublishSettings>
 
             Directory.CreateDirectory(Path.GetDirectoryName(final)!);
             temporaryZip = Path.Combine(Path.GetDirectoryName(final)!, $".talewright-{Guid.NewGuid():N}.zip.tmp");
+            if (allInOne && target == "desktop")
+                content = WrapDesktopContent(working, content, result.Story!.Title, result.Story.Id);
             publication.CreateZip(content, temporaryZip);
             if (approved is not null && approved != DestinationState.Capture(final))
             {
@@ -323,14 +325,16 @@ public sealed class PublishCommand : Command<PublishSettings>
                 foreach (var runtime in DesktopRuntimes)
                 {
                     var built = BuildSplitDesktop(working, runtime, story, storyTitle, storyId, output, error, publication);
-                    publication.CreateZip(built, Path.Combine(desktopWorking, $"{stem}-{runtime}.zip"));
+                    publication.CreateZip(WrapDesktopContent(working, built, storyTitle, storyId),
+                        Path.Combine(desktopWorking, $"{stem}-{runtime}.zip"));
                 }
             }
             else
             {
                 var desktopContent = BuildStandalone(working, story, storyTitle, storyId, "desktop", null,
                     output, error, publication, universalDesktop: true);
-                publication.CreateZip(desktopContent, Path.Combine(desktopWorking, $"{stem}-desktop.zip"));
+                publication.CreateZip(WrapDesktopContent(working, desktopContent, storyTitle, storyId),
+                    Path.Combine(desktopWorking, $"{stem}-desktop.zip"));
             }
             staged.Add(("desktop", desktopWorking));
 
@@ -405,7 +409,7 @@ public sealed class PublishCommand : Command<PublishSettings>
                 var built = BuildSplitDesktop(working, runtime, story, storyTitle, storyId, output, error, publication);
                 var temporary = Path.Combine(destination, $".talewright-{Guid.NewGuid():N}.zip.tmp");
                 staged.Add((runtime, temporary, targets[runtime]));
-                publication.CreateZip(built, temporary);
+                publication.CreateZip(WrapDesktopContent(working, built, storyTitle, storyId), temporary);
             }
 
             InstallOutputs(staged.Select(item => (item.Path, item.Final)).ToArray(), approved, settings.Force,
@@ -676,6 +680,14 @@ public sealed class PublishCommand : Command<PublishSettings>
         WriteStory(source, root, story);
         _ = StorySource.FromDirectory(story);
         return story;
+    }
+
+    private static string WrapDesktopContent(string working, string content, string storyTitle, string storyId)
+    {
+        var archiveRoot = Path.Combine(working, $"desktop-archive-{Guid.NewGuid():N}");
+        Directory.CreateDirectory(archiveRoot);
+        Directory.Move(content, Path.Combine(archiveRoot, SafeDesktopName(storyTitle, storyId)));
+        return archiveRoot;
     }
 
     private static void WriteStory(StorySource source, string root, string directory)
