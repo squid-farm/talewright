@@ -12,7 +12,7 @@
         case RenderedMedia media:
             @if (CollapsedImages?.Contains(media.MediaId) ?? HistoryReading)
             {
-                <HistoryMediaView @key="(index, media, Images)" Media="media" Images="Images" ChoiceLabel="ChoiceLabel" />
+                <HistoryMediaView @key="(index, media, Images, ChoiceLabel)" Media="media" Images="Images" ChoiceLabel="ChoiceLabel" />
             }
             else
             {

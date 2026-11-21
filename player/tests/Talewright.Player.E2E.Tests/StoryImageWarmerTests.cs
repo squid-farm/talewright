@@ -144,6 +144,9 @@ public sealed class StoryImageWarmerTests
                     _displayed.Enqueue(Assert.IsType<string>(args![1]));
                     result = true;
                     break;
+                case "dimensions":
+                    result = new[] { 1, 1 };
+                    break;
                 case "release":
                     break;
                 default:

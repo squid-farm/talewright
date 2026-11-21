@@ -244,7 +244,7 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
         await Page.EvaluateAsync<bool>("url => window.historyUrls.revoked.includes(url)", url);
 
     [Fact]
-    public async Task Unmeasured_small_images_and_choice_images_stay_inline_in_history()
+    public async Task Unmeasured_small_images_are_measured_in_the_browser_and_choice_images_stay_inline()
     {
         using var files = new ImageStoryFiles();
         await File.WriteAllTextAsync(files.TalePath, """
@@ -283,10 +283,8 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
             await Choices.First.ClickAsync();
             await Driver.ClickAsync("History");
 
-            var historicalSmall = History.GetByAltText("Tiny credit", new() { Exact = true });
-            await Expect(historicalSmall).ToBeVisibleAsync();
             await Expect(History.GetByRole(AriaRole.Button, new() { Name = "Reveal image: Tiny credit", Exact = true }))
-                .ToHaveCountAsync(0);
+                .ToBeVisibleAsync();
             await Expect(History.GetByAltText("Choice token", new() { Exact = true })).ToBeVisibleAsync();
             await Expect(History.GetByRole(AriaRole.Button, new() { Name = "Reveal image: Choice token", Exact = true }))
                 .ToHaveCountAsync(0);
@@ -299,6 +297,10 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
                     window.resumeUnmeasuredImages.splice(0).forEach(resume => resume());
                 }
                 """);
+            var historicalSmall = History.GetByAltText("Tiny credit", new() { Exact = true });
+            await Expect(historicalSmall).ToBeVisibleAsync();
+            await Expect(History.GetByRole(AriaRole.Button, new() { Name = "Reveal image: Tiny credit", Exact = true }))
+                .ToHaveCountAsync(0);
             await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0",
                 await historicalSmall.ElementHandleAsync());
         }

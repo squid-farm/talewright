@@ -97,6 +97,17 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
                 dimensions.Width <= SmallImageMaxWidth && dimensions.Height <= SmallImageMaxHeight;
     }
 
+    internal (int Width, int Height)? GetRecordedImageDimensions(string path)
+    {
+        lock (_sync)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (!_paths.Contains(path))
+                throw new InvalidDataException($"Image '{path}' is not in this story's safe image catalogue.");
+            return _dimensions.TryGetValue(path, out var dimensions) ? dimensions : null;
+        }
+    }
+
     internal void RecordImageDimensions(string path, int width, int height)
     {
         if (width <= 0 || height <= 0) return;
@@ -105,23 +116,6 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
             if (!_disposed && _paths.Contains(path))
                 _dimensions[path] = (width, height);
         }
-    }
-
-    internal async Task<(int Width, int Height)?> GetImageDimensionsAsync(string path)
-    {
-        lock (_sync)
-        {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-            if (!_paths.Contains(path))
-                throw new InvalidDataException($"Image '{path}' is not in this story's safe image catalogue.");
-            if (_dimensions.TryGetValue(path, out var cachedDimensions)) return cachedDimensions;
-        }
-
-        await using var stream = await OpenAsync(path, Lifetime);
-        var imageDimensions = await ImageDimensions.ReadAsync(stream, path, Lifetime);
-        if (imageDimensions is { } measured)
-            RecordImageDimensions(path, measured.Width, measured.Height);
-        return imageDimensions;
     }
 
     private async Task<string> TransferAsync(string path, Entry entry)

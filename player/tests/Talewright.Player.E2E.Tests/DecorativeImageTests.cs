@@ -74,8 +74,8 @@ public sealed class DecorativeImageTests(WebHostFixture host, ITestOutputHelper 
         if (Driver is NativePlayerDriver nativeHistory)
         {
             var history = await nativeHistory.SnapshotAsync();
-            Assert.Equal(2, history.Descendants().Count(node =>
-                node.Role == "push button" && node.Name == "Reveal decorative image"));
+            Assert.Single(history.Descendants(), node =>
+                node.Role == "push button" && node.Name == "Reveal decorative image");
             await nativeHistory.ClickAsync("Reveal decorative image");
             var afterReveal = await nativeHistory.SnapshotAsync();
             Assert.Contains("You arrive.", afterReveal.Content);
@@ -90,7 +90,7 @@ public sealed class DecorativeImageTests(WebHostFixture host, ITestOutputHelper 
                 Name = "Reveal decorative image",
                 Exact = true,
             });
-            await Expect(reveal).ToHaveCountAsync(2);
+            await Expect(reveal).ToHaveCountAsync(1);
             await reveal.First.ClickAsync();
             await Expect(Page.Locator(".tw-history-frame").Last).ToContainTextAsync("You arrive.");
             await Expect(Page.GetByRole(AriaRole.Button, new()
