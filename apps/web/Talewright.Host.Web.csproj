@@ -26,6 +26,17 @@
     <ProjectReference Include="../../engine/src/Talewright.Runtime/Talewright.Runtime.csproj" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(TalewrightStandalone)' == 'true'">
+    <Compile Remove="Program.cs" />
+    <Compile Include="../../tooling/cli/src/Talewright.Cli/PublishAssets/standalone/web/Program.cs" Link="Program.cs" />
+    <Content Remove="App.razor" />
+    <RazorComponent Remove="App.razor" />
+    <RazorComponent Include="../../tooling/cli/src/Talewright.Cli/PublishAssets/standalone/web/App.razor" Link="App.razor" />
+    <Content Remove="wwwroot/index.html" />
+    <Content Include="../../tooling/cli/src/Talewright.Cli/PublishAssets/standalone/web/wwwroot/index.html"
+             Link="wwwroot/index.html" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
   <Import Project="$(TalewrightBuildIdentityTargets)" />
 
   <!-- The same identity the player displays, for scripts and bug reports (#315). -->

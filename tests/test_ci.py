@@ -132,21 +132,15 @@ class RepositoryLayoutTests(unittest.TestCase):
                 }
                 self.assertEqual(expected, actual)
 
-    def test_cli_copies_both_source_hosts_into_publish_templates(self):
+    def test_cli_does_not_ship_runner_sources_with_prebuilt_template_publishing(self):
         directory = self.ROOT / "tooling/cli/src/Talewright.Cli"
         project = ET.parse(directory / "Talewright.Cli.csproj")
-        for host, assembly in (("web", "Talewright.Host.Web"), ("desktop", "Talewright.Host.Desktop")):
-            with self.subTest(host=host):
-                templates = {
-                    path.name
-                    for item in project.findall(".//None")
-                    if item.attrib.get("Link", "").startswith(f"publish-assets/{host}/")
-                    for pattern in item.attrib.get("Include", "").split(";")
-                    if pattern
-                    for path in directory.glob(pattern.replace("\\", "/"))
-                    if path.is_file()
-                }
-                self.assertTrue({f"{assembly}.csproj", "App.razor", "Program.cs"} <= templates)
+        shipped = [item.attrib.get("Link", "") for item in project.findall(".//None")]
+        self.assertFalse(any(link.startswith((
+            "publish-assets/web/", "publish-assets/desktop/", "publish-assets/standalone/",
+        )) for link in shipped))
+        self.assertTrue(any(link.startswith("publish-assets/player/") for link in shipped))
+        self.assertTrue(any(link.startswith("publish-assets/launchers/") for link in shipped))
 
 
 class DebuggerIsolationTests(unittest.TestCase):
@@ -269,15 +263,6 @@ class PackageBoundaryTests(unittest.TestCase):
                              "debug-assets/debugger.css",
                              "debug-assets/Talewright.Debugger.styles.css",
                              *MAP_ASSETS,
-                             "publish-assets/web/Talewright.Host.Web.csproj",
-                             "publish-assets/web/BuildIdentity.targets",
-                             "publish-assets/desktop/Talewright.Host.Desktop.csproj",
-                             "publish-assets/desktop/THIRD-PARTY-NOTICES.txt",
-                             "publish-assets/standalone/web/App.razor",
-                             "publish-assets/standalone/web/Program.cs",
-                             "publish-assets/standalone/web/wwwroot/index.html",
-                             "publish-assets/standalone/desktop/App.razor",
-                             "publish-assets/standalone/desktop/Program.cs",
                              *PLAYER_ASSETS,
                              "publish-assets/launchers/start.sh",
                              "publish-assets/launchers/start.command",
@@ -481,7 +466,7 @@ class PackageBoundaryTests(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, "missing tools/"):
                 verify(directory, "1.2.3")
 
-    def test_missing_desktop_dialog_notice_fails(self):
+    def test_missing_cli_launcher_asset_fails(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             self.write_package(directory, "Talewright")
@@ -489,14 +474,14 @@ class PackageBoundaryTests(unittest.TestCase):
             tool = self.write_package(directory, "Talewright.Cli")
             with ZipFile(tool) as package:
                 entries = {name: package.read(name) for name in package.namelist()
-                           if not name.endswith("publish-assets/desktop/THIRD-PARTY-NOTICES.txt")}
+                           if not name.endswith("publish-assets/launchers/start.sh")}
             with ZipFile(tool, "w") as package:
                 for name, content in entries.items():
                     package.writestr(name, content)
-            with self.assertRaisesRegex(ValueError, "missing .*THIRD-PARTY-NOTICES.txt"):
+            with self.assertRaisesRegex(ValueError, "missing .*publish-assets/launchers/start.sh"):
                 verify(directory, "1.2.3")
 
-    def test_missing_web_build_identity_targets_fails(self):
+    def test_missing_cli_engine_license_fails(self):
         with tempfile.TemporaryDirectory() as temporary:
             directory = Path(temporary)
             self.write_package(directory, "Talewright")
@@ -504,11 +489,11 @@ class PackageBoundaryTests(unittest.TestCase):
             tool = self.write_package(directory, "Talewright.Cli")
             with ZipFile(tool) as package:
                 entries = {name: package.read(name) for name in package.namelist()
-                           if not name.endswith("publish-assets/web/BuildIdentity.targets")}
+                           if not name.endswith("publish-assets/ENGINE-LICENSE.txt")}
             with ZipFile(tool, "w") as package:
                 for name, content in entries.items():
                     package.writestr(name, content)
-            with self.assertRaisesRegex(ValueError, "missing .*BuildIdentity.targets"):
+            with self.assertRaisesRegex(ValueError, "missing .*publish-assets/ENGINE-LICENSE.txt"):
                 verify(directory, "1.2.3")
 
 
