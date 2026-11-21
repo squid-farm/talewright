@@ -89,10 +89,12 @@ administrator.
 
 ## `dotnet` isn't found
 
-If you are building from source, publishing a standalone game or installing the CLI as a .NET tool,
-install the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (the SDK, not just the
-runtime), then open a new terminal. See [which .NET version you need](getting-started.md#which-net-version-do-i-need)
-for the portable CLI and player requirements.
+If you are building from source or installing the CLI as a .NET tool, install the
+[.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) (the SDK, not just the runtime),
+then open a new terminal. The CLI download can publish standalone games without .NET, but needs an
+internet connection the first time it downloads a runner template. See
+[which .NET version you need](getting-started.md#which-net-version-do-i-need) for the other CLI and
+player requirements.
 
 ## Can I add audio, background music or video?
 

@@ -166,6 +166,16 @@ jobs:
           VERSION: ${{ needs.build.outputs.version }}
           RID: ${{ matrix.rid }}
         run: bash .github/scripts/package_cli.sh "$VERSION" "$RID"
+      - name: Build standalone desktop runner template
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+          RID: ${{ matrix.rid }}
+        run: bash .github/scripts/package_publish_template.sh "$VERSION" desktop "$RID"
+      - name: Build standalone web runner template
+        if: matrix.rid == 'linux-x64'
+        env:
+          VERSION: ${{ needs.build.outputs.version }}
+        run: bash .github/scripts/package_publish_template.sh "$VERSION" web
       - name: Smoke-test Linux x64 CLI
         if: matrix.rid == 'linux-x64'
         run: |
@@ -177,6 +187,13 @@ jobs:
         with:
           name: cli-${{ matrix.rid }}
           path: artifacts/cli-archives/*
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: publish-templates-${{ matrix.rid }}
+          path: |
+            artifacts/publish-templates/talewright-publish-template-*.zip
+            artifacts/publish-templates/talewright-publish-template-*.zip.sha256
           if-no-files-found: error
 
   provisional-vsix:
@@ -254,11 +271,22 @@ jobs:
           pattern: cli-*
           merge-multiple: true
           path: artifacts/cli-archives
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: publish-templates-*
+          merge-multiple: true
+          path: artifacts/publish-templates
       - name: Verify CLI archive checksums
         run: |
           cd artifacts/cli-archives
           test "$(find . -name '*.sha256' | wc -l)" -eq 6
           for checksum in *.sha256; do sha256sum --check "$checksum"; done
+      - name: Verify runner template checksums
+        run: |
+          cd artifacts/publish-templates
+          test "$(find . -maxdepth 1 -name '*.zip' | wc -l)" -eq 7
+          test "$(find . -maxdepth 1 -name '*.zip.sha256' | wc -l)" -eq 7
+          for checksum in *.zip.sha256; do sha256sum --check "$checksum"; done
       - name: Verify the exact release artifacts
         env:
           VERSION: ${{ needs.build.outputs.version }}
@@ -341,9 +369,14 @@ jobs:
           pattern: cli-*
           merge-multiple: true
           path: artifacts/cli-archives
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: publish-templates-*
+          merge-multiple: true
+          path: artifacts/publish-templates
       - name: Create or resume the release with generated notes and the tested VSIX
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           python3 .github/scripts/verify_release_vsix.py artifacts/extension "$GITHUB_REF_NAME" --all
-          python3 .github/scripts/github_release.py artifacts/extension/talewright.vsix --assets artifacts/extension/talewright-*.vsix artifacts/cli-archives/*
+          python3 .github/scripts/github_release.py artifacts/extension/talewright.vsix --assets artifacts/extension/talewright-*.vsix artifacts/cli-archives/* artifacts/publish-templates/*

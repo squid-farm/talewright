@@ -15,6 +15,14 @@
     <PackageReference Include="Photino.Blazor" Version="4.0.13" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(TalewrightStandalone)' == 'true'">
+    <Compile Remove="Program.cs" />
+    <Compile Include="../../tooling/cli/src/Talewright.Cli/PublishAssets/standalone/desktop/Program.cs" Link="Program.cs" />
+    <Content Remove="App.razor" />
+    <RazorComponent Remove="App.razor" />
+    <RazorComponent Include="../../tooling/cli/src/Talewright.Cli/PublishAssets/standalone/desktop/App.razor" Link="App.razor" />
+  </ItemGroup>
+
   <ItemGroup>
     <ProjectReference Include="../../player/src/Talewright.Player/Talewright.Player.csproj" />
     <ProjectReference Include="../../engine/src/Talewright.Runtime/Talewright.Runtime.csproj" />

@@ -19,11 +19,11 @@ Every `publish` checks your story first and stops if there are errors.
 | You want to… | Publish | Players need | You need |
 |---|---|---|---|
 | Send the story to someone with a Talewright player | A story file | The [web player](https://play.trytalewright.com/) or any Talewright player | Nothing extra |
-| Put a playable game on the web or itch.io | A web game | A web browser | The .NET 10 SDK |
-| Give players a downloadable app | A desktop game | Nothing on macOS. WebView2 on Windows (built into Windows 11 and up-to-date Windows 10). WebKitGTK 4.1 and libnotify on Linux. | The .NET 10 SDK |
+| Put a playable game on the web or itch.io | A web game | A web browser | The Talewright CLI and an internet connection the first time you publish |
+| Give players a downloadable app | A desktop game | Nothing on macOS. WebView2 on Windows (built into Windows 11 and up-to-date Windows 10). WebKitGTK 4.1 and libnotify on Linux. | The Talewright CLI and an internet connection the first time you publish |
 
-Making a web or desktop game also needs an internet connection; see
-[which .NET version you need](getting-started.md#which-net-version-do-i-need).
+Publishing downloads the matching runner for your CLI version and caches it for later. The CLI
+download can publish standalone games without the .NET SDK.
 
 Talewright doesn't vouch for stories or games made with it. See
 [distribution and runtime safety](../reference/safety.md) for what players and authors should know.

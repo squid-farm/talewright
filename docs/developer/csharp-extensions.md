@@ -35,7 +35,8 @@ framework group in the package contains all seven assemblies and their XML docum
 This matters only if you embed the headless engine. Authors and players don't need it. The
 repository SDK, the supplied Blazor player, the hosts, CLI, debugger, language server and C#
 examples all stay on .NET 10. Browser builds and self-contained downloads carry their own runtime,
-so players don't need .NET installed. Building a standalone game still requires SDK 10.
+so players don't need .NET installed. Building a host from source requires SDK 10; publishing a
+standalone game with the downloaded CLI uses a prebuilt runner and does not.
 
 The engine needs no polyfills or extra packages on .NET 8. Three test calls use an explicit
 `Enumerable.Reverse` so that older targets bind the same overload.
