@@ -118,6 +118,18 @@ class InstallDevTests(unittest.TestCase):
                 name = "talewright.vsix" if target == "linux-x64" else f"talewright-{target}.vsix"
                 self.assertIn(str(self.editor / "artifacts" / name), install)
 
+    def test_macos_publish_templates_use_dotnet_application_support_cache(self):
+        self.args.publish_templates = True
+        home = self.root / "mac home"
+        with patch.object(installer.platform, "system", return_value="Darwin"), \
+             patch.dict(os.environ, HOME=str(home), XDG_DATA_HOME=str(self.root / "wrong data")):
+            installer.install(self.args)
+        templates = [command for command, _ in self.commands if command[0] == "bash"]
+        version = templates[0][2]
+        assets = home / "Library/Application Support/Talewright/publish-templates/development-assets" / version
+        self.assertEqual(len(list(assets.iterdir())), 14)
+        self.assertFalse((self.root / "wrong data/Talewright/publish-templates").exists())
+
     def test_build_package_check_and_editor_failures_preserve_old_cli(self):
         for failing in ("publish", "package", "test:package", "--install-extension"):
             with self.subTest(failing=failing):

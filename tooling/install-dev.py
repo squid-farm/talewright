@@ -20,7 +20,13 @@ def run(command, *, cwd=ROOT, env=None):
     subprocess.run(command, cwd=cwd, env=env, check=True)
 
 
-def prepare_publish_templates(build, data_home, version, env):
+def publish_template_cache_root(system, data_home):
+    if system == "Darwin":
+        return Path.home() / "Library/Application Support/Talewright/publish-templates"
+    return data_home / "Talewright/publish-templates"
+
+
+def prepare_publish_templates(build, cache_root, version, env):
     output = build / "template-build"
     assets = build / "template-assets"
     assets.mkdir()
@@ -38,16 +44,17 @@ def prepare_publish_templates(build, data_home, version, env):
         shutil.rmtree(output / f"build-{target}{'-' + runtime if runtime else ''}")
 
     output.rmdir()
-    destination = data_home / "Talewright/publish-templates/development-assets" / version
+    destination = cache_root / "development-assets" / version
     destination.parent.mkdir(parents=True, exist_ok=True)
     assets.rename(destination)
     return destination
 
 
 def install(args):
+    system_name = platform.system()
     system = {"Linux": ("linux", "linux"), "Darwin": ("osx", "darwin")}
     architectures = {"x86_64": "x64", "amd64": "x64", "aarch64": "arm64", "arm64": "arm64"}
-    host = system.get(platform.system())
+    host = system.get(system_name)
     arch = architectures.get(platform.machine().lower())
     if host is None or arch is None:
         raise RuntimeError("This installer supports Linux and macOS on x64/ARM64.")
@@ -118,7 +125,8 @@ def install(args):
                            "-o", str(build / "debug-host")], env=env)
             run([str(build / "Talewright.Cli"), "--help"], env=env)
         if args.publish_templates:
-            local_assets = prepare_publish_templates(build, data_home, version, env)
+            cache_root = publish_template_cache_root(system_name, data_home)
+            local_assets = prepare_publish_templates(build, cache_root, version, env)
         run(["npm", "run", "package"], cwd=editor, env=env)
         run(["npm", "run", "test:package"], cwd=editor, env=env)
         name = "talewright.vsix" if target == "linux-x64" else f"talewright-{target}.vsix"
