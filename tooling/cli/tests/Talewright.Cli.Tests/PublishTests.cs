@@ -186,10 +186,40 @@ public sealed class PublishTests : IDisposable
         Assert.NotNull(desktopArchive.GetEntry("Publish/Publish.sh"));
     }
 
+    [Fact]
+    public void Split_and_all_archive_names_use_the_declared_story_version()
+    {
+        var manifest = new ManifestFaker("publish", "Publish", "a") { Version = "1.2.3 / candidate" };
+        manifest.Character("player", "Tester");
+        File.WriteAllText(Path.Combine(Story, "story.talewright.yaml"), manifest.Build(trailingNewline: true));
+
+        var split = RunSplitControlled(new UnreadableInput(), inputRedirected: true, publication: SplitBuilds());
+        Assert.Equal(0, split.Code);
+        foreach (var runtime in PublishCommand.DesktopRuntimes)
+        {
+            Assert.True(File.Exists(Path.Combine(SplitDirectory, $"publish-v1.2.3-candidate-{runtime}.zip")));
+        }
+
+        var all = RunAllControlled(new UnreadableInput(), inputRedirected: true, publication: AllBuilds());
+        Assert.Equal(0, all.Code);
+        Assert.True(File.Exists(Path.Combine(AllDirectory, "web", "publish-v1.2.3-candidate-web.zip")));
+        Assert.True(File.Exists(Path.Combine(AllDirectory, "desktop", "publish-v1.2.3-candidate-desktop.zip")));
+    }
+
     private static string ReadEntry(ZipArchive archive, string name)
     {
         using var reader = new StreamReader(archive.GetEntry(name)!.Open());
         return reader.ReadToEnd();
+    }
+
+    [Theory]
+    [InlineData("1.2.3", "publish-v1.2.3-linux-x64.zip")]
+    [InlineData(" release / candidate ", "publish-vrelease-candidate-linux-x64.zip")]
+    [InlineData("", "publish-linux-x64.zip")]
+    [InlineData(null, "publish-linux-x64.zip")]
+    public void Archive_names_include_safe_declared_versions(string? version, string expected)
+    {
+        Assert.Equal(expected, PublishCommand.ArchiveName("publish", version, "linux-x64"));
     }
 
     private static void AssertDesktopRoot(ZipArchive archive, string folder)

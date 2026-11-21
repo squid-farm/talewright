@@ -166,12 +166,12 @@ public sealed class PublishCommand : Command<PublishSettings>
 
         if (target == "all")
         {
-            return PublishAll(final, result.Story!.Id, result.Story.Title, source, writers, settings, publication);
+            return PublishAll(final, result.Story!.Id, result.Story.Title, source.ReadVersion(), source, writers, settings, publication);
         }
 
         if (split)
         {
-            return PublishSplit(final, result.Story!.Id, result.Story.Title, source, writers, settings, publication);
+            return PublishSplit(final, result.Story!.Id, result.Story.Title, source.ReadVersion(), source, writers, settings, publication);
         }
 
         string? working = null;
@@ -271,7 +271,7 @@ public sealed class PublishCommand : Command<PublishSettings>
         return false;
     }
 
-    private static int PublishAll(string destination, string storyId, string storyTitle, StorySource source, CommandWriters writers,
+    private static int PublishAll(string destination, string storyId, string storyTitle, string? storyVersion, StorySource source, CommandWriters writers,
         PublishSettings settings, Operations publication)
     {
         var (output, error, _, _) = writers;
@@ -314,8 +314,7 @@ public sealed class PublishCommand : Command<PublishSettings>
             var webContent = BuildStandalone(working, story, storyTitle, storyId, "web", null,
                 output, error, publication);
             WebHostingSize.FromDirectory(webContent).WriteWarning(error, estimate: false, target: "web");
-            var stem = Uri.EscapeDataString(storyId);
-            publication.CreateZip(webContent, Path.Combine(webWorking, $"{stem}-web.zip"));
+            publication.CreateZip(webContent, Path.Combine(webWorking, ArchiveName(storyId, storyVersion, "web")));
             staged.Add(("web", webWorking));
 
             var desktopWorking = Path.Combine(working, "desktop-output");
@@ -326,7 +325,7 @@ public sealed class PublishCommand : Command<PublishSettings>
                 {
                     var built = BuildSplitDesktop(working, runtime, story, storyTitle, storyId, output, error, publication);
                     publication.CreateZip(WrapDesktopContent(working, built, storyTitle, storyId),
-                        Path.Combine(desktopWorking, $"{stem}-{runtime}.zip"));
+                        Path.Combine(desktopWorking, ArchiveName(storyId, storyVersion, runtime)));
                 }
             }
             else
@@ -334,7 +333,7 @@ public sealed class PublishCommand : Command<PublishSettings>
                 var desktopContent = BuildStandalone(working, story, storyTitle, storyId, "desktop", null,
                     output, error, publication, universalDesktop: true);
                 publication.CreateZip(WrapDesktopContent(working, desktopContent, storyTitle, storyId),
-                    Path.Combine(desktopWorking, $"{stem}-desktop.zip"));
+                    Path.Combine(desktopWorking, ArchiveName(storyId, storyVersion, "desktop")));
             }
             staged.Add(("desktop", desktopWorking));
 
@@ -366,7 +365,7 @@ public sealed class PublishCommand : Command<PublishSettings>
         }
     }
 
-    private static int PublishSplit(string destination, string storyId, string storyTitle, StorySource source, CommandWriters writers,
+    private static int PublishSplit(string destination, string storyId, string storyTitle, string? storyVersion, StorySource source, CommandWriters writers,
         PublishSettings settings, Operations publication)
     {
         var (output, error, _, _) = writers;
@@ -376,10 +375,9 @@ public sealed class PublishCommand : Command<PublishSettings>
         try
         {
             Directory.CreateDirectory(destination);
-            var stem = Uri.EscapeDataString(storyId);
             var targets = DesktopRuntimes.ToDictionary(
                 runtime => runtime,
-                runtime => Path.Combine(destination, $"{stem}-{runtime}.zip"),
+                runtime => Path.Combine(destination, ArchiveName(storyId, storyVersion, runtime)),
                 StringComparer.Ordinal);
             var approved = new Dictionary<string, DestinationState?>(StringComparer.Ordinal);
             foreach (var (runtime, path) in targets)
@@ -810,6 +808,37 @@ public sealed class PublishCommand : Command<PublishSettings>
                 }, StringComparer.Ordinal);
             File.WriteAllText(Path.Combine(externalStory, "index.json"), System.Text.Json.JsonSerializer.Serialize(index));
         }
+    }
+
+    internal static string ArchiveName(string storyId, string? storyVersion, string target)
+    {
+        var stem = Uri.EscapeDataString(storyId);
+        var version = SafeArchiveVersion(storyVersion);
+        if (version is not null)
+            stem += "-v" + version;
+        return $"{stem}-{target}.zip";
+    }
+
+    internal static string? SafeArchiveVersion(string? version)
+    {
+        if (string.IsNullOrWhiteSpace(version))
+            return null;
+
+        var value = version.Trim();
+        var builder = new StringBuilder(value.Length);
+        foreach (var character in value)
+        {
+            if (char.IsLetterOrDigit(character) || character is '-' or '_' or '.' or '+')
+                builder.Append(character);
+            else if (builder.Length > 0 && builder[^1] != '-')
+                builder.Append('-');
+        }
+
+        var slug = builder.ToString().Trim('.', '-', ' ');
+        if (string.IsNullOrWhiteSpace(slug))
+            return null;
+        slug = slug.Length <= 100 ? slug : slug[..100].Trim('.', '-', ' ');
+        return string.IsNullOrWhiteSpace(slug) ? null : slug;
     }
 
     private static void CopyDirectory(string source, string destination, bool overwrite = false)

@@ -1,6 +1,7 @@
 const vscode = require('vscode');
 const path = require('node:path');
-const { readdir } = require('node:fs/promises');
+const { readFile, readdir } = require('node:fs/promises');
+const { parse } = require('yaml');
 const { cliExecutable, cliIsSelfContained, executeCli, registerCliSetup, requireDotnetRuntime } = require('./cli-tools.cjs');
 
 const PENDING_NEW_STORY = 'pendingNewStory';
@@ -10,6 +11,34 @@ const SCENE_ID = /^[A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*$/;
 function contains(root, file) {
   const relative = path.relative(root, file);
   return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+}
+
+function safeArchiveVersion(version) {
+  if (!version) return undefined;
+  const slug = version.trim().replace(/[^A-Za-z0-9_.+\-]+/g, '-').replace(/^[.\-]+|[.\-]+$/g, '').slice(0, 100).replace(/[.\-]+$/g, '');
+  return slug || undefined;
+}
+
+async function publishName(root) {
+  let storyId = path.basename(root);
+  let version;
+  try {
+    const manifestPath = path.join(root, 'story.talewright.yaml');
+    let text;
+    try {
+      text = (await vscode.workspace.openTextDocument(vscode.Uri.file(manifestPath))).getText();
+    } catch {
+      text = await readFile(manifestPath, 'utf8');
+    }
+    const manifest = parse(text);
+    const game = manifest?.game;
+    if (typeof game?.id === 'string' && game.id) storyId = game.id;
+    if (typeof game?.version === 'string' && game.version) version = game.version;
+  } catch {
+    // Keep the story directory name when the manifest cannot be read.
+  }
+  const safeVersion = safeArchiveVersion(version);
+  return { storyId, suggested: safeVersion ? `${storyId}-v${safeVersion}` : storyId };
 }
 
 async function storyRoots() {
@@ -196,9 +225,10 @@ async function createTask(command, requested, definition, scope, scene) {
   const args = [command, root];
   if (command === 'debug' && scene) args.push('--scene', scene);
   if (command === 'publish') {
+    const publish = await publishName(root);
     const output = await vscode.window.showSaveDialog({
       title: 'Publish story files for a Talewright player (not a standalone game)',
-      defaultUri: vscode.Uri.file(path.join(root, `${path.basename(root)}.zip`)),
+      defaultUri: vscode.Uri.file(path.join(root, `${publish.suggested}.zip`)),
       filters: { 'Story ZIP': ['zip'] },
     });
     if (!output) return undefined;
@@ -210,9 +240,10 @@ async function createTask(command, requested, definition, scope, scene) {
   let standaloneDestination;
   if (command === 'publish-desktop' || command === 'publish-web') {
     const target = command === 'publish-desktop' ? 'desktop' : 'web';
+    const publish = await publishName(root);
     const output = await vscode.window.showSaveDialog({
       title: `Publish standalone ${target} game`,
-      defaultUri: vscode.Uri.file(path.join(root, `${path.basename(root)}-${target}.zip`)),
+      defaultUri: vscode.Uri.file(path.join(root, `${publish.suggested}-${target}.zip`)),
       filters: { [`Standalone ${target} ZIP`]: ['zip'] },
     });
     if (!output) return undefined;
