@@ -13,18 +13,18 @@ internal sealed class PublishTemplateCache
     private static readonly HttpClient SharedClient = new() { Timeout = TimeSpan.FromMinutes(30) };
     private static readonly JsonSerializerOptions MetadataJsonOptions = new() { PropertyNameCaseInsensitive = true };
 
-    private readonly string _cacheRoot;
+    private readonly string? _cacheRoot;
     private readonly Uri _releaseBaseUri;
     private readonly HttpClient _client;
     private readonly string? _localAssetDirectory;
 
     internal static PublishTemplateCache Default { get; } = new(
-        DefaultCacheRoot(),
+        null,
         new Uri($"https://github.com/{Repository}/releases/download/"),
         SharedClient,
         Environment.GetEnvironmentVariable("TALEWRIGHT_PUBLISH_TEMPLATE_DIRECTORY"));
 
-    internal PublishTemplateCache(string cacheRoot, Uri releaseBaseUri, HttpClient client, string? localAssetDirectory = null)
+    internal PublishTemplateCache(string? cacheRoot, Uri releaseBaseUri, HttpClient client, string? localAssetDirectory = null)
     {
         _cacheRoot = cacheRoot;
         _releaseBaseUri = releaseBaseUri;
@@ -37,7 +37,10 @@ internal sealed class PublishTemplateCache
         ValidateRequest(version, target, runtime);
         var assetName = $"talewright-publish-template-{target}{(runtime is null ? "" : "-" + runtime)}-{version}.zip";
         var directoryName = Path.GetFileNameWithoutExtension(assetName);
-        var versionDirectory = Path.Combine(_cacheRoot, version);
+        var cacheRoot = _cacheRoot ?? (_localAssetDirectory is null
+            ? DefaultCacheRoot()
+            : Path.Combine(Path.GetTempPath(), "Talewright", "publish-templates"));
+        var versionDirectory = Path.Combine(cacheRoot, version);
         var cacheDirectory = Path.Combine(versionDirectory, directoryName);
         if (Directory.Exists(cacheDirectory))
         {

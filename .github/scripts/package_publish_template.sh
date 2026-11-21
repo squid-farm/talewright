@@ -29,7 +29,6 @@ fi
 publish_args=(
   publish "$project" -c Release -p:Version="$version"
   -p:TalewrightStandalone=true -p:TalewrightIncludeSamples=false
-  -p:TalewrightBuildVersion="$version"
   -p:TalewrightBuildCommit="${GITHUB_SHA:-unknown}"
   -p:TalewrightBuildDate="$(date -u +%F)"
   -o "$staging"
