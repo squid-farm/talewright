@@ -8,6 +8,12 @@ using Talewright.Testing;
 
 namespace Talewright.Cli.Tests;
 
+[CollectionDefinition("Publish tests", DisableParallelization = true)]
+public sealed class PublishTestsCollection
+{
+}
+
+[Collection("Publish tests")]
 public sealed class PublishTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"talewright-publish-test-{Guid.NewGuid():N}");
@@ -48,6 +54,22 @@ public sealed class PublishTests : IDisposable
         var code = CommandLine.Run(["publish", Story, "--output", Zip, .. args], output, error,
             new CliInput(input, inputRedirected, outputRedirected, errorRedirected), publication ?? TemplatePublication);
         return (code, output.ToString(), error.ToString());
+    }
+
+    private (int Code, string Output, string Error) RunWithoutDotnet(params string[] args)
+    {
+        var originalPath = Environment.GetEnvironmentVariable("PATH");
+        var unavailablePath = Path.Combine(_root, "empty-path");
+        Directory.CreateDirectory(unavailablePath);
+        try
+        {
+            Environment.SetEnvironmentVariable("PATH", unavailablePath);
+            return RunControlled(new UnreadableInput(), inputRedirected: true, args: args);
+        }
+        finally
+        {
+            Environment.SetEnvironmentVariable("PATH", originalPath);
+        }
     }
 
     private sealed class UnreadableInput : TextReader
@@ -113,8 +135,7 @@ public sealed class PublishTests : IDisposable
     [Fact]
     public void Standalone_publication_packages_prebuilt_templates_without_the_dotnet_sdk()
     {
-        var web = RunControlled(new UnreadableInput(), inputRedirected: true,
-            publication: TemplatePublication, args: ["-a", "--target", "web"]);
+        var web = RunWithoutDotnet("-a", "--target", "web");
         Assert.True(web.Code == 0, web.Error + web.Output);
         using (var archive = ZipFile.OpenRead(Zip))
         {
@@ -125,12 +146,10 @@ public sealed class PublishTests : IDisposable
 
         File.Delete(Path.Combine(TemplateAssets,
             $"talewright-publish-template-web-{PublishTemplateCache.CurrentCliVersion()}.zip"));
-        var webCacheHit = RunControlled(new UnreadableInput(), inputRedirected: true,
-            publication: TemplatePublication, args: ["-a", "--target", "web", "--force"]);
+        var webCacheHit = RunWithoutDotnet("-a", "--target", "web", "--force");
         Assert.True(webCacheHit.Code == 0, webCacheHit.Error + webCacheHit.Output);
 
-        var desktop = RunControlled(new UnreadableInput(), inputRedirected: true,
-            publication: TemplatePublication, args: ["-a", "--target", "desktop", "--runtime", "linux-x64", "--force"]);
+        var desktop = RunWithoutDotnet("-a", "--target", "desktop", "--runtime", "linux-x64", "--force");
         Assert.True(desktop.Code == 0, desktop.Error + desktop.Output);
         using var desktopArchive = ZipFile.OpenRead(Zip);
         Assert.Equal("linux-x64", ReadEntry(desktopArchive, "internal/linux-x64/Talewright.Host.Desktop"));
