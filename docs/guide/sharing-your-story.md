@@ -77,9 +77,9 @@ To create both web and desktop packages in one pass, use the `all` target:
 talewright publish my-story -a --target all --output publish/
 ```
 
-This validates the story once and writes the web bundle to `publish/web/` and the desktop bundle to
-`publish/desktop/`. Add `--split` to put one desktop ZIP per supported computer type in
-`publish/desktop/` instead of a single universal desktop bundle.
+This validates the story once and writes `publish/web/my-story-web.zip` and
+`publish/desktop/my-story-desktop.zip`. Add `--split` to put one desktop ZIP per supported computer
+type in `publish/desktop/` instead of the universal desktop ZIP. The web ZIP is still created.
 
 ## A desktop game
 

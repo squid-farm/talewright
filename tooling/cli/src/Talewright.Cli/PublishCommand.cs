@@ -311,15 +311,15 @@ public sealed class PublishCommand : Command<PublishSettings>
             Directory.CreateDirectory(webWorking);
             var webContent = BuildStandalone(working, story, storyTitle, storyId, "web", null,
                 output, error, publication);
-            CopyDirectory(webContent, webWorking);
-            WebHostingSize.FromDirectory(webWorking).WriteWarning(error, estimate: false, target: "web");
+            WebHostingSize.FromDirectory(webContent).WriteWarning(error, estimate: false, target: "web");
+            var stem = Uri.EscapeDataString(storyId);
+            publication.CreateZip(webContent, Path.Combine(webWorking, $"{stem}-web.zip"));
             staged.Add(("web", webWorking));
 
             var desktopWorking = Path.Combine(working, "desktop-output");
             Directory.CreateDirectory(desktopWorking);
             if (settings.Split)
             {
-                var stem = Uri.EscapeDataString(storyId);
                 foreach (var runtime in DesktopRuntimes)
                 {
                     var built = BuildSplitDesktop(working, runtime, story, storyTitle, storyId, output, error, publication);
@@ -330,7 +330,7 @@ public sealed class PublishCommand : Command<PublishSettings>
             {
                 var desktopContent = BuildStandalone(working, story, storyTitle, storyId, "desktop", null,
                     output, error, publication, universalDesktop: true);
-                CopyDirectory(desktopContent, desktopWorking);
+                publication.CreateZip(desktopContent, Path.Combine(desktopWorking, $"{stem}-desktop.zip"));
             }
             staged.Add(("desktop", desktopWorking));
 
