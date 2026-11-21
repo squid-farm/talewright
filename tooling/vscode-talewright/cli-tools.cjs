@@ -95,6 +95,7 @@ async function selectExecutable(resource) {
   requireTrust();
   await configuration(resource).update('cli.executablePath', file.fsPath);
   vscode.window.showInformationMessage(`Talewright CLI selected: ${file.fsPath}`);
+  return file.fsPath;
 }
 
 async function fetchJson(url, version) {
@@ -239,6 +240,7 @@ async function installTool(resource, version) {
     if (exitCode !== 0) throw new Error(`CLI installation failed or was cancelled (exit ${exitCode ?? 'unknown'}). See the Install CLI task terminal.`);
     const executable = await cliExecutable(resource?.fsPath ?? os.homedir());
     vscode.window.showInformationMessage(`Talewright CLI is available at ${executable}. Run your story action again.`);
+    return executable;
   } finally {
     for (const listener of listeners) listener.dispose();
     installing = false;
@@ -284,17 +286,19 @@ async function setUpCli(context, options = {}) {
       placeHolder: compatible ? `Set up CLI ${version}; availability is checked before installation`
         : 'No compatible .NET 10 SDK found. Use a portable CLI or select an existing executable.',
     });
-    if (choice === 'Download Tools (Recommended)') await downloadTools(context, resource, version);
-    else if (choice === 'Install via .NET Tool' && compatible) await installTool(resource, version);
-    else if (choice === 'Locate Existing...') await selectExecutable(resource);
-    if (choice && typeof resumeAction === 'function') await resumeAction();
+    let configured;
+    if (choice === 'Download Tools (Recommended)') configured = await downloadTools(context, resource, version);
+    else if (choice === 'Install via .NET Tool' && compatible) configured = await installTool(resource, version);
+    else if (choice === 'Locate Existing...') configured = await selectExecutable(resource);
+    if (configured && typeof resumeAction === 'function') await resumeAction();
   } catch (error) {
     const choice = await vscode.window.showErrorMessage(`Talewright CLI setup: ${error.message}`,
       ...(vscode.workspace.isTrusted ? [...(version ? ['Download Tools (Recommended)'] : []), 'Locate Existing...'] : []));
     try {
-      if (choice === 'Download Tools (Recommended)' && version) await downloadTools(context, resource, version);
-      if (choice === 'Locate Existing...') await selectExecutable(resource);
-      if (choice && typeof resumeAction === 'function') await resumeAction();
+      let configured;
+      if (choice === 'Download Tools (Recommended)' && version) configured = await downloadTools(context, resource, version);
+      if (choice === 'Locate Existing...') configured = await selectExecutable(resource);
+      if (configured && typeof resumeAction === 'function') await resumeAction();
     } catch (followUpError) {
       await vscode.window.showErrorMessage(`Talewright CLI setup: ${followUpError.message}`);
     }

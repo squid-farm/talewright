@@ -772,3 +772,41 @@ test('locating an existing executable remains explicit and space-safe', async ()
   assert.match(invalid.calls.errors[0], /not its DLL/);
   assert.equal(invalid.calls.updates.length, 0);
 });
+
+test('CLI setup resumes only after configuration succeeds', async () => {
+  const resume = () => { resumes++; };
+  let resumes = 0;
+
+  const quickPickCancelled = host({ files: [], pick: undefined });
+  await quickPickCancelled.calls.commands.get('talewright.setUpCli')({ resumeAction: resume });
+  assert.equal(resumes, 0);
+
+  const installDeclined = host({
+    files: [], sdks: '10.0.113 [/sdk]', pick: 1,
+  });
+  await installDeclined.calls.commands.get('talewright.setUpCli')({ resumeAction: resume });
+  assert.equal(resumes, 0);
+
+  const executable = '/downloads/Talewright.Cli';
+  const locateSucceeded = host({
+    files: [executable], sdks: '10.0.113 [/sdk]', pick: 2, selected: executable,
+  });
+  await locateSucceeded.calls.commands.get('talewright.setUpCli')({ resumeAction: resume });
+  assert.equal(resumes, 1);
+
+  resumes = 0;
+  const followUpCancelled = host({
+    files: [], version: 'invalid', sdks: '10.0.113 [/sdk]',
+    errorChoice: 'Locate Existing...',
+  });
+  await followUpCancelled.calls.commands.get('talewright.setUpCli')({ resumeAction: resume });
+  assert.equal(resumes, 0);
+
+  const followUpSelected = '/downloads/Recovered Talewright.Cli';
+  const followUpSucceeded = host({
+    files: [followUpSelected], version: 'invalid', sdks: '10.0.113 [/sdk]',
+    errorChoice: 'Locate Existing...', selected: followUpSelected,
+  });
+  await followUpSucceeded.calls.commands.get('talewright.setUpCli')({ resumeAction: resume });
+  assert.equal(resumes, 1);
+});
