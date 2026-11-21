@@ -39,6 +39,13 @@ The tools are tested on Linux computers with Intel or AMD processors. The Window
 downloads haven't been tried on those computers yet, so please tell us if something goes wrong.
 The Linux downloads don't work on Alpine Linux.
 
+## VS Code: automatic setup
+
+In VS Code, run **Talewright: Set Up CLI** or choose **Set Up CLI** after a CLI action reports that
+the tool is missing. Choose **Download Tools (Recommended)** to download and configure the matching
+archive automatically. VS Code asks before downloading, shows progress, verifies the executable,
+and can resume the action that requested setup.
+
 ## 2. Unpack the download
 
 1. Download the file for your computer.
@@ -136,7 +143,8 @@ For a download you have already unpacked, choose **Select Existing Executable** 
 
 - **Talewright: Validate Story** checks for mistakes.
 - **Talewright: Run Story** plays the story from the beginning. It also needs the
-  [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0).
+  [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) when using a
+  framework-dependent CLI. The standalone download includes its runtime.
 - **Talewright: Publish Story ZIP** lets you choose where to save a ZIP for the web player.
 - **Talewright: Open Author Debugger** opens the testing window.
 

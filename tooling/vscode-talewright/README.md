@@ -268,10 +268,30 @@ CLI. Find them in the Command Palette (**Ctrl+Shift+P**):
   editor context menu) opens the Author Debugger at that scene. Turn off the code lens with
   `talewright.codeLens.playFromScene`.
 - **Talewright: Run Story** runs `talewright run` to play from the start in the native player. It
-  needs the [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0); the extension checks
-  but never installs it.
+  needs the [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) when using a
+  framework-dependent CLI. The downloaded standalone CLI includes its runtime; the extension checks
+  but never installs .NET.
 
 Actions use the story containing the active file, the only story in the workspace, or ask you to choose.
+
+Press **F5** or **Ctrl+F5** while editing a `.tale` file or `story.talewright.yaml` to launch the
+containing story in the Author Debugger. In a multi-story workspace, the active story is used or the
+extension asks you to choose if it is ambiguous.
+
+Optional `launch.json` configurations can launch a scene or the normal player:
+
+```json
+{
+  "type": "talewright",
+  "request": "launch",
+  "name": "Talewright: Debug Scene",
+  "mode": "debug",
+  "scene": "intro"
+}
+```
+
+Set `"mode": "run"` to start the normal story player. VS Code launch snippets are available from
+**Add Configuration**.
 They need a trusted workspace and offer to save unsaved story files first. Output and errors stay in
 the task terminal; close the debugger or player with **Tasks: Terminate Task**. The debugger and player
 need a desktop and the platform webview: WebKitGTK 4.1 on Linux, WebView2 on Windows, WKWebView on macOS.
@@ -286,8 +306,10 @@ to the executable. Setup only runs when you ask; opening a story never installs 
 - With the .NET 10 SDK, setup offers to install the CLI version that matches this extension:
   `dotnet tool install --global Talewright.Cli --version VERSION --source https://api.nuget.org/v3/index.json`,
   in a visible terminal, after you approve it.
-- Without the SDK, setup opens the matching [GitHub release](https://github.com/squid-farm/talewright/releases)
-  so you can download the standalone CLI. Extract the whole archive, then use **Select Executable**.
+- Download Tools retrieves the matching platform archive from GitHub into VS Code's persistent
+  global storage, verifies and extracts it, enables executable permissions, verifies `--version`,
+  and configures `talewright.cli.executablePath`. No .NET SDK is required.
+- Use **Locate Existing...** to configure an extracted or separately installed executable.
 
 The extension never installs the SDK, changes PATH, elevates permissions or updates an existing tool.
 See the [author setup guide](https://github.com/squid-farm/talewright/blob/main/docs/guide/cli-installation.md)

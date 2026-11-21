@@ -1,7 +1,7 @@
 const vscode = require('vscode');
 const path = require('node:path');
 const { readdir } = require('node:fs/promises');
-const { cliExecutable, executeCli, registerCliSetup, requireDotnetRuntime } = require('./cli-tools.cjs');
+const { cliExecutable, cliIsSelfContained, executeCli, registerCliSetup, requireDotnetRuntime } = require('./cli-tools.cjs');
 
 const PENDING_NEW_STORY = 'pendingNewStory';
 const PENDING_NEW_STORY_MAX_AGE = 5 * 60 * 1000;
@@ -185,8 +185,14 @@ async function createTask(command, requested, definition, scope, scene) {
   if (!vscode.workspace.isTrusted) throw new Error('Trust this workspace before running Talewright CLI commands.');
   const root = await selectStory(requested);
   if (!root) return undefined;
-  if (command === 'run') await requireDotnetRuntime();
-  const executable = await cliExecutable(root);
+  let executable;
+  try {
+    executable = await cliExecutable(root);
+  } catch (error) {
+    error.resource = vscode.Uri.file(root);
+    throw error;
+  }
+  if (command === 'run' && !await cliIsSelfContained(executable)) await requireDotnetRuntime();
   const args = [command, root];
   if (command === 'debug' && scene) args.push('--scene', scene);
   if (command === 'publish') {
@@ -297,10 +303,13 @@ async function executeAuthorTask(task, label) {
 
 function registerAuthorActions(context) {
   registerCliSetup(context);
-  const report = async error => {
+  const report = async (error, resumeAction) => {
     const choice = await vscode.window.showErrorMessage(`Talewright: ${error.message}`,
       ...(error.code === 'CLI_NOT_FOUND' ? ['Set Up CLI'] : []));
-    if (choice === 'Set Up CLI') await vscode.commands.executeCommand('talewright.setUpCli');
+    if (choice === 'Set Up CLI') await vscode.commands.executeCommand('talewright.setUpCli', {
+      resource: error.resource,
+      resumeAction,
+    });
   };
   const updateSceneContext = async editor => {
     const active = editor ?? vscode.window.activeTextEditor;
@@ -347,7 +356,7 @@ function registerAuthorActions(context) {
           }
         }
       } catch (error) {
-        await report(error);
+        await report(error, async () => vscode.commands.executeCommand(`talewright.${id}`));
       }
     }));
   }
@@ -355,7 +364,7 @@ function registerAuthorActions(context) {
     try {
       await playFromScene(uri, line);
     } catch (error) {
-      await report(error);
+      await report(error, async () => playFromScene(uri, line));
     }
   }));
   const codeLensChanges = new vscode.EventEmitter();
@@ -436,6 +445,43 @@ function registerAuthorActions(context) {
       }
     },
   }));
+  if (vscode.debug?.registerDebugConfigurationProvider) {
+    const resolveDebugConfiguration = async (folder, config) => {
+      try {
+        if (!vscode.workspace.isTrusted) throw new Error('Trust this workspace before running Talewright CLI commands.');
+        if (config?.request !== undefined && config.request !== 'launch') {
+          throw new Error('A Talewright launch configuration must use request "launch".');
+        }
+        if (config?.type !== undefined && config.type !== 'talewright') {
+          throw new Error('A Talewright launch configuration must use type "talewright".');
+        }
+        const mode = config?.mode ?? 'debug';
+        if (!['debug', 'run'].includes(mode)) {
+          throw new Error('A Talewright launch mode must be "debug" or "run".');
+        }
+        const scene = config?.scene;
+        if (scene !== undefined &&
+            (mode !== 'debug' || typeof scene !== 'string' || !SCENE_ID.test(scene))) {
+          throw new Error('A Talewright scene must be a valid scene ID and can only be used with mode "debug".');
+        }
+        const task = await createTask(mode, undefined, undefined, folder, scene);
+        if (task) await vscode.tasks.executeTask(task);
+        return undefined;
+      } catch (error) {
+        await report(error, async () => resolveDebugConfiguration(folder, config));
+        return undefined;
+      }
+    };
+    context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('talewright', {
+      provideDebugConfigurations: () => [{
+        type: 'talewright',
+        request: 'launch',
+        name: 'Talewright: Debug Story',
+        mode: 'debug',
+      }],
+      resolveDebugConfiguration,
+    }));
+  }
   return Promise.all([pendingStory, sceneContext]);
 }
 
