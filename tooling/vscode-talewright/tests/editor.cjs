@@ -188,8 +188,11 @@ async function testFormattingCommands(extension, editor, document) {
   try {
     editor = await vscode.window.showTextDocument(document);
     await replaceText('shortcut');
-    selectText('shortcut');
     assert.equal(await renderer.focusEditor(), true, 'Editor input must be focused before Ctrl+B');
+    // Select in the workbench so the keybinding context is updated before dispatch.
+    await vscode.commands.executeCommand('editor.action.selectAll');
+    await waitUntil(() => document.getText(editor.selection) === 'shortcut',
+      'Editor must select the shortcut text before Ctrl+B');
     await renderer.dispatchKey('b', 'KeyB', 66, 2);
     await waitUntil(() => document.getText() === '**shortcut**'
       && document.getText(editor.selection) === 'shortcut',
@@ -215,8 +218,12 @@ async function testFormattingCommands(extension, editor, document) {
     assert.equal(document.getText(editor.selection), 'shortcut');
 
     await replaceText('**Bold**');
-    editor.selection = select(2, 7);
     assert.equal(await renderer.focusEditor(), true, 'Editor input must be focused before partial-delimiter Ctrl+B');
+    await vscode.commands.executeCommand('cursorMove', { to: 'wrappedLineStart' });
+    await vscode.commands.executeCommand('cursorMove', { to: 'right', by: 'character', value: 2 });
+    await vscode.commands.executeCommand('cursorMove', { to: 'right', by: 'character', value: 5, select: true });
+    await waitUntil(() => editor.selection.start.character === 2 && editor.selection.end.character === 7,
+      'Editor must select the partial delimiter before Ctrl+B');
     await renderer.dispatchKey('b', 'KeyB', 66, 2);
     await waitUntil(() => document.getText() === 'Bold' && document.getText(editor.selection) === 'Bold',
       'Ctrl+B must remove the complete bold pair when the selection includes only part of its closing delimiter');
@@ -226,7 +233,10 @@ async function testFormattingCommands(extension, editor, document) {
     await vscode.commands.executeCommand('redo');
     assert.equal(document.getText(), 'Bold', 'Redo must restore the exact delimiter-free text');
 
-    selectText('Bold');
+    assert.equal(await renderer.focusEditor(), true, 'Editor input must be focused before selecting Bold');
+    await vscode.commands.executeCommand('editor.action.selectAll');
+    await waitUntil(() => document.getText(editor.selection) === 'Bold',
+      'Editor must select Bold before repeated Ctrl+B');
     for (const [expected, message] of [
       ['**Bold**', 'A repeated Ctrl+B must restore bold without duplicating delimiter runs'],
       ['Bold', 'A further Ctrl+B must remove bold without accumulating delimiter runs'],
