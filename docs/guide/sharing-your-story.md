@@ -71,6 +71,16 @@ itch.io currently allows **200 MB per file, 500 MB total, and 1,000 files** afte
 size of the whole game. Both warn if it's over those limits, but still let you publish. If you get
 a warning, make your images smaller and publish again, or offer a desktop game instead.
 
+To create both web and desktop packages in one pass, use the `all` target:
+
+```bash
+talewright publish my-story -a --target all --output publish/
+```
+
+This validates the story once and writes the web bundle to `publish/web/` and the desktop bundle to
+`publish/desktop/`. Add `--split` to put one desktop ZIP per supported computer type in
+`publish/desktop/` instead of a single universal desktop bundle.
+
 ## A desktop game
 
 ```bash
