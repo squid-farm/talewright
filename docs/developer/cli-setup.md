@@ -88,6 +88,21 @@ The script publishes a self-contained CLI and native debugger, packages and veri
 the matching VSIX (including the current language server), and force-installs it.
 Rerun the same command after each fix; no version bump or release is needed.
 
+To test standalone `publish -a` with this unreleased build, add `--publish-templates`:
+
+```bash
+python3 tooling/install-dev.py --global-tool --publish-templates
+```
+
+This builds the web template and all six desktop runtime templates from the same
+checkout, so it takes longer and needs the SDK's build dependencies and network
+access for any missing packages. It works with either installer mode. The templates
+are kept under `${XDG_DATA_HOME:-~/.local/share}/Talewright/publish-templates/`
+and reused by that uniquely versioned development CLI. Rerun the installer after
+source changes; old development versions can be removed from that directory when
+no longer needed. Without this option, unreleased builds cannot download templates
+from a release. Direct source builds need matching templates prepared separately.
+
 To replace your existing **global .NET tool** instead, keeping the same `talewright`
 path for terminals and VS Code:
 

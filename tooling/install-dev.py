@@ -12,11 +12,36 @@ import tempfile
 import uuid
 
 ROOT = Path(__file__).resolve().parents[1]
+DESKTOP_RUNTIMES = ("linux-x64", "linux-arm64", "win-x64", "win-arm64", "osx-x64", "osx-arm64")
 
 
 def run(command, *, cwd=ROOT, env=None):
     print("+ " + " ".join(str(part) for part in command), flush=True)
     subprocess.run(command, cwd=cwd, env=env, check=True)
+
+
+def prepare_publish_templates(build, data_home, version, env):
+    output = build / "template-build"
+    assets = build / "template-assets"
+    assets.mkdir()
+    template_env = dict(env, TALEWRIGHT_PUBLISH_TEMPLATE_OUTPUT=str(output))
+    script = ROOT / ".github/scripts/package_publish_template.sh"
+    targets = [("web", None), *(("desktop", runtime) for runtime in DESKTOP_RUNTIMES)]
+    for target, runtime in targets:
+        command = ["bash", str(script), version, target]
+        if runtime:
+            command.append(runtime)
+        run(command, env=template_env)
+        name = f"talewright-publish-template-{target}{'-' + runtime if runtime else ''}-{version}.zip"
+        for suffix in ("", ".sha256"):
+            shutil.move(str(output / (name + suffix)), str(assets / (name + suffix)))
+        shutil.rmtree(output / f"build-{target}{'-' + runtime if runtime else ''}")
+
+    output.rmdir()
+    destination = data_home / "Talewright/publish-templates/development-assets" / version
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    assets.rename(destination)
+    return destination
 
 
 def install(args):
@@ -28,7 +53,12 @@ def install(args):
         raise RuntimeError("This installer supports Linux and macOS on x64/ARM64.")
     rid = f"{host[0]}-{arch}"
     target = f"{host[1]}-{arch}"
-    for command in ("dotnet", "node", "npm", "unzip", args.code):
+    required = ["dotnet", "node", "npm", "unzip", args.code]
+    if args.publish_templates:
+        required += ["bash"]
+        if shutil.which("sha256sum") is None:
+            required += ["shasum"]
+    for command in required:
         if shutil.which(command) is None:
             raise RuntimeError(f"Required command not found: {command}")
     run(["dotnet", "--version"])
@@ -64,10 +94,12 @@ def install(args):
     home.mkdir(parents=True, exist_ok=True)
     build = Path(tempfile.mkdtemp(prefix="build-", dir=home))
     activated = False
+    installation_completed = False
+    local_assets = None
+    version = f"0.0.0-dev.{uuid.uuid4().hex}" if args.global_tool or args.publish_templates else None
     try:
         if args.global_tool:
             # A fresh identity prevents NuGet from reusing a prior checkout's package.
-            version = f"0.0.0-dev.{uuid.uuid4().hex}"
             packages = build / "packages"
             run(["dotnet", "pack", str(ROOT / "tooling/cli/src/Talewright.Cli"),
                  "-c", "Release", f"-p:Version={version}", "-o", str(packages)], env=env)
@@ -79,10 +111,14 @@ def install(args):
         else:
             publish = ["dotnet", "publish", "-c", "Release", "-r", rid,
                        "--self-contained", "true", "-p:PackAsTool=false"]
+            if version:
+                publish.append(f"-p:Version={version}")
             run(publish + [str(ROOT / "tooling/cli/src/Talewright.Cli"), "-o", str(build)], env=env)
             run(publish + [str(ROOT / "tooling/debugger/src/Talewright.Debugger"),
                            "-o", str(build / "debug-host")], env=env)
             run([str(build / "Talewright.Cli"), "--help"], env=env)
+        if args.publish_templates:
+            local_assets = prepare_publish_templates(build, data_home, version, env)
         run(["npm", "run", "package"], cwd=editor, env=env)
         run(["npm", "run", "test:package"], cwd=editor, env=env)
         name = "talewright.vsix" if target == "linux-x64" else f"talewright-{target}.vsix"
@@ -97,22 +133,28 @@ def install(args):
         if args.global_tool:
             run(["dotnet", "tool", "update", "Talewright.Cli", "--global", "--allow-downgrade"]
                 + tool_source, env=env)
+            installation_completed = True
         else:
             bin_dir.mkdir(parents=True, exist_ok=True)
             current.unlink(missing_ok=True)
             current.symlink_to(build, target_is_directory=True)
             activated = True
+            installation_completed = True
             shim.unlink(missing_ok=True)
             shim.symlink_to(current / "Talewright.Cli")
         run([str(shim), "--help"], env=env)
         if previous and previous.exists():
             shutil.rmtree(previous)
     finally:
+        if local_assets and not installation_completed:
+            shutil.rmtree(local_assets)
         if not activated:
             shutil.rmtree(build)
 
     print(f"\nInstalled development CLI: {shim}")
     print(f"Installed development VSIX: {vsix}")
+    if local_assets:
+        print(f"Prepared local publish templates: {local_assets}")
     if args.global_tool:
         print("Replaced the global .NET tool; its executable path is unchanged.")
         print("VS Code can discover it automatically when talewright.cli.executablePath is empty.")
@@ -129,6 +171,8 @@ def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--code", default="code", help="VS Code CLI command or path (default: code)")
     parser.add_argument("--profile", help="VS Code profile to install into")
+    parser.add_argument("--publish-templates", action="store_true",
+                        help="Build and cache all standalone publish templates for this development build")
     destination = parser.add_mutually_exclusive_group()
     destination.add_argument("--bin-dir", type=Path, default=Path.home() / ".local/bin",
                              help="Directory for the talewright symlink (default: ~/.local/bin)")

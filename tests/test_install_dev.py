@@ -23,7 +23,8 @@ class InstallDevTests(unittest.TestCase):
         self.editor = self.root / "tooling/vscode-talewright"
         self.editor.mkdir(parents=True)
         self.args = argparse.Namespace(code="code-insiders", profile="Dev Profile",
-                                       bin_dir=self.root / "local bin", global_tool=False)
+                                       bin_dir=self.root / "local bin", global_tool=False,
+                                       publish_templates=False)
         self.commands = []
         self.failure = None
         for patcher in [
@@ -61,6 +62,15 @@ class InstallDevTests(unittest.TestCase):
             shim = self.root / "dotnet home/.dotnet/tools/talewright"
             shim.parent.mkdir(parents=True, exist_ok=True)
             shim.write_text("fresh global tool")
+        if command[0] == "bash" and command[1].endswith("package_publish_template.sh"):
+            version, target = command[2:4]
+            runtime = command[4] if len(command) > 4 else None
+            output = Path(options["env"]["TALEWRIGHT_PUBLISH_TEMPLATE_OUTPUT"])
+            staging = output / f"build-{target}{'-' + runtime if runtime else ''}"
+            staging.mkdir(parents=True)
+            name = f"talewright-publish-template-{target}{'-' + runtime if runtime else ''}-{version}.zip"
+            for suffix in ("", ".sha256"):
+                (output / (name + suffix)).write_text("template")
 
     @property
     def home(self):
@@ -200,6 +210,61 @@ class InstallDevTests(unittest.TestCase):
                 self.assertEqual(shim.read_text(), "released tool")
                 self.assertEqual(list(self.home.glob("build-*")), [])
                 self.assertFalse(any("uninstall" in command for command, _ in self.commands))
+
+    def test_opt_in_prepares_matching_templates_for_both_install_modes(self):
+        self.args.publish_templates = True
+        versions = []
+        for global_tool in (False, True):
+            with self.subTest(global_tool=global_tool):
+                self.args.global_tool = global_tool
+                self.commands.clear()
+                installer.install(self.args)
+                templates = [command for command, _ in self.commands if command[0] == "bash"]
+                self.assertEqual(len(templates), 7)
+                version = templates[0][2]
+                versions.append(version)
+                self.assertTrue(all(command[2] == version for command in templates))
+                self.assertEqual(
+                    {(command[3], command[4] if len(command) > 4 else None) for command in templates},
+                    {("web", None), *(("desktop", runtime) for runtime in installer.DESKTOP_RUNTIMES)})
+                assets = self.root / "data/Talewright/publish-templates/development-assets" / version
+                self.assertEqual(len(list(assets.iterdir())), 14)
+                if global_tool:
+                    install = next(command for command, _ in self.commands
+                                   if command[:3] == ["dotnet", "tool", "update"])
+                    self.assertIn(version, install)
+                else:
+                    publish = next(command for command, _ in self.commands
+                                   if command[:2] == ["dotnet", "publish"])
+                    self.assertIn(f"-p:Version={version}", publish)
+                    self.assertFalse(((self.home / "current").resolve() / "template-build").exists())
+        self.assertNotEqual(*versions)
+
+    def test_template_failure_preserves_existing_installation(self):
+        self.args.publish_templates = True
+        for global_tool in (False, True):
+            with self.subTest(global_tool=global_tool):
+                self.args.global_tool = global_tool
+                self.failure = None
+                installer.install(self.args)
+                assets = self.root / "data/Talewright/publish-templates/development-assets"
+                before = set(assets.iterdir())
+                shim = (self.root / "dotnet home/.dotnet/tools/talewright"
+                        if global_tool else self.args.bin_dir / "talewright")
+                old = shim.read_text()
+                self.failure = lambda command: command[0] == "bash" and "win-x64" in command
+                with self.assertRaises(subprocess.CalledProcessError):
+                    installer.install(self.args)
+                self.assertEqual(shim.read_text(), old)
+                self.assertEqual(set(assets.iterdir()), before)
+
+    def test_later_install_failure_removes_uninstalled_templates(self):
+        self.args.publish_templates = True
+        self.failure = lambda command: "--install-extension" in command
+        with self.assertRaises(subprocess.CalledProcessError):
+            installer.install(self.args)
+        assets = self.root / "data/Talewright/publish-templates/development-assets"
+        self.assertEqual(list(assets.iterdir()), [])
 
 
 if __name__ == "__main__":
