@@ -155,6 +155,7 @@ function host(options = {}) {
   const dependencies = {
     vscode, 'node:path': path, 'node:fs': { constants: { X_OK: 1, F_OK: 0 } },
     'node:os': { homedir: () => '/home/author' },
+    'node:crypto': { createHash: () => ({ update: () => ({ digest: () => '0'.repeat(64) }) }) },
     'node:child_process': { execFile: {} },
     'node:util': { promisify: () => async (...args) => {
       if (args[0] === 'dotnet' && args[1][0] === '--list-runtimes') {
@@ -180,8 +181,23 @@ function host(options = {}) {
     'node:fs/promises': {
       access: async file => { if (!files.includes(file)) throw Object.assign(new Error('missing'), { code: 'ENOENT' }); },
       stat: async () => ({ isFile: () => true }),
-      readFile: async () => JSON.stringify({ version: options.version ?? '0.1.0-preview.1' }),
+      readFile: async file => {
+        if (file.endsWith('.runtimeconfig.json')) {
+          if (options.selfContainedCli) {
+            return JSON.stringify({
+              runtimeOptions: { includedFrameworks: [{ name: 'Microsoft.NETCore.App', version: '10.0.0' }] },
+            });
+          }
+          throw Object.assign(new Error('missing'), { code: 'ENOENT' });
+        }
+        return JSON.stringify({ version: options.version ?? '0.1.0-preview.1' });
+      },
       readdir: async () => options.directoryEntries ?? [],
+      mkdir: async () => {},
+      rm: async () => {},
+      writeFile: async () => {},
+      chmod: async () => {},
+      open: async () => ({ write: async () => {}, close: async () => {} }),
     },
   };
   const globals = {
@@ -397,6 +413,17 @@ test('Run Story executes talewright run as a visible, space-safe player task', a
   assert.equal(calls.errors.length, 0);
 });
 
+test('Run Story skips the system runtime check for a self-contained CLI', async () => {
+  const executable = '/storage/cli/0.1.0-preview.1/linux-x64/Talewright.Cli';
+  const { calls, run } = host({
+    executable, files: [executable], selfContainedCli: true, dotnetError: 'ENOENT',
+  });
+  await run('runStory');
+  assert.equal(calls.tasks[0].execution.executable, executable);
+  assert.equal(calls.runtimeChecks.length, 0);
+  assert.equal(calls.errors.length, 0);
+});
+
 test('Run Story reports task launch failures without claiming success', async () => {
   const { calls, run } = host({ launchError: 'spawn failed' });
   await run('runStory');
@@ -431,6 +458,12 @@ test('Run Story requires .NET 10 and reports missing runtimes without installing
   assert.match(missingCli.calls.errors[0], /CLI not found/);
   assert.deepEqual(missingCli.calls.errorActions, ['Set Up CLI']);
   assert.equal(missingCli.calls.tasks.length, 0);
+  const missingBoth = host({ files: [], dotnetError: 'ENOENT' });
+  await missingBoth.run('runStory');
+  assert.match(missingBoth.calls.errors[0], /CLI not found/);
+  assert.deepEqual(missingBoth.calls.errorActions, ['Set Up CLI']);
+  assert.equal(missingBoth.calls.runtimeChecks.length, 0);
+  assert.equal(missingBoth.calls.tasks.length, 0);
   assert.equal(missingCli.calls.sdk.length, 0);
   assert.equal(missingCli.calls.updates.length, 0);
 });
@@ -623,16 +656,33 @@ test('setup respects trust and broken custom paths; missing CLI action offers ex
   assert.equal(outside.calls.configurationResource.fsPath, '/workspace');
 });
 
+test('CLI setup configures the selected story resource in a multi-root workspace', async () => {
+  const { calls } = host({
+    folders: ['/workspace/A', '/workspace/B'],
+    roots: ['/workspace/A/My Story', '/workspace/B/Other Story'],
+    active: '/workspace/A/My Story/scene.tale',
+    files: ['/downloads/Talewright.Cli'],
+    sdks: '10.0.113 [/sdk]',
+    pick: 2,
+    selected: '/downloads/Talewright.Cli',
+  });
+  await calls.commands.get('talewright.setUpCli')({
+    resource: { scheme: 'file', fsPath: '/workspace/B/Other Story' },
+  });
+  assert.equal(calls.configurationResource.fsPath, '/workspace/B/Other Story');
+  assert.deepEqual(calls.updates, [['cli.executablePath', '/downloads/Talewright.Cli']]);
+});
+
 test('only a stable .NET 10 SDK offers tool installation, and cancellation installs nothing', async () => {
   for (const options of [{ sdks: '9.0.100 [/sdk]\n11.0.100 [/sdk]' }, { sdkError: 'ENOENT' },
     { sdks: '10.0.100-rc.1 [/sdk]' }]) {
-    const { calls, run } = host({ files: [], ...options });
+    const { calls, run } = host({ files: [], pick: 1, ...options });
     await run('setUpCli');
-    assert.equal(calls.picks[0][0], 'Use standalone download');
+    assert.equal(calls.picks[0][0], 'Download Tools (Recommended)');
     assert.match(calls.pickSettings.placeHolder, /No compatible/);
     assert.equal(calls.fetches.length, 0);
   }
-  const cancelled = host({ files: [], sdks: '10.0.113 [/sdk]', pick: 0 });
+  const cancelled = host({ files: [], sdks: '10.0.113 [/sdk]', pick: 1 });
   await cancelled.run('setUpCli');
   assert.equal(cancelled.calls.warnings.length, 1);
   assert.equal(cancelled.calls.tasks.length, 0);
@@ -640,7 +690,7 @@ test('only a stable .NET 10 SDK offers tool installation, and cancellation insta
 
 test('approved installation pins the published version and discovers the new shim without PATH refresh', async () => {
   const { calls, run } = host({
-    files: [], sdks: '10.0.113 [/sdk]', pick: 0, saveChoice: 'Install CLI', installSuccess: true,
+    files: [], sdks: '10.0.113 [/sdk]', pick: 1, saveChoice: 'Install CLI', installSuccess: true,
   });
   await run('setUpCli');
   const task = calls.tasks[0];
@@ -656,7 +706,7 @@ test('approved installation pins the published version and discovers the new shi
   assert.equal(calls.tasks[1].execution.executable, '/home/author/.dotnet/tools/talewright');
   for (const version of ['0.1.0-preview.2', '0.1.0']) {
     const other = host({ files: [], version, versions: [version], sdks: '10.0.113 [/sdk]',
-      pick: 0, saveChoice: 'Install CLI', installSuccess: true });
+      pick: 1, saveChoice: 'Install CLI', installSuccess: true });
     await other.run('setUpCli');
     assert.equal(other.calls.tasks[0].execution.args[5], version);
   }
@@ -671,7 +721,7 @@ test('unavailable version, feed/network/SDK failures and revoked trust never ins
     [{ version: '../bad' }, /no supported CLI version/],
     [{ onConsent: vscode => { vscode.workspace.isTrusted = false; }, saveChoice: 'Install CLI' }, /Trust/],
   ]) {
-    const { calls, run } = host({ files: [], sdks: '10.0.113 [/sdk]', pick: 0, ...options });
+    const { calls, run } = host({ files: [], sdks: '10.0.113 [/sdk]', pick: 1, ...options });
     await run('setUpCli');
     assert.match(calls.errors[0], expected);
     assert.equal(calls.tasks.length, 0);
@@ -679,17 +729,15 @@ test('unavailable version, feed/network/SDK failures and revoked trust never ins
   }
 });
 
-test('failed installation reports failure; standalone requires a separate explicit choice', async () => {
-  const options = { files: [], sdks: '10.0.113 [/sdk]', pick: 0, saveChoice: 'Install CLI', exitCode: 1 };
+test('failed installation reports failure and offers download or locating an existing executable', async () => {
+  const options = { files: [], sdks: '10.0.113 [/sdk]', pick: 1, saveChoice: 'Install CLI', exitCode: 1 };
   const failed = host(options);
   await failed.run('setUpCli');
   assert.match(failed.calls.errors[0], /failed or was cancelled.*exit 1/);
   assert.equal(failed.calls.messages.length, 0);
   assert.equal(failed.calls.urls.length, 0);
-  assert.ok(failed.calls.errorActions.includes('Use standalone instead'));
-  const explicit = host({ ...options, errorChoice: 'Use standalone instead' });
-  await explicit.run('setUpCli');
-  assert.deepEqual(explicit.calls.urls, ['https://github.com/squid-farm/talewright/releases/tag/v0.1.0-preview.1']);
+  assert.ok(failed.calls.errorActions.includes('Download Tools (Recommended)'));
+  assert.ok(failed.calls.errorActions.includes('Locate Existing...'));
   const launch = host({ ...options, launchError: 'permission denied' });
   await launch.run('setUpCli');
   assert.match(launch.calls.errors[0], /permission denied/);
@@ -709,16 +757,9 @@ test('failed installation reports failure; standalone requires a separate explic
   assert.equal(noShim.calls.messages.length, 0, 'Exit zero without a discoverable CLI is not setup success');
 });
 
-test('standalone opens only an existing release with archive/checksum; selection is space-safe', async () => {
-  const unavailable = host({ files: [], pick: 0, assets: [] });
-  await unavailable.run('setUpCli');
-  assert.match(unavailable.calls.errors[0], /does not supply/);
-  assert.equal(unavailable.calls.urls.length, 0);
-  const missing = host({ files: [], pick: 0, httpStatus: 404 });
-  await missing.run('setUpCli');
-  assert.equal(missing.calls.urls.length, 0);
+test('locating an existing executable remains explicit and space-safe', async () => {
   const executable = '/downloads/My CLI/Talewright.Cli';
-  const selected = host({ files: [executable], pick: 0, selected: executable, infoChoice: 'Select Executable' });
+  const selected = host({ files: [executable], pick: 1, selected: executable, infoChoice: 'Select Executable' });
   await selected.run('setUpCli');
   assert.deepEqual(selected.calls.updates, [['cli.executablePath', executable]]);
   await selected.run('validateStory');
@@ -730,4 +771,42 @@ test('standalone opens only an existing release with archive/checksum; selection
   await invalid.run('setUpCli');
   assert.match(invalid.calls.errors[0], /not its DLL/);
   assert.equal(invalid.calls.updates.length, 0);
+});
+
+test('CLI setup resumes only after configuration succeeds', async () => {
+  const resume = () => { resumes++; };
+  let resumes = 0;
+
+  const quickPickCancelled = host({ files: [], pick: undefined });
+  await quickPickCancelled.calls.commands.get('talewright.setUpCli')({ resumeAction: resume });
+  assert.equal(resumes, 0);
+
+  const installDeclined = host({
+    files: [], sdks: '10.0.113 [/sdk]', pick: 1,
+  });
+  await installDeclined.calls.commands.get('talewright.setUpCli')({ resumeAction: resume });
+  assert.equal(resumes, 0);
+
+  const executable = '/downloads/Talewright.Cli';
+  const locateSucceeded = host({
+    files: [executable], sdks: '10.0.113 [/sdk]', pick: 2, selected: executable,
+  });
+  await locateSucceeded.calls.commands.get('talewright.setUpCli')({ resumeAction: resume });
+  assert.equal(resumes, 1);
+
+  resumes = 0;
+  const followUpCancelled = host({
+    files: [], version: 'invalid', sdks: '10.0.113 [/sdk]',
+    errorChoice: 'Locate Existing...',
+  });
+  await followUpCancelled.calls.commands.get('talewright.setUpCli')({ resumeAction: resume });
+  assert.equal(resumes, 0);
+
+  const followUpSelected = '/downloads/Recovered Talewright.Cli';
+  const followUpSucceeded = host({
+    files: [followUpSelected], version: 'invalid', sdks: '10.0.113 [/sdk]',
+    errorChoice: 'Locate Existing...', selected: followUpSelected,
+  });
+  await followUpSucceeded.calls.commands.get('talewright.setUpCli')({ resumeAction: resume });
+  assert.equal(resumes, 1);
 });
