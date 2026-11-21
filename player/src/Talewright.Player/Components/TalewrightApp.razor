@@ -73,7 +73,14 @@
         </CascadingValue>
     }
 
-    @if (!LibraryEnabled && _story is null)
+    @if (!LibraryEnabled && _story is null && !_startupComplete)
+    {
+        <section aria-label="Loading story" aria-busy="true">
+            <h1>Talewright</h1>
+            <p>Loading story…</p>
+        </section>
+    }
+    else if (!LibraryEnabled && _story is null)
     {
         <section aria-label="Story startup">
             <h1>@(_failedTitle ?? "Talewright")</h1>
@@ -185,6 +192,7 @@
     private StoryImageWarmer? _imageWarmer;
     private long _openGeneration;
     private bool _disposed;
+    private bool _startupComplete;
     private CharacterSelection? _character;
     private ulong _creationSeed;
     private bool _showLibrary;
@@ -220,16 +228,30 @@
         _entries = await Library.ListAsync();
         if (AutoStartStoryId is not null && _entries.FirstOrDefault(e => e.Id == AutoStartStoryId) is { } entry)
         {
-            await OpenAsync(entry);
+            await OpenStartupStoryAsync(entry);
         }
         else if (!LibraryEnabled)
         {
             _error = "The selected story could not be found.";
             Report.Record(PlayerDiagnosticOperation.StoryOpen, PlayerDiagnosticCause.NotFound, includeContext: false);
+            _startupComplete = true;
         }
     }
 
-    private Task RetryStoryAsync() => OpenAsync(_entries!.First(entry => entry.Id == AutoStartStoryId));
+    private Task RetryStoryAsync() => OpenStartupStoryAsync(_entries!.First(entry => entry.Id == AutoStartStoryId));
+
+    private async Task OpenStartupStoryAsync(StoryEntry entry)
+    {
+        _startupComplete = false;
+        try
+        {
+            await OpenAsync(entry);
+        }
+        finally
+        {
+            _startupComplete = true;
+        }
+    }
 
     private async Task OpenAsync(StoryEntry entry)
     {
