@@ -145,7 +145,7 @@ Most authors don't need .NET at all.
 | Using the CLI download, including the Author Debugger | Nothing extra; the download includes what it needs. |
 | **Talewright: Run Story** in VS Code | The .NET 10 Runtime. |
 | Installing the CLI as a .NET tool | The .NET 10 SDK. |
-| Making a standalone website or desktop game | The .NET 10 SDK (10.0.100 or later) and an internet connection. |
+| Making a standalone website or desktop game with the CLI download | An internet connection the first time you publish; the matching runner is cached for later. |
 | Playing a published desktop game | Nothing extra; the game includes what it needs. |
 
 If you need the SDK, install the [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0);

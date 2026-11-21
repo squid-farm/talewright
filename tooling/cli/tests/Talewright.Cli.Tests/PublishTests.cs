@@ -11,9 +11,12 @@ namespace Talewright.Cli.Tests;
 public sealed class PublishTests : IDisposable
 {
     private readonly string _root = Path.Combine(Path.GetTempPath(), $"talewright-publish-test-{Guid.NewGuid():N}");
+    private readonly HttpClient _templateHttpClient = new();
     private string Story => Path.Combine(_root, "story");
     private string Zip => Path.Combine(_root, "output.zip");
     private string SplitDirectory => Path.Combine(_root, "split");
+    private string TemplateAssets => Path.Combine(_root, "template-assets");
+    private PublishCommand.Operations TemplatePublication { get; }
 
     public PublishTests()
     {
@@ -24,6 +27,12 @@ public sealed class PublishTests : IDisposable
         File.WriteAllText(Path.Combine(Story, "chapters", "main.tale"), string.Join('\n',
             SceneFaker.Header("a"), "Hello.", DivertFaker.To("END")));
         File.WriteAllText(Path.Combine(Story, "private-notes.txt"), "Not story content");
+        CreateTemplateAssets();
+        TemplatePublication = PublishCommand.Operations.Create(new PublishTemplateCache(
+            Path.Combine(_root, "template-cache"),
+            new Uri("https://example.invalid/releases/download/"),
+            _templateHttpClient,
+            TemplateAssets));
     }
 
     private (int Code, string Output, string Error) Run(params string[] args)
@@ -36,7 +45,7 @@ public sealed class PublishTests : IDisposable
         using var output = new StringWriter();
         using var error = new StringWriter();
         var code = CommandLine.Run(["publish", Story, "--output", Zip, .. args], output, error,
-            new CliInput(input, inputRedirected, outputRedirected, errorRedirected), publication);
+            new CliInput(input, inputRedirected, outputRedirected, errorRedirected), publication ?? TemplatePublication);
         return (code, output.ToString(), error.ToString());
     }
 
@@ -45,14 +54,94 @@ public sealed class PublishTests : IDisposable
         public override string? ReadLine() => throw new InvalidOperationException("Input must not be read.");
     }
 
-    private PublishCommand.Operations DuringArchive(Action action) => PublishCommand.Operations.Default with
+    private PublishCommand.Operations DuringArchive(Action action) => TemplatePublication with
     {
         CreateZip = (content, path) =>
         {
-            PublishCommand.Operations.Default.CreateZip(content, path);
+            TemplatePublication.CreateZip(content, path);
             action();
         },
     };
+
+    private void CreateTemplateAssets()
+    {
+        Directory.CreateDirectory(TemplateAssets);
+        var version = PublishTemplateCache.CurrentCliVersion();
+        AddTemplate("web", null);
+        foreach (var runtime in PublishCommand.DesktopRuntimes)
+        {
+            AddTemplate("desktop", runtime);
+        }
+
+        void AddTemplate(string target, string? runtime)
+        {
+            var name = $"talewright-publish-template-{target}{(runtime is null ? "" : "-" + runtime)}-{version}.zip";
+            var archivePath = Path.Combine(TemplateAssets, name);
+            using (var archive = ZipFile.Open(archivePath, ZipArchiveMode.Create))
+            {
+                AddEntry(archive, ".talewright-template.json",
+                    JsonSerializer.Serialize(new { version, target, runtime }), 0x1A4);
+                if (target == "web")
+                {
+                    AddEntry(archive, "index.html", "<html>prebuilt web template</html>", 0x1A4);
+                    AddEntry(archive, "runtime.wasm", "prebuilt web runtime", 0x1A4);
+                }
+                else
+                {
+                    var executable = runtime!.StartsWith("win-", StringComparison.Ordinal)
+                        ? "Talewright.Host.Desktop.exe"
+                        : "Talewright.Host.Desktop";
+                    AddEntry(archive, executable, runtime, 0x1ED);
+                    AddEntry(archive, "runtime.json", "prebuilt desktop runtime", 0x1A4);
+                }
+            }
+
+            var checksum = Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(archivePath))).ToLowerInvariant();
+            File.WriteAllText(archivePath + ".sha256", $"{checksum}  {name}\n");
+        }
+
+        static void AddEntry(ZipArchive archive, string name, string content, int mode)
+        {
+            var entry = archive.CreateEntry(name);
+            entry.ExternalAttributes = ((mode | 0x8000) << 16);
+            using var writer = new StreamWriter(entry.Open());
+            writer.Write(content);
+        }
+    }
+
+    [Fact]
+    public void Standalone_publication_packages_prebuilt_templates_without_the_dotnet_sdk()
+    {
+        var web = RunControlled(new UnreadableInput(), inputRedirected: true,
+            publication: TemplatePublication, args: ["-a", "--target", "web"]);
+        Assert.True(web.Code == 0, web.Error + web.Output);
+        using (var archive = ZipFile.OpenRead(Zip))
+        {
+            Assert.Equal("<html>prebuilt web template</html>", ReadEntry(archive, "index.html"));
+            Assert.Equal("prebuilt web runtime", ReadEntry(archive, "runtime.wasm"));
+            Assert.NotNull(archive.GetEntry("story/story.talewright.yaml"));
+        }
+
+        File.Delete(Path.Combine(TemplateAssets,
+            $"talewright-publish-template-web-{PublishTemplateCache.CurrentCliVersion()}.zip"));
+        var webCacheHit = RunControlled(new UnreadableInput(), inputRedirected: true,
+            publication: TemplatePublication, args: ["-a", "--target", "web", "--force"]);
+        Assert.True(webCacheHit.Code == 0, webCacheHit.Error + webCacheHit.Output);
+
+        var desktop = RunControlled(new UnreadableInput(), inputRedirected: true,
+            publication: TemplatePublication, args: ["-a", "--target", "desktop", "--runtime", "linux-x64", "--force"]);
+        Assert.True(desktop.Code == 0, desktop.Error + desktop.Output);
+        using var desktopArchive = ZipFile.OpenRead(Zip);
+        Assert.Equal("linux-x64", ReadEntry(desktopArchive, "internal/linux-x64/Talewright.Host.Desktop"));
+        Assert.Equal("prebuilt desktop runtime", ReadEntry(desktopArchive, "internal/linux-x64/runtime.json"));
+        Assert.NotNull(desktopArchive.GetEntry("Publish.sh"));
+    }
+
+    private static string ReadEntry(ZipArchive archive, string name)
+    {
+        using var reader = new StreamReader(archive.GetEntry(name)!.Open());
+        return reader.ReadToEnd();
+    }
 
     private (int Code, string Output, string Error) RunSplitControlled(TextReader input,
         bool inputRedirected = false, PublishCommand.Operations? publication = null, params string[] args)
@@ -61,7 +150,7 @@ public sealed class PublishTests : IDisposable
         using var error = new StringWriter();
         var code = CommandLine.Run(
             ["publish", Story, "--output", SplitDirectory, "-a", "--target", "desktop", "--split", .. args],
-            output, error, new CliInput(input, inputRedirected, false), publication);
+            output, error, new CliInput(input, inputRedirected, false), publication ?? TemplatePublication);
         return (code, output.ToString(), error.ToString());
     }
 
@@ -1193,5 +1282,9 @@ public sealed class PublishTests : IDisposable
         Assert.False(File.Exists(Zip));
     }
 
-    public void Dispose() => Directory.Delete(_root, recursive: true);
+    public void Dispose()
+    {
+        _templateHttpClient.Dispose();
+        Directory.Delete(_root, recursive: true);
+    }
 }

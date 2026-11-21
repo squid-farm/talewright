@@ -1,11 +1,8 @@
 using System.ComponentModel;
-using System.Diagnostics;
 using System.IO.Compression;
 using System.Security.Cryptography;
-using System.Xml.Linq;
 using Spectre.Console;
 using Spectre.Console.Cli;
-using Talewright.Player;
 using Talewright.Talemark.Compilation;
 
 namespace Talewright.Cli;
@@ -66,7 +63,6 @@ public sealed class PublishSettings : CliSettings
 
 public sealed class PublishCommand : Command<PublishSettings>
 {
-    private const string ComponentsVersion = "10.0.13";
     internal static readonly string[] DesktopRuntimes =
         ["linux-x64", "linux-arm64", "win-x64", "win-arm64", "osx-x64", "osx-arm64"];
 
@@ -82,9 +78,11 @@ public sealed class PublishCommand : Command<PublishSettings>
         Func<string, DestinationState> CaptureDestination,
         Action<string, string> MoveFile)
     {
-        internal static Operations Default { get; } = new(
-            PublishCommand.BuildHost, PublishCommand.CreateZip,
-            DestinationState.Capture, File.Move);
+        internal static Operations Default => Create(PublishTemplateCache.Default);
+
+        internal static Operations Create(PublishTemplateCache templates) => new(
+            (working, target, runtime, _, _, _) => PublishCommand.BuildHost(working, target, runtime, templates),
+            PublishCommand.CreateZip, DestinationState.Capture, File.Move);
     }
 
     private static int Run(PublishSettings settings, CommandWriters writers)
@@ -548,79 +546,16 @@ public sealed class PublishCommand : Command<PublishSettings>
     private static string BuildDesktopRuntime(string working, string runtime, string story, TextWriter output,
         TextWriter error, Operations publication)
     {
-        output.WriteLine($"Building desktop runtime: {runtime}");
+        output.WriteLine($"Packaging desktop runtime: {runtime}");
         return publication.BuildHost(Path.Combine(working, runtime), "desktop", runtime, story, output, error);
     }
 
-    private static string BuildHost(string working, string target, string? runtime, string story, TextWriter output, TextWriter error)
+    private static string BuildHost(string working, string target, string? runtime, PublishTemplateCache templates)
     {
-        var host = Path.Combine(working, "host");
-        CopyDirectory(Path.Combine(AssetsRoot, target), host);
-        var project = Directory.GetFiles(host, "*.csproj").Single();
-        var xml = XDocument.Load(project);
-        xml.Descendants("ProjectReference").Remove();
-        xml.Descendants("EmbeddedResource").Remove();
-        var binaries = Path.GetDirectoryName(typeof(PublishCommand).Assembly.Location)!;
-        var references = new XElement("ItemGroup");
-        foreach (var name in new[] { "Talewright.Core", "Talewright.Graphs", "Talewright.Rules", "Talewright.Narrative",
-            "Talewright.Rulesets.Generic", "Talewright.Talemark", "Talewright.Runtime", "Talewright.Player",
-            "MessagePack", "MessagePack.Annotations", "Microsoft.NET.StringTools", "YamlDotNet" })
-        {
-            var path = Path.Combine(binaries, name + ".dll");
-            if (!File.Exists(path))
-            {
-                throw new FileNotFoundException($"The installed CLI is missing publishing assembly '{name}'.", path);
-            }
-
-            references.Add(new XElement("Reference", new XAttribute("Include", name), new XElement("HintPath", path)));
-        }
-
-        references.Add(new XElement("PackageReference", new XAttribute("Include", "Microsoft.AspNetCore.Components.Web"),
-            new XAttribute("Version", ComponentsVersion)));
-        xml.Root!.Add(references);
-        xml.Root.Add(new XElement("PropertyGroup", new XElement("TreatWarningsAsErrors", "true"),
-            new XElement("LangVersion", "latest"), new XElement("JSModulesEnabled", "false")));
-        xml.Save(project);
-        CopyDirectory(Path.Combine(AssetsRoot, "player"), Path.Combine(host, "wwwroot", "_content", "Talewright.Player"));
-
-        CopyDirectory(Path.Combine(AssetsRoot, "standalone", target), host, overwrite: true);
-
         var published = Path.Combine(working, "output");
-        var start = new ProcessStartInfo("dotnet") { RedirectStandardOutput = true, RedirectStandardError = true, WorkingDirectory = host };
-        foreach (var argument in new[] { "publish", project, "-c", "Release", "-o", published, "-p:TalewrightIncludeSamples=false" })
-        {
-            start.ArgumentList.Add(argument);
-        }
-
-        if (target == "web")
-        {
-            var identity = PlayerBuildIdentity.Current;
-            start.ArgumentList.Add("-p:TalewrightBuildIdentityTargets=BuildIdentity.targets");
-            start.ArgumentList.Add($"-p:TalewrightBuildVersion={identity.Version}");
-            start.ArgumentList.Add($"-p:TalewrightBuildCommit={identity.Commit}");
-            start.ArgumentList.Add($"-p:TalewrightBuildDate={identity.Date}");
-        }
-
-        if (runtime is not null)
-        {
-            start.ArgumentList.Add("-r");
-            start.ArgumentList.Add(runtime);
-            start.ArgumentList.Add("--self-contained");
-            start.ArgumentList.Add("true");
-        }
-
-        using var process = Process.Start(start) ?? throw new PublishBuildException("Could not start the .NET SDK.");
-        var stdout = process.StandardOutput.ReadToEndAsync();
-        var stderr = process.StandardError.ReadToEndAsync();
-        process.WaitForExit();
-        output.Write(stdout.GetAwaiter().GetResult());
-        error.Write(stderr.GetAwaiter().GetResult());
-        if (process.ExitCode != 0)
-        {
-            throw new PublishBuildException($"The Release host build exited with code {process.ExitCode}.");
-        }
-
-        return target == "web" ? Path.Combine(published, "wwwroot") : published;
+        Directory.CreateDirectory(published);
+        CopyDirectory(templates.GetTemplate(PublishTemplateCache.CurrentCliVersion(), target, runtime), published);
+        return published;
     }
 
     private static void StageExternalStory(string story, string content, string target)
@@ -759,5 +694,5 @@ public sealed class PublishCommand : Command<PublishSettings>
         }
     }
 
-    internal sealed class PublishBuildException(string message) : Exception(message);
+    internal sealed class PublishBuildException(string message, Exception? inner = null) : Exception(message, inner);
 }

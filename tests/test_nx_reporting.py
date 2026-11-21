@@ -456,15 +456,22 @@ class PreparedBrowserInputTests(unittest.TestCase):
         self.populate_test_output(root / self.run_e2e.TEST_OUTPUT)
         self.populate_web_output(root / self.run_e2e.WEB_OUTPUT)
         self.populate_cli_output(root / self.run_e2e.CLI_OUTPUT)
+        self.populate_template_output(root / self.run_e2e.TEMPLATE_OUTPUT)
         self.run_e2e.write_prepared_manifest(root, self.identity)
 
     def populate_cli_output(self, root):
         root.mkdir(parents=True)
         for name in ("Talewright.Cli.dll", "Talewright.Cli.deps.json",
-                     "Talewright.Cli.runtimeconfig.json", "publish-assets/standalone/web/App.razor"):
+                     "Talewright.Cli.runtimeconfig.json"):
             file = root / name
             file.parent.mkdir(parents=True, exist_ok=True)
             file.write_text(name)
+
+    def populate_template_output(self, root):
+        root.mkdir(parents=True)
+        name = "talewright-publish-template-web-1.2.3.zip"
+        (root / name).write_bytes(b"web template")
+        (root / f"{name}.sha256").write_text("checksum  " + name + "\n")
 
     def validate(self, root):
         with patch.dict(os.environ, self.identity_environment), patch.object(
@@ -556,16 +563,23 @@ class PreparedBrowserInputTests(unittest.TestCase):
         output = self.root / "artifacts/browser-e2e-inputs"
         binary = self.root / "bin/Release/net10.0"
         commands = []
+        environments = []
 
         def fake_run(command, **kwargs):
             commands.append(command)
+            environments.append(kwargs.get("env"))
             if command[:2] == ["dotnet", "build"] and command[2] == self.run_e2e.PROJECT:
                 self.populate_test_output(binary)
             elif command[:2] == ["dotnet", "build"]:
                 self.populate_cli_output(self.root / "tooling/cli/src/Talewright.Cli/bin/Release/net10.0")
-            else:
+            elif command[:2] == ["dotnet", "publish"]:
                 self.assertEqual(["dotnet", "publish"], command[:2])
                 self.populate_web_output(Path(command[command.index("-o") + 1]))
+            elif command[0] == "dotnet" and command[-1] == "--version":
+                return SimpleNamespace(stdout="1.2.3+local\n")
+            else:
+                self.assertEqual("package_publish_template.sh", Path(command[1]).name)
+                self.populate_template_output(Path(kwargs["env"]["TALEWRIGHT_PUBLISH_TEMPLATE_OUTPUT"]))
 
         with patch.dict(os.environ, self.identity_environment), patch.object(
             self.run_e2e, "ROOT", self.root
@@ -575,10 +589,16 @@ class PreparedBrowserInputTests(unittest.TestCase):
             self.run_e2e.prepare_browser_inputs(output)
             self.validate(output)
 
-        self.assertEqual(3, len(commands))
+        self.assertEqual(5, len(commands))
         self.assertEqual(["dotnet", "build"], commands[0][:2])
         self.assertEqual(["dotnet", "publish"], commands[1][:2])
         self.assertEqual(["dotnet", "build"], commands[2][:2])
+        self.assertEqual("dotnet", commands[3][0])
+        self.assertEqual("Talewright.Cli.dll", Path(commands[3][1]).name)
+        self.assertEqual(["bash"], commands[4][:1])
+        self.assertEqual("1.2.3", commands[4][2])
+        self.assertEqual("web", commands[4][3])
+        self.assertEqual([None] * 4, environments[:4])
         self.assertTrue(output.with_suffix(".tar.gz").is_file())
 
     def test_published_smoke_uses_prepared_cli_and_tests_and_checks_report(self):
@@ -586,21 +606,27 @@ class PreparedBrowserInputTests(unittest.TestCase):
         assembly = inputs / "test-output/Talewright.Player.E2E.Tests.dll"
         results = self.root / "artifacts/test-results"
         results.mkdir(parents=True)
-        commands, jobs = [], []
+        commands, command_environments, jobs = [], [], []
 
         def capture_jobs(work, limit, destination):
             jobs.extend(work)
             work[0].report.write_text('<TestRun><Counters executed="16" failed="0" /></TestRun>')
             return []
 
+        def capture_run(command, **kwargs):
+            commands.append(command)
+            command_environments.append(kwargs.get("env"))
+
         with patch.object(self.run_e2e, "ROOT", self.root), patch.object(
             self.run_e2e, "PREPARED_INPUTS", inputs
         ), patch.object(self.run_e2e, "extract_prepared_archive"), patch.object(
             self.run_e2e, "validate_prepared_inputs", return_value=(assembly, inputs / "web")
-        ), patch.object(self.run_e2e, "run", side_effect=lambda command, **kwargs: commands.append(command)
+        ), patch.object(self.run_e2e, "run", side_effect=capture_run
         ), patch.object(self.run_e2e, "run_jobs", side_effect=capture_jobs):
             self.assertEqual(0, self.run_e2e.run_published_web("firefox", results))
         self.assertEqual(["dotnet", inputs / "cli/Talewright.Cli.dll", "publish"], commands[0][:3])
+        self.assertEqual(str(inputs / self.run_e2e.TEMPLATE_OUTPUT),
+                         command_environments[0]["TALEWRIGHT_PUBLISH_TEMPLATE_DIRECTORY"])
         self.assertEqual(["dotnet", "vstest", assembly], jobs[0].command[:3])
         self.assertIn("--TestCaseFilter:Artifact=Standalone", jobs[0].command)
         self.assertEqual("/games/published", jobs[0].environment["TALEWRIGHT_WEB_BASE_PATH"])

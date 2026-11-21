@@ -26,6 +26,7 @@ PREPARED_ARCHIVE = ROOT / "artifacts/browser-e2e-inputs.tar.gz"
 TEST_OUTPUT = "test-output"
 WEB_OUTPUT = "web"
 CLI_OUTPUT = "cli"
+TEMPLATE_OUTPUT = "templates"
 MANIFEST_NAME = "manifest.json"
 TEST_ASSEMBLY = "Talewright.Player.E2E.Tests.dll"
 MANIFEST_IDENTITY_KEYS = ("source_sha", "run_id", "run_attempt")
@@ -166,6 +167,9 @@ def git_revision():
 def required_prepared_files(inputs):
     test_output = inputs / TEST_OUTPUT
     web_root = inputs / WEB_OUTPUT / "wwwroot"
+    templates = inputs / TEMPLATE_OUTPUT
+    template_archives = sorted(templates.glob("talewright-publish-template-web-*.zip"))
+    missing = []
     required = [
         test_output / TEST_ASSEMBLY,
         test_output / "Talewright.Player.E2E.Tests.deps.json",
@@ -177,9 +181,12 @@ def required_prepared_files(inputs):
         inputs / CLI_OUTPUT / "Talewright.Cli.dll",
         inputs / CLI_OUTPUT / "Talewright.Cli.deps.json",
         inputs / CLI_OUTPUT / "Talewright.Cli.runtimeconfig.json",
-        inputs / CLI_OUTPUT / "publish-assets/standalone/web/App.razor",
     ]
-    missing = [path.relative_to(inputs).as_posix() for path in required if not path.is_file()]
+    if len(template_archives) != 1:
+        missing.append(f"{TEMPLATE_OUTPUT}/talewright-publish-template-web-*.zip")
+    else:
+        required.append(Path(str(template_archives[0]) + ".sha256"))
+    missing.extend(path.relative_to(inputs).as_posix() for path in required if not path.is_file())
     if not any(path.name.casefold().endswith("testadapter.dll")
                for path in test_output.glob("*.dll")):
         missing.append(f"{TEST_OUTPUT}/*testadapter.dll")
@@ -192,7 +199,7 @@ def required_prepared_files(inputs):
 
 def prepared_file_hashes(inputs):
     hashes = {}
-    for folder in (TEST_OUTPUT, WEB_OUTPUT, CLI_OUTPUT):
+    for folder in (TEST_OUTPUT, WEB_OUTPUT, CLI_OUTPUT, TEMPLATE_OUTPUT):
         root = inputs / folder
         if not root.is_dir():
             raise RuntimeError(f"Prepared browser inputs are incomplete; missing {folder}/")
@@ -337,8 +344,23 @@ def prepare_browser_inputs(output=PREPARED_INPUTS):
         run(["dotnet", "publish", ROOT / "apps/web", "-c", "Release",
              "-o", staged / WEB_OUTPUT])
         run(["dotnet", "build", ROOT / "tooling/cli/src/Talewright.Cli", "-c", "Release"])
-        shutil.copytree(ROOT / "tooling/cli/src/Talewright.Cli/bin/Release/net10.0",
-                        staged / CLI_OUTPUT)
+        cli_output = ROOT / "tooling/cli/src/Talewright.Cli/bin/Release/net10.0"
+        shutil.copytree(cli_output, staged / CLI_OUTPUT)
+        version_result = run(["dotnet", cli_output / "Talewright.Cli.dll", "--version"],
+                             capture_output=True, text=True)
+        version = version_result.stdout.strip().split("+", 1)[0]
+        if not version:
+            raise RuntimeError("The prepared CLI did not report its release version.")
+        template_output = Path(temporary) / "publish-templates"
+        template_environment = dict(
+            os.environ, TALEWRIGHT_PUBLISH_TEMPLATE_OUTPUT=str(template_output),
+        )
+        run(["bash", ROOT / ".github/scripts/package_publish_template.sh", version, "web"],
+            env=template_environment)
+        staged_templates = staged / TEMPLATE_OUTPUT
+        staged_templates.mkdir()
+        for path in template_output.glob("talewright-publish-template-web-*.zip*"):
+            shutil.copy2(path, staged_templates / path.name)
         write_prepared_manifest(staged, identity)
         staged.rename(output)
     create_prepared_archive(output, archive)
@@ -397,8 +419,12 @@ def run_published_web(browser, results):
     archive.unlink(missing_ok=True)
     if web_root.exists():
         shutil.rmtree(web_root)
+    environment = dict(
+        os.environ,
+        TALEWRIGHT_PUBLISH_TEMPLATE_DIRECTORY=str(PREPARED_INPUTS / TEMPLATE_OUTPUT),
+    )
     run(["dotnet", PREPARED_INPUTS / CLI_OUTPUT / "Talewright.Cli.dll", "publish",
-         "samples/LostRelic", "-a", "--target", "web", "--output", archive])
+         "samples/LostRelic", "-a", "--target", "web", "--output", archive], env=environment)
     web_root.mkdir(parents=True)
     run(["unzip", "-oq", archive, "-d", web_root])
     name = f"standalone-{browser}"

@@ -16,16 +16,6 @@
     <ProjectReference Include="../../../debugger/src/Talewright.Debugger/Talewright.Debugger.csproj" />
   </ItemGroup>
   <ItemGroup>
-    <None Pack="false" Include="../../../../apps/web/*.cs;../../../../apps/web/*.razor;../../../../apps/web/*.csproj"
-             Link="publish-assets/web/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <None Pack="false" Include="../../../../player/src/Talewright.Player/BuildIdentity.targets"
-             Link="publish-assets/web/BuildIdentity.targets" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <None Pack="false" Include="../../../../apps/web/wwwroot/**"
-             Link="publish-assets/web/wwwroot/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <None Pack="false" Include="../../../../apps/desktop/*.cs;../../../../apps/desktop/*.razor;../../../../apps/desktop/*.csproj;../../../../apps/desktop/THIRD-PARTY-NOTICES.txt"
-             Link="publish-assets/desktop/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
-    <None Pack="false" Include="../../../../apps/desktop/wwwroot/**"
-             Link="publish-assets/desktop/wwwroot/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Pack="false" Include="../../../../player/src/Talewright.Player/wwwroot/**"
              Link="publish-assets/player/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Pack="false" Include="../../../../player/src/Talewright.Player/Components/*.razor.js"
@@ -34,6 +24,5 @@
     <None Pack="false" Update="PublishAssets/*" Link="publish-assets/launchers/%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
     <None Remove="PublishAssets/standalone/**" />
     <Compile Remove="PublishAssets/standalone/**/*.cs" />
-    <None Pack="false" Include="PublishAssets/standalone/**" Link="publish-assets/standalone/%(RecursiveDir)%(Filename)%(Extension)" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
   </ItemGroup>
 </Project>
