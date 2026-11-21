@@ -15,6 +15,18 @@ function requireTrust() {
   if (!vscode.workspace.isTrusted) throw new Error('Trust this workspace before setting up or running the Talewright CLI.');
 }
 
+async function writeFully(handle, chunk) {
+  let offset = 0;
+  while (offset < chunk.byteLength) {
+    const { bytesWritten } = await handle.write(chunk, offset, chunk.byteLength - offset, null);
+    if (!Number.isInteger(bytesWritten) || bytesWritten <= 0) {
+      throw new Error('Could not write the Talewright CLI download completely.');
+    }
+    offset += bytesWritten;
+  }
+  return offset;
+}
+
 async function requireDotnetRuntime() {
   let stdout;
   try {
@@ -154,11 +166,11 @@ async function downloadTools(context, resource, version) {
     try {
       for await (const chunk of response.body) {
         if (abort.signal.aborted) throw new Error('Talewright CLI download was cancelled.');
-        await handle.write(chunk);
-        downloaded += chunk.length;
+        const written = await writeFully(handle, chunk);
+        downloaded += written;
         progress.report({
           message: total ? `${Math.round(downloaded * 100 / total)}%` : `${Math.round(downloaded / 1024)} KB`,
-          increment: total ? chunk.length * 100 / total : undefined,
+          increment: total ? written * 100 / total : undefined,
         });
       }
     } finally {
@@ -347,5 +359,5 @@ function registerCliSetup(context) {
 
 module.exports = {
   cliExecutable, cliIsSelfContained, executeCli, registerCliSetup, requireDotnetRuntime,
-  cliPlatform, releaseAsset, downloadTools, checkCliUpdates,
+  cliPlatform, releaseAsset, writeFully, downloadTools, checkCliUpdates,
 };

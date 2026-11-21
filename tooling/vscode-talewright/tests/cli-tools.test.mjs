@@ -58,6 +58,20 @@ test('release asset resolution requires the exact archive and checksum', () => {
   assert.equal(tools.releaseAsset(release, 'missing.tar.gz'), undefined);
 });
 
+test('download writes every byte when FileHandle.write returns a short count', async () => {
+  const tools = loadTools();
+  const calls = [];
+  const handle = {
+    write: async (_chunk, offset, length) => {
+      calls.push([offset, length]);
+      return { bytesWritten: offset === 0 ? 2 : length };
+    },
+  };
+
+  assert.equal(await tools.writeFully(handle, new Uint8Array([1, 2, 3, 4, 5])), 5);
+  assert.deepEqual(calls, [[0, 5], [2, 3]]);
+});
+
 test('download verifies, extracts, permissions, configures and reports progress', async () => {
   const calls = { progress: [], exec: [], updates: [], chmod: [] };
   const vscode = {
@@ -97,7 +111,10 @@ test('download verifies, extracts, permissions, configures and reports progress'
         rm: async (file, options) => calls.exec.push(['rm', file, options]),
         writeFile: async () => {},
         chmod: async (file, mode) => calls.chmod.push([file, mode]),
-        open: async () => ({ write: async () => {}, close: async () => {} }),
+        open: async () => ({
+          write: async (chunk, offset, length) => ({ bytesWritten: Math.min(length, chunk.byteLength - offset) }),
+          close: async () => {},
+        }),
       };
       if (name === 'node:fs') return { constants: { F_OK: 0, X_OK: 1 } };
       if (name === 'node:child_process') return { execFile: () => {} };
@@ -214,7 +231,10 @@ test('CLI updates only replace the resource still configured to the managed down
         rm: async () => {},
         writeFile: async (file, contents) => calls.writes.push([file, String(contents)]),
         chmod: async () => {},
-        open: async () => ({ write: async () => {}, close: async () => {} }),
+        open: async () => ({
+          write: async (chunk, offset, length) => ({ bytesWritten: Math.min(length, chunk.byteLength - offset) }),
+          close: async () => {},
+        }),
       };
       if (name === 'node:fs') return { constants: { F_OK: 0, X_OK: 1 } };
       if (name === 'node:child_process') return { execFile: () => {} };
