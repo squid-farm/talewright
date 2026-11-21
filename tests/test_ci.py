@@ -526,7 +526,7 @@ class DesktopArchiveTests(unittest.TestCase):
         with ZipFile(path, "w") as archive:
             for name, content in files.items():
                 if name != missing:
-                    entry = ZipInfo(name)
+                    entry = ZipInfo("Story Name/" + name)
                     entry.external_attr = (0o100755 if executable else 0o100644) << 16
                     archive.writestr(entry, content)
 
@@ -534,7 +534,7 @@ class DesktopArchiveTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "desktop.zip"
             self.write_archive(path)
-            verify_desktop_archive(path)
+            self.assertEqual("Story Name/", verify_desktop_archive(path))
             for change, error in [
                     ({"missing": "internal/win-arm64/coreclr.dll"}, "missing"),
                     ({"missing": "internal/win-x64/nfd.dll"}, "missing"),
@@ -545,6 +545,17 @@ class DesktopArchiveTests(unittest.TestCase):
                 with self.subTest(change=change):
                     self.write_archive(path, **change)
                     with self.assertRaisesRegex(ValueError, error):
+                        verify_desktop_archive(path)
+
+    def test_rejects_files_outside_game_folder(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "desktop.zip"
+            for name in ["loose.txt", "Another Game/loose.txt"]:
+                with self.subTest(name=name):
+                    self.write_archive(path)
+                    with ZipFile(path, "a") as archive:
+                        archive.writestr(name, "")
+                    with self.assertRaisesRegex(ValueError, "one game folder"):
                         verify_desktop_archive(path)
 
 

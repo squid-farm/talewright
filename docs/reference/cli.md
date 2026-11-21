@@ -232,7 +232,7 @@ talewright publish path/to/story -a --target desktop --split --output desktop-bu
 
 This builds each of the six supported RIDs once and writes six ZIPs, such as
 `desktop-builds/my-story-linux-x64.zip` and `desktop-builds/my-story-osx-arm64.zip`.
-Each contains a story-named launcher at the archive root (`.sh`, `.command` or `.cmd`, depending on
+Each contains one story-named folder with a launcher (`.sh`, `.command` or `.cmd`, depending on
 the platform), plus that runtime's apphost and supporting files under `internal/`. The published
 story, engine license and deployment instructions remain inside the package. PDB inclusion is unchanged.
 The universal `start.*` launchers are not included. These are unsigned
@@ -293,9 +293,10 @@ across operating systems and filesystems.
 itch.io as an HTML5 game. Players need no backend or .NET.
 
 **Desktop output** is one universal zip with self-contained .NET for Windows, Linux and macOS on x64 and
-ARM64. Extract everything, then run the story-named `.cmd` (Windows), `.sh` (Linux) or `.command`
-(macOS) launcher; the universal launchers pick the right platform. Runtime and story support files
-remain under `internal/`; the launchers resolve them from their own location, so the launcher's working
+ARM64. Extract everything; the ZIP creates a story-named folder. Run its story-named `.cmd` (Windows),
+`.sh` (Linux) or `.command`
+(macOS) launcher; the universal launchers pick the right platform. Runtime support files
+remain under `internal/`; the launchers resolve their files from their own location, so the launcher's working
 directory does not need to be the package root. A single-runtime or split zip is smaller and uses only
 the matching story-named `.cmd`, `.sh` or `.command` launcher. Photino supplies the
 native binaries, so any platform can be built from any machine. Linux x64 is runtime-verified; Windows,
