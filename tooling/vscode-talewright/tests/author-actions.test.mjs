@@ -21,6 +21,7 @@ function host(options = {}) {
     tasks: [], errors: [], picks: [], dialogs: [], openDialogs: [], messages: [], warnings: [], updates: [],
     urls: [], fetches: [], sdk: [], cli: [], runtimeChecks: [], openFolders: [], openedDocuments: [],
     shownDocuments: [], commands: new Map(), contextKeys: [], codeLensProviders: [],
+    progress: [],
   };
   const globalState = options.state ?? new Map();
   const roots = options.roots ?? ['/workspace/My Story'];
@@ -101,6 +102,10 @@ function host(options = {}) {
       },
       showTextDocument: async document => { calls.shownDocuments.push(document); return {}; },
       showSaveDialog: async settings => { calls.dialogs.push(settings); return options.output ? uri(options.output) : undefined; },
+      withProgress: async (options, task) => {
+        calls.progress.push(options);
+        return task();
+      },
     },
     commands: {
       registerCommand: (id, handler) => { calls.commands.set(id, handler); return {}; },
@@ -521,6 +526,35 @@ test('publish chooses a ZIP then uses interactive CLI overwrite behavior, never 
   await invalid.run('publishStoryZip');
   assert.equal(invalid.calls.tasks.length, 0);
   assert.match(invalid.calls.errors[0], /\.zip/);
+});
+
+test('standalone publish actions choose destinations and pass target arguments without --force', async () => {
+  const desktop = host({ output: '/exports/My Game-desktop.zip' });
+  await desktop.run('publishStandaloneDesktop');
+  assert.deepEqual(Array.from(desktop.calls.tasks[0].execution.args),
+    ['publish', '/workspace/My Story', '-a', '--target', 'desktop',
+      '--output', '/exports/My Game-desktop.zip']);
+  assert.equal(desktop.calls.progress.length, 1);
+  assert.doesNotMatch(desktop.calls.tasks[0].execution.args.join(' '), /--force/);
+
+  const web = host({ output: '/exports/My Game-web.zip' });
+  await web.run('publishStandaloneWeb');
+  assert.deepEqual(Array.from(web.calls.tasks[0].execution.args),
+    ['publish', '/workspace/My Story', '-a', '--target', 'web',
+      '--output', '/exports/My Game-web.zip']);
+
+  const all = host({ selected: '/exports/My Game' });
+  await all.run('publishStandaloneAll');
+  assert.deepEqual(Array.from(all.calls.tasks[0].execution.args),
+    ['publish', '/workspace/My Story', '-a', '--target', 'all',
+      '--output', '/exports/My Game']);
+
+  const cancelledDesktop = host();
+  await cancelledDesktop.run('publishStandaloneDesktop');
+  assert.equal(cancelledDesktop.calls.tasks.length, 0);
+  const cancelledAll = host();
+  await cancelledAll.run('publishStandaloneAll');
+  assert.equal(cancelledAll.calls.tasks.length, 0);
 });
 
 test('debug and run actions and reusable tasks share selection, executable, trust and save handling', async () => {

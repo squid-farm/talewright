@@ -53,6 +53,9 @@
     "commands": [
       { "command": "talewright.validateStory", "title": "Talewright: Validate Story" },
       { "command": "talewright.publishStoryZip", "title": "Talewright: Publish Story ZIP" },
+      { "command": "talewright.publishStandaloneDesktop", "title": "Talewright: Publish Standalone Desktop Game" },
+      { "command": "talewright.publishStandaloneWeb", "title": "Talewright: Publish Standalone Web Game" },
+      { "command": "talewright.publishStandaloneAll", "title": "Talewright: Publish All Standalone Targets" },
       { "command": "talewright.openAuthorDebugger", "title": "Talewright: Open Author Debugger" },
       { "command": "talewright.playFromScene", "title": "Talewright: Play From This Scene" },
       { "command": "talewright.runStory", "title": "Talewright: Run Story" },
