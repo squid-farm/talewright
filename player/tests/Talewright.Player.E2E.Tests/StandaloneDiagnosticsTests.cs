@@ -172,6 +172,7 @@ public sealed class StandaloneDiagnosticsTests(WebHostFixture host, ITestOutputH
         await ReloadAsync();
         await Expect(Page.GetByRole(AriaRole.Alert)).ToContainTextAsync("Invalid published story index entry");
         await Expect(Page.GetByLabel("Story archive")).ToHaveCountAsync(0);
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Retry opening story", Exact = true })).ToBeVisibleAsync();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Diagnostics", Exact = true }).ClickAsync();
         var preview = Page.GetByLabel("Diagnostic report");
         await Expect(preview).ToContainTextAsync("Open story: invalid data");

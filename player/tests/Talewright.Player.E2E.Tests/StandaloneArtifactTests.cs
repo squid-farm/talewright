@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using Xunit.Abstractions;
 using static Microsoft.Playwright.Assertions;
@@ -20,6 +21,51 @@ public sealed class StandaloneFactAttribute : FactAttribute
 public sealed class StandaloneArtifactTests(WebHostFixture host, ITestOutputHelper output) : PlayerTest(host, output)
 {
     protected override bool StartsInLibrary => false;
+
+    [StandaloneFact]
+    [Trait("Host", "Browser")]
+    public async Task Story_startup_shows_loading_until_a_delayed_story_is_ready()
+    {
+        var creation = Environment.GetEnvironmentVariable("TALEWRIGHT_STANDALONE_CREATION") == "1";
+        var ready = creation
+            ? Page.GetByRole(AriaRole.Button, new() { Name = "Start story", Exact = true })
+            : Latest;
+        await Expect(ready).ToBeVisibleAsync();
+
+        var indexRequested = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var continueLoading = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        await Page.RouteAsync(new Regex("/story/index\\.json\\?"), async route =>
+        {
+            indexRequested.TrySetResult();
+            await continueLoading.Task;
+            await route.ContinueAsync();
+        });
+
+        var reload = ReloadAsync();
+        try
+        {
+            await indexRequested.Task.WaitAsync(TimeSpan.FromSeconds(15));
+            var loading = Page.GetByLabel("Loading story");
+            await Expect(loading).ToBeVisibleAsync();
+            await Expect(loading).ToHaveAttributeAsync("aria-busy", "true");
+            await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Retry opening story", Exact = true }))
+                .ToHaveCountAsync(0);
+        }
+        finally
+        {
+            continueLoading.TrySetResult();
+            await reload;
+        }
+
+        await Expect(ready).ToBeVisibleAsync();
+        await Expect(Page.GetByRole(AriaRole.Button, new() { Name = "Retry opening story", Exact = true }))
+            .ToHaveCountAsync(0);
+        if (creation)
+        {
+            await Driver.ClickAsync("Start story");
+        }
+        await Expect(Latest).ToBeVisibleAsync();
+    }
 
     [StandaloneFact]
     [Trait("Host", "Browser")]
