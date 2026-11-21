@@ -15,6 +15,17 @@ namespace Talewright.Talemark.Tests;
 public sealed class AnalysisCancellationTests
 {
     [Fact]
+    public void Choice_label_parser_stops_before_scanning_when_token_is_cancelled()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+        var text = "* [" + new string('x', 4096);
+
+        Assert.Throws<OperationCanceledException>(() =>
+            TaleSyntaxParser.Parse("=== first\n" + text, cancellation.Token));
+    }
+
+    [Fact]
     public void Analyzer_throws_before_parsing_when_token_is_already_cancelled()
     {
         using var cancellation = new CancellationTokenSource();
