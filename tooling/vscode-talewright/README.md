@@ -286,8 +286,10 @@ to the executable. Setup only runs when you ask; opening a story never installs 
 - With the .NET 10 SDK, setup offers to install the CLI version that matches this extension:
   `dotnet tool install --global Talewright.Cli --version VERSION --source https://api.nuget.org/v3/index.json`,
   in a visible terminal, after you approve it.
-- Without the SDK, setup opens the matching [GitHub release](https://github.com/squid-farm/talewright/releases)
-  so you can download the standalone CLI. Extract the whole archive, then use **Select Executable**.
+- Download Tools retrieves the matching platform archive from GitHub into VS Code's persistent
+  global storage, verifies and extracts it, enables executable permissions, verifies `--version`,
+  and configures `talewright.cli.executablePath`. No .NET SDK is required.
+- Use **Locate Existing...** to configure an extracted or separately installed executable.
 
 The extension never installs the SDK, changes PATH, elevates permissions or updates an existing tool.
 See the [author setup guide](https://github.com/squid-farm/talewright/blob/main/docs/guide/cli-installation.md)

@@ -155,6 +155,7 @@ function host(options = {}) {
   const dependencies = {
     vscode, 'node:path': path, 'node:fs': { constants: { X_OK: 1, F_OK: 0 } },
     'node:os': { homedir: () => '/home/author' },
+    'node:crypto': { createHash: () => ({ update: () => ({ digest: () => '0'.repeat(64) }) }) },
     'node:child_process': { execFile: {} },
     'node:util': { promisify: () => async (...args) => {
       if (args[0] === 'dotnet' && args[1][0] === '--list-runtimes') {
@@ -182,6 +183,11 @@ function host(options = {}) {
       stat: async () => ({ isFile: () => true }),
       readFile: async () => JSON.stringify({ version: options.version ?? '0.1.0-preview.1' }),
       readdir: async () => options.directoryEntries ?? [],
+      mkdir: async () => {},
+      rm: async () => {},
+      writeFile: async () => {},
+      chmod: async () => {},
+      open: async () => ({ write: async () => {}, close: async () => {} }),
     },
   };
   const globals = {
@@ -626,13 +632,13 @@ test('setup respects trust and broken custom paths; missing CLI action offers ex
 test('only a stable .NET 10 SDK offers tool installation, and cancellation installs nothing', async () => {
   for (const options of [{ sdks: '9.0.100 [/sdk]\n11.0.100 [/sdk]' }, { sdkError: 'ENOENT' },
     { sdks: '10.0.100-rc.1 [/sdk]' }]) {
-    const { calls, run } = host({ files: [], ...options });
+    const { calls, run } = host({ files: [], pick: 1, ...options });
     await run('setUpCli');
-    assert.equal(calls.picks[0][0], 'Use standalone download');
+    assert.equal(calls.picks[0][0], 'Download Tools (Recommended)');
     assert.match(calls.pickSettings.placeHolder, /No compatible/);
     assert.equal(calls.fetches.length, 0);
   }
-  const cancelled = host({ files: [], sdks: '10.0.113 [/sdk]', pick: 0 });
+  const cancelled = host({ files: [], sdks: '10.0.113 [/sdk]', pick: 1 });
   await cancelled.run('setUpCli');
   assert.equal(cancelled.calls.warnings.length, 1);
   assert.equal(cancelled.calls.tasks.length, 0);
@@ -640,7 +646,7 @@ test('only a stable .NET 10 SDK offers tool installation, and cancellation insta
 
 test('approved installation pins the published version and discovers the new shim without PATH refresh', async () => {
   const { calls, run } = host({
-    files: [], sdks: '10.0.113 [/sdk]', pick: 0, saveChoice: 'Install CLI', installSuccess: true,
+    files: [], sdks: '10.0.113 [/sdk]', pick: 1, saveChoice: 'Install CLI', installSuccess: true,
   });
   await run('setUpCli');
   const task = calls.tasks[0];
@@ -656,7 +662,7 @@ test('approved installation pins the published version and discovers the new shi
   assert.equal(calls.tasks[1].execution.executable, '/home/author/.dotnet/tools/talewright');
   for (const version of ['0.1.0-preview.2', '0.1.0']) {
     const other = host({ files: [], version, versions: [version], sdks: '10.0.113 [/sdk]',
-      pick: 0, saveChoice: 'Install CLI', installSuccess: true });
+      pick: 1, saveChoice: 'Install CLI', installSuccess: true });
     await other.run('setUpCli');
     assert.equal(other.calls.tasks[0].execution.args[5], version);
   }
@@ -671,7 +677,7 @@ test('unavailable version, feed/network/SDK failures and revoked trust never ins
     [{ version: '../bad' }, /no supported CLI version/],
     [{ onConsent: vscode => { vscode.workspace.isTrusted = false; }, saveChoice: 'Install CLI' }, /Trust/],
   ]) {
-    const { calls, run } = host({ files: [], sdks: '10.0.113 [/sdk]', pick: 0, ...options });
+    const { calls, run } = host({ files: [], sdks: '10.0.113 [/sdk]', pick: 1, ...options });
     await run('setUpCli');
     assert.match(calls.errors[0], expected);
     assert.equal(calls.tasks.length, 0);
@@ -679,17 +685,15 @@ test('unavailable version, feed/network/SDK failures and revoked trust never ins
   }
 });
 
-test('failed installation reports failure; standalone requires a separate explicit choice', async () => {
-  const options = { files: [], sdks: '10.0.113 [/sdk]', pick: 0, saveChoice: 'Install CLI', exitCode: 1 };
+test('failed installation reports failure and offers download or locating an existing executable', async () => {
+  const options = { files: [], sdks: '10.0.113 [/sdk]', pick: 1, saveChoice: 'Install CLI', exitCode: 1 };
   const failed = host(options);
   await failed.run('setUpCli');
   assert.match(failed.calls.errors[0], /failed or was cancelled.*exit 1/);
   assert.equal(failed.calls.messages.length, 0);
   assert.equal(failed.calls.urls.length, 0);
-  assert.ok(failed.calls.errorActions.includes('Use standalone instead'));
-  const explicit = host({ ...options, errorChoice: 'Use standalone instead' });
-  await explicit.run('setUpCli');
-  assert.deepEqual(explicit.calls.urls, ['https://github.com/squid-farm/talewright/releases/tag/v0.1.0-preview.1']);
+  assert.ok(failed.calls.errorActions.includes('Download Tools (Recommended)'));
+  assert.ok(failed.calls.errorActions.includes('Locate Existing...'));
   const launch = host({ ...options, launchError: 'permission denied' });
   await launch.run('setUpCli');
   assert.match(launch.calls.errors[0], /permission denied/);
@@ -709,16 +713,9 @@ test('failed installation reports failure; standalone requires a separate explic
   assert.equal(noShim.calls.messages.length, 0, 'Exit zero without a discoverable CLI is not setup success');
 });
 
-test('standalone opens only an existing release with archive/checksum; selection is space-safe', async () => {
-  const unavailable = host({ files: [], pick: 0, assets: [] });
-  await unavailable.run('setUpCli');
-  assert.match(unavailable.calls.errors[0], /does not supply/);
-  assert.equal(unavailable.calls.urls.length, 0);
-  const missing = host({ files: [], pick: 0, httpStatus: 404 });
-  await missing.run('setUpCli');
-  assert.equal(missing.calls.urls.length, 0);
+test('locating an existing executable remains explicit and space-safe', async () => {
   const executable = '/downloads/My CLI/Talewright.Cli';
-  const selected = host({ files: [executable], pick: 0, selected: executable, infoChoice: 'Select Executable' });
+  const selected = host({ files: [executable], pick: 1, selected: executable, infoChoice: 'Select Executable' });
   await selected.run('setUpCli');
   assert.deepEqual(selected.calls.updates, [['cli.executablePath', executable]]);
   await selected.run('validateStory');

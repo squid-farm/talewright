@@ -39,6 +39,13 @@ The tools are tested on Linux computers with Intel or AMD processors. The Window
 downloads haven't been tried on those computers yet, so please tell us if something goes wrong.
 The Linux downloads don't work on Alpine Linux.
 
+## VS Code: automatic setup
+
+In VS Code, run **Talewright: Set Up CLI** or choose **Set Up CLI** after a CLI action reports that
+the tool is missing. Choose **Download Tools (Recommended)** to download and configure the matching
+archive automatically. VS Code asks before downloading, shows progress, verifies the executable,
+and can resume the action that requested setup.
+
 ## 2. Unpack the download
 
 1. Download the file for your computer.

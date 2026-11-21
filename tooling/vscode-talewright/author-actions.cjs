@@ -297,10 +297,10 @@ async function executeAuthorTask(task, label) {
 
 function registerAuthorActions(context) {
   registerCliSetup(context);
-  const report = async error => {
+  const report = async (error, resumeAction) => {
     const choice = await vscode.window.showErrorMessage(`Talewright: ${error.message}`,
       ...(error.code === 'CLI_NOT_FOUND' ? ['Set Up CLI'] : []));
-    if (choice === 'Set Up CLI') await vscode.commands.executeCommand('talewright.setUpCli');
+    if (choice === 'Set Up CLI') await vscode.commands.executeCommand('talewright.setUpCli', { resumeAction });
   };
   const updateSceneContext = async editor => {
     const active = editor ?? vscode.window.activeTextEditor;
@@ -347,7 +347,7 @@ function registerAuthorActions(context) {
           }
         }
       } catch (error) {
-        await report(error);
+        await report(error, async () => vscode.commands.executeCommand(`talewright.${id}`));
       }
     }));
   }
@@ -355,7 +355,7 @@ function registerAuthorActions(context) {
     try {
       await playFromScene(uri, line);
     } catch (error) {
-      await report(error);
+      await report(error, async () => playFromScene(uri, line));
     }
   }));
   const codeLensChanges = new vscode.EventEmitter();
