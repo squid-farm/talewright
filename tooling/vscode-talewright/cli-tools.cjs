@@ -198,7 +198,10 @@ async function downloadTools(context, resource, version) {
     version, rid, executable, verifiedVersion: stdout.trim(),
   }, null, 2));
   await mkdir(path.join(storage, 'cli'), { recursive: true });
-  await writeFile(path.join(storage, 'cli', 'downloaded.json'), JSON.stringify({ version, rid, executable }));
+  const resourcePath = typeof resource === 'string' ? resource : resource?.fsPath;
+  await writeFile(path.join(storage, 'cli', 'downloaded.json'), JSON.stringify({
+    version, rid, executable, resource: resourcePath,
+  }));
   vscode.window.showInformationMessage(`Talewright CLI ${stdout.trim()} was downloaded and configured.`);
   return executable;
 }
@@ -313,13 +316,23 @@ async function checkCliUpdates(context) {
     const metadata = JSON.parse(await readFile(path.join(context.extensionPath, 'server', 'talewright-server.json'), 'utf8'));
     if (typeof downloaded.version !== 'string' || typeof metadata.version !== 'string'
         || downloaded.version === metadata.version) return;
+    const resources = [];
+    if (typeof downloaded.resource === 'string' && path.isAbsolute(downloaded.resource)) {
+      resources.push(vscode.Uri.file(downloaded.resource));
+    }
+    const active = vscode.window.activeTextEditor?.document.uri;
+    if (active && vscode.workspace.getWorkspaceFolder(active)) resources.push(active);
+    resources.push(...(vscode.workspace.workspaceFolders ?? []).map(folder => folder.uri));
+    if (!resources.length) resources.push(undefined);
+    const configuredResource = resources
+      .map(resource => ({ resource, executable: configuration(resource).get('cli.executablePath', '') }))
+      .find(entry => entry.executable === downloaded.executable);
+    if (!configuredResource) return;
     if (await vscode.window.showInformationMessage(
       `A newer Talewright CLI ${metadata.version} is available for this extension.`,
       'Update CLI',
     ) === 'Update CLI') {
-      const active = vscode.window.activeTextEditor?.document.uri;
-      const resource = active && vscode.workspace.getWorkspaceFolder(active) ? active : vscode.workspace.workspaceFolders?.[0]?.uri;
-      await downloadTools(context, resource, metadata.version);
+      await downloadTools(context, configuredResource.resource, metadata.version);
     }
   } catch (error) {
     if (error.code !== 'ENOENT') vscode.window.showErrorMessage(`Talewright CLI update check: ${error.message}`);
