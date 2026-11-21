@@ -232,9 +232,14 @@ async function installTool(resource, version) {
   }
 }
 
-async function setUpCli(context, resumeAction) {
+async function setUpCli(context, options = {}) {
+  const resumeAction = options?.resumeAction;
   const active = vscode.window.activeTextEditor?.document.uri;
-  const resource = active && vscode.workspace.getWorkspaceFolder(active) ? active : vscode.workspace.workspaceFolders?.[0]?.uri;
+  const resource = options?.resource?.scheme
+    ? options.resource
+    : typeof options?.resource === 'string'
+      ? vscode.Uri.file(options.resource)
+      : active && vscode.workspace.getWorkspaceFolder(active) ? active : vscode.workspace.workspaceFolders?.[0]?.uri;
   let version;
   try {
     requireTrust();
@@ -306,7 +311,7 @@ async function checkCliUpdates(context) {
 
 function registerCliSetup(context) {
   context.subscriptions.push(vscode.commands.registerCommand('talewright.setUpCli', options =>
-    setUpCli(context, options?.resumeAction)));
+    setUpCli(context, options)));
   void checkCliUpdates(context);
 }
 

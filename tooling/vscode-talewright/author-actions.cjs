@@ -185,8 +185,14 @@ async function createTask(command, requested, definition, scope, scene) {
   if (!vscode.workspace.isTrusted) throw new Error('Trust this workspace before running Talewright CLI commands.');
   const root = await selectStory(requested);
   if (!root) return undefined;
+  let executable;
+  try {
+    executable = await cliExecutable(root);
+  } catch (error) {
+    error.resource = vscode.Uri.file(root);
+    throw error;
+  }
   if (command === 'run') await requireDotnetRuntime();
-  const executable = await cliExecutable(root);
   const args = [command, root];
   if (command === 'debug' && scene) args.push('--scene', scene);
   if (command === 'publish') {
@@ -300,7 +306,10 @@ function registerAuthorActions(context) {
   const report = async (error, resumeAction) => {
     const choice = await vscode.window.showErrorMessage(`Talewright: ${error.message}`,
       ...(error.code === 'CLI_NOT_FOUND' ? ['Set Up CLI'] : []));
-    if (choice === 'Set Up CLI') await vscode.commands.executeCommand('talewright.setUpCli', { resumeAction });
+    if (choice === 'Set Up CLI') await vscode.commands.executeCommand('talewright.setUpCli', {
+      resource: error.resource,
+      resumeAction,
+    });
   };
   const updateSceneContext = async editor => {
     const active = editor ?? vscode.window.activeTextEditor;

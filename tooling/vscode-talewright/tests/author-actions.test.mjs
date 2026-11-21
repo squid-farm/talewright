@@ -437,6 +437,12 @@ test('Run Story requires .NET 10 and reports missing runtimes without installing
   assert.match(missingCli.calls.errors[0], /CLI not found/);
   assert.deepEqual(missingCli.calls.errorActions, ['Set Up CLI']);
   assert.equal(missingCli.calls.tasks.length, 0);
+  const missingBoth = host({ files: [], dotnetError: 'ENOENT' });
+  await missingBoth.run('runStory');
+  assert.match(missingBoth.calls.errors[0], /CLI not found/);
+  assert.deepEqual(missingBoth.calls.errorActions, ['Set Up CLI']);
+  assert.equal(missingBoth.calls.runtimeChecks.length, 0);
+  assert.equal(missingBoth.calls.tasks.length, 0);
   assert.equal(missingCli.calls.sdk.length, 0);
   assert.equal(missingCli.calls.updates.length, 0);
 });
@@ -627,6 +633,23 @@ test('setup respects trust and broken custom paths; missing CLI action offers ex
   const outside = host({ active: '/outside/file.txt' });
   await outside.run('setUpCli');
   assert.equal(outside.calls.configurationResource.fsPath, '/workspace');
+});
+
+test('CLI setup configures the selected story resource in a multi-root workspace', async () => {
+  const { calls } = host({
+    folders: ['/workspace/A', '/workspace/B'],
+    roots: ['/workspace/A/My Story', '/workspace/B/Other Story'],
+    active: '/workspace/A/My Story/scene.tale',
+    files: ['/downloads/Talewright.Cli'],
+    sdks: '10.0.113 [/sdk]',
+    pick: 2,
+    selected: '/downloads/Talewright.Cli',
+  });
+  await calls.commands.get('talewright.setUpCli')({
+    resource: { scheme: 'file', fsPath: '/workspace/B/Other Story' },
+  });
+  assert.equal(calls.configurationResource.fsPath, '/workspace/B/Other Story');
+  assert.deepEqual(calls.updates, [['cli.executablePath', '/downloads/Talewright.Cli']]);
 });
 
 test('only a stable .NET 10 SDK offers tool installation, and cancellation installs nothing', async () => {
