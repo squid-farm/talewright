@@ -63,6 +63,19 @@ public sealed class StoryImagesTests
     }
 
     [Fact]
+    public async Task Unvisited_image_dimensions_are_available_without_acquiring_image_bytes()
+    {
+        using var files = new ImageStoryFiles();
+        using var images = StoryImages.FromDirectory(StorySource.FromDirectory(files.Root), files.Root);
+
+        var dimensions = await images.GetImageDimensionsAsync("images/unvisited.png");
+
+        Assert.Equal((1, 1), dimensions);
+        Assert.True(images.IsSmallImage("images/unvisited.png"));
+        Assert.Null(images.TryAcquireExisting("images/unvisited.png"));
+    }
+
+    [Fact]
     public async Task A_root_replaced_with_a_symlink_after_cataloguing_is_rejected()
     {
         using var files = new ImageStoryFiles();

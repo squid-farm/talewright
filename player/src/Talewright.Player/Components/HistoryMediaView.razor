@@ -1,24 +1,70 @@
 @using Talewright.Narrative.Templates
 
-<span class="tw-history-media">
-    <button type="button" class="tw-link" aria-expanded="@(_revealed ? "true" : "false")" @onclick="Toggle">
-        @ToggleText
-    </button>
-    @if (_revealed)
-    {
-        <span class="tw-history-image">
-            <MediaView Media="Media" Images="Images" />
-        </span>
-    }
-</span>
+@if (ChoiceLabel || _smallImage)
+{
+    <span class="tw-history-media tw-history-media-inline">
+        <MediaView Media="Media" Images="Images" ChoiceLabel="ChoiceLabel" />
+    </span>
+}
+else
+{
+    <span class="tw-history-media">
+        <button type="button" class="tw-link" aria-expanded="@(_revealed ? "true" : "false")" @onclick="Toggle">
+            @ToggleText
+        </button>
+        @if (_revealed)
+        {
+            <span class="tw-history-image">
+                <MediaView Media="Media" Images="Images" ChoiceLabel="ChoiceLabel" />
+            </span>
+        }
+    </span>
+}
 
 @code {
     [Parameter, EditorRequired] public RenderedMedia Media { get; set; } = default!;
     [Parameter] public StoryImages? Images { get; set; }
+    [Parameter] public bool ChoiceLabel { get; set; }
     private bool _revealed;
+    private bool _smallImage;
+    private int _classificationGeneration;
+    private StoryImages? _classifiedImages;
+    private string? _classifiedMediaId;
+    private bool _classifiedChoiceLabel;
     private string ToggleText => Media.Accessibility == MediaAccessibility.Decorative
         ? _revealed ? "Hide decorative image" : "Reveal decorative image"
         : (_revealed ? "Hide image: " : "Reveal image: ") + Media.AltText;
+
+    protected override async Task OnParametersSetAsync()
+    {
+        var images = Images;
+        var mediaId = Media.MediaId;
+        if (ReferenceEquals(_classifiedImages, images) && _classifiedMediaId == mediaId &&
+            _classifiedChoiceLabel == ChoiceLabel)
+            return;
+
+        _classifiedImages = images;
+        _classifiedMediaId = mediaId;
+        _classifiedChoiceLabel = ChoiceLabel;
+        _revealed = false;
+        var generation = ++_classificationGeneration;
+        _smallImage = ChoiceLabel || images?.IsSmallImage(mediaId) == true;
+        if (_smallImage || images is null) return;
+
+        try
+        {
+            var dimensions = await images.GetImageDimensionsAsync(mediaId);
+            if (generation == _classificationGeneration && dimensions is { } measured)
+                _smallImage = measured.Width <= StoryImages.SmallImageMaxWidth &&
+                    measured.Height <= StoryImages.SmallImageMaxHeight;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException
+            or ObjectDisposedException or OperationCanceledException)
+        {
+            if (generation == _classificationGeneration && ex is not OperationCanceledException)
+                Console.Error.WriteLine($"History image '{mediaId}' could not be classified; it will remain behind its reveal control: {ex.Message}");
+        }
+    }
 
     private void Toggle() => _revealed = !_revealed;
 }

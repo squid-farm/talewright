@@ -5,7 +5,7 @@
 <DocumentView Document="Entry.Frame.Document" />
 @if (Entry.Chosen is not null && !Entry.ChosenAutomatically)
 {
-    <p class="tw-chosen">→ <InlineView Inlines="Entry.Chosen" /></p>
+    <p class="tw-chosen">→ <InlineView Inlines="Entry.Chosen" ChoiceLabel="true" /></p>
 }
 
 @code {

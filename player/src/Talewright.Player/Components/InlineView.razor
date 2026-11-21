@@ -12,11 +12,11 @@
         case RenderedMedia media:
             @if (CollapsedImages?.Contains(media.MediaId) ?? HistoryReading)
             {
-                <HistoryMediaView @key="(index, media, Images)" Media="media" Images="Images" />
+                <HistoryMediaView @key="(index, media, Images)" Media="media" Images="Images" ChoiceLabel="ChoiceLabel" />
             }
             else
             {
-                <MediaView @key="(index, media, Images)" Media="media" Images="Images" />
+                <MediaView @key="(index, media, Images)" Media="media" Images="Images" ChoiceLabel="ChoiceLabel" />
             }
             break;
     }
@@ -26,6 +26,9 @@
     /// <summary>The inlines to render.</summary>
     [Parameter, EditorRequired]
     public IReadOnlyList<RenderedInline> Inlines { get; set; } = [];
+
+    [Parameter]
+    public bool ChoiceLabel { get; set; }
 
     [CascadingParameter]
     public StoryImages? Images { get; set; }

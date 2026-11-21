@@ -14,8 +14,12 @@ public sealed record LoadedStory(StorySource Source, StoryImages? Images = null)
 /// <summary>Lazy access to one accepted source's local images. Identity also defines a UI source generation.</summary>
 public sealed class StoryImages : IDisposable, IAsyncDisposable
 {
+    internal const int SmallImageMaxWidth = 48;
+    internal const int SmallImageMaxHeight = 64;
+
     private readonly object _sync = new();
     private readonly Dictionary<string, Entry> _entries = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, (int Width, int Height)> _dimensions = new(StringComparer.Ordinal);
     private readonly HashSet<Entry> _detached = [];
     private readonly List<Task> _retired = [];
     private readonly IStoryImageSource _source;
@@ -79,10 +83,45 @@ public sealed class StoryImages : IDisposable, IAsyncDisposable
         lock (_sync)
         {
             ObjectDisposedException.ThrowIf(_disposed, this);
+            _dimensions.Clear();
             foreach (var entry in _entries.Values)
                 _detached.Add(entry);
             _entries.Clear();
         }
+    }
+
+    internal bool IsSmallImage(string path)
+    {
+        lock (_sync)
+            return _dimensions.TryGetValue(path, out var dimensions) &&
+                dimensions.Width <= SmallImageMaxWidth && dimensions.Height <= SmallImageMaxHeight;
+    }
+
+    internal void RecordImageDimensions(string path, int width, int height)
+    {
+        if (width <= 0 || height <= 0) return;
+        lock (_sync)
+        {
+            if (!_disposed && _paths.Contains(path))
+                _dimensions[path] = (width, height);
+        }
+    }
+
+    internal async Task<(int Width, int Height)?> GetImageDimensionsAsync(string path)
+    {
+        lock (_sync)
+        {
+            ObjectDisposedException.ThrowIf(_disposed, this);
+            if (!_paths.Contains(path))
+                throw new InvalidDataException($"Image '{path}' is not in this story's safe image catalogue.");
+            if (_dimensions.TryGetValue(path, out var cachedDimensions)) return cachedDimensions;
+        }
+
+        await using var stream = await OpenAsync(path, Lifetime);
+        var imageDimensions = await ImageDimensions.ReadAsync(stream, path, Lifetime);
+        if (imageDimensions is { } measured)
+            RecordImageDimensions(path, measured.Width, measured.Height);
+        return imageDimensions;
     }
 
     private async Task<string> TransferAsync(string path, Entry entry)
