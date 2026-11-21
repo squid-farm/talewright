@@ -36,11 +36,28 @@ public sealed class PublishSettings : CliSettings
 
     public override ValidationResult Validate()
     {
-        if (Destination is null || (!Split && !Destination.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)))
+        var targetAll = Target == "all";
+        if (Destination is null)
         {
-            return ValidationResult.Error(Split
-                ? "--split requires --output <directory>."
+            return ValidationResult.Error(targetAll
+                ? "--target all requires --output <directory>."
                 : "--output <file.zip> is required.");
+        }
+
+        if (targetAll)
+        {
+            if (Destination.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            {
+                return ValidationResult.Error("--target all uses --output as a directory, not a ZIP path.");
+            }
+            if (Runtime is not null)
+            {
+                return ValidationResult.Error("--runtime cannot be combined with --target all.");
+            }
+        }
+        else if (!Split && !Destination.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+        {
+            return ValidationResult.Error("--output <file.zip> is required.");
         }
 
         if (Split && Destination.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
@@ -48,16 +65,16 @@ public sealed class PublishSettings : CliSettings
             return ValidationResult.Error("--split uses --output as a directory, not a ZIP path.");
         }
 
-        if (Split && (!AllInOne || Target != "desktop" || Runtime is not null))
+        if (Split && (!AllInOne || (Target != "desktop" && Target != "all") || Runtime is not null))
         {
-            return ValidationResult.Error("--split requires -a --target desktop and cannot be combined with --runtime.");
+            return ValidationResult.Error("--split requires -a --target desktop|all and cannot be combined with --runtime.");
         }
 
         if ((!AllInOne && (Target is not null || Runtime is not null)) ||
-            (Target is not null && Target is not ("web" or "desktop")) ||
+            (Target is not null && Target is not ("web" or "desktop" or "all")) ||
             (Runtime is not null && (Target != "desktop" || !PublishCommand.DesktopRuntimes.Contains(Runtime))))
         {
-            return ValidationResult.Error("Use --all-in-one with --target web|desktop; --runtime is only valid for desktop and must match a supported Photino RID.");
+            return ValidationResult.Error("Use --all-in-one with --target web|desktop|all; --runtime is only valid for desktop and must match a supported Photino RID.");
         }
 
         return ValidationResult.Success();
@@ -109,11 +126,15 @@ public sealed class PublishCommand : Command<PublishSettings>
             {
                 throw new IOException($"Output '{final}' is a file. Choose a directory for --output.");
             }
-            if (!split && Directory.Exists(final))
+            if (target == "all" && File.Exists(final))
+            {
+                throw new IOException($"Output '{final}' is a file. Choose a directory for --target all.");
+            }
+            if (target != "all" && !split && Directory.Exists(final))
             {
                 throw new IOException($"Output '{final}' is a directory. Choose a different --output ZIP path.");
             }
-            if (!split && File.Exists(final) && !force)
+            if (target != "all" && !split && File.Exists(final) && !force)
             {
                 if (settings.NonInteractive || !input.IsInteractive)
                 {
@@ -151,6 +172,11 @@ public sealed class PublishCommand : Command<PublishSettings>
         {
             error.WriteLine("Publication failed: the story has compiler errors.");
             return 1;
+        }
+
+        if (target == "all")
+        {
+            return PublishAll(final, result.Story!.Id, result.Story.Title, source, writers, settings, publication);
         }
 
         if (split)
@@ -224,6 +250,212 @@ public sealed class PublishCommand : Command<PublishSettings>
                 File.Delete(temporaryZip);
             }
 
+            if (working is not null && Directory.Exists(working))
+            {
+                Directory.Delete(working, recursive: true);
+            }
+        }
+    }
+
+    private static int PublishAll(string destination, string storyId, string storyTitle, StorySource source, CommandWriters writers,
+        PublishSettings settings, Operations publication)
+    {
+        var (output, error, input, _) = writers;
+        var existing = new[] { Path.Combine(destination, "web"), Path.Combine(destination, "desktop") }
+            .Where(path => Directory.Exists(path) || File.Exists(path))
+            .ToArray();
+
+        if (existing.Length > 0 && !settings.Force)
+        {
+            if (settings.NonInteractive || !input.IsInteractive)
+            {
+                error.WriteLine($"{CliDiagnosticCodes.IoFailure}: All-target output already exists: {string.Join(", ", existing)}. Choose a new --output directory or use --force to replace the full set explicitly.");
+                return 2;
+            }
+
+            error.WriteLine("These all-target outputs already exist:");
+            foreach (var path in existing)
+            {
+                error.WriteLine($"  {path}");
+            }
+            error.Write("Replace all existing outputs? [y/N] ");
+            error.Flush();
+            var answer = input.Reader.ReadLine()?.Trim();
+            if (!string.Equals(answer, "y", StringComparison.OrdinalIgnoreCase) &&
+                !string.Equals(answer, "yes", StringComparison.OrdinalIgnoreCase))
+            {
+                error.WriteLine("Publication cancelled. No target was published.");
+                return 2;
+            }
+        }
+
+        string? working = null;
+        var staged = new List<(string Target, string Path)>();
+        var backups = new Dictionary<string, string>(StringComparer.Ordinal);
+        var installed = new HashSet<string>(StringComparer.Ordinal);
+        try
+        {
+            working = Path.Combine(Path.GetTempPath(), $"talewright-publish-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(working);
+            var story = Path.Combine(working, "story");
+            WriteStory(source, settings.Root, story);
+            _ = StorySource.FromDirectory(story);
+
+            var webWorking = Path.Combine(working, "web-output");
+            Directory.CreateDirectory(webWorking);
+            var webContent = publication.BuildHost(working, "web", null, story, output, error);
+            StageExternalStory(story, webContent, "web");
+            File.Copy(Path.Combine(AssetsRoot, "ENGINE-LICENSE.txt"), Path.Combine(webContent, "ENGINE-LICENSE.txt"));
+            File.WriteAllText(Path.Combine(webContent, "DEPLOYMENT.txt"), DeploymentInstructions("web", null, storyTitle));
+            CopyDirectory(webContent, webWorking);
+            WebHostingSize.FromDirectory(webWorking).WriteWarning(error, estimate: false, target: "web");
+            staged.Add(("web", webWorking));
+
+            var desktopWorking = Path.Combine(working, "desktop-output");
+            Directory.CreateDirectory(desktopWorking);
+            if (settings.Split)
+            {
+                var stem = Uri.EscapeDataString(storyId);
+                foreach (var runtime in DesktopRuntimes)
+                {
+                    var built = BuildDesktopRuntime(working, runtime, story, output, error, publication);
+                    MoveDesktopRuntimeToInternal(built, runtime);
+                    var internalStory = Path.Combine(built, "internal", "story");
+                    Directory.CreateDirectory(internalStory);
+                    CopyDirectory(story, internalStory);
+                    CreateSplitLauncher(built, storyTitle, storyId, runtime);
+                    File.Copy(Path.Combine(AssetsRoot, "ENGINE-LICENSE.txt"), Path.Combine(built, "ENGINE-LICENSE.txt"));
+                    File.WriteAllText(Path.Combine(built, "DEPLOYMENT.txt"), DeploymentInstructions("desktop", runtime, storyTitle));
+                    publication.CreateZip(built, Path.Combine(desktopWorking, $"{stem}-{runtime}.zip"));
+                }
+            }
+            else
+            {
+                var desktopContent = BuildUniversalDesktop(working, story, storyTitle, storyId, output, error, publication);
+                File.Copy(Path.Combine(AssetsRoot, "ENGINE-LICENSE.txt"), Path.Combine(desktopContent, "ENGINE-LICENSE.txt"));
+                File.WriteAllText(Path.Combine(desktopContent, "DEPLOYMENT.txt"), DeploymentInstructions("desktop", null, storyTitle));
+                CopyDirectory(desktopContent, desktopWorking);
+            }
+            staged.Add(("desktop", desktopWorking));
+
+            Directory.CreateDirectory(destination);
+            try
+            {
+                foreach (var (target, stagedPath) in staged)
+                {
+                    var final = Path.Combine(destination, target);
+                    if (Directory.Exists(final) || File.Exists(final))
+                    {
+                        var backup = Path.Combine(destination, $".talewright-{Guid.NewGuid():N}-{target}.bak");
+                        if (Directory.Exists(final))
+                        {
+                            Directory.Move(final, backup);
+                        }
+                        else
+                        {
+                            publication.MoveFile(final, backup);
+                        }
+                        backups.Add(final, backup);
+                    }
+                }
+
+                foreach (var (target, stagedPath) in staged)
+                {
+                    var final = Path.Combine(destination, target);
+                    Directory.Move(stagedPath, final);
+                    installed.Add(final);
+                }
+            }
+            catch (Exception commitError)
+            {
+                var rollbackErrors = new List<Exception>();
+                foreach (var final in installed.Reverse())
+                {
+                    try
+                    {
+                        if (Directory.Exists(final))
+                        {
+                            Directory.Delete(final, recursive: true);
+                        }
+                        else if (File.Exists(final))
+                        {
+                            File.Delete(final);
+                        }
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        rollbackErrors.Add(ex);
+                    }
+                }
+                foreach (var (final, backup) in backups.Reverse())
+                {
+                    try
+                    {
+                        if (Directory.Exists(backup))
+                        {
+                            Directory.Move(backup, final);
+                        }
+                        else
+                        {
+                            publication.MoveFile(backup, final);
+                        }
+                    }
+                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                    {
+                        rollbackErrors.Add(ex);
+                    }
+                }
+                if (rollbackErrors.Count > 0)
+                {
+                    throw new IOException(
+                        "All-target publication failed and rollback was incomplete.",
+                        new AggregateException([commitError, .. rollbackErrors]));
+                }
+                throw;
+            }
+
+            foreach (var backup in backups.Values)
+            {
+                try
+                {
+                    if (Directory.Exists(backup))
+                    {
+                        Directory.Delete(backup, recursive: true);
+                    }
+                    else if (File.Exists(backup))
+                    {
+                        File.Delete(backup);
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    error.WriteLine($"Warning: all-target output was published, but backup '{backup}' could not be removed: {ex.Message}");
+                }
+            }
+
+            foreach (var (target, _) in staged)
+            {
+                output.WriteLine($"Published {target} target: {Path.Combine(destination, target)}");
+            }
+            return 0;
+        }
+        catch (IOException ex) when (existing.Length > 0 && !settings.Force)
+        {
+            error.WriteLine($"{CliDiagnosticCodes.IoFailure}: Publication failed: {ex.Message}");
+            return 2;
+        }
+        catch (PublishBuildException ex)
+        {
+            error.WriteLine($"Publication failed: {ex.Message}");
+            return 1;
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException or Win32Exception)
+        {
+            error.WriteLine($"{CliDiagnosticCodes.IoFailure}: Publication failed: {ex.Message}");
+            return 2;
+        }
+        finally
+        {
             if (working is not null && Directory.Exists(working))
             {
                 Directory.Delete(working, recursive: true);

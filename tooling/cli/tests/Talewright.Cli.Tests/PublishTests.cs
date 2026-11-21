@@ -14,6 +14,7 @@ public sealed class PublishTests : IDisposable
     private string Story => Path.Combine(_root, "story");
     private string Zip => Path.Combine(_root, "output.zip");
     private string SplitDirectory => Path.Combine(_root, "split");
+    private string AllDirectory => Path.Combine(_root, "all-output");
 
     public PublishTests()
     {
@@ -61,6 +62,17 @@ public sealed class PublishTests : IDisposable
         using var error = new StringWriter();
         var code = CommandLine.Run(
             ["publish", Story, "--output", SplitDirectory, "-a", "--target", "desktop", "--split", .. args],
+            output, error, new CliInput(input, inputRedirected, false), publication);
+        return (code, output.ToString(), error.ToString());
+    }
+
+    private (int Code, string Output, string Error) RunAllControlled(TextReader input,
+        bool inputRedirected = false, PublishCommand.Operations? publication = null, params string[] args)
+    {
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var code = CommandLine.Run(
+            ["publish", Story, "--output", AllDirectory, "-a", "--target", "all", .. args],
             output, error, new CliInput(input, inputRedirected, false), publication);
         return (code, output.ToString(), error.ToString());
     }
@@ -1119,6 +1131,116 @@ public sealed class PublishTests : IDisposable
     }
 
     [Fact]
+    public void All_target_builds_web_and_universal_desktop_once_after_validation()
+    {
+        var builds = new List<(string Target, string? Runtime)>();
+        var publication = PublishCommand.Operations.Default with
+        {
+            BuildHost = (working, target, runtime, story, output, error) =>
+            {
+                builds.Add((target, runtime));
+                var host = Path.Combine(working, $"host-{target}-{runtime ?? "web"}");
+                Directory.CreateDirectory(host);
+                File.WriteAllText(Path.Combine(host, "host.txt"), runtime ?? "web");
+                if (runtime is null && target == "desktop")
+                {
+                    foreach (var desktopRuntime in PublishCommand.DesktopRuntimes)
+                    {
+                        var runtimeDirectory = Path.Combine(host, desktopRuntime);
+                        Directory.CreateDirectory(runtimeDirectory);
+                        File.WriteAllText(Path.Combine(runtimeDirectory, "host.txt"), desktopRuntime);
+                    }
+                }
+                return host;
+            },
+        };
+
+        var result = RunAllControlled(new UnreadableInput(), inputRedirected: true, publication: publication);
+
+        Assert.Equal(0, result.Code);
+        Assert.Empty(result.Error);
+        Assert.Contains(( "web", (string?)null), builds);
+        Assert.Equal(PublishCommand.DesktopRuntimes.Length,
+            builds.Count(build => build.Target == "desktop" && build.Runtime is not null));
+        Assert.True(Directory.Exists(Path.Combine(AllDirectory, "web")));
+        Assert.True(Directory.Exists(Path.Combine(AllDirectory, "desktop")));
+        Assert.True(File.Exists(Path.Combine(AllDirectory, "web", "story", "story.talewright.yaml")));
+        Assert.True(Directory.Exists(Path.Combine(AllDirectory, "desktop", "internal")));
+        Assert.Empty(Directory.GetFiles(_root, "*.tmp"));
+    }
+
+    [Fact]
+    public void All_target_validation_failure_builds_nothing()
+    {
+        File.WriteAllText(Path.Combine(Story, "chapters", "main.tale"), "=== a\n-> missing");
+        var builds = 0;
+        var publication = PublishCommand.Operations.Default with
+        {
+            BuildHost = (_, _, _, _, _, _) =>
+            {
+                builds++;
+                throw new InvalidOperationException("Validation must prevent all target builds.");
+            },
+        };
+
+        var result = RunAllControlled(new UnreadableInput(), inputRedirected: true, publication: publication);
+
+        Assert.Equal(1, result.Code);
+        Assert.Equal(0, builds);
+        Assert.False(Directory.Exists(AllDirectory));
+    }
+
+    [Fact]
+    public void All_target_split_builds_desktop_archives_under_desktop_directory()
+    {
+        var builds = 0;
+        var publication = PublishCommand.Operations.Default with
+        {
+            BuildHost = (working, _, runtime, _, _, _) =>
+            {
+                builds++;
+                var output = Path.Combine(working, $"output-{runtime}");
+                Directory.CreateDirectory(output);
+                File.WriteAllText(Path.Combine(output, "host.txt"), runtime);
+                return output;
+            },
+        };
+
+        var result = RunAllControlled(new UnreadableInput(), inputRedirected: true,
+            publication: publication, args: ["--split"]);
+
+        Assert.Equal(0, result.Code);
+        Assert.Equal(PublishCommand.DesktopRuntimes.Length + 1, builds);
+        Assert.True(Directory.Exists(Path.Combine(AllDirectory, "web")));
+        var desktop = Path.Combine(AllDirectory, "desktop");
+        Assert.Equal(PublishCommand.DesktopRuntimes.Length,
+            Directory.GetFiles(desktop, "*.zip").Length);
+    }
+
+    [Fact]
+    public void All_target_existing_output_requires_force_before_building()
+    {
+        Directory.CreateDirectory(Path.Combine(AllDirectory, "web"));
+        File.WriteAllText(Path.Combine(AllDirectory, "web", "keep"), "keep");
+        var builds = 0;
+        var publication = PublishCommand.Operations.Default with
+        {
+            BuildHost = (_, _, _, _, _, _) =>
+            {
+                builds++;
+                throw new InvalidOperationException("Existing output must prevent builds.");
+            },
+        };
+
+        var result = RunAllControlled(new UnreadableInput(), inputRedirected: true, publication: publication);
+
+        Assert.Equal(2, result.Code);
+        Assert.Contains("--force", result.Error);
+        Assert.Equal(0, builds);
+        Assert.Equal("keep", File.ReadAllText(Path.Combine(AllDirectory, "web", "keep")));
+    }
+
+    [Fact]
     public void Existing_output_requires_force_and_failed_validation_preserves_it()
     {
         Assert.Equal(0, Run().Code);
@@ -1129,6 +1251,22 @@ public sealed class PublishTests : IDisposable
         Assert.Equal(1, Run("--force").Code);
         Assert.Equal(before, File.ReadAllBytes(Zip));
         Assert.Empty(Directory.GetFiles(_root, "*.tmp"));
+    }
+
+    [Fact]
+    public void All_target_rejects_zip_output_and_runtime()
+    {
+        using var zipOutput = new StringWriter();
+        using var zipError = new StringWriter();
+        Assert.Equal(2, CommandLine.Run(
+            ["publish", Story, "--output", Zip, "-a", "--target", "all"],
+            zipOutput, zipError, new CliInput(new UnreadableInput(), true, true)));
+        Assert.Contains("directory, not a ZIP path", zipError.ToString());
+
+        var runtimeResult = RunAllControlled(new UnreadableInput(), inputRedirected: true,
+            args: ["--runtime", "linux-x64"]);
+        Assert.Equal(2, runtimeResult.Code);
+        Assert.Contains("--runtime cannot be combined", runtimeResult.Error);
     }
 
     [Theory]
