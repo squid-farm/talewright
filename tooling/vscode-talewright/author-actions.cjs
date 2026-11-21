@@ -201,12 +201,47 @@ async function createTask(command, requested, definition, scope, scene) {
     }
     args.push('--output', output.fsPath);
   }
+  let standaloneDestination;
+  if (command === 'publish-desktop' || command === 'publish-web') {
+    const target = command === 'publish-desktop' ? 'desktop' : 'web';
+    const output = await vscode.window.showSaveDialog({
+      title: `Publish standalone ${target} game`,
+      defaultUri: vscode.Uri.file(path.join(root, `${path.basename(root)}-${target}.zip`)),
+      filters: { [`Standalone ${target} ZIP`]: ['zip'] },
+    });
+    if (!output) return undefined;
+    if (output.scheme !== 'file' || path.extname(output.fsPath).toLowerCase() !== '.zip') {
+      throw new Error(`Choose a local .zip destination for the standalone ${target} game.`);
+    }
+    standaloneDestination = output.fsPath;
+    args.splice(0, args.length, 'publish', root, '-a', '--target', target,
+      '--output', standaloneDestination);
+  }
+  if (command === 'publish-all') {
+    const [output] = await vscode.window.showOpenDialog({
+      title: 'Choose a folder for standalone web and desktop games',
+      defaultUri: vscode.Uri.file(root),
+      canSelectFiles: false,
+      canSelectFolders: true,
+      canSelectMany: false,
+    }) ?? [];
+    if (!output) return undefined;
+    if (output.scheme !== 'file' || !path.isAbsolute(output.fsPath)) {
+      throw new Error('Choose a local output folder for all standalone targets.');
+    }
+    standaloneDestination = path.resolve(output.fsPath);
+    args.splice(0, args.length, 'publish', root, '-a', '--target', 'all',
+      '--output', standaloneDestination);
+  }
   if (!await saveStory(root)) return undefined;
   if (!vscode.workspace.isTrusted) throw new Error('Workspace trust was revoked. No CLI task was started.');
   const folder = vscode.workspace.getWorkspaceFolder(vscode.Uri.file(root));
   const names = {
     validate: 'Validate Story', publish: 'Publish Story ZIP',
     debug: 'Open Author Debugger', run: 'Run Story',
+    'publish-desktop': 'Publish Standalone Desktop Game',
+    'publish-web': 'Publish Standalone Web Game',
+    'publish-all': 'Publish All Standalone Targets',
   };
   const taskDefinition = definition ?? {
     type: 'talewright', command, story: root, ...(scene ? { scene } : {}),
@@ -217,7 +252,47 @@ async function createTask(command, requested, definition, scope, scene) {
     new vscode.ProcessExecution(executable, args, { cwd: root }), [],
   );
   task.presentationOptions = { reveal: vscode.TaskRevealKind.Always, panel: vscode.TaskPanelKind.Dedicated, focus: true };
+  task.talewrightStandaloneDestination = standaloneDestination;
   return task;
+}
+
+async function executeAuthorTask(task, label) {
+  const run = async () => {
+    await new Promise((resolve, reject) => {
+      let settled = false;
+      const processSubscription = vscode.tasks.onDidEndTaskProcess?.(event => {
+        if (settled) return;
+        if (event.execution?.task && event.execution.task !== task) return;
+        settled = true;
+        processSubscription?.dispose();
+        if (event.exitCode === 0) {
+          const destination = task.talewrightStandaloneDestination;
+          const folder = destination && path.extname(destination).toLowerCase() === '.zip'
+            ? path.dirname(destination) : destination;
+          vscode.window.showInformationMessage(`${label} published successfully.`, 'Open Folder')
+            .then(choice => {
+              if (choice === 'Open Folder' && folder) {
+                void vscode.env.openExternal(vscode.Uri.file(folder).toString());
+              }
+            });
+        }
+        resolve();
+      });
+      void vscode.tasks.executeTask(task).catch(error => {
+        processSubscription?.dispose();
+        reject(error);
+      });
+    });
+  };
+  if (vscode.window.withProgress) {
+    await vscode.window.withProgress({
+      location: vscode.ProgressLocation?.Notification ?? 15,
+      title: `Publishing ${label}`,
+      cancellable: false,
+    }, run);
+  } else {
+    await run();
+  }
 }
 
 function registerAuthorActions(context) {
@@ -254,11 +329,23 @@ function registerAuthorActions(context) {
   for (const [id, command] of [
     ['validateStory', 'validate'], ['publishStoryZip', 'publish'],
     ['openAuthorDebugger', 'debug'], ['runStory', 'run'],
+    ['publishStandaloneDesktop', 'publish-desktop'],
+    ['publishStandaloneWeb', 'publish-web'],
+    ['publishStandaloneAll', 'publish-all'],
   ]) {
     context.subscriptions.push(vscode.commands.registerCommand(`talewright.${id}`, async () => {
       try {
         const task = await createTask(command);
-        if (task) await vscode.tasks.executeTask(task);
+        if (task) {
+          if (command.startsWith('publish-')) {
+            const label = command === 'publish-desktop' ? 'Standalone desktop game'
+              : command === 'publish-web' ? 'Standalone web game'
+              : 'Standalone web and desktop games';
+            await executeAuthorTask(task, label);
+          } else {
+            await vscode.tasks.executeTask(task);
+          }
+        }
       } catch (error) {
         await report(error);
       }

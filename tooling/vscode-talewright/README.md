@@ -255,6 +255,13 @@ CLI. Find them in the Command Palette (**Ctrl+Shift+P**):
 - **Talewright: Publish Story ZIP** asks for a destination and runs `talewright publish`. This makes a
   story ZIP for a Talewright player, not a standalone game. If the file exists, answer the replace
   question in the terminal; the extension never adds `--force`.
+- **Talewright: Publish Standalone Desktop Game** asks for a ZIP destination and packages a standalone
+  desktop game.
+- **Talewright: Publish Standalone Web Game** asks for a ZIP destination and packages a standalone
+  web game.
+- **Talewright: Publish All Standalone Targets** asks for an output folder and packages both web and
+  desktop targets beneath it. Existing output prompts are handled interactively in the terminal;
+  the extension never adds `--force`.
 - **Talewright: Open Author Debugger** runs `talewright debug` and opens the native Author Debugger
   (not VS Code's debugger).
 - **Talewright: Play From This Scene** (also the **Play from here** code lens above each scene, and the
