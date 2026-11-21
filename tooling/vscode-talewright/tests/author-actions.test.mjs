@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { test } from 'node:test';
 import vm from 'node:vm';
+import { parse } from 'yaml';
 
 const source = await readFile(new URL('../author-actions.cjs', import.meta.url), 'utf8');
 const toolsSource = await readFile(new URL('../cli-tools.cjs', import.meta.url), 'utf8');
@@ -163,6 +164,7 @@ function host(options = {}) {
   const module = { exports: {} };
   const dependencies = {
     vscode, 'node:path': path, 'node:fs': { constants: { X_OK: 1, F_OK: 0 } },
+    yaml: { parse },
     'node:os': { homedir: () => '/home/author' },
     'node:crypto': { createHash: () => ({ update: () => ({ digest: () => '0'.repeat(64) }) }) },
     'node:child_process': { execFile: {} },
@@ -690,6 +692,24 @@ test('publish save dialogs suggest story id and safe declared version', async ()
   await desktop.run('publishStandaloneDesktop');
   assert.equal(desktop.calls.dialogs[0].defaultUri.fsPath,
     '/workspace/My Story/uss-bastogne-v0.1.0-release-desktop.zip');
+});
+
+test('publish save dialogs parse flow-style manifests and quoted hash scalars', async () => {
+  const flow = host({
+    manifestText: 'game: {id: test, title: Test, version: 1.2.3, start: beginning}\n',
+    output: '/exports/test-v1.2.3.zip',
+  });
+  await flow.run('publishStoryZip');
+  assert.equal(flow.calls.dialogs[0].defaultUri.fsPath,
+    '/workspace/My Story/test-v1.2.3.zip');
+
+  const quoted = host({
+    manifestText: 'game:\n  id: test\n  title: Test\n  version: "alpha # beta"\n  start: beginning\n',
+    output: '/exports/test-valpha-beta.zip',
+  });
+  await quoted.run('publishStoryZip');
+  assert.equal(quoted.calls.dialogs[0].defaultUri.fsPath,
+    '/workspace/My Story/test-valpha-beta.zip');
 });
 
 test('debug and run actions and reusable tasks share selection, executable, trust and save handling', async () => {

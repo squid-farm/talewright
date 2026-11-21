@@ -1,6 +1,7 @@
 const vscode = require('vscode');
 const path = require('node:path');
 const { readFile, readdir } = require('node:fs/promises');
+const { parse } = require('yaml');
 const { cliExecutable, cliIsSelfContained, executeCli, registerCliSetup, requireDotnetRuntime } = require('./cli-tools.cjs');
 
 const PENDING_NEW_STORY = 'pendingNewStory';
@@ -29,23 +30,10 @@ async function publishName(root) {
     } catch {
       text = await readFile(manifestPath, 'utf8');
     }
-    const lines = text.split(/\r\n|\r|\n/);
-    const game = lines.findIndex(line => /^\s*game\s*:\s*(?:$|#)/.test(line));
-    if (game >= 0) {
-      const gameIndent = lines[game].search(/\S/);
-      for (let index = game + 1; index < lines.length; index++) {
-        const line = lines[index];
-        if (!/^\s*(?:$|#)/.test(line) && line.search(/\S/) <= gameIndent) break;
-        const match = /^\s*(id|version)\s*:\s*(.*?)\s*$/.exec(line);
-        if (!match) continue;
-        let value = match[2].replace(/\s+#.*$/, '').trim();
-        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
-          value = value.slice(1, -1);
-        }
-        if (match[1] === 'id' && value) storyId = value;
-        if (match[1] === 'version' && value) version = value;
-      }
-    }
+    const manifest = parse(text);
+    const game = manifest?.game;
+    if (typeof game?.id === 'string' && game.id) storyId = game.id;
+    if (typeof game?.version === 'string' && game.version) version = game.version;
   } catch {
     // Keep the story directory name when the manifest cannot be read.
   }
