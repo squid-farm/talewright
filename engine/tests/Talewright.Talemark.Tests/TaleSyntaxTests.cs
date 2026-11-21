@@ -302,6 +302,23 @@ public sealed class TaleSyntaxTests
             (clause.Kind, clause.Start, syntax.Value(scene, line, clause).ToString().Trim())));
     }
 
+    [Fact]
+    public void Choice_label_closer_preserves_following_clauses_after_an_unclosed_substitution()
+    {
+        var syntax = Parse("=== start\n* [my {var:count] (requires flag:ready) -> finish\n=== finish\n-> END");
+        var scene = syntax.Scenes[0];
+        var line = Assert.Single(scene.Lines);
+
+        Assert.Empty(scene.Diagnostics);
+        Assert.Equal(
+        [
+            (TaleClauseKind.Label, "my {var:count"),
+            (TaleClauseKind.Requires, "flag:ready"),
+            (TaleClauseKind.Divert, "finish"),
+        ], scene.Clauses(line).ToArray()
+            .Select(clause => (clause.Kind, syntax.Value(scene, line, clause).ToString())));
+    }
+
     [Theory]
     [InlineData("* [Go -> next", 2)]
     [InlineData("* [Go] (requires flag:f -> next", 7)]
