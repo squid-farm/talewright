@@ -92,6 +92,22 @@ try {
     }
   }
   await assertAbsent(dotnetMarker);
+  await writeFile(path.join(profile, 'user', 'User', 'settings.json'), JSON.stringify({
+    'security.workspace.trust.startupPrompt': 'never',
+    'talewright.languageServer.enabled': false,
+    'files.simpleDialog.enable': true,
+  }));
+  await runTests({
+    vscodeExecutablePath: executable,
+    extensionDevelopmentPath: path.join(root, 'tests/host'),
+    extensionTestsPath: path.join(root, 'tests/editor.cjs'),
+    extensionTestsEnv: {
+      TALEWRIGHT_TEST_STANDALONE_PUBLISH: 'true',
+      TALEWRIGHT_RENDERER_PORT: String(rendererPort),
+    },
+    launchArgs: [...profileArgs, untrusted, '--disable-workspace-trust', '--disable-gpu', '--no-sandbox',
+      `--remote-debugging-port=${rendererPort}`],
+  });
   if (process.env.TALEWRIGHT_TEST_CLI) {
     await writeFile(path.join(profile, 'user', 'User', 'settings.json'), JSON.stringify({
       'talewright.cli.executablePath': process.env.TALEWRIGHT_TEST_CLI,

@@ -69,6 +69,12 @@ edits every occurrence of one; signature help, formatting, and autofixes are
 not advertised.
 Unsupported requests return JSON-RPC method-not-found.
 
+The VS Code client may send an optional `talewrightCompletionText` string with a
+completion request when full-text synchronization overtakes its captured position.
+The server calculates the completion against that request snapshot without changing
+the open document, and still rejects the result if the current document changes again.
+Other clients can omit this field and use normal synchronized document text.
+
 ### Requests, analysis, and diagnostics
 
 Document and filesystem notifications are handled in arrival order. Semantic

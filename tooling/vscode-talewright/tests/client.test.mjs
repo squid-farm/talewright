@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 import { test } from 'node:test';
@@ -55,6 +56,7 @@ function host(settings = {}, trusted = true, failStart = false, platform = 'linu
     require: name => {
       if (name === 'vscode') return vscode;
       if (name === 'node:path') return path;
+      if (name === 'node:async_hooks') return { AsyncLocalStorage };
       if (name === './author-actions.cjs') return { registerAuthorActions: () => {} };
       if (name === './formatting.cjs') return { registerFormattingCommands: () => {} };
       if (name === './refactor-saves.cjs') return { registerRefactorSaves: () => ({}) };
@@ -71,6 +73,37 @@ function host(settings = {}, trusted = true, failStart = false, platform = 'linu
   });
   return { extension: module.exports, calls, context: { subscriptions: [], extensionPath: '/installed/talewright' } };
 }
+
+test('completion requests use the original text when pending document changes overtake the request', async () => {
+  const { extension, calls, context } = host();
+  await extension.activate(context);
+  const middleware = calls.clients[0].options.middleware;
+  const document = {
+    uri: { toString: () => 'file:///start.tale' },
+    version: 1, text: 'su', getText() { return this.text; },
+  };
+  const token = { isCancellationRequested: false };
+  const type = { method: 'textDocument/completion' };
+  const params = { textDocument: { uri: 'file:///start.tale' }, position: { line: 2, character: 6 } };
+  const send = () => middleware.sendRequest(type, params, token, (_type, sent) => sent);
+
+  const fresh = await middleware.provideCompletionItem(document, params.position, {}, token, send);
+  assert.equal(fresh, params);
+
+  const stale = await middleware.provideCompletionItem(document, params.position, {}, token, async () => {
+    await Promise.resolve();
+    document.version++;
+    document.text = 'suc';
+    const unrelated = middleware.sendRequest(type, { textDocument: { uri: 'file:///other.tale' } }, token,
+      (_type, sent) => sent);
+    assert.equal(unrelated.talewrightCompletionText, undefined);
+    return send();
+  });
+  assert.equal(stale.talewrightCompletionText, 'su');
+  assert.equal(params.talewrightCompletionText, undefined);
+  assert.equal(middleware.sendRequest(type, params, token, (_type, sent) => sent), params);
+  await extension.deactivate();
+});
 
 test('preview toggle changes only Talemark native inlay visibility without a reload', async () => {
   for (const [current, expected] of [['on', 'off'], ['off', 'on'], ['onUnlessPressed', 'off']]) {

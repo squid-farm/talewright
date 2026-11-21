@@ -1,12 +1,14 @@
 const vscode = require('vscode');
 const path = require('node:path');
 const { accessSync, constants, readFileSync } = require('node:fs');
+const { AsyncLocalStorage } = require('node:async_hooks');
 const { LanguageClient } = require('vscode-languageclient/node');
 const { registerAuthorActions } = require('./author-actions.cjs');
 const { registerFormattingCommands } = require('./formatting.cjs');
 const { registerRefactorSaves } = require('./refactor-saves.cjs');
 
 let client;
+const completionSnapshots = new AsyncLocalStorage();
 
 async function activate(context) {
   registerFormattingCommands(context, vscode);
@@ -79,7 +81,23 @@ async function startLanguageServer(context) {
         fileEvents,
       },
       outputChannel,
-      middleware: registerRefactorSaves(context, outputChannel),
+      middleware: {
+        ...registerRefactorSaves(context, outputChannel),
+        provideCompletionItem: async (document, position, completionContext, token, next) => {
+          // Full-sync changes can be flushed after the position is captured but before the request is sent.
+          const snapshot = { document, version: document.version, text: document.getText() };
+          return completionSnapshots.run(snapshot, () => next(document, position, completionContext, token));
+        },
+        sendRequest: (type, params, token, next) => {
+          const snapshot = completionSnapshots.getStore();
+          if (type.method === 'textDocument/completion' && snapshot &&
+              params?.textDocument?.uri === snapshot.document.uri.toString() &&
+              snapshot.document.version !== snapshot.version) {
+            params = { ...params, talewrightCompletionText: snapshot.text };
+          }
+          return next(type, params, token);
+        },
+      },
     });
     context.subscriptions.push(vscode.workspace.onDidChangeConfiguration(event => {
       if (event.affectsConfiguration('talewright.languageServer')) {
