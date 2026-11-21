@@ -1300,8 +1300,11 @@ public sealed class PublishTests : IDisposable
             builds.Count(build => build.Target == "desktop" && build.Runtime is not null));
         Assert.True(Directory.Exists(Path.Combine(AllDirectory, "web")));
         Assert.True(Directory.Exists(Path.Combine(AllDirectory, "desktop")));
-        Assert.True(File.Exists(Path.Combine(AllDirectory, "web", "story", "story.talewright.yaml")));
-        Assert.True(Directory.Exists(Path.Combine(AllDirectory, "desktop", "internal")));
+        using var web = ZipFile.OpenRead(Path.Combine(AllDirectory, "web", "publish-web.zip"));
+        Assert.NotNull(web.GetEntry("story/story.talewright.yaml"));
+        using var desktop = ZipFile.OpenRead(Path.Combine(AllDirectory, "desktop", "publish-desktop.zip"));
+        Assert.NotNull(desktop.GetEntry("Publish.sh"));
+        Assert.NotNull(desktop.GetEntry("internal/linux-x64/host.txt"));
         Assert.Empty(Directory.GetFiles(_root, "*.tmp"));
     }
 
@@ -1347,10 +1350,60 @@ public sealed class PublishTests : IDisposable
 
         Assert.Equal(0, result.Code);
         Assert.Equal(PublishCommand.DesktopRuntimes.Length + 1, builds);
-        Assert.True(Directory.Exists(Path.Combine(AllDirectory, "web")));
+        using var web = ZipFile.OpenRead(Path.Combine(AllDirectory, "web", "publish-web.zip"));
+        Assert.NotNull(web.GetEntry("story/story.talewright.yaml"));
         var desktop = Path.Combine(AllDirectory, "desktop");
         Assert.Equal(PublishCommand.DesktopRuntimes.Length,
             Directory.GetFiles(desktop, "*.zip").Length);
+        foreach (var runtime in PublishCommand.DesktopRuntimes)
+        {
+            using var archive = ZipFile.OpenRead(Path.Combine(desktop, $"publish-{runtime}.zip"));
+            Assert.NotNull(archive.GetEntry($"internal/{runtime}/host.txt"));
+        }
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void All_target_archives_prebuilt_web_and_desktop_templates(bool split)
+    {
+        var result = RunAllControlled(new UnreadableInput(), inputRedirected: true,
+            publication: TemplatePublication, args: split ? ["--split"] : []);
+
+        Assert.True(result.Code == 0, result.Error + result.Output);
+        Assert.Equal(["publish-web.zip"], Directory.GetFiles(Path.Combine(AllDirectory, "web")).Select(Path.GetFileName));
+        using var web = ZipFile.OpenRead(Path.Combine(AllDirectory, "web", "publish-web.zip"));
+        Assert.Equal("<html>prebuilt web template</html>", ReadEntry(web, "index.html"));
+        Assert.NotNull(web.GetEntry("story/story.talewright.yaml"));
+
+        var desktopDirectory = Path.Combine(AllDirectory, "desktop");
+        var names = split
+            ? PublishCommand.DesktopRuntimes.Select(runtime => $"publish-{runtime}.zip").Order().ToArray()
+            : ["publish-desktop.zip"];
+        Assert.Equal(names, Directory.GetFiles(desktopDirectory).Select(Path.GetFileName).Order());
+        if (split)
+        {
+            foreach (var runtime in PublishCommand.DesktopRuntimes)
+            {
+                using var desktop = ZipFile.OpenRead(Path.Combine(desktopDirectory, $"publish-{runtime}.zip"));
+                var executable = runtime.StartsWith("win-", StringComparison.Ordinal)
+                    ? "Talewright.Host.Desktop.exe" : "Talewright.Host.Desktop";
+                Assert.Equal(runtime, ReadEntry(desktop, $"internal/{runtime}/{executable}"));
+                Assert.NotNull(desktop.GetEntry("internal/story/story.talewright.yaml"));
+            }
+        }
+        else
+        {
+            using var desktop = ZipFile.OpenRead(Path.Combine(desktopDirectory, "publish-desktop.zip"));
+            Assert.NotNull(desktop.GetEntry("Publish.sh"));
+            Assert.NotNull(desktop.GetEntry("story/story.talewright.yaml"));
+            foreach (var runtime in PublishCommand.DesktopRuntimes)
+            {
+                var executable = runtime.StartsWith("win-", StringComparison.Ordinal)
+                    ? "Talewright.Host.Desktop.exe" : "Talewright.Host.Desktop";
+                Assert.Equal(runtime, ReadEntry(desktop, $"internal/{runtime}/{executable}"));
+            }
+        }
     }
 
     [Fact]
@@ -1416,9 +1469,11 @@ public sealed class PublishTests : IDisposable
             Assert.Contains("Replace all existing outputs?", result.Error);
         if (expected == 0)
         {
-            Assert.True(File.Exists(Path.Combine(web, "story", "story.talewright.yaml")));
+            using var webArchive = ZipFile.OpenRead(Path.Combine(web, "publish-web.zip"));
+            Assert.NotNull(webArchive.GetEntry("story/story.talewright.yaml"));
             Assert.False(File.Exists(Path.Combine(web, "keep")));
-            Assert.True(File.Exists(Path.Combine(AllDirectory, "desktop", "Publish.sh")));
+            using var desktopArchive = ZipFile.OpenRead(Path.Combine(AllDirectory, "desktop", "publish-desktop.zip"));
+            Assert.NotNull(desktopArchive.GetEntry("Publish.sh"));
         }
         else
         {
@@ -1480,6 +1535,35 @@ public sealed class PublishTests : IDisposable
         Assert.Equal("original", File.ReadAllText(Path.Combine(web, "keep")));
         Assert.False(Directory.Exists(Path.Combine(AllDirectory, "desktop")));
         Assert.Empty(Directory.GetDirectories(AllDirectory, ".talewright-*"));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void All_target_archive_failure_preserves_outputs_and_cleans_staging(bool split)
+    {
+        var web = Path.Combine(AllDirectory, "web");
+        Directory.CreateDirectory(web);
+        File.WriteAllText(Path.Combine(web, "keep"), "original");
+        var builds = AllBuilds();
+        var archives = 0;
+        var publication = builds with
+        {
+            CreateZip = (content, path) =>
+            {
+                if (++archives == 2) throw new IOException("controlled archive failure");
+                builds.CreateZip(content, path);
+            },
+        };
+
+        var result = RunAllControlled(new StringReader("yes\n"), publication: publication,
+            args: split ? ["--split"] : []);
+
+        Assert.Equal(2, result.Code);
+        Assert.Contains("controlled archive failure", result.Error);
+        Assert.Equal("original", File.ReadAllText(Path.Combine(web, "keep")));
+        Assert.False(Directory.Exists(Path.Combine(AllDirectory, "desktop")));
+        Assert.Empty(Directory.GetFileSystemEntries(AllDirectory, ".talewright-*"));
     }
 
     [Fact]

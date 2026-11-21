@@ -219,9 +219,9 @@ Validates first, then builds. For a walkthrough, see [Sharing your story](../gui
 | `-a`, `--all-in-one` | Include the player and engine, opening only this story (no samples). Without it, the zip holds `story.talewright.yaml`, `.tale` files and safe, supported files from `images/` in their folder layout. `--a` is not accepted. |
 | `--target web` | Default. A static site with a root `index.html` and relative URLs. |
 | `--target desktop` | A self-contained desktop app. |
-| `--target all` | With `-a`, publish both targets after one validation, into `web/` and `desktop/` under the output directory. Cannot be combined with `--runtime`. |
+| `--target all` | With `-a`, publish both targets after one validation, as `web/<story-id>-web.zip` and `desktop/<story-id>-desktop.zip` under the output directory. Cannot be combined with `--runtime`. |
 | `--runtime <rid>` | Desktop only: a single platform instead of all six. `linux-x64`, `linux-arm64`, `win-x64`, `win-arm64`, `osx-x64` or `osx-arm64`. |
-| `--split` | With `-a --target desktop`, write one self-contained ZIP per supported runtime into the `--output` directory. With `--target all`, put those ZIPs in its `desktop/` directory. Cannot be combined with `--runtime`; it is not supported for story-only or web output. Filenames are `<story-id>-<rid>.zip`. |
+| `--split` | With `-a --target desktop`, write one self-contained ZIP per supported runtime into the `--output` directory. With `--target all`, put those ZIPs in its `desktop/` directory instead of the universal desktop ZIP; the web ZIP is unchanged. Cannot be combined with `--runtime`; it is not supported for story-only or web output. Filenames are `<story-id>-<rid>.zip`. |
 | `--force` | Authorize replacement without asking, independently of `--non-interactive`. |
 
 ### Advanced: split desktop output
