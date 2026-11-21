@@ -273,6 +273,25 @@ CLI. Find them in the Command Palette (**Ctrl+Shift+P**):
   but never installs .NET.
 
 Actions use the story containing the active file, the only story in the workspace, or ask you to choose.
+
+Press **F5** or **Ctrl+F5** while editing a `.tale` file or `story.talewright.yaml` to launch the
+containing story in the Author Debugger. In a multi-story workspace, the active story is used or the
+extension asks you to choose if it is ambiguous.
+
+Optional `launch.json` configurations can launch a scene or the normal player:
+
+```json
+{
+  "type": "talewright",
+  "request": "launch",
+  "name": "Talewright: Debug Scene",
+  "mode": "debug",
+  "scene": "intro"
+}
+```
+
+Set `"mode": "run"` to start the normal story player. VS Code launch snippets are available from
+**Add Configuration**.
 They need a trusted workspace and offer to save unsaved story files first. Output and errors stay in
 the task terminal; close the debugger or player with **Tasks: Terminate Task**. The debugger and player
 need a desktop and the platform webview: WebKitGTK 4.1 on Linux, WebView2 on Windows, WKWebView on macOS.

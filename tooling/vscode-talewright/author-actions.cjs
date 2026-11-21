@@ -445,6 +445,43 @@ function registerAuthorActions(context) {
       }
     },
   }));
+  if (vscode.debug?.registerDebugConfigurationProvider) {
+    const resolveDebugConfiguration = async (folder, config) => {
+      try {
+        if (!vscode.workspace.isTrusted) throw new Error('Trust this workspace before running Talewright CLI commands.');
+        if (config?.request !== undefined && config.request !== 'launch') {
+          throw new Error('A Talewright launch configuration must use request "launch".');
+        }
+        if (config?.type !== undefined && config.type !== 'talewright') {
+          throw new Error('A Talewright launch configuration must use type "talewright".');
+        }
+        const mode = config?.mode ?? 'debug';
+        if (!['debug', 'run'].includes(mode)) {
+          throw new Error('A Talewright launch mode must be "debug" or "run".');
+        }
+        const scene = config?.scene;
+        if (scene !== undefined &&
+            (mode !== 'debug' || typeof scene !== 'string' || !SCENE_ID.test(scene))) {
+          throw new Error('A Talewright scene must be a valid scene ID and can only be used with mode "debug".');
+        }
+        const task = await createTask(mode, undefined, undefined, folder, scene);
+        if (task) await vscode.tasks.executeTask(task);
+        return undefined;
+      } catch (error) {
+        await report(error, async () => resolveDebugConfiguration(folder, config));
+        return undefined;
+      }
+    };
+    context.subscriptions.push(vscode.debug.registerDebugConfigurationProvider('talewright', {
+      provideDebugConfigurations: () => [{
+        type: 'talewright',
+        request: 'launch',
+        name: 'Talewright: Debug Story',
+        mode: 'debug',
+      }],
+      resolveDebugConfiguration,
+    }));
+  }
   return Promise.all([pendingStory, sceneContext]);
 }
 
