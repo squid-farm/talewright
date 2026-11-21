@@ -34,7 +34,7 @@ public sealed class PublishTests : IDisposable
         File.WriteAllText(Path.Combine(Story, "chapters", "main.tale"), string.Join('\n',
             SceneFaker.Header("a"), "Hello.", DivertFaker.To("END")));
         File.WriteAllText(Path.Combine(Story, "private-notes.txt"), "Not story content");
-        CreateTemplateAssets();
+        CreateTemplateAssets(PublishTemplateCache.CurrentCliVersion(), TemplateAssets);
         TemplatePublication = PublishCommand.Operations.Create(new PublishTemplateCache(
             Path.Combine(_root, "template-cache"),
             new Uri("https://example.invalid/releases/download/"),
@@ -86,10 +86,9 @@ public sealed class PublishTests : IDisposable
         },
     };
 
-    private void CreateTemplateAssets()
+    private static void CreateTemplateAssets(string version, string directory)
     {
-        Directory.CreateDirectory(TemplateAssets);
-        var version = PublishTemplateCache.CurrentCliVersion();
+        Directory.CreateDirectory(directory);
         AddTemplate("web", null);
         foreach (var runtime in PublishCommand.DesktopRuntimes)
         {
@@ -99,7 +98,7 @@ public sealed class PublishTests : IDisposable
         void AddTemplate(string target, string? runtime)
         {
             var name = $"talewright-publish-template-{target}{(runtime is null ? "" : "-" + runtime)}-{version}.zip";
-            var archivePath = Path.Combine(TemplateAssets, name);
+            var archivePath = Path.Combine(directory, name);
             using (var archive = ZipFile.Open(archivePath, ZipArchiveMode.Create))
             {
                 AddEntry(archive, ".talewright-template.json",
@@ -130,6 +129,35 @@ public sealed class PublishTests : IDisposable
             using var writer = new StreamWriter(entry.Open());
             writer.Write(content);
         }
+    }
+
+    [Fact]
+    public void Development_templates_are_resolved_locally_and_checked_before_caching()
+    {
+        const string version = "0.0.0-dev.localtest";
+        var cacheRoot = Path.Combine(_root, "development-cache");
+        var assets = Path.Combine(cacheRoot, "development-assets", version);
+        CreateTemplateAssets(version, assets);
+        var cache = new PublishTemplateCache(cacheRoot, new Uri("https://example.invalid/"), _templateHttpClient);
+        var web = cache.GetTemplate(version, "web", null);
+        Assert.True(File.Exists(Path.Combine(web, "index.html")));
+        File.Delete(Path.Combine(assets, $"talewright-publish-template-web-{version}.zip"));
+        Assert.Equal(web, cache.GetTemplate(version, "web", null));
+        foreach (var runtime in PublishCommand.DesktopRuntimes)
+        {
+            var executable = runtime.StartsWith("win-", StringComparison.Ordinal)
+                ? "Talewright.Host.Desktop.exe" : "Talewright.Host.Desktop";
+            Assert.True(File.Exists(Path.Combine(cache.GetTemplate(version, "desktop", runtime), executable)));
+        }
+
+        const string badVersion = "0.0.0-dev.badchecksum";
+        var badAssets = Path.Combine(cacheRoot, "development-assets", badVersion);
+        CreateTemplateAssets(badVersion, badAssets);
+        File.WriteAllText(Path.Combine(badAssets, $"talewright-publish-template-web-{badVersion}.zip.sha256"),
+            new string('0', 64));
+        Assert.Throws<InvalidDataException>(() => cache.GetTemplate(badVersion, "web", null));
+        File.Delete(Path.Combine(badAssets, $"talewright-publish-template-web-{badVersion}.zip.sha256"));
+        Assert.Throws<FileNotFoundException>(() => cache.GetTemplate(badVersion, "web", null));
     }
 
     [Fact]

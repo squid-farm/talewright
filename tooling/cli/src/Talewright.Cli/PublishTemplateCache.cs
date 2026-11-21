@@ -40,6 +40,11 @@ internal sealed class PublishTemplateCache
         var cacheRoot = _cacheRoot ?? (_localAssetDirectory is null
             ? DefaultCacheRoot()
             : Path.Combine(Path.GetTempPath(), "Talewright", "publish-templates"));
+        var developmentAssets = Path.Combine(cacheRoot, "development-assets", version);
+        var localAssetDirectory = _localAssetDirectory ??
+            (version.StartsWith("0.0.0-dev.", StringComparison.Ordinal) && Directory.Exists(developmentAssets)
+                ? developmentAssets
+                : null);
         var versionDirectory = Path.Combine(cacheRoot, version);
         var cacheDirectory = Path.Combine(versionDirectory, directoryName);
         if (Directory.Exists(cacheDirectory))
@@ -55,7 +60,7 @@ internal sealed class PublishTemplateCache
             var assetUri = new Uri(_releaseBaseUri, $"v{Uri.EscapeDataString(version)}/{Uri.EscapeDataString(assetName)}");
             var checksumUri = new Uri(assetUri + ".sha256");
             var archivePath = Path.Combine(staging, assetName);
-            var checksum = _localAssetDirectory is { } localDirectory
+            var checksum = localAssetDirectory is { } localDirectory
                 ? CopyLocalAsset(localDirectory, assetName, archivePath)
                 : DownloadAsset(assetUri, checksumUri, archivePath);
             VerifyChecksum(archivePath, checksum, assetName);
