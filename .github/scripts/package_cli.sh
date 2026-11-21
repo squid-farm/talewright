@@ -57,7 +57,7 @@ for file in "Talewright.Cli$extension" "debug-host/Talewright.Debugger$extension
   debug-host/debug-assets/map/vendor/licenses/d3-timer.txt \
   debug-host/debug-assets/map/vendor/licenses/d3-transition.txt \
   debug-host/debug-assets/map/vendor/licenses/d3-zoom.txt \
-  debug-assets/index.html publish-assets/standalone/web/App.razor \
+  debug-assets/index.html \
   debug-assets/map/map.js debug-assets/map/vendor/THIRD-PARTY-NOTICES.md \
   debug-assets/map/vendor/d3-zoom.bundle.min.js \
   debug-assets/map/vendor/elk-api.js debug-assets/map/vendor/elk-worker.min.js \
@@ -71,7 +71,6 @@ for file in "Talewright.Cli$extension" "debug-host/Talewright.Debugger$extension
   debug-assets/map/vendor/licenses/d3-timer.txt \
   debug-assets/map/vendor/licenses/d3-transition.txt \
   debug-assets/map/vendor/licenses/d3-zoom.txt \
-  publish-assets/standalone/desktop/App.razor publish-assets/desktop/THIRD-PARTY-NOTICES.txt \
   publish-assets/player/talewright.css \
   debug-host/publish-assets/player/talewright.css \
   debug-host/publish-assets/player/Preferences/PlayerPreferences.js \

@@ -157,8 +157,9 @@ For a download you have already unpacked, choose **Select Existing Executable** 
   [WebKitGTK and libnotify](getting-started.md#linux-desktop-setup). You can still check and share
   your story without the debugger.
 
-Checking a story and making a story ZIP don't need .NET. Making a separate website or desktop game
-does; see [which .NET version you need](getting-started.md#which-net-version-do-i-need).
+Checking a story, making a story ZIP, and publishing a standalone website or desktop game with the
+CLI download don't need .NET. The first standalone publish for a CLI version downloads and caches
+its matching runner, so it needs an internet connection.
 
 Still stuck? [Report a problem on GitHub](https://github.com/squid-farm/talewright/issues/new?template=report-a-problem.yml).
 Include your operating system, the Talewright version, what you tried, and the exact error message.

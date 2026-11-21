@@ -28,6 +28,9 @@ MAP_ASSETS = ("debug-assets/map/map.js",
 ENGINE_ASSEMBLIES = {"Talewright." + module for module in
                      ("Core", "Graphs", "Rules", "Narrative", "Rulesets.Generic", "Talemark", "Runtime")}
 ENGINE_FRAMEWORKS = ("net8.0", "net9.0", "net10.0")
+PUBLISH_TEMPLATE_RUNTIMES = (
+    "linux-x64", "linux-arm64", "win-x64", "win-arm64", "osx-x64", "osx-arm64",
+)
 PLAYER_ASSETS = ("player-assets/player.html",
                  "publish-assets/player/talewright.css",
                  "publish-assets/player/Preferences/PlayerPreferencesBootstrap.js",
@@ -136,15 +139,6 @@ def verify(directory, version):
                                   "tools/net10.0/any/debug-assets/Talewright.Debugger.styles.css",
                                   *[f"tools/net10.0/any/{asset}" for asset in MAP_ASSETS],
                                   *[f"tools/net10.0/any/{asset}" for asset in PLAYER_ASSETS],
-                                  "tools/net10.0/any/publish-assets/web/Talewright.Host.Web.csproj",
-                                  "tools/net10.0/any/publish-assets/web/BuildIdentity.targets",
-                                  "tools/net10.0/any/publish-assets/desktop/Talewright.Host.Desktop.csproj",
-                                  "tools/net10.0/any/publish-assets/standalone/web/App.razor",
-                                  "tools/net10.0/any/publish-assets/standalone/web/Program.cs",
-                                  "tools/net10.0/any/publish-assets/standalone/web/wwwroot/index.html",
-                                  "tools/net10.0/any/publish-assets/standalone/desktop/App.razor",
-                                  "tools/net10.0/any/publish-assets/standalone/desktop/Program.cs",
-                                  "tools/net10.0/any/publish-assets/desktop/THIRD-PARTY-NOTICES.txt",
                                   "tools/net10.0/any/publish-assets/launchers/start.sh",
                                   "tools/net10.0/any/publish-assets/launchers/start.command",
                                   "tools/net10.0/any/publish-assets/launchers/start.cmd",
@@ -181,7 +175,7 @@ def verify(directory, version):
                 for assembly in ("MessagePack", "MessagePack.Annotations", "Microsoft.NET.StringTools"):
                     if f"tools/net10.0/any/{assembly}.dll" not in names:
                         raise ValueError(f"{path}: missing CLI serializer dependency {assembly}")
-                for rid in ["linux-x64", "linux-arm64", "win-x64", "win-arm64", "osx-x64", "osx-arm64"]:
+                for rid in PUBLISH_TEMPLATE_RUNTIMES:
                     extension = "dll" if rid.startswith("win") else "dylib" if rid.startswith("osx") else "so"
                     if f"tools/net10.0/any/runtimes/{rid}/native/Photino.Native.{extension}" not in names:
                         raise ValueError(f"{path}: missing debugger native dependency for {rid}")
@@ -224,7 +218,27 @@ def verify(directory, version):
 def smoke(directory, version):
     with tempfile.TemporaryDirectory(prefix="talewright-consumer-") as temporary:
         root = Path(temporary)
-        environment = dict(os.environ, NUGET_PACKAGES=str(root / "packages"))
+        template_directory = root / "publish-templates"
+        template_environment = dict(
+            os.environ, TALEWRIGHT_PUBLISH_TEMPLATE_OUTPUT=str(template_directory),
+        )
+        workspace = Path(__file__).resolve().parents[2]
+        template_script = workspace / ".github/scripts/package_publish_template.sh"
+        template_targets = [
+            ("web", None),
+            *[("desktop", runtime) for runtime in PUBLISH_TEMPLATE_RUNTIMES],
+        ]
+        for target, runtime in template_targets:
+            command = ["bash", str(template_script), version, target]
+            if runtime is not None:
+                command.append(runtime)
+            subprocess.run(command, cwd=workspace, env=template_environment, check=True)
+
+        environment = dict(
+            os.environ,
+            NUGET_PACKAGES=str(root / "packages"),
+            TALEWRIGHT_PUBLISH_TEMPLATE_DIRECTORY=str(template_directory),
+        )
         config = root / "NuGet.Config"
         config.write_text(f"""<configuration>
   <packageSources>

@@ -39,7 +39,7 @@ If you remove the tools, also remove any PATH entry or alias you added.
 | `--help`, `validate`, `lint` | No SDK or installed .NET runtime; OS runtime libraries still required. |
 | `publish STORY --output FILE.zip` | No SDK/runtime; outputs story files for a Talewright player, not a standalone game. |
 | `debug STORY` | No installed .NET with the bundled debugger host; graphical desktop and native webview libraries required. |
-| `publish -a --target web` or `desktop` | .NET 10 SDK, restore/network access and applicable runtime/workload packs are required by the build-based publisher. |
+| `publish -a --target web` or `desktop` | No SDK or installed .NET runtime; the matching runner template is downloaded on first use and cached. |
 
 Ubuntu 24.04 x64 requires `libc6`, `libgcc-s1`, `libstdc++6`, `libicu74`, `libssl3t64` and `zlib1g`.
 Native debugging additionally requires WebKitGTK 4.1 (`libwebkit2gtk-4.1-0`), `libnotify4`, and a
