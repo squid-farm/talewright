@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO.Compression;
 using System.Security.Cryptography;
+using System.Text;
 using System.Xml.Linq;
 using Spectre.Console;
 using Spectre.Console.Cli;
@@ -102,11 +103,12 @@ public sealed class PublishCommand : Command<PublishSettings>
         internal static Operations Default { get; } = new(
             PublishCommand.BuildHost, PublishCommand.CreateZip,
             DestinationState.Capture, File.Move);
+        internal Action<string, string> MoveDirectory { get; init; } = Directory.Move;
     }
 
     private static int Run(PublishSettings settings, CommandWriters writers)
     {
-        var (output, error, input, publication) = writers;
+        var (output, error, _, publication) = writers;
         var root = settings.Root;
         var destination = settings.Destination!;
         var runtime = settings.Runtime;
@@ -136,20 +138,9 @@ public sealed class PublishCommand : Command<PublishSettings>
             }
             if (target != "all" && !split && File.Exists(final) && !force)
             {
-                if (settings.NonInteractive || !input.IsInteractive)
+                if (!ConfirmOverwrite([final], settings, writers, null,
+                    () => approved = DestinationState.Capture(final)))
                 {
-                    throw new IOException($"Output '{final}' exists. Choose a new --output path or use --force to replace it explicitly.");
-                }
-
-                approved = DestinationState.Capture(final);
-                error.WriteLine($"Output '{final}' already exists.");
-                error.Write("Replace it? [y/N] ");
-                error.Flush();
-                var answer = input.Reader.ReadLine()?.Trim();
-                if (!string.Equals(answer, "y", StringComparison.OrdinalIgnoreCase) &&
-                    !string.Equals(answer, "yes", StringComparison.OrdinalIgnoreCase))
-                {
-                    error.WriteLine("Publication cancelled. No archive was published.");
                     return 2;
                 }
             }
@@ -190,32 +181,12 @@ public sealed class PublishCommand : Command<PublishSettings>
         {
             working = Path.Combine(Path.GetTempPath(), $"talewright-publish-{Guid.NewGuid():N}");
             Directory.CreateDirectory(working);
-            var story = Path.Combine(working, "story");
-            WriteStory(source, root, story);
-            _ = StorySource.FromDirectory(story);
+            var story = StageStory(source, root, working);
             var content = story;
             if (allInOne)
             {
-                content = universalDesktop
-                    ? BuildUniversalDesktop(working, story, result.Story!.Title, result.Story.Id, output, error, publication)
-                    : publication.BuildHost(working, target, runtime, story, output, error);
-                if (!universalDesktop)
-                {
-                    if (target == "desktop")
-                    {
-                        MoveDesktopRuntimeToInternal(content, runtime!);
-                        var internalStory = Path.Combine(content, "internal", "story");
-                        Directory.CreateDirectory(internalStory);
-                        CopyDirectory(story, internalStory);
-                        CreateSplitLauncher(content, result.Story!.Title, result.Story.Id, runtime);
-                    }
-                    else
-                    {
-                        StageExternalStory(story, content, target);
-                    }
-                }
-                File.Copy(Path.Combine(AssetsRoot, "ENGINE-LICENSE.txt"), Path.Combine(content, "ENGINE-LICENSE.txt"));
-                File.WriteAllText(Path.Combine(content, "DEPLOYMENT.txt"), DeploymentInstructions(target, runtime, result.Story!.Title));
+                content = BuildStandalone(working, story, result.Story!.Title, result.Story.Id,
+                    target, runtime, output, error, publication, universalDesktop);
             }
 
             if (allInOne && target == "web")
@@ -257,56 +228,90 @@ public sealed class PublishCommand : Command<PublishSettings>
         }
     }
 
+    private static bool ConfirmOverwrite(IReadOnlyList<string> existing, PublishSettings settings,
+        CommandWriters writers, string? group, Action? beforePrompt = null)
+    {
+        if (existing.Count == 0) return true;
+
+        var (_, error, input, _) = writers;
+        if (settings.NonInteractive || !input.IsInteractive)
+        {
+            throw new IOException(group is null
+                ? $"Output '{existing[0]}' exists. Choose a new --output path or use --force to replace it explicitly."
+                : $"{(group == "split" ? "Split" : "All-target")} output already exists: {string.Join(", ", existing)}. Choose a new --output directory or use --force to replace the full set explicitly.");
+        }
+
+        beforePrompt?.Invoke();
+        if (group is null)
+        {
+            error.WriteLine($"Output '{existing[0]}' already exists.");
+            error.Write("Replace it? [y/N] ");
+        }
+        else
+        {
+            error.WriteLine($"These {group} outputs already exist:");
+            foreach (var path in existing) error.WriteLine($"  {path}");
+            error.Write("Replace all existing outputs? [y/N] ");
+        }
+        error.Flush();
+        var answer = input.Reader.ReadLine()?.Trim();
+        if (string.Equals(answer, "y", StringComparison.OrdinalIgnoreCase) ||
+            string.Equals(answer, "yes", StringComparison.OrdinalIgnoreCase))
+        {
+            return true;
+        }
+
+        error.WriteLine(group switch
+        {
+            null => "Publication cancelled. No archive was published.",
+            "split" => "Publication cancelled. No archives were published.",
+            _ => "Publication cancelled. No target was published.",
+        });
+        return false;
+    }
+
     private static int PublishAll(string destination, string storyId, string storyTitle, StorySource source, CommandWriters writers,
         PublishSettings settings, Operations publication)
     {
-        var (output, error, input, _) = writers;
-        var existing = new[] { Path.Combine(destination, "web"), Path.Combine(destination, "desktop") }
+        var (output, error, _, _) = writers;
+        var targets = new[] { Path.Combine(destination, "web"), Path.Combine(destination, "desktop") };
+        var existing = targets
             .Where(path => Directory.Exists(path) || File.Exists(path))
             .ToArray();
-
-        if (existing.Length > 0 && !settings.Force)
+        var approved = new Dictionary<string, string?>(StringComparer.Ordinal);
+        try
         {
-            if (settings.NonInteractive || !input.IsInteractive)
+            void CaptureApproval()
             {
-                error.WriteLine($"{CliDiagnosticCodes.IoFailure}: All-target output already exists: {string.Join(", ", existing)}. Choose a new --output directory or use --force to replace the full set explicitly.");
-                return 2;
+                foreach (var path in targets)
+                    approved[path] = existing.Contains(path, StringComparer.Ordinal) ? CaptureOutput(path) : null;
             }
 
-            error.WriteLine("These all-target outputs already exist:");
-            foreach (var path in existing)
+            if (!settings.Force && !ConfirmOverwrite(existing, settings, writers, "all-target", CaptureApproval))
             {
-                error.WriteLine($"  {path}");
-            }
-            error.Write("Replace all existing outputs? [y/N] ");
-            error.Flush();
-            var answer = input.Reader.ReadLine()?.Trim();
-            if (!string.Equals(answer, "y", StringComparison.OrdinalIgnoreCase) &&
-                !string.Equals(answer, "yes", StringComparison.OrdinalIgnoreCase))
-            {
-                error.WriteLine("Publication cancelled. No target was published.");
                 return 2;
             }
+            if (!settings.Force && existing.Length == 0) CaptureApproval();
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            error.WriteLine($"{CliDiagnosticCodes.IoFailure}: Publication failed: {ex.Message}");
+            return 2;
         }
 
         string? working = null;
         var staged = new List<(string Target, string Path)>();
-        var backups = new Dictionary<string, string>(StringComparer.Ordinal);
-        var installed = new HashSet<string>(StringComparer.Ordinal);
         try
         {
-            working = Path.Combine(Path.GetTempPath(), $"talewright-publish-{Guid.NewGuid():N}");
+            Directory.CreateDirectory(destination);
+            working = Path.Combine(destination, $".talewright-publish-{Guid.NewGuid():N}");
             Directory.CreateDirectory(working);
-            var story = Path.Combine(working, "story");
-            WriteStory(source, settings.Root, story);
-            _ = StorySource.FromDirectory(story);
+            var story = StageStory(source, settings.Root, working);
 
             var webWorking = Path.Combine(working, "web-output");
             Directory.CreateDirectory(webWorking);
-            var webContent = publication.BuildHost(working, "web", null, story, output, error);
-            StageExternalStory(story, webContent, "web");
-            File.Copy(Path.Combine(AssetsRoot, "ENGINE-LICENSE.txt"), Path.Combine(webContent, "ENGINE-LICENSE.txt"));
-            File.WriteAllText(Path.Combine(webContent, "DEPLOYMENT.txt"), DeploymentInstructions("web", null, storyTitle));
+            var webContent = BuildStandalone(working, story, storyTitle, storyId, "web", null,
+                output, error, publication);
             CopyDirectory(webContent, webWorking);
             WebHostingSize.FromDirectory(webWorking).WriteWarning(error, estimate: false, target: "web");
             staged.Add(("web", webWorking));
@@ -318,131 +323,26 @@ public sealed class PublishCommand : Command<PublishSettings>
                 var stem = Uri.EscapeDataString(storyId);
                 foreach (var runtime in DesktopRuntimes)
                 {
-                    var built = BuildDesktopRuntime(working, runtime, story, output, error, publication);
-                    MoveDesktopRuntimeToInternal(built, runtime);
-                    var internalStory = Path.Combine(built, "internal", "story");
-                    Directory.CreateDirectory(internalStory);
-                    CopyDirectory(story, internalStory);
-                    CreateSplitLauncher(built, storyTitle, storyId, runtime);
-                    File.Copy(Path.Combine(AssetsRoot, "ENGINE-LICENSE.txt"), Path.Combine(built, "ENGINE-LICENSE.txt"));
-                    File.WriteAllText(Path.Combine(built, "DEPLOYMENT.txt"), DeploymentInstructions("desktop", runtime, storyTitle));
+                    var built = BuildSplitDesktop(working, runtime, story, storyTitle, storyId, output, error, publication);
                     publication.CreateZip(built, Path.Combine(desktopWorking, $"{stem}-{runtime}.zip"));
                 }
             }
             else
             {
-                var desktopContent = BuildUniversalDesktop(working, story, storyTitle, storyId, output, error, publication);
-                File.Copy(Path.Combine(AssetsRoot, "ENGINE-LICENSE.txt"), Path.Combine(desktopContent, "ENGINE-LICENSE.txt"));
-                File.WriteAllText(Path.Combine(desktopContent, "DEPLOYMENT.txt"), DeploymentInstructions("desktop", null, storyTitle));
+                var desktopContent = BuildStandalone(working, story, storyTitle, storyId, "desktop", null,
+                    output, error, publication, universalDesktop: true);
                 CopyDirectory(desktopContent, desktopWorking);
             }
             staged.Add(("desktop", desktopWorking));
 
-            Directory.CreateDirectory(destination);
-            try
-            {
-                foreach (var (target, stagedPath) in staged)
-                {
-                    var final = Path.Combine(destination, target);
-                    if (Directory.Exists(final) || File.Exists(final))
-                    {
-                        var backup = Path.Combine(destination, $".talewright-{Guid.NewGuid():N}-{target}.bak");
-                        if (Directory.Exists(final))
-                        {
-                            Directory.Move(final, backup);
-                        }
-                        else
-                        {
-                            publication.MoveFile(final, backup);
-                        }
-                        backups.Add(final, backup);
-                    }
-                }
-
-                foreach (var (target, stagedPath) in staged)
-                {
-                    var final = Path.Combine(destination, target);
-                    Directory.Move(stagedPath, final);
-                    installed.Add(final);
-                }
-            }
-            catch (Exception commitError)
-            {
-                var rollbackErrors = new List<Exception>();
-                foreach (var final in installed.Reverse())
-                {
-                    try
-                    {
-                        if (Directory.Exists(final))
-                        {
-                            Directory.Delete(final, recursive: true);
-                        }
-                        else if (File.Exists(final))
-                        {
-                            File.Delete(final);
-                        }
-                    }
-                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                    {
-                        rollbackErrors.Add(ex);
-                    }
-                }
-                foreach (var (final, backup) in backups.Reverse())
-                {
-                    try
-                    {
-                        if (Directory.Exists(backup))
-                        {
-                            Directory.Move(backup, final);
-                        }
-                        else
-                        {
-                            publication.MoveFile(backup, final);
-                        }
-                    }
-                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                    {
-                        rollbackErrors.Add(ex);
-                    }
-                }
-                if (rollbackErrors.Count > 0)
-                {
-                    throw new IOException(
-                        "All-target publication failed and rollback was incomplete.",
-                        new AggregateException([commitError, .. rollbackErrors]));
-                }
-                throw;
-            }
-
-            foreach (var backup in backups.Values)
-            {
-                try
-                {
-                    if (Directory.Exists(backup))
-                    {
-                        Directory.Delete(backup, recursive: true);
-                    }
-                    else if (File.Exists(backup))
-                    {
-                        File.Delete(backup);
-                    }
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    error.WriteLine($"Warning: all-target output was published, but backup '{backup}' could not be removed: {ex.Message}");
-                }
-            }
+            InstallOutputs(staged.Select(item => (item.Path, Final: Path.Combine(destination, item.Target))).ToArray(),
+                approved, settings.Force, CaptureOutput, allowDirectories: true, publication, error);
 
             foreach (var (target, _) in staged)
             {
                 output.WriteLine($"Published {target} target: {Path.Combine(destination, target)}");
             }
             return 0;
-        }
-        catch (IOException ex) when (existing.Length > 0 && !settings.Force)
-        {
-            error.WriteLine($"{CliDiagnosticCodes.IoFailure}: Publication failed: {ex.Message}");
-            return 2;
         }
         catch (PublishBuildException ex)
         {
@@ -466,11 +366,9 @@ public sealed class PublishCommand : Command<PublishSettings>
     private static int PublishSplit(string destination, string storyId, string storyTitle, StorySource source, CommandWriters writers,
         PublishSettings settings, Operations publication)
     {
-        var (output, error, input, _) = writers;
+        var (output, error, _, _) = writers;
         string? working = null;
         var staged = new List<(string Runtime, string Path, string Final)>();
-        var backups = new Dictionary<string, string>(StringComparer.Ordinal);
-        var installed = new Dictionary<string, DestinationState?>(StringComparer.Ordinal);
 
         try
         {
@@ -494,154 +392,26 @@ public sealed class PublishCommand : Command<PublishSettings>
             }
 
             var existing = approved.Where(pair => pair.Value is not null).Select(pair => pair.Key).ToArray();
-            if (existing.Length > 0 && !settings.Force)
+            if (!settings.Force && !ConfirmOverwrite(existing, settings, writers, "split"))
             {
-                if (settings.NonInteractive || !input.IsInteractive)
-                {
-                    throw new IOException($"Split output already exists: {string.Join(", ", existing)}. Choose a new --output directory or use --force to replace the full set explicitly.");
-                }
-
-                error.WriteLine("These split outputs already exist:");
-                foreach (var path in existing)
-                {
-                    error.WriteLine($"  {path}");
-                }
-
-                error.Write("Replace all existing outputs? [y/N] ");
-                error.Flush();
-                var answer = input.Reader.ReadLine()?.Trim();
-                if (!string.Equals(answer, "y", StringComparison.OrdinalIgnoreCase) &&
-                    !string.Equals(answer, "yes", StringComparison.OrdinalIgnoreCase))
-                {
-                    error.WriteLine("Publication cancelled. No archives were published.");
-                    return 2;
-                }
+                return 2;
             }
 
             working = Path.Combine(Path.GetTempPath(), $"talewright-publish-{Guid.NewGuid():N}");
             Directory.CreateDirectory(working);
-            var story = Path.Combine(working, "story");
-            WriteStory(source, settings.Root, story);
-            _ = StorySource.FromDirectory(story);
+            var story = StageStory(source, settings.Root, working);
 
             foreach (var runtime in DesktopRuntimes)
             {
-                var built = BuildDesktopRuntime(working, runtime, story, output, error, publication);
-                MoveDesktopRuntimeToInternal(built, runtime);
-                var internalStory = Path.Combine(built, "internal", "story");
-                Directory.CreateDirectory(internalStory);
-                CopyDirectory(story, internalStory);
-                CreateSplitLauncher(built, storyTitle, storyId, runtime);
-                File.Copy(Path.Combine(AssetsRoot, "ENGINE-LICENSE.txt"), Path.Combine(built, "ENGINE-LICENSE.txt"));
-                File.WriteAllText(Path.Combine(built, "DEPLOYMENT.txt"), DeploymentInstructions("desktop", runtime, storyTitle));
+                var built = BuildSplitDesktop(working, runtime, story, storyTitle, storyId, output, error, publication);
                 var temporary = Path.Combine(destination, $".talewright-{Guid.NewGuid():N}.zip.tmp");
                 staged.Add((runtime, temporary, targets[runtime]));
                 publication.CreateZip(built, temporary);
             }
 
-            if (!settings.Force)
-            {
-                foreach (var (path, state) in approved)
-                {
-                    var current = File.Exists(path) ? publication.CaptureDestination(path) : null;
-                    if (current != state)
-                    {
-                        throw new IOException($"Output '{path}' changed after approval. No archives were published. Retry to approve the current files, choose a new --output directory, or use --force.");
-                    }
-                }
-            }
-
-            try
-            {
-                foreach (var (_, _, final) in staged)
-                {
-                    if (Directory.Exists(final))
-                    {
-                        throw new IOException($"Output '{final}' became a directory. No archives were published.");
-                    }
-
-                    if (!settings.Force)
-                    {
-                        var current = File.Exists(final) ? publication.CaptureDestination(final) : null;
-                        if (current != approved[final])
-                        {
-                            throw new IOException($"Output '{final}' changed after approval. No archives were published. Retry to approve the current files, choose a new --output directory, or use --force.");
-                        }
-                    }
-
-                    if (File.Exists(final))
-                    {
-                        var backup = Path.Combine(destination, $".talewright-{Guid.NewGuid():N}.bak");
-                        publication.MoveFile(final, backup);
-                        backups.Add(final, backup);
-                    }
-                }
-
-                foreach (var (_, temporary, final) in staged)
-                {
-                    publication.MoveFile(temporary, final);
-                    installed.Add(final, null);
-                    installed[final] = publication.CaptureDestination(final);
-                }
-            }
-            catch (Exception commitError)
-            {
-                var rollbackErrors = new List<Exception>();
-                foreach (var (path, state) in installed.Reverse())
-                {
-                    try
-                    {
-                        if (File.Exists(path))
-                        {
-                            if (state is null || publication.CaptureDestination(path) != state)
-                            {
-                                throw new IOException($"Output '{path}' changed during rollback and was left untouched.");
-                            }
-
-                            File.Delete(path);
-                        }
-                    }
-                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                    {
-                        rollbackErrors.Add(ex);
-                    }
-                }
-
-                foreach (var (final, backup) in backups.Reverse())
-                {
-                    try
-                    {
-                        publication.MoveFile(backup, final);
-                    }
-                    catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                    {
-                        rollbackErrors.Add(ex);
-                    }
-                }
-
-                if (rollbackErrors.Count > 0)
-                {
-                    var recovery = string.Join(", ", backups.Values.Where(File.Exists)
-                        .Concat(installed.Keys.Where(File.Exists)));
-                    throw new IOException(
-                        $"Split publication failed and rollback was incomplete. Preserve recovery files: {recovery}.",
-                        new AggregateException([commitError, .. rollbackErrors]));
-                }
-
-                throw;
-            }
-
-            foreach (var backup in backups.Values)
-            {
-                try
-                {
-                    File.Delete(backup);
-                }
-                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
-                {
-                    error.WriteLine($"Warning: all split archives were published, but backup '{backup}' could not be removed: {ex.Message}");
-                }
-            }
+            InstallOutputs(staged.Select(item => (item.Path, item.Final)).ToArray(), approved, settings.Force,
+                path => File.Exists(path) ? publication.CaptureDestination(path) : null,
+                allowDirectories: false, publication, error);
 
             foreach (var (_, _, final) in staged)
             {
@@ -674,6 +444,178 @@ public sealed class PublishCommand : Command<PublishSettings>
                 Directory.Delete(working, recursive: true);
             }
         }
+    }
+
+    private static void InstallOutputs<T>(IReadOnlyList<(string Path, string Final)> staged,
+        IReadOnlyDictionary<string, T?> approved, bool force, Func<string, T?> capture,
+        bool allowDirectories, Operations publication, TextWriter error) where T : class
+    {
+        var backups = new Dictionary<string, string>(StringComparer.Ordinal);
+        var installed = new Dictionary<string, T?>(StringComparer.Ordinal);
+        var kind = allowDirectories ? "All-target" : "Split";
+        var outputs = allowDirectories ? "targets" : "archives";
+
+        void CheckApproval(string path)
+        {
+            if (!Equals(capture(path), approved[path]))
+                throw new IOException($"Output '{path}' changed after approval. No {outputs} were published. Retry to approve the current files, choose a new --output directory, or use --force.");
+        }
+
+        bool Exists(string path) => File.Exists(path) || Directory.Exists(path);
+        void Move(string from, string to)
+        {
+            if (allowDirectories && Directory.Exists(from)) publication.MoveDirectory(from, to);
+            else publication.MoveFile(from, to);
+        }
+        void Delete(string path)
+        {
+            if (allowDirectories && Directory.Exists(path)) Directory.Delete(path, recursive: true);
+            else File.Delete(path);
+        }
+
+        if (!force)
+        {
+            foreach (var (_, final) in staged) CheckApproval(final);
+        }
+
+        try
+        {
+            foreach (var (_, final) in staged)
+            {
+                if (!allowDirectories && Directory.Exists(final))
+                    throw new IOException($"Output '{final}' became a directory. No archives were published.");
+                if (!force) CheckApproval(final);
+                if (Exists(final))
+                {
+                    var backup = Path.Combine(Path.GetDirectoryName(final)!, $".talewright-{Guid.NewGuid():N}.bak");
+                    Move(final, backup);
+                    backups.Add(final, backup);
+                }
+            }
+
+            foreach (var (temporary, final) in staged)
+            {
+                Move(temporary, final);
+                installed.Add(final, null);
+                installed[final] = capture(final);
+            }
+        }
+        catch (Exception commitError)
+        {
+            var rollbackErrors = new List<Exception>();
+            foreach (var (path, state) in installed.Reverse())
+            {
+                try
+                {
+                    if (Exists(path))
+                    {
+                        if ((!allowDirectories && Directory.Exists(path)) || state is null || !Equals(capture(path), state))
+                            throw new IOException($"Output '{path}' changed during rollback and was left untouched.");
+                        Delete(path);
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    rollbackErrors.Add(ex);
+                }
+            }
+
+            foreach (var (final, backup) in backups.Reverse())
+            {
+                try
+                {
+                    Move(backup, final);
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    rollbackErrors.Add(ex);
+                }
+            }
+
+            if (rollbackErrors.Count > 0)
+            {
+                var recovery = string.Join(", ", backups.Values.Where(Exists).Concat(installed.Keys.Where(Exists)));
+                throw new IOException(
+                    $"{kind} publication failed and rollback was incomplete. Preserve recovery files: {recovery}.",
+                    new AggregateException([commitError, .. rollbackErrors]));
+            }
+            throw;
+        }
+
+        foreach (var backup in backups.Values)
+        {
+            try
+            {
+                Delete(backup);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                error.WriteLine($"Warning: {kind.ToLowerInvariant()} outputs were published, but backup '{backup}' could not be removed: {ex.Message}");
+            }
+        }
+    }
+
+    private static string? CaptureOutput(string path)
+    {
+        var isFile = File.Exists(path);
+        if (!isFile && !Directory.Exists(path)) return null;
+
+        using var buffer = new MemoryStream();
+        using (var writer = new BinaryWriter(buffer, Encoding.UTF8, leaveOpen: true))
+        {
+            writer.Write(isFile);
+            if (isFile) CaptureFile(path);
+            else CaptureDirectory(path, "");
+
+            void CaptureFile(string file)
+            {
+                var state = DestinationState.Capture(file);
+                writer.Write(state.Length);
+                writer.Write(state.LastWriteTimeUtc.Ticks);
+                writer.Write(state.CreationTimeUtc.Ticks);
+                writer.Write(state.LinkTarget ?? "");
+                writer.Write(state.Hash);
+            }
+
+            void CaptureDirectory(string directory, string relative)
+            {
+                var info = new DirectoryInfo(directory);
+                var modified = info.LastWriteTimeUtc;
+                var created = info.CreationTimeUtc;
+                writer.Write(relative);
+                writer.Write(modified.Ticks);
+                writer.Write(created.Ticks);
+                writer.Write(info.LinkTarget ?? "");
+                if (info.LinkTarget is not null) return;
+
+                foreach (var entry in Directory.EnumerateFileSystemEntries(directory).Order(StringComparer.Ordinal))
+                {
+                    var name = Path.GetFileName(entry);
+                    var child = Path.Combine(relative, name);
+                    var attributes = File.GetAttributes(entry);
+                    writer.Write((int)attributes);
+                    if ((attributes & FileAttributes.Directory) != 0)
+                    {
+                        CaptureDirectory(entry, child);
+                    }
+                    else if ((attributes & FileAttributes.ReparsePoint) != 0)
+                    {
+                        writer.Write(child);
+                        writer.Write(new FileInfo(entry).LinkTarget ?? "");
+                    }
+                    else
+                    {
+                        writer.Write(child);
+                        CaptureFile(entry);
+                    }
+                }
+
+                info.Refresh();
+                if (!info.Exists || info.LastWriteTimeUtc != modified || info.CreationTimeUtc != created)
+                    throw new IOException($"Output '{directory}' changed while checking it; retry or use --force.");
+            }
+        }
+        return Convert.ToHexString(SHA256.HashData(buffer.GetBuffer().AsSpan(0, (int)buffer.Length)));
     }
 
     internal sealed record DestinationState(long Length, DateTime LastWriteTimeUtc, DateTime CreationTimeUtc,
@@ -729,6 +671,14 @@ public sealed class PublishCommand : Command<PublishSettings>
         return launch + " The .NET runtime is included. Platform webview prerequisite: WebKitGTK 4.1 on Linux, WebView2 on Windows, built-in WKWebView on macOS. Linux x64 is automated here; other OS/CPU combinations require runtime verification. This ZIP is not a signed installer or macOS .app bundle.";
     }
 
+    private static string StageStory(StorySource source, string root, string working)
+    {
+        var story = Path.Combine(working, "story");
+        WriteStory(source, root, story);
+        _ = StorySource.FromDirectory(story);
+        return story;
+    }
+
     private static void WriteStory(StorySource source, string root, string directory)
     {
         foreach (var (path, text) in source.Files)
@@ -756,6 +706,48 @@ public sealed class PublishCommand : Command<PublishSettings>
 
             return destination;
         }
+    }
+
+    private static string BuildStandalone(string working, string story, string storyTitle, string storyId,
+        string target, string? runtime, TextWriter output, TextWriter error, Operations publication,
+        bool universalDesktop = false)
+    {
+        var content = universalDesktop
+            ? BuildUniversalDesktop(working, story, storyTitle, storyId, output, error, publication)
+            : publication.BuildHost(working, target, runtime, story, output, error);
+        if (!universalDesktop)
+        {
+            if (target == "desktop")
+                PrepareDesktopRuntime(content, runtime!, story, storyTitle, storyId);
+            else
+                StageExternalStory(story, content, target);
+        }
+        AddDeploymentFiles(content, target, runtime, storyTitle);
+        return content;
+    }
+
+    private static string BuildSplitDesktop(string working, string runtime, string story, string storyTitle,
+        string storyId, TextWriter output, TextWriter error, Operations publication)
+    {
+        var content = BuildDesktopRuntime(working, runtime, story, output, error, publication);
+        PrepareDesktopRuntime(content, runtime, story, storyTitle, storyId);
+        AddDeploymentFiles(content, "desktop", runtime, storyTitle);
+        return content;
+    }
+
+    private static void PrepareDesktopRuntime(string content, string runtime, string story, string storyTitle, string storyId)
+    {
+        MoveDesktopRuntimeToInternal(content, runtime);
+        var internalStory = Path.Combine(content, "internal", "story");
+        Directory.CreateDirectory(internalStory);
+        CopyDirectory(story, internalStory);
+        CreateSplitLauncher(content, storyTitle, storyId, runtime);
+    }
+
+    private static void AddDeploymentFiles(string content, string target, string? runtime, string storyTitle)
+    {
+        File.Copy(Path.Combine(AssetsRoot, "ENGINE-LICENSE.txt"), Path.Combine(content, "ENGINE-LICENSE.txt"));
+        File.WriteAllText(Path.Combine(content, "DEPLOYMENT.txt"), DeploymentInstructions(target, runtime, storyTitle));
     }
 
     private static string BuildUniversalDesktop(string working, string story, string storyTitle, string storyId,

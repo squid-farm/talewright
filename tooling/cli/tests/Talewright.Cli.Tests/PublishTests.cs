@@ -1240,6 +1240,139 @@ public sealed class PublishTests : IDisposable
         Assert.Equal("keep", File.ReadAllText(Path.Combine(AllDirectory, "web", "keep")));
     }
 
+    private PublishCommand.Operations AllBuilds(Action? onFirstBuild = null)
+    {
+        var first = true;
+        return PublishCommand.Operations.Default with
+        {
+            BuildHost = (working, _, runtime, _, _, _) =>
+            {
+                if (first)
+                {
+                    first = false;
+                    onFirstBuild?.Invoke();
+                }
+                var host = Path.Combine(working, "host-output");
+                Directory.CreateDirectory(host);
+                File.WriteAllText(Path.Combine(host, "host.txt"), runtime ?? "web");
+                return host;
+            },
+        };
+    }
+
+    [Theory]
+    [InlineData("yes\n", false, 0)]
+    [InlineData("no\n", false, 2)]
+    [InlineData("", true, 0)]
+    public void All_target_overwrite_confirmation_and_force(string answer, bool force, int expected)
+    {
+        var web = Path.Combine(AllDirectory, "web");
+        Directory.CreateDirectory(web);
+        File.WriteAllText(Path.Combine(web, "keep"), "original");
+
+        var result = RunAllControlled(force ? new UnreadableInput() : new StringReader(answer),
+            inputRedirected: force, publication: AllBuilds(), args: force ? ["--force"] : []);
+
+        Assert.Equal(expected, result.Code);
+        if (force)
+            Assert.DoesNotContain("[y/N]", result.Error);
+        else
+            Assert.Contains("Replace all existing outputs?", result.Error);
+        if (expected == 0)
+        {
+            Assert.True(File.Exists(Path.Combine(web, "story", "story.talewright.yaml")));
+            Assert.False(File.Exists(Path.Combine(web, "keep")));
+            Assert.True(File.Exists(Path.Combine(AllDirectory, "desktop", "Publish.sh")));
+        }
+        else
+        {
+            Assert.Equal("original", File.ReadAllText(Path.Combine(web, "keep")));
+            Assert.False(Directory.Exists(Path.Combine(AllDirectory, "desktop")));
+        }
+        Assert.Empty(Directory.GetDirectories(AllDirectory, ".talewright-*"));
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public void All_target_does_not_replace_an_output_changed_or_created_during_build(bool initiallyExists)
+    {
+        var web = Path.Combine(AllDirectory, "web");
+        if (initiallyExists)
+        {
+            Directory.CreateDirectory(web);
+            File.WriteAllText(Path.Combine(web, "keep"), "original");
+        }
+        var publication = AllBuilds(() =>
+        {
+            Directory.CreateDirectory(web);
+            File.WriteAllText(Path.Combine(web, "keep"), "other publisher");
+        });
+
+        var result = RunAllControlled(initiallyExists ? new StringReader("yes\n") : new UnreadableInput(),
+            inputRedirected: !initiallyExists, publication: publication);
+
+        Assert.Equal(2, result.Code);
+        Assert.Contains("changed after approval", result.Error);
+        Assert.Equal("other publisher", File.ReadAllText(Path.Combine(web, "keep")));
+        Assert.False(Directory.Exists(Path.Combine(AllDirectory, "desktop")));
+        Assert.Empty(Directory.GetDirectories(AllDirectory, ".talewright-*"));
+    }
+
+    [Fact]
+    public void All_target_build_failure_preserves_outputs_and_cleans_staging()
+    {
+        var web = Path.Combine(AllDirectory, "web");
+        Directory.CreateDirectory(web);
+        File.WriteAllText(Path.Combine(web, "keep"), "original");
+        var builds = AllBuilds();
+        var publication = builds with
+        {
+            BuildHost = (working, target, runtime, story, output, error) =>
+            {
+                Assert.StartsWith(AllDirectory + Path.DirectorySeparatorChar, working);
+                if (target == "desktop")
+                    throw new PublishCommand.PublishBuildException("controlled desktop failure");
+                return builds.BuildHost(working, target, runtime, story, output, error);
+            },
+        };
+
+        var result = RunAllControlled(new StringReader("yes\n"), publication: publication);
+
+        Assert.Equal(1, result.Code);
+        Assert.Contains("controlled desktop failure", result.Error);
+        Assert.Equal("original", File.ReadAllText(Path.Combine(web, "keep")));
+        Assert.False(Directory.Exists(Path.Combine(AllDirectory, "desktop")));
+        Assert.Empty(Directory.GetDirectories(AllDirectory, ".talewright-*"));
+    }
+
+    [Fact]
+    public void All_target_install_failure_rolls_back_existing_directory_and_file()
+    {
+        var web = Path.Combine(AllDirectory, "web");
+        var desktop = Path.Combine(AllDirectory, "desktop");
+        Directory.CreateDirectory(web);
+        File.WriteAllText(Path.Combine(web, "keep"), "original web");
+        File.WriteAllText(desktop, "original desktop");
+        var publication = AllBuilds() with
+        {
+            MoveDirectory = (source, target) =>
+            {
+                if (Path.GetFileName(source) == "desktop-output")
+                    throw new IOException("controlled installation failure");
+                Directory.Move(source, target);
+            },
+        };
+
+        var result = RunAllControlled(new StringReader("yes\n"), publication: publication);
+
+        Assert.Equal(2, result.Code);
+        Assert.Contains("controlled installation failure", result.Error);
+        Assert.Equal("original web", File.ReadAllText(Path.Combine(web, "keep")));
+        Assert.Equal("original desktop", File.ReadAllText(desktop));
+        Assert.Empty(Directory.GetFileSystemEntries(AllDirectory, ".talewright-*"));
+    }
+
     [Fact]
     public void Existing_output_requires_force_and_failed_validation_preserves_it()
     {
