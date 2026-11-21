@@ -166,6 +166,63 @@ public sealed partial class ServerTests
             token.Type == "talemarkFormatting" && token.Text == "*" && token.Line == 7);
     }
 
+    [Fact]
+    public async Task Choice_label_incomplete_substitution_recovers_diagnostics_and_semantic_tokens()
+    {
+        const string valid = """
+            === start
+            * [my {var:choice}] (requires flag:ready) -> finish
+            === finish
+            -> END
+            """;
+        var incomplete = valid.Replace("{var:choice}", "{var:choice", StringComparison.Ordinal);
+        await using var client = new Client();
+        File.WriteAllText(client.PathOf("story.talewright.yaml"),
+            Manifest + "flags: [ready]\nvars: {choice: 1}\n");
+        var initialized = await client.Initialize();
+        var legend = initialized.GetProperty("result").GetProperty("capabilities")
+            .GetProperty("semanticTokensProvider").GetProperty("legend").GetProperty("tokenTypes")
+            .EnumerateArray().Select(value => value.GetString()!).ToArray();
+
+        async Task<DecodedToken[]> ReadTokens(string source)
+        {
+            var response = await client.Request("textDocument/semanticTokens/full", new
+            {
+                textDocument = new { uri = client.UriOf("start.tale") }
+            });
+            Assert.False(response.TryGetProperty("error", out _));
+            var data = response.GetProperty("result").GetProperty("data")
+                .EnumerateArray().Select(value => value.GetInt32()).ToArray();
+            Assert.Equal(0, data.Length % 5);
+            var tokens = Decode(data, legend, source);
+            for (var index = 1; index < tokens.Length; index++)
+                Assert.False(tokens[index].Line == tokens[index - 1].Line &&
+                    tokens[index].Start < tokens[index - 1].Start + tokens[index - 1].Length);
+            Assert.Contains(tokens, token => token.Text == "requires" && token.Type == "keyword");
+            Assert.Contains(tokens, token => token.Text == "->" && token.Type == "talemarkDivert");
+            return tokens;
+        }
+
+        await client.Open("start.tale", valid, 1);
+        Assert.Empty(await client.Diagnostics("start.tale", 1));
+        await ReadTokens(valid);
+
+        await client.Change("start.tale", incomplete, 2);
+        var diagnostic = Assert.Single(await client.Diagnostics("start.tale", 2));
+        Assert.Equal("TW1004", diagnostic.GetProperty("code").GetString());
+        var diagnosticRange = diagnostic.GetProperty("range");
+        Assert.Equal(1, diagnosticRange.GetProperty("start").GetProperty("line").GetInt32());
+        Assert.Equal(incomplete.Split('\n')[1].IndexOf('{'),
+            diagnosticRange.GetProperty("start").GetProperty("character").GetInt32());
+        Assert.True(diagnosticRange.GetProperty("end").GetProperty("character").GetInt32() <=
+            incomplete.Split('\n')[1].IndexOf("(requires", StringComparison.Ordinal));
+        await ReadTokens(incomplete);
+
+        await client.Change("start.tale", valid, 3);
+        Assert.Empty(await client.Diagnostics("start.tale", 3));
+        await ReadTokens(valid);
+    }
+
     private static DecodedToken[] Decode(int[] data, string[] legend, string source)
     {
         var lines = source.ReplaceLineEndings("\n").Split('\n');
