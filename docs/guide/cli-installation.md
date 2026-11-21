@@ -143,7 +143,8 @@ For a download you have already unpacked, choose **Select Existing Executable** 
 
 - **Talewright: Validate Story** checks for mistakes.
 - **Talewright: Run Story** plays the story from the beginning. It also needs the
-  [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0).
+  [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) when using a
+  framework-dependent CLI. The standalone download includes its runtime.
 - **Talewright: Publish Story ZIP** lets you choose where to save a ZIP for the web player.
 - **Talewright: Open Author Debugger** opens the testing window.
 

@@ -63,6 +63,19 @@ async function cliExecutable(root) {
     { code: 'CLI_NOT_FOUND' });
 }
 
+async function cliIsSelfContained(executable) {
+  const runtimeConfig = path.join(path.dirname(executable), `${path.parse(executable).name}.runtimeconfig.json`);
+  let config;
+  try {
+    config = JSON.parse(await readFile(runtimeConfig, 'utf8'));
+  } catch (error) {
+    if (error.code === 'ENOENT') return false;
+    throw new Error(`Could not inspect the CLI runtime configuration at ${runtimeConfig}: ${error.message}`);
+  }
+  return Array.isArray(config?.runtimeOptions?.includedFrameworks)
+    && config.runtimeOptions.includedFrameworks.some(framework => framework?.name === 'Microsoft.NETCore.App');
+}
+
 async function executeCli(root, args) {
   const executable = await cliExecutable(root);
   return execute(executable, args, { cwd: root, timeout: 60000, maxBuffer: 1024 * 1024 });
@@ -316,6 +329,6 @@ function registerCliSetup(context) {
 }
 
 module.exports = {
-  cliExecutable, executeCli, registerCliSetup, requireDotnetRuntime,
+  cliExecutable, cliIsSelfContained, executeCli, registerCliSetup, requireDotnetRuntime,
   cliPlatform, releaseAsset, downloadTools, checkCliUpdates,
 };

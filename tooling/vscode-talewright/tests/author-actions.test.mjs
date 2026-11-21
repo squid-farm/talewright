@@ -181,7 +181,17 @@ function host(options = {}) {
     'node:fs/promises': {
       access: async file => { if (!files.includes(file)) throw Object.assign(new Error('missing'), { code: 'ENOENT' }); },
       stat: async () => ({ isFile: () => true }),
-      readFile: async () => JSON.stringify({ version: options.version ?? '0.1.0-preview.1' }),
+      readFile: async file => {
+        if (file.endsWith('.runtimeconfig.json')) {
+          if (options.selfContainedCli) {
+            return JSON.stringify({
+              runtimeOptions: { includedFrameworks: [{ name: 'Microsoft.NETCore.App', version: '10.0.0' }] },
+            });
+          }
+          throw Object.assign(new Error('missing'), { code: 'ENOENT' });
+        }
+        return JSON.stringify({ version: options.version ?? '0.1.0-preview.1' });
+      },
       readdir: async () => options.directoryEntries ?? [],
       mkdir: async () => {},
       rm: async () => {},
@@ -400,6 +410,17 @@ test('Run Story executes talewright run as a visible, space-safe player task', a
   assert.equal(task.presentationOptions.focus, true);
   assert.equal(calls.runtimeChecks[0][0], 'dotnet');
   assert.deepEqual(Array.from(calls.runtimeChecks[0][1]), ['--list-runtimes']);
+  assert.equal(calls.errors.length, 0);
+});
+
+test('Run Story skips the system runtime check for a self-contained CLI', async () => {
+  const executable = '/storage/cli/0.1.0-preview.1/linux-x64/Talewright.Cli';
+  const { calls, run } = host({
+    executable, files: [executable], selfContainedCli: true, dotnetError: 'ENOENT',
+  });
+  await run('runStory');
+  assert.equal(calls.tasks[0].execution.executable, executable);
+  assert.equal(calls.runtimeChecks.length, 0);
   assert.equal(calls.errors.length, 0);
 });
 

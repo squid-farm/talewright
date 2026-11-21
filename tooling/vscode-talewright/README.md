@@ -268,8 +268,9 @@ CLI. Find them in the Command Palette (**Ctrl+Shift+P**):
   editor context menu) opens the Author Debugger at that scene. Turn off the code lens with
   `talewright.codeLens.playFromScene`.
 - **Talewright: Run Story** runs `talewright run` to play from the start in the native player. It
-  needs the [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0); the extension checks
-  but never installs it.
+  needs the [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0) when using a
+  framework-dependent CLI. The downloaded standalone CLI includes its runtime; the extension checks
+  but never installs .NET.
 
 Actions use the story containing the active file, the only story in the workspace, or ask you to choose.
 They need a trusted workspace and offer to save unsaved story files first. Output and errors stay in

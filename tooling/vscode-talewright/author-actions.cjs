@@ -1,7 +1,7 @@
 const vscode = require('vscode');
 const path = require('node:path');
 const { readdir } = require('node:fs/promises');
-const { cliExecutable, executeCli, registerCliSetup, requireDotnetRuntime } = require('./cli-tools.cjs');
+const { cliExecutable, cliIsSelfContained, executeCli, registerCliSetup, requireDotnetRuntime } = require('./cli-tools.cjs');
 
 const PENDING_NEW_STORY = 'pendingNewStory';
 const PENDING_NEW_STORY_MAX_AGE = 5 * 60 * 1000;
@@ -192,7 +192,7 @@ async function createTask(command, requested, definition, scope, scene) {
     error.resource = vscode.Uri.file(root);
     throw error;
   }
-  if (command === 'run') await requireDotnetRuntime();
+  if (command === 'run' && !await cliIsSelfContained(executable)) await requireDotnetRuntime();
   const args = [command, root];
   if (command === 'debug' && scene) args.push('--scene', scene);
   if (command === 'publish') {
