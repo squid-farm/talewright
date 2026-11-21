@@ -19,7 +19,26 @@ internal static partial class TaleSyntaxParser
             if (pos < rest.Length && rest[pos] == SceneVocabulary.OpenBracket)
             {
                 var labelScan = DelimiterScanner.Scan(rest, DelimiterScanMode.ChoiceLabel, pos, _cancellationToken);
-                if (!labelScan.TryGetClose(pos, out var close))
+                var hasClose = labelScan.TryGetClose(pos, out var close);
+                var hasUnclosedImage = false;
+                if (hasClose)
+                {
+                    var checkpoint = _cancellationToken.CanBeCanceled ? new CancellationCheckpoint(_cancellationToken) : null;
+                    foreach (var issue in labelScan.Issues)
+                    {
+                        checkpoint?.Check();
+                        if (issue.Kind == DelimiterKind.Brace &&
+                            issue.Issue is (DelimiterIssueKind.UnclosedOpener or DelimiterIssueKind.MismatchedOpener) &&
+                            issue.Offset < close &&
+                            ImageSyntax.IsCall(rest.AsSpan(issue.Offset + 1), _cancellationToken))
+                        {
+                            hasUnclosedImage = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (!hasClose || hasUnclosedImage)
                 {
                     UnclosedLabel(line, rest, pos, labelScan);
                     return true;

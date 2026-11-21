@@ -96,7 +96,6 @@ public sealed class ChoiceDiagnosticsTests
     [InlineData("* [Go to the", null)]
     [InlineData("* [Hello {player:first-name}", null)]
     [InlineData("* [Hello {player:first-name", null)]
-    [InlineData("* [Hello {player:first-name] -> END", null)]
     public void Missing_bracket_hints_only_for_one_clear_boundary(string line, string? marker)
     {
         var diagnostic = Assert.Single(Compile("=== start\n" + line).Diagnostics);
@@ -149,6 +148,19 @@ public sealed class ChoiceDiagnosticsTests
         Assert.Equal("TW1011", diagnostic.Code);
         Assert.Equal(message, diagnostic.Message);
         Assert.Equal(new SourceLocation("main.tale", 2, line.IndexOfAny(['(', '{']) + 1), diagnostic.Location);
+    }
+
+    [Fact]
+    public void Unclosed_substitution_in_closed_choice_label_reports_only_local_inline_error()
+    {
+        const string line = "* [my {var:count] (requires flag:ready) -> finish";
+        var result = Compile($"=== start\n{line}\n=== finish\n-> END");
+
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal("TW1004", diagnostic.Code);
+        Assert.Equal(new SourceLocation("main.tale", 2, line.IndexOf('{') + 1), diagnostic.Location);
+        Assert.Null(diagnostic.EndLocation);
+        Assert.DoesNotContain(result.Diagnostics, item => item.Code == "TW1011");
     }
 
     [Theory]
