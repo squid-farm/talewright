@@ -76,6 +76,9 @@ function host(options = {}) {
       }),
       openTextDocument: async resource => {
         calls.openedDocuments.push(resource);
+        if (options.manifestText && resource.fsPath.endsWith('/story.talewright.yaml')) {
+          return document(resource.fsPath, options.manifestText);
+        }
         return textDocuments.find(item => item.uri.fsPath === resource.fsPath) ?? { uri: resource };
       },
       onDidChangeTextDocument: listener => { calls.documentChanged = listener; return { dispose() {} }; },
@@ -669,6 +672,24 @@ test('standalone publish actions choose destinations and pass target arguments w
   const cancelledAll = host();
   await cancelledAll.run('publishStandaloneAll');
   assert.equal(cancelledAll.calls.tasks.length, 0);
+});
+
+test('publish save dialogs suggest story id and safe declared version', async () => {
+  const published = host({
+    manifestText: 'game:\n  id: uss-bastogne\n  version: "0.1.0 / release"\n',
+    output: '/exports/uss-bastogne-v0.1.0-release.zip',
+  });
+  await published.run('publishStoryZip');
+  assert.equal(published.calls.dialogs[0].defaultUri.fsPath,
+    '/workspace/My Story/uss-bastogne-v0.1.0-release.zip');
+
+  const desktop = host({
+    manifestText: 'game:\n  id: uss-bastogne\n  version: "0.1.0 / release"\n',
+    output: '/exports/uss-bastogne-v0.1.0-release-desktop.zip',
+  });
+  await desktop.run('publishStandaloneDesktop');
+  assert.equal(desktop.calls.dialogs[0].defaultUri.fsPath,
+    '/workspace/My Story/uss-bastogne-v0.1.0-release-desktop.zip');
 });
 
 test('debug and run actions and reusable tasks share selection, executable, trust and save handling', async () => {

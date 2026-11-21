@@ -80,6 +80,9 @@ talewright publish my-story -a --target all --output publish/
 This validates the story once and writes `publish/web/my-story-web.zip` and
 `publish/desktop/my-story-desktop.zip`. Add `--split` to put one desktop ZIP per supported computer
 type in `publish/desktop/` instead of the universal desktop ZIP. The web ZIP is still created.
+When `game.version` is declared in `story.talewright.yaml`, published archive names include it, for
+example `publish/web/my-story-v1.2.3-web.zip` and `publish/desktop/my-story-v1.2.3-win-x64.zip`.
+If the version is omitted or empty, Talewright keeps the unversioned names.
 
 ## A desktop game
 

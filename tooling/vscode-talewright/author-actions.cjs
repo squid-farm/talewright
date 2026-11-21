@@ -1,6 +1,6 @@
 const vscode = require('vscode');
 const path = require('node:path');
-const { readdir } = require('node:fs/promises');
+const { readFile, readdir } = require('node:fs/promises');
 const { cliExecutable, cliIsSelfContained, executeCli, registerCliSetup, requireDotnetRuntime } = require('./cli-tools.cjs');
 
 const PENDING_NEW_STORY = 'pendingNewStory';
@@ -10,6 +10,47 @@ const SCENE_ID = /^[A-Za-z_][A-Za-z0-9_]*(?:[.-][A-Za-z0-9_]+)*$/;
 function contains(root, file) {
   const relative = path.relative(root, file);
   return relative === '' || (relative !== '..' && !relative.startsWith(`..${path.sep}`) && !path.isAbsolute(relative));
+}
+
+function safeArchiveVersion(version) {
+  if (!version) return undefined;
+  const slug = version.trim().replace(/[^A-Za-z0-9_.+\-]+/g, '-').replace(/^[.\-]+|[.\-]+$/g, '').slice(0, 100).replace(/[.\-]+$/g, '');
+  return slug || undefined;
+}
+
+async function publishName(root) {
+  let storyId = path.basename(root);
+  let version;
+  try {
+    const manifestPath = path.join(root, 'story.talewright.yaml');
+    let text;
+    try {
+      text = (await vscode.workspace.openTextDocument(vscode.Uri.file(manifestPath))).getText();
+    } catch {
+      text = await readFile(manifestPath, 'utf8');
+    }
+    const lines = text.split(/\r\n|\r|\n/);
+    const game = lines.findIndex(line => /^\s*game\s*:\s*(?:$|#)/.test(line));
+    if (game >= 0) {
+      const gameIndent = lines[game].search(/\S/);
+      for (let index = game + 1; index < lines.length; index++) {
+        const line = lines[index];
+        if (!/^\s*(?:$|#)/.test(line) && line.search(/\S/) <= gameIndent) break;
+        const match = /^\s*(id|version)\s*:\s*(.*?)\s*$/.exec(line);
+        if (!match) continue;
+        let value = match[2].replace(/\s+#.*$/, '').trim();
+        if ((value.startsWith('"') && value.endsWith('"')) || (value.startsWith("'") && value.endsWith("'"))) {
+          value = value.slice(1, -1);
+        }
+        if (match[1] === 'id' && value) storyId = value;
+        if (match[1] === 'version' && value) version = value;
+      }
+    }
+  } catch {
+    // Keep the story directory name when the manifest cannot be read.
+  }
+  const safeVersion = safeArchiveVersion(version);
+  return { storyId, suggested: safeVersion ? `${storyId}-v${safeVersion}` : storyId };
 }
 
 async function storyRoots() {
@@ -196,9 +237,10 @@ async function createTask(command, requested, definition, scope, scene) {
   const args = [command, root];
   if (command === 'debug' && scene) args.push('--scene', scene);
   if (command === 'publish') {
+    const publish = await publishName(root);
     const output = await vscode.window.showSaveDialog({
       title: 'Publish story files for a Talewright player (not a standalone game)',
-      defaultUri: vscode.Uri.file(path.join(root, `${path.basename(root)}.zip`)),
+      defaultUri: vscode.Uri.file(path.join(root, `${publish.suggested}.zip`)),
       filters: { 'Story ZIP': ['zip'] },
     });
     if (!output) return undefined;
@@ -210,9 +252,10 @@ async function createTask(command, requested, definition, scope, scene) {
   let standaloneDestination;
   if (command === 'publish-desktop' || command === 'publish-web') {
     const target = command === 'publish-desktop' ? 'desktop' : 'web';
+    const publish = await publishName(root);
     const output = await vscode.window.showSaveDialog({
       title: `Publish standalone ${target} game`,
-      defaultUri: vscode.Uri.file(path.join(root, `${path.basename(root)}-${target}.zip`)),
+      defaultUri: vscode.Uri.file(path.join(root, `${publish.suggested}-${target}.zip`)),
       filters: { [`Standalone ${target} ZIP`]: ['zip'] },
     });
     if (!output) return undefined;

@@ -272,6 +272,35 @@ public sealed class StorySource
         }
     }
 
+    /// <summary>Reads <c>game.version</c> from story.talewright.yaml. Returns null when it is omitted or empty.</summary>
+    public string? ReadVersion()
+    {
+        if (!Files.TryGetValue(ManifestFileName, out var yaml))
+        {
+            return null;
+        }
+
+        try
+        {
+            var stream = new YamlDotNet.RepresentationModel.YamlStream();
+            stream.Load(new StringReader(yaml));
+            if (stream.Documents.FirstOrDefault()?.RootNode is not YamlDotNet.RepresentationModel.YamlMappingNode root ||
+                !root.Children.TryGetValue(new YamlDotNet.RepresentationModel.YamlScalarNode(ManifestVocabulary.Game), out var gameNode) ||
+                gameNode is not YamlDotNet.RepresentationModel.YamlMappingNode game ||
+                !game.Children.TryGetValue(new YamlDotNet.RepresentationModel.YamlScalarNode(ManifestVocabulary.Version), out var version))
+            {
+                return null;
+            }
+
+            var value = (version as YamlDotNet.RepresentationModel.YamlScalarNode)?.Value?.Trim();
+            return string.IsNullOrWhiteSpace(value) ? null : value;
+        }
+        catch (YamlDotNet.Core.YamlException)
+        {
+            return null;
+        }
+    }
+
     /// <summary>Recognizes reserved story configuration inputs, including supporting files.</summary>
     public static bool IsConfigurationFile(string path) =>
         path.EndsWith(ConfigurationFileExtension, StringComparison.Ordinal);
