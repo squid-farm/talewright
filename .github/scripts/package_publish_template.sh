@@ -88,5 +88,9 @@ with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED, compresslev
             while chunk := source.read(1024 * 1024):
                 destination.write(chunk)
 PY
-(cd "$(dirname "$archive")" && sha256sum "$name" > "$name.sha256")
+if command -v sha256sum >/dev/null; then
+  (cd "$(dirname "$archive")" && sha256sum "$name" > "$name.sha256")
+else
+  (cd "$(dirname "$archive")" && shasum -a 256 "$name" > "$name.sha256")
+fi
 unzip -tq "$archive"

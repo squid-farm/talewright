@@ -601,7 +601,7 @@ async function testLiveDiagnostics() {
   try {
     renderer = await openRenderer();
     await fs.writeFile(path.join(folder, 'story.talewright.yaml'),
-      'game:\n  id: live\n  title: Live\n  start: start\ncharacters:\n  player: {first-name: Ada}\n');
+      'game:\n  id: live\n  title: Live\n  start: start\ncharacters:\n  player: {first-name: Ada}\nflags: [ready]\nvars: {choice: 1}\n');
     const file = path.join(folder, 'start.tale');
     await fs.writeFile(file, '=== start\n* [Go] -> missing\n');
     const document = await vscode.workspace.openTextDocument(file);
@@ -648,6 +648,39 @@ async function testLiveDiagnostics() {
     await waitForCompiler(document, items => items.length === 0);
     await assertSemanticTokens(document);
     await assertRenderedColors(document);
+
+    const choiceValid = '=== start\n* [my {var:choice}] (requires flag:ready) -> finish\n=== finish\n-> END\n';
+    const choiceIncomplete = choiceValid.replace('{var:choice}', '{var:choice');
+    const replaceStory = async text => {
+      const choiceEdit = new vscode.WorkspaceEdit();
+      choiceEdit.replace(document.uri,
+        new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)), text);
+      assert.equal(await vscode.workspace.applyEdit(choiceEdit), true);
+    };
+    const assertChoiceTokens = async () => {
+      const semanticTokens = await vscode.commands.executeCommand(
+        'vscode.provideDocumentSemanticTokens', document.uri);
+      assert.ok(semanticTokens?.data, 'VS Code must receive semantic tokens without a failed request');
+      assert.equal(semanticTokens.data.length % 5, 0,
+        'Choice-label semantic tokens must use valid five-integer LSP groups');
+    };
+
+    await replaceStory(choiceValid);
+    await waitForCompiler(document, items => items.length === 0);
+    await assertChoiceTokens();
+    await replaceStory(choiceIncomplete);
+    const choiceDiagnostics = await waitForCompiler(document, items => items.some(item => item.code === 'TW1004'));
+    const unclosedSubstitution = choiceDiagnostics.find(item => item.code === 'TW1004');
+    assert.equal(choiceDiagnostics.length, 1, 'Only the incomplete substitution should be diagnosed');
+    assert.equal(unclosedSubstitution.range.start.line, 1);
+    assert.equal(unclosedSubstitution.range.start.character, choiceIncomplete.split('\n')[1].indexOf('{'));
+    assert.ok(unclosedSubstitution.range.end.character <=
+      choiceIncomplete.split('\n')[1].indexOf('(requires'));
+    await assertChoiceTokens();
+    await replaceStory(choiceValid);
+    await waitForCompiler(document, items => items.length === 0);
+    await assertChoiceTokens();
+
     assert.ok((await fs.readFile(file, 'utf8')).includes('missing'), 'Disk must remain invalid');
     const completionEdit = new vscode.WorkspaceEdit();
     completionEdit.replace(document.uri, new vscode.Range(document.positionAt(0), document.positionAt(document.getText().length)),

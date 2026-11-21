@@ -8,9 +8,11 @@ namespace Talewright.Talemark.Parsing;
 
 internal static class ImageSyntax
 {
-    internal static bool IsCall(ReadOnlySpan<char> text)
+    internal static bool IsCall(ReadOnlySpan<char> text, CancellationToken cancellationToken = default)
     {
+        cancellationToken.ThrowIfCancellationRequested();
         var trimmed = text.TrimStart();
+        cancellationToken.ThrowIfCancellationRequested();
         return trimmed.StartsWith(ExpressionVocabulary.Image, StringComparison.Ordinal)
             && trimmed[ExpressionVocabulary.Image.Length..].TrimStart() is [ExpressionVocabulary.OpenParen, ..];
     }
@@ -179,7 +181,7 @@ internal static class ImageSyntax
 
         if (!closed)
         {
-            Error("The image call is missing its closing '}'.", end);
+            Error("The image call is missing its closing '}'. Close it with '}'.", end);
             return null;
         }
 

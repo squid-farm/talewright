@@ -74,6 +74,20 @@ public sealed class DelimiterScannerTests
     }
 
     [Fact]
+    public void Choice_label_closer_is_recognized_after_an_unclosed_inline_construct()
+    {
+        const string text = "[my {var:choice]";
+
+        var result = DelimiterScanner.Scan(text, DelimiterScanMode.ChoiceLabel);
+
+        Assert.True(result.TryGetClose(0, out var close));
+        Assert.Equal(text.Length - 1, close);
+        Assert.Contains(result.Issues, issue =>
+            issue.Kind == DelimiterKind.Brace && issue.Offset == text.IndexOf('{') &&
+            issue.Issue == DelimiterIssueKind.MismatchedOpener);
+    }
+
+    [Fact]
     public void Code_groups_nest_delimiters_and_ignore_quoted_delimiters()
     {
         const string text = "(call(\")]}{}\", ([x])))";

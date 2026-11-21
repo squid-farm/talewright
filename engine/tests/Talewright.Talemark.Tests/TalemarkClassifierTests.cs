@@ -267,6 +267,33 @@ public sealed class TalemarkClassifierTests
             classification.Range.Start.File == "main.tale");
     }
 
+    [Fact]
+    public void Incomplete_substitution_in_closed_choice_label_has_non_overlapping_classifications()
+    {
+        const string tale = "=== start\n* [my {var:count] (requires flag:ready) -> finish\n=== finish\n-> END";
+        var classifications = TalemarkClassifier.Classify("main.tale", tale)
+            .OrderBy(item => item.Range.Start.Line)
+            .ThenBy(item => item.Range.Start.Column)
+            .ThenBy(item => item.Range.End.Column)
+            .ToArray();
+
+        for (var index = 1; index < classifications.Length; index++)
+        {
+            var previous = classifications[index - 1];
+            var current = classifications[index];
+            Assert.False(previous.Range.Start.Line == current.Range.Start.Line &&
+                current.Range.Start.Column < previous.Range.End.Column,
+                $"Overlapping classifications: {previous} and {current}");
+        }
+
+        Assert.Single(classifications, item => TextOf(tale, item) == "var");
+        Assert.Single(classifications, item => TextOf(tale, item) == "count");
+        Assert.Contains(classifications, item =>
+            item.Kind == TalemarkClassificationKind.Keyword && TextOf(tale, item) == "requires");
+        Assert.Contains(classifications, item =>
+            item.Kind == TalemarkClassificationKind.Divert && TextOf(tale, item) == "->");
+    }
+
     [Theory]
     [InlineData("game: {id: classifier, title: Classifier, start: start}")]
     [InlineData(null)]
