@@ -42,7 +42,7 @@ class Job:
 
 def run(command, **kwargs):
     print("+", " ".join(map(str, command)), flush=True)
-    subprocess.run(list(map(str, command)), cwd=ROOT, check=True, **kwargs)
+    return subprocess.run(list(map(str, command)), cwd=ROOT, check=True, **kwargs)
 
 
 def verify_report(report):
