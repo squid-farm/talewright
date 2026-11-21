@@ -244,6 +244,78 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
         await Page.EvaluateAsync<bool>("url => window.historyUrls.revoked.includes(url)", url);
 
     [Fact]
+    public async Task Unmeasured_small_images_are_measured_in_the_browser_and_choice_images_stay_inline()
+    {
+        using var files = new ImageStoryFiles();
+        await File.WriteAllTextAsync(files.TalePath, """
+            === start
+            {image("unvisited.png", "Tiny credit")} {image("photo.jpeg", "A camp")}
+            * [Continue {image("pixel.png", "Choice token")}] -> next
+            === next
+            The next passage.
+            * [Finish] -> END
+            """);
+
+        await Page.RouteAsync("**/MediaView.razor.js", async route =>
+        {
+            var response = await route.FetchAsync();
+            var script = await response.TextAsync();
+            const string point = "const bytes = await stream.arrayBuffer();";
+            Assert.Contains(point, script);
+            script = script.Replace(point, """
+                if (window.pauseUnmeasuredImages)
+                    await new Promise(resolve => window.resumeUnmeasuredImages.push(resolve));
+                const bytes = await stream.arrayBuffer();
+                """, StringComparison.Ordinal);
+            await route.FulfillAsync(new() { Response = response, Body = script });
+        });
+        await Page.EvaluateAsync("""
+            () => {
+                window.pauseUnmeasuredImages = true;
+                window.resumeUnmeasuredImages = [];
+            }
+            """);
+
+        try
+        {
+            await UploadBytes("history-small-images.zip", files.Zip());
+            await Page.WaitForFunctionAsync("window.resumeUnmeasuredImages.length > 0");
+            await Choices.First.ClickAsync();
+            await Driver.ClickAsync("History");
+
+            await Expect(History.GetByRole(AriaRole.Button, new() { Name = "Reveal image: Tiny credit", Exact = true }))
+                .ToBeVisibleAsync();
+            await Expect(History.GetByAltText("Choice token", new() { Exact = true })).ToBeVisibleAsync();
+            await Expect(History.GetByRole(AriaRole.Button, new() { Name = "Reveal image: Choice token", Exact = true }))
+                .ToHaveCountAsync(0);
+            await Expect(History.GetByRole(AriaRole.Button, new() { Name = "Reveal image: A camp", Exact = true }))
+                .ToBeVisibleAsync();
+
+            await Page.EvaluateAsync("""
+                () => {
+                    window.pauseUnmeasuredImages = false;
+                    window.resumeUnmeasuredImages.splice(0).forEach(resume => resume());
+                }
+                """);
+            var historicalSmall = History.GetByAltText("Tiny credit", new() { Exact = true });
+            await Expect(historicalSmall).ToBeVisibleAsync();
+            await Expect(History.GetByRole(AriaRole.Button, new() { Name = "Reveal image: Tiny credit", Exact = true }))
+                .ToHaveCountAsync(0);
+            await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0",
+                await historicalSmall.ElementHandleAsync());
+        }
+        finally
+        {
+            await Page.EvaluateAsync("""
+                () => {
+                    window.pauseUnmeasuredImages = false;
+                    window.resumeUnmeasuredImages.splice(0).forEach(resume => resume());
+                }
+                """);
+        }
+    }
+
+    [Fact]
     [Trait("Host", "Browser")]
     public async Task Play_screen_only_collapses_images_repeated_in_a_later_scene_group()
     {
@@ -363,7 +435,7 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
     [Theory]
     [InlineData(1100)]
     [InlineData(390)]
-    public async Task Revealed_images_keep_their_original_layout_without_an_inner_scroll_box(int viewportWidth)
+    public async Task Revealed_images_use_a_bounded_frame_without_an_inner_scroll_box(int viewportWidth)
     {
         await Page.SetViewportSizeAsync(viewportWidth, 900);
         using var files = new ImageStoryFiles();
@@ -394,15 +466,28 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
                 await revealed.ElementHandleAsync());
             var bounds = (await revealed.BoundingBoxAsync())!;
             var expectedWidth = await revealed.EvaluateAsync<double>(
-                "image => Math.min(image.naturalWidth, image.closest('p').clientWidth)");
+                """
+                image => {
+                    const frame = image.closest('.tw-media');
+                    const style = getComputedStyle(frame);
+                    const horizontalInsets = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight)
+                        + parseFloat(style.borderLeftWidth) + parseFloat(style.borderRightWidth);
+                    return Math.min(image.naturalWidth, image.closest('p').clientWidth - horizontalInsets);
+                }
+                """);
             Assert.InRange(Math.Abs(bounds.Width - expectedWidth), 0, 1);
             Assert.InRange(Math.Abs(bounds.Height - expectedWidth * original.Height / original.Width), 0, 1);
             Assert.True(await revealed.EvaluateAsync<bool>("""
                 image => {
+                    const frame = image.closest('.tw-media');
                     const box = image.closest('.tw-history-image');
-                    return box.scrollHeight <= box.clientHeight + 1
+                    const style = getComputedStyle(frame);
+                    const verticalInsets = parseFloat(style.paddingTop) + parseFloat(style.paddingBottom)
+                        + parseFloat(style.borderTopWidth) + parseFloat(style.borderBottomWidth);
+                    return frame.getBoundingClientRect().width <= image.closest('p').clientWidth + 1
+                        && box.scrollHeight <= box.clientHeight + 1
                         && box.scrollWidth <= box.clientWidth + 1
-                        && Math.abs(box.getBoundingClientRect().height - image.getBoundingClientRect().height) <= 1
+                        && Math.abs(frame.getBoundingClientRect().height - image.getBoundingClientRect().height - verticalInsets) <= 1
                         && image.closest('.tw-media-strong') !== null;
                 }
                 """));
@@ -536,8 +621,8 @@ public sealed class TranscriptHistoryTests(WebHostFixture host, ITestOutputHelpe
             tale.AppendLine("Runtime visits {var:visits}.");
             if (images)
             {
-                File.Copy(Path.Combine(files.Root, "images", "pixel.png"), Path.Combine(files.Root, "images", $"camp-{index}.png"));
-                tale.AppendLine($"{{image(\"camp-{index}.png\", \"Camp {index}\")}}");
+                File.Copy(files.ImagePath, Path.Combine(files.Root, "images", $"camp-{index}.jpeg"));
+                tale.AppendLine($"{{image(\"camp-{index}.jpeg\", \"Camp {index}\")}}");
             }
             tale.AppendLine(index == 45 ? "* [Finish] -> done" : $"* [Next] -> passage{index + 1}");
         }

@@ -127,7 +127,8 @@ public sealed class NativeImageTests
         Assert.Contains("Choice camp", choice.Name);
         await driver.ScrollToButtonAsync(choice.Name);
         await WaitFor(driver, snapshot => snapshot.Descendants().Any(node =>
-            node.Role == "push button" && node.Name == choice.Name && node.Bounds.Height > 100));
+            node.Role == "push button" && node.Name == choice.Name &&
+            node.Bounds.Height is > 0 and < 100));
         await driver.ResizeAsync(520, 800);
         await driver.ScrollToButtonAsync(choice.Name);
         var narrow = await WaitFor(driver, snapshot => snapshot.Descendants().Any(node =>
@@ -135,12 +136,13 @@ public sealed class NativeImageTests
         Assert.DoesNotContain("unavailable", narrow.Content);
         await ActivateChoice(driver);
         await WaitFor(driver, snapshot => snapshot.Content.Contains("Next passage."));
-        var history = await driver.SnapshotAsync();
+        var history = await WaitFor(driver, snapshot =>
+            snapshot.Descendants().Any(node => node.Role == "image" && node.Name == "Choice camp"));
         Assert.Contains(history.Descendants(), node =>
             node.Role == "push button" && node.Name == "Reveal image: A camp");
         Assert.DoesNotContain(history.Descendants(), node => node.Role == "image" && node.Name == "A camp");
-        Assert.Contains(history.Descendants(), node =>
-            node.Role == "push button" && node.Name == "Reveal image: Choice camp");
+        Assert.DoesNotContain(history.Descendants(), node =>
+            node.Role == "push button" && node.Name == "Expand image: Choice camp");
         await driver.ScrollToImageAsync("Next camp");
         await WaitFor(driver, snapshot => snapshot.Descendants().Any(node =>
             node.Name == "Next camp" && node.Bounds.Height > 100));

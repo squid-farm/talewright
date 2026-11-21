@@ -1,9 +1,11 @@
 const images = new Map();
+const measurementObservers = new Map();
 let next = 0;
+let nextMeasurement = 0;
 
 export function observe(image, receiver) {
     const id = ++next;
-    const state = { image, url: null, observer: null };
+    const state = { image, receiver, url: null, observer: null };
     const request = () => {
         state.observer?.disconnect();
         receiver.invokeMethodAsync("LoadAsync").catch(error => {
@@ -48,10 +50,79 @@ export async function display(id, url) {
     return success;
 }
 
+export function dimensions(id) {
+    const image = images.get(id)?.image;
+    if (!image) throw new Error("Cannot read dimensions for an unobserved image.");
+    return [image.naturalWidth, image.naturalHeight];
+}
+
+export function observeMeasurement(element, receiver) {
+    const id = ++nextMeasurement;
+    const observer = new IntersectionObserver(entries => {
+        if (!entries.some(entry => entry.isIntersecting)) return;
+        observer.disconnect();
+        measurementObservers.delete(id);
+        receiver.invokeMethodAsync("MeasureInBrowserAsync").catch(error => {
+            console.error("History image measurement request failed.", error);
+        });
+    }, { rootMargin: "200px" });
+    observer.observe(element);
+    measurementObservers.set(id, observer);
+    return id;
+}
+
+export function releaseMeasurement(id) {
+    const observer = measurementObservers.get(id);
+    if (!observer) return;
+    measurementObservers.delete(id);
+    observer.disconnect();
+}
+
+export function measure(url) {
+    const image = new Image();
+    return new Promise((resolve, reject) => {
+        image.onload = () => resolve([image.naturalWidth, image.naturalHeight]);
+        image.onerror = () => reject(new Error("The browser could not decode the image."));
+        image.src = url;
+    }).finally(() => {
+        image.onload = image.onerror = null;
+        image.removeAttribute("src");
+    });
+}
+
+export function openLightbox(id, trigger, dialog, expandedImage) {
+    const state = images.get(id);
+    if (!state || !state.image.currentSrc) throw new Error("Cannot expand an unloaded image.");
+    state.trigger = trigger;
+    state.lightbox = dialog;
+    state.expandedImage = expandedImage;
+    state.onBackdropClick ??= event => {
+        if (event.target === state.lightbox) state.lightbox.close();
+    };
+    state.onClose ??= () => {
+        state.expandedImage.removeAttribute("src");
+        state.trigger.focus({ preventScroll: true });
+        state.receiver.invokeMethodAsync("LightboxClosed").catch(error => {
+            if (images.has(id)) console.error("Image lightbox close notification failed.", error);
+        });
+    };
+    dialog.addEventListener("click", state.onBackdropClick);
+    dialog.addEventListener("close", state.onClose);
+    trigger.focus({ preventScroll: true });
+    expandedImage.src = state.image.currentSrc;
+    dialog.showModal();
+}
+
+export function closeLightbox(id) {
+    const dialog = images.get(id)?.lightbox;
+    if (dialog?.open) dialog.close();
+}
+
 export function release(id) {
     const state = images.get(id);
     if (!state) return;
     images.delete(id);
+    if (state.lightbox?.open) state.lightbox.close();
     state.observer.disconnect();
     state.image.onload = state.image.onerror = null;
     state.image.removeAttribute("src");

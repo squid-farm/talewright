@@ -471,4 +471,84 @@ public sealed class ImageRenderingTests : PlayerTest
             Assert.True(decoded, name + " decoded in the actual browser.");
         }
     }
+
+    [Fact]
+    public async Task Small_images_stay_inline_and_narrative_illustrations_open_a_full_resolution_lightbox()
+    {
+        using var files = new ImageStoryFiles();
+        await File.WriteAllTextAsync(files.TalePath, """
+            === start
+            Before {image("pixel.png", "Tiny credit")} after {image("photo.jpeg", "A camp")}.
+            * [Continue {image("pixel.png", "Choice token")}] -> next
+            === next
+            Finished.
+            * [Finish] -> END
+            """);
+        await UploadBytes("image-presentation.zip", files.Zip());
+
+        var tiny = Page.GetByAltText("Tiny credit", new() { Exact = true });
+        var illustration = Page.Locator(".tw-frame .tw-media > img[alt='A camp']");
+        await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0", await tiny.ElementHandleAsync());
+        await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0",
+            await illustration.ElementHandleAsync());
+        Assert.Null(await tiny.GetAttributeAsync("role"));
+        Assert.Null(await tiny.GetAttributeAsync("tabindex"));
+        Assert.Empty(await Page.GetByRole(AriaRole.Button, new() { Name = "Expand image: Tiny credit", Exact = true }).AllAsync());
+        Assert.Equal("inline", await tiny.EvaluateAsync<string>("image => getComputedStyle(image).display"));
+        var choiceImage = Page.GetByAltText("Choice token", new() { Exact = true });
+        await Expect(choiceImage).ToBeVisibleAsync();
+        Assert.Empty(await Page.GetByRole(AriaRole.Button, new() { Name = "Expand image: Choice token", Exact = true }).AllAsync());
+        Assert.Equal("inline", await choiceImage.EvaluateAsync<string>("image => getComputedStyle(image).display"));
+
+        var trigger = Page.GetByRole(AriaRole.Button, new() { Name = "Expand image: A camp", Exact = true });
+        await Expect(trigger).ToBeVisibleAsync();
+        await Expect(trigger).ToHaveCSSAsync("cursor", "zoom-in");
+        var dialog = Page.Locator("dialog.tw-image-lightbox");
+        string? lightBackground = null;
+        foreach (var theme in new[] { "light", "dark" })
+        {
+            await Page.EvaluateAsync("theme => document.documentElement.dataset.twTheme = theme", theme);
+            if (theme == "light")
+            {
+                await trigger.ClickAsync();
+            }
+            else
+            {
+                await trigger.FocusAsync();
+                await Page.Keyboard.PressAsync("Enter");
+            }
+            await Expect(trigger).ToHaveAttributeAsync("aria-expanded", "true");
+            await Expect(dialog).ToBeVisibleAsync();
+            await Expect(Page.GetByRole(AriaRole.Dialog, new() { Name = "A camp", Exact = true }))
+                .ToBeVisibleAsync();
+            var expanded = dialog.GetByAltText("A camp", new() { Exact = true });
+            await Page.WaitForFunctionAsync("image => image.complete && image.naturalWidth > 0",
+                await expanded.ElementHandleAsync());
+            Assert.Equal(await illustration.EvaluateAsync<int>("image => image.naturalWidth"),
+                await expanded.EvaluateAsync<int>("image => image.naturalWidth"));
+            var background = await dialog.EvaluateAsync<string>("element => getComputedStyle(element).backgroundColor");
+            Assert.NotEqual("rgba(0, 0, 0, 0)", background);
+            if (theme == "light") lightBackground = background;
+            else Assert.NotEqual(lightBackground, background);
+
+            if (theme == "light")
+            {
+                await Page.Keyboard.PressAsync("Escape");
+                await Expect(dialog).ToBeHiddenAsync();
+                await Expect(trigger).ToBeFocusedAsync();
+            }
+            else
+            {
+                await dialog.EvaluateAsync("element => element.click()");
+                await Expect(dialog).ToBeHiddenAsync();
+                await Expect(trigger).ToBeFocusedAsync();
+            }
+        }
+
+        await trigger.ClickAsync();
+        await Expect(dialog.GetByRole(AriaRole.Button, new() { Name = "Close image", Exact = true })).ToBeVisibleAsync();
+        await dialog.GetByRole(AriaRole.Button, new() { Name = "Close image", Exact = true }).ClickAsync();
+        await Expect(dialog).ToBeHiddenAsync();
+        await Expect(trigger).ToBeFocusedAsync();
+    }
 }

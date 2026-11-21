@@ -18,7 +18,7 @@ else
                     <button type="button" class="tw-choice" disabled="@(Busy || !entry.IsAvailable)"
                             data-tw-choice="@entry.Key" @onclick="() => Choose(entry.Key)">
                         <span class="tw-choice-number">@(entry.Number).</span>
-                        <InlineView Inlines="entry.Label" />
+                        <InlineView Inlines="entry.Label" ChoiceLabel="true" />
                         @if (!entry.IsAvailable)
                         {
                             <span class="tw-choice-status"> (Unavailable)</span>

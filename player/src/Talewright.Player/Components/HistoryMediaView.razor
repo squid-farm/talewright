@@ -1,24 +1,201 @@
+@implements IAsyncDisposable
+@inject IJSRuntime JS
 @using Talewright.Narrative.Templates
 
-<span class="tw-history-media">
-    <button type="button" class="tw-link" aria-expanded="@(_revealed ? "true" : "false")" @onclick="Toggle">
-        @ToggleText
-    </button>
-    @if (_revealed)
-    {
-        <span class="tw-history-image">
-            <MediaView Media="Media" Images="Images" />
-        </span>
-    }
-</span>
+@if (ChoiceLabel || _smallImage)
+{
+    <span class="tw-history-media tw-history-media-inline">
+        <MediaView Media="Media" Images="Images" ChoiceLabel="ChoiceLabel" />
+    </span>
+}
+else
+{
+    <span class="tw-history-media">
+        <button type="button" class="tw-link" aria-expanded="@(_revealed ? "true" : "false")" @onclick="Toggle">
+            @ToggleText
+        </button>
+        @if (_measurementPending)
+        {
+            <span @ref="_measurementTarget" class="tw-history-measure-target" aria-hidden="true"></span>
+        }
+        @if (_revealed)
+        {
+            <span class="tw-history-image">
+                <MediaView Media="Media" Images="Images" ChoiceLabel="ChoiceLabel" />
+            </span>
+        }
+    </span>
+}
 
 @code {
     [Parameter, EditorRequired] public RenderedMedia Media { get; set; } = default!;
     [Parameter] public StoryImages? Images { get; set; }
+    [Parameter] public bool ChoiceLabel { get; set; }
     private bool _revealed;
+    private bool _smallImage;
+    private bool _measurementPending;
+    private bool _measurementObserverStarted;
+    private bool _disposed;
+    private int _classificationGeneration;
+    private int _measurementHandle;
+    private StoryImages? _classifiedImages;
+    private string? _classifiedMediaId;
+    private bool _classifiedChoiceLabel;
+    private ElementReference _measurementTarget;
+    private IJSObjectReference? _module;
+    private DotNetObjectReference<HistoryMediaView>? _reference;
+    private CancellationTokenSource? _measurementCancellation;
+    private StoryImages.Lease? _classificationLease;
+    private Task _measurement = Task.CompletedTask;
+    private Task _initializing = Task.CompletedTask;
     private string ToggleText => Media.Accessibility == MediaAccessibility.Decorative
         ? _revealed ? "Hide decorative image" : "Reveal decorative image"
         : (_revealed ? "Hide image: " : "Reveal image: ") + Media.AltText;
 
+    protected override void OnParametersSet()
+    {
+        var images = Images;
+        var mediaId = Media.MediaId;
+        if (ReferenceEquals(_classifiedImages, images) && _classifiedMediaId == mediaId &&
+            _classifiedChoiceLabel == ChoiceLabel)
+            return;
+
+        _classifiedImages = images;
+        _classifiedMediaId = mediaId;
+        _classifiedChoiceLabel = ChoiceLabel;
+        _revealed = false;
+        ++_classificationGeneration;
+        var dimensions = images?.GetRecordedImageDimensions(mediaId);
+        _smallImage = ChoiceLabel || dimensions is { } measured &&
+            measured.Width <= StoryImages.SmallImageMaxWidth &&
+            measured.Height <= StoryImages.SmallImageMaxHeight;
+        _measurementPending = !ChoiceLabel && images is not null && dimensions is null;
+        _measurementObserverStarted = false;
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (!_measurementPending || _measurementObserverStarted || Images is null) return;
+        _measurementObserverStarted = true;
+        _initializing = ObserveMeasurementAsync();
+        await _initializing;
+    }
+
+    private async Task ObserveMeasurementAsync()
+    {
+        try
+        {
+            _module = await JS.InvokeAsync<IJSObjectReference>("import",
+                "./_content/Talewright.Player/Components/MediaView.razor.js");
+            if (_disposed) return;
+            _reference = DotNetObjectReference.Create(this);
+            _measurementHandle = await _module.InvokeAsync<int>(
+                "observeMeasurement", _measurementTarget, _reference);
+        }
+        catch (JSException ex)
+        {
+            if (!_disposed)
+            {
+                _measurementPending = false;
+                Console.Error.WriteLine($"History image measurement is unavailable: {ex.Message}");
+                await InvokeAsync(StateHasChanged);
+            }
+        }
+    }
+
+    [JSInvokable]
+    public Task MeasureInBrowserAsync()
+    {
+        if (_disposed || !_measurementPending) return Task.CompletedTask;
+        if (!_measurement.IsCompleted) return _measurement;
+        return _measurement = MeasureInBrowserCoreAsync();
+    }
+
+    private async Task MeasureInBrowserCoreAsync()
+    {
+        var images = Images;
+        if (images is null || _module is null) return;
+        var mediaId = Media.MediaId;
+        var generation = _classificationGeneration;
+        using var cancellation = CancellationTokenSource.CreateLinkedTokenSource(images.Lifetime);
+        _measurementCancellation = cancellation;
+        StoryImages.Lease? lease = null;
+        try
+        {
+            lease = images.Acquire(mediaId, JS);
+            var url = await lease.Url.WaitAsync(cancellation.Token);
+            var dimensions = await _module.InvokeAsync<int[]>("measure", cancellation.Token, url);
+            if (!IsCurrent(images, mediaId, generation)) return;
+            if (dimensions.Length != 2 || dimensions[0] <= 0 || dimensions[1] <= 0)
+                throw new InvalidDataException("The image's natural dimensions are unavailable.");
+
+            images.RecordImageDimensions(mediaId, dimensions[0], dimensions[1]);
+            _smallImage = dimensions[0] <= StoryImages.SmallImageMaxWidth &&
+                dimensions[1] <= StoryImages.SmallImageMaxHeight;
+            _measurementPending = false;
+            if (_smallImage)
+            {
+                _classificationLease = lease;
+                lease = null;
+            }
+        }
+        catch (Exception ex) when ((ex is OperationCanceledException or ObjectDisposedException) &&
+            (_disposed || cancellation.IsCancellationRequested || images.Lifetime.IsCancellationRequested))
+        {
+            return;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or InvalidDataException or JSException)
+        {
+            if (IsCurrent(images, mediaId, generation))
+            {
+                _measurementPending = false;
+                Console.WriteLine($"History image '{mediaId}' could not be classified; it will remain behind its reveal control: {ex.Message}");
+            }
+        }
+        finally
+        {
+            if (ReferenceEquals(_measurementCancellation, cancellation))
+                _measurementCancellation = null;
+            if (lease is not null) await lease.DisposeAsync();
+        }
+        if (IsCurrent(images, mediaId, generation))
+            await InvokeAsync(StateHasChanged);
+    }
+
     private void Toggle() => _revealed = !_revealed;
+
+    private bool IsCurrent(StoryImages images, string mediaId, int generation) =>
+        !_disposed && generation == _classificationGeneration &&
+        ReferenceEquals(images, Images) && mediaId == Media.MediaId;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        _measurementCancellation?.Cancel();
+        await _initializing;
+        if (_module is not null)
+        {
+            try
+            {
+                if (_measurementHandle != 0)
+                    await _module.InvokeVoidAsync("releaseMeasurement", _measurementHandle);
+            }
+            catch (JSDisconnectedException)
+            {
+                // The host already destroyed this document.
+            }
+        }
+        await _measurement;
+        if (_classificationLease is not null) await _classificationLease.DisposeAsync();
+        _reference?.Dispose();
+        if (_module is not null)
+        {
+            try { await _module.DisposeAsync(); }
+            catch (JSDisconnectedException)
+            {
+                // The host already destroyed this document.
+            }
+        }
+    }
 }
