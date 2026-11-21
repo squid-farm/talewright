@@ -44,7 +44,7 @@ try {
   const untrusted = path.join(profile, 'untrusted-story');
   await mkdir(untrusted);
   await writeFile(path.join(untrusted, 'story.talewright.yaml'),
-    'game:\n  id: untrusted\n  title: Untrusted\n  start: start\ncharacters:\n  player: {first-name: Tester}\n');
+    'game:\n  id: untrusted\n  version: 1.2.3\n  title: Untrusted\n  start: start\ncharacters:\n  player: {first-name: Tester}\n');
   await writeFile(path.join(untrusted, 'start.tale'), '=== start\n* [Go] -> missing\n');
   for (const restricted of [true, false]) {
     const options = {

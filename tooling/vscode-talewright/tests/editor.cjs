@@ -4,6 +4,7 @@ const os = require('node:os');
 const path = require('node:path');
 const vscode = require('vscode');
 const WebSocket = require('ws');
+const YAML = require('yaml');
 
 exports.run = async () => {
   const extension = vscode.extensions.getExtension('squid-farm.talewright');
@@ -337,6 +338,8 @@ async function testAuthorActions(extension) {
 async function testStandalonePublish(extension) {
   assert.equal(vscode.workspace.isTrusted, true);
   const root = vscode.workspace.workspaceFolders[0].uri.fsPath;
+  const { game } = YAML.parse(await fs.readFile(path.join(root, 'story.talewright.yaml'), 'utf8'));
+  const suggestedName = game.version ? `${game.id}-v${game.version}` : game.id;
   const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'talewright-publish-smoke-'));
   const executable = path.join(folder, 'talewright');
   const invocationLog = path.join(folder, 'invocations.jsonl');
@@ -379,7 +382,7 @@ if (args.includes('web')) {
     });
     try {
       const command = vscode.commands.executeCommand(`talewright.publishStandalone${target[0].toUpperCase()}${target.slice(1)}`);
-      const defaultDestination = path.join(root, `${path.basename(root)}-${target}.zip`);
+      const defaultDestination = path.join(root, `${suggestedName}-${target}.zip`);
       await waitUntil(() => renderer.evaluate(`(() => {
         const input = document.querySelector('.quick-input-widget input');
         return !!input?.offsetParent && input.value === ${JSON.stringify(defaultDestination)};
