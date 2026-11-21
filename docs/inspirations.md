@@ -1,6 +1,7 @@
 # Inspirations and choosing your tools
 
 Talewright wouldn't exist without **[Twine](https://twinery.org/)**,
+**[ink](https://www.inklestudios.com/ink/)**,
 **[Ren'Py](https://www.renpy.org/)**, and
 **[ChoiceScript](https://www.choiceofgames.com/make-your-own-games/choicescript-intro/)**.
 They are direct inspirations for this work.
@@ -13,6 +14,9 @@ games helped make projects like Talewright possible. We are grateful for those e
 - **Twine** has opened interactive fiction to writers through visual passage-based authoring
   and a community of story formats, tutorials, and examples. It inspires our commitment to
   approachable authoring and easy sharing.
+- **ink**, by inkle, has shown how a text-first authoring language can express branching
+  narratives with variables and reusable story structure. It inspires our focus on legible
+  `.tale` files and tools that stay close to the author's words.
 - **Ren'Py** has given visual novel creators a writing-friendly scripting language alongside
   powerful tools for images, sound, and custom behavior. It inspires our aim to let authors
   start with a story and add complexity when they need it.
@@ -41,6 +45,7 @@ Talewright is an early preview. The story format can still change between releas
 | Tool | Consider it when... |
 |---|---|
 | [Twine](https://twinery.org/) | You want to arrange passages visually, prototype branching fiction quickly, or choose from established story formats and customize a browser-based story with web technologies. |
+| [ink](https://www.inklestudios.com/ink/) | You want a text-first, programmer-friendly branching narrative language with variables, reusable structure, and established runtimes for embedding interactive fiction. |
 | [Ren'Py](https://www.renpy.org/) | Your project centers on visual novel presentation, images, audio, or animation; you need mobile releases; or you want Python for custom systems. |
 | [ChoiceScript](https://www.choiceofgames.com/make-your-own-games/choicescript-intro/) | You want a prose-first, choice-and-stat-driven novel and its established author community, or you are interested in the Choice of Games or Hosted Games publishing routes. Review their current submission and licensing terms. |
 
