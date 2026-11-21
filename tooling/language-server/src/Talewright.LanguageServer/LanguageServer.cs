@@ -102,6 +102,8 @@ public sealed class LanguageServer
         public string Path { get; } = path;
         public string Root { get; } = document.Root;
         public string Text { get; } = document.Text;
+        // A completion snapshot may predate the server document used to detect later changes.
+        public string CurrentText { get; init; } = document.Text;
         public int Version { get; } = document.Version;
         public Story Story { get; set; } = story;
         public long Generation { get; set; } = story.Generation;
@@ -499,6 +501,13 @@ public sealed class LanguageServer
         var path = PathFromUri(parameters.GetProperty("textDocument").GetProperty("uri").GetString()!);
         if (!_documents.TryGetValue(path, out var document))
             throw new ArgumentException($"{feature} requires an open story document.");
+        var currentText = document.Text;
+        if (kind == Feature.Completion && parameters.TryGetProperty("talewrightCompletionText", out var completionText))
+        {
+            if (completionText.ValueKind != JsonValueKind.String)
+                throw new ArgumentException("Completion snapshot must be a string.");
+            document = document with { Text = completionText.GetString()! };
+        }
         var lines = document.Text.ReplaceLineEndings("\n").Split('\n');
         var story = _stories[document.Root];
         SourceLocation Position(JsonElement point)
@@ -556,7 +565,8 @@ public sealed class LanguageServer
                 parameters.TryGetProperty("context", out var context) && context.ValueKind == JsonValueKind.Object &&
                 context.TryGetProperty("includeDeclaration", out var include) && include.ValueKind == JsonValueKind.True,
             NewName = newName,
-            ChangeAnnotationsSupported = _changeAnnotationsSupported
+            ChangeAnnotationsSupported = _changeAnnotationsSupported,
+            CurrentText = currentText
         };
         _requests.Add(key, request);
         var published = story.PublishedAnalysis;
@@ -935,7 +945,7 @@ public sealed class LanguageServer
             return;
         }
         var result = await finished.Task;
-        if (!_documents.TryGetValue(request.Path, out var document) || document.Text != request.Text ||
+        if (!_documents.TryGetValue(request.Path, out var document) || document.Text != request.CurrentText ||
             !PathComparer.Equals(document.Root, request.Root) || !_stories.TryGetValue(request.Root, out var story))
         {
             await FinishRequestErrorAsync(request, -32801, "Document content was modified.", cancellationToken);

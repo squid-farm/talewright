@@ -10,6 +10,43 @@ namespace Talewright.LanguageServer.Tests;
 public sealed partial class ServerTests
 {
     [Fact]
+    public async Task Completion_can_use_the_request_snapshot_after_a_newer_document_change()
+    {
+        await using var client = new Client();
+        DeclareRpg(client);
+        await client.Initialize();
+        const string prefix = "=== start\n::: skill-check player perception dc 12\n    ";
+        const string suffix = " { set flag:ready } -> END\n";
+        await client.Open("start.tale", prefix + "su" + suffix, 1);
+        await client.Change("start.tale", prefix + "suc" + suffix, 2);
+        var response = await client.Request("textDocument/completion", new
+        {
+            textDocument = new { uri = client.UriOf("start.tale") },
+            position = new { line = 2, character = 6 },
+            talewrightCompletionText = prefix + "su" + suffix
+        });
+        var item = Assert.Single(Items(response), HasLabel("success:"));
+        Assert.Equal(6, item.GetProperty("textEdit").GetProperty("range").GetProperty("end")
+            .GetProperty("character").GetInt32());
+
+        var current = Assert.Single(Items(await Completion(client, "start.tale", prefix + "suc|" + suffix)),
+            HasLabel("success:"));
+        Assert.Equal(7, current.GetProperty("textEdit").GetProperty("range").GetProperty("end")
+            .GetProperty("character").GetInt32());
+
+        await client.Change("start.tale", prefix + "success" + suffix, 3);
+        response = await client.Request("textDocument/completion", new
+        {
+            textDocument = new { uri = client.UriOf("start.tale") },
+            position = new { line = 2, character = 7 },
+            talewrightCompletionText = prefix + "succes" + suffix
+        });
+        item = Assert.Single(Items(response), HasLabel("success:"));
+        Assert.Equal(10, item.GetProperty("textEdit").GetProperty("range").GetProperty("end")
+            .GetProperty("character").GetInt32());
+    }
+
+    [Fact]
     public async Task Multiline_yaml_identifiers_are_not_returned_as_primary_completion_edits()
     {
         await using var client = new Client();

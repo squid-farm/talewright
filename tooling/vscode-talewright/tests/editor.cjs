@@ -11,6 +11,15 @@ exports.run = async () => {
   assert.ok(extension.extensionPath.includes(`${path.sep}extensions${path.sep}`),
     'Exercise the installed VSIX, not the development source');
   assert.equal(extension.packageJSON.main, './dist/extension.cjs');
+  if (process.env.TALEWRIGHT_TEST_STANDALONE_PUBLISH === 'true') {
+    try {
+      await testStandalonePublish(extension);
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
+    return;
+  }
   if (process.env.TALEWRIGHT_TEST_ACTIONS === 'true') {
     try {
       await testAuthorActions(extension);
@@ -313,6 +322,120 @@ async function testAuthorActions(extension) {
   assert.match(await fs.readFile(path.join(root, 'story.talewright.yaml'), 'utf8'), /start:\s*start/);
   assert.equal((await run('validateStory')).code, 0, 'The generated story must validate through the extension CLI action');
   console.log('Installed CLI action smoke passed: validation success/failure, player/debugger/scene tasks, new story creation and start-scene opening.');
+}
+
+async function testStandalonePublish(extension) {
+  assert.equal(vscode.workspace.isTrusted, true);
+  const root = vscode.workspace.workspaceFolders[0].uri.fsPath;
+  const folder = await fs.mkdtemp(path.join(os.tmpdir(), 'talewright-publish-smoke-'));
+  const executable = path.join(folder, 'talewright');
+  const invocationLog = path.join(folder, 'invocations.jsonl');
+  const failureText = 'TEST_STANDALONE_PUBLISH_FAILURE: web packaging failed';
+  await fs.writeFile(executable, `#!/usr/bin/env node
+const fs = require('node:fs');
+const args = process.argv.slice(2);
+fs.appendFileSync(${JSON.stringify(invocationLog)}, JSON.stringify(args) + '\\n');
+if (args.includes('web')) {
+  process.stderr.write(${JSON.stringify(`${failureText}\n`)});
+  process.exitCode = 23;
+} else {
+  process.stdout.write('standalone desktop package complete\\n');
+}
+`);
+  await fs.chmod(executable, 0o755);
+  await vscode.workspace.getConfiguration('talewright').update(
+    'cli.executablePath', executable, vscode.ConfigurationTarget.Global);
+  await extension.activate();
+  const renderer = await openRenderer();
+
+  const runPublish = async target => {
+    const name = `Publish Standalone ${target[0].toUpperCase()}${target.slice(1)} Game`;
+    const destination = path.join(folder, `published-${target}.zip`);
+    // The matching directory proves the picker has loaded the chosen parent before Enter.
+    const marker = `${path.basename(destination)}-option`;
+    await fs.mkdir(path.join(folder, marker));
+
+    let timeout;
+    let end;
+    const completed = new Promise((resolve, reject) => {
+      timeout = setTimeout(() => reject(new Error(`${name} task timed out`)), 30000);
+      end = vscode.tasks.onDidEndTaskProcess(event => {
+        if (event.execution.task.source !== 'Talewright' || event.execution.task.name !== name) return;
+        resolve({
+          exitCode: event.exitCode,
+          args: Array.from(event.execution.task.execution.args),
+        });
+      });
+    });
+    try {
+      const command = vscode.commands.executeCommand(`talewright.publishStandalone${target[0].toUpperCase()}${target.slice(1)}`);
+      const defaultDestination = path.join(root, `${path.basename(root)}-${target}.zip`);
+      await waitUntil(() => renderer.evaluate(`(() => {
+        const input = document.querySelector('.quick-input-widget input');
+        return !!input?.offsetParent && input.value === ${JSON.stringify(defaultDestination)};
+      })()`),
+        `Standalone ${target} destination picker must open`);
+      await renderer.evaluate(`(() => {
+        const input = document.querySelector('.quick-input-widget input');
+        input.focus();
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set;
+        setter.call(input, ${JSON.stringify(destination)});
+        input.dispatchEvent(new Event('input', { bubbles: true }));
+      })()`);
+      await waitUntil(() => renderer.evaluate(`(() => {
+        const widget = document.querySelector('.quick-input-widget');
+        return widget?.querySelector('input')?.value === ${JSON.stringify(destination)} &&
+          widget.querySelector('.quick-input-progress')?.classList.contains('done') &&
+          [...widget.querySelectorAll('.quick-input-list .monaco-list-row')].some(row =>
+            row.textContent.includes(${JSON.stringify(marker)}));
+      })()`), `Standalone ${target} destination picker must finish loading`);
+      await renderer.dispatchKey('Enter', 'Enter', 13, 0);
+      const result = await completed;
+      await command;
+      return result;
+    } finally {
+      clearTimeout(timeout);
+      end.dispose();
+    }
+  };
+
+  try {
+    const desktopArgs = [
+      'publish', root, '-a', '--target', 'desktop', '--output', path.join(folder, 'published-desktop.zip'),
+    ];
+    const desktop = await runPublish('desktop');
+    assert.equal(desktop.exitCode, 0, 'Standalone desktop publish must complete successfully');
+    assert.deepEqual(desktop.args, desktopArgs, 'The VS Code task must receive the desktop target and output path');
+
+    const webArgs = [
+      'publish', root, '-a', '--target', 'web', '--output', path.join(folder, 'published-web.zip'),
+    ];
+    const web = await runPublish('web');
+    assert.equal(web.exitCode, 23, 'Standalone web publish must retain the CLI failure status');
+    assert.deepEqual(web.args, webArgs, 'The VS Code task must receive the web target and output path');
+
+    const invocations = (await fs.readFile(invocationLog, 'utf8')).trim().split('\n').map(line => JSON.parse(line));
+    assert.deepEqual(invocations, [desktopArgs, webArgs], 'The installed CLI process must receive the target and output path');
+    const terminal = vscode.window.activeTerminal;
+    assert.ok(terminal, 'The failed publish task must leave its output terminal visible');
+    assert.equal(terminal.name, 'Publish Standalone Web Game');
+    const clipboard = await vscode.env.clipboard.readText();
+    let terminalOutput;
+    try {
+      terminal.show();
+      await vscode.commands.executeCommand('workbench.action.terminal.selectAll');
+      await vscode.commands.executeCommand('workbench.action.terminal.copySelection');
+      terminalOutput = await vscode.env.clipboard.readText();
+    } finally {
+      await vscode.env.clipboard.writeText(clipboard);
+    }
+    assert.match(terminalOutput, new RegExp(failureText),
+      'The failed CLI output must be visible in the standalone publish task terminal');
+    console.log('Installed VSIX standalone publish task smoke passed: real task arguments and surfaced CLI failure output.');
+  } finally {
+    renderer.close();
+    await fs.rm(folder, { recursive: true, force: true });
+  }
 }
 
 async function bundledServerProcesses(extension) {
