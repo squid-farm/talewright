@@ -20,7 +20,7 @@ function host(options = {}) {
   const calls = {
     tasks: [], errors: [], picks: [], dialogs: [], openDialogs: [], messages: [], warnings: [], updates: [],
     urls: [], fetches: [], sdk: [], cli: [], runtimeChecks: [], openFolders: [], openedDocuments: [],
-    shownDocuments: [], commands: new Map(), contextKeys: [], codeLensProviders: [],
+    shownDocuments: [], commands: new Map(), contextKeys: [], codeLensProviders: [], debugProviders: new Map(),
     progress: [],
   };
   const globalState = options.state ?? new Map();
@@ -140,6 +140,12 @@ function host(options = {}) {
       },
       onDidEndTask: handler => {
         calls.taskEndHandler = handler;
+        return { dispose() {} };
+      },
+    },
+    debug: {
+      registerDebugConfigurationProvider: (type, provider) => {
+        calls.debugProviders.set(type, provider);
         return { dispose() {} };
       },
     },
@@ -442,6 +448,81 @@ test('Run Story uses normal story selection and does not launch on selection can
   const cancelled = host({ roots });
   await cancelled.run('runStory');
   assert.equal(cancelled.calls.tasks.length, 0);
+});
+
+test('F5 launch provider resolves default, scene override, and run mode', async () => {
+  const defaultLaunch = host({ active: '/workspace/My Story/scene.tale' });
+  const provider = defaultLaunch.calls.debugProviders.get('talewright');
+  assert.ok(provider);
+  assert.equal(provider.provideDebugConfigurations()[0].mode, 'debug');
+  await provider.resolveDebugConfiguration(undefined, {
+    type: 'talewright', request: 'launch', mode: 'debug',
+  });
+  assert.equal(defaultLaunch.calls.tasks[0].execution.executable, '/bin/talewright');
+  assert.deepEqual(Array.from(defaultLaunch.calls.tasks[0].execution.args),
+    ['debug', '/workspace/My Story']);
+
+  const sceneLaunch = host({ active: '/workspace/My Story/scene.tale' });
+  await sceneLaunch.calls.debugProviders.get('talewright').resolveDebugConfiguration(undefined, {
+    type: 'talewright', request: 'launch', mode: 'debug', scene: 'intro',
+  });
+  assert.deepEqual(Array.from(sceneLaunch.calls.tasks[0].execution.args),
+    ['debug', '/workspace/My Story', '--scene', 'intro']);
+
+  const runLaunch = host({ active: '/workspace/My Story/scene.tale' });
+  await runLaunch.calls.debugProviders.get('talewright').resolveDebugConfiguration(undefined, {
+    type: 'talewright', request: 'launch', mode: 'run',
+  });
+  assert.deepEqual(Array.from(runLaunch.calls.tasks[0].execution.args),
+    ['run', '/workspace/My Story']);
+});
+
+test('F5 launch provider rejects invalid mode and scene combinations', async () => {
+  const invalidMode = host();
+  await invalidMode.calls.debugProviders.get('talewright').resolveDebugConfiguration(undefined, {
+    type: 'talewright', request: 'launch', mode: 'other',
+  });
+  assert.match(invalidMode.calls.errors[0], /mode.*debug.*run/i);
+  assert.equal(invalidMode.calls.tasks.length, 0);
+
+  const invalidScene = host();
+  await invalidScene.calls.debugProviders.get('talewright').resolveDebugConfiguration(undefined, {
+    type: 'talewright', request: 'launch', mode: 'run', scene: 'intro',
+  });
+  assert.match(invalidScene.calls.errors[0], /scene.*only be used with mode "debug"/i);
+  assert.equal(invalidScene.calls.tasks.length, 0);
+});
+
+test('F5 setup resumes default and explicit launch configurations after CLI setup', async () => {
+  const executable = '/downloads/Talewright.Cli';
+  for (const config of [
+    { type: 'talewright', request: 'launch', mode: 'debug' },
+    { type: 'talewright', request: 'launch', mode: 'debug', scene: 'intro' },
+  ]) {
+    const launch = host({
+      active: '/workspace/My Story/scene.tale',
+      files: [executable],
+      errorChoice: 'Set Up CLI',
+      pick: 1,
+      selected: executable,
+    });
+    await launch.calls.debugProviders.get('talewright').resolveDebugConfiguration(undefined, config);
+    assert.equal(launch.calls.tasks.length, 1,
+      'CLI setup success must resume the original F5 launch');
+    assert.equal(launch.calls.tasks[0].execution.executable, executable);
+  }
+
+  const cancelled = host({
+    active: '/workspace/My Story/scene.tale',
+    files: [],
+    errorChoice: 'Set Up CLI',
+    pick: undefined,
+  });
+  await cancelled.calls.debugProviders.get('talewright').resolveDebugConfiguration(undefined, {
+    type: 'talewright', request: 'launch', mode: 'debug',
+  });
+  assert.equal(cancelled.calls.tasks.length, 0,
+    'CLI setup cancellation must not launch the story');
 });
 
 test('Run Story requires .NET 10 and reports missing runtimes without installing anything', async () => {

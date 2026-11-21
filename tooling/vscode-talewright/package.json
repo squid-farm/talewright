@@ -7,7 +7,7 @@
   "icon": "icon.png",
   "license": "MPL-2.0",
   "main": "./dist/extension.cjs",
-  "activationEvents": ["onLanguage:tale", "onLanguage:yaml", "workspaceContains:**/story.talewright.yaml", "onTaskType:talewright"],
+  "activationEvents": ["onLanguage:tale", "onLanguage:yaml", "workspaceContains:**/story.talewright.yaml", "onTaskType:talewright", "onDebug"],
   "capabilities": {
     "untrustedWorkspaces": {
       "supported": "limited",
@@ -156,6 +156,42 @@
         "path": "./snippets/tale.json"
       }
     ],
+    "debuggers": [{
+      "type": "talewright",
+      "label": "Talewright",
+      "languages": ["tale", "yaml"],
+      "configurationAttributes": {
+        "launch": {
+          "required": ["type", "request"],
+          "properties": {
+            "type": { "type": "string", "enum": ["talewright"], "description": "Use the Talewright launch configuration." },
+            "request": { "type": "string", "enum": ["launch"], "description": "Launch a Talewright story." },
+            "name": { "type": "string", "description": "The display name for this debug session." },
+            "scene": { "type": "string", "description": "Optional scene ID to open in the Author Debugger." },
+            "mode": { "type": "string", "enum": ["debug", "run"], "default": "debug", "description": "Open the Author Debugger or run the normal story player." }
+          }
+        }
+      },
+      "configurationSnippets": [{
+        "label": "Talewright: Debug Story",
+        "description": "Launch the active or selected Talewright story in the Author Debugger.",
+        "body": {
+          "type": "talewright",
+          "request": "launch",
+          "name": "Talewright: Debug Story",
+          "mode": "debug"
+        }
+      }, {
+        "label": "Talewright: Run Story",
+        "description": "Launch the active or selected Talewright story in the normal player.",
+        "body": {
+          "type": "talewright",
+          "request": "launch",
+          "name": "Talewright: Run Story",
+          "mode": "run"
+        }
+      }]
+    }],
     "yamlValidation": [
       {
         "fileMatch": ["*.talewright.yaml"],

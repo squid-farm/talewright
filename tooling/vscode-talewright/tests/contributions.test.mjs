@@ -20,6 +20,23 @@ test('snippets have discoverable prefixes and a bounded default-expansion contra
   }
 });
 
+test('Talewright contributes launch configuration provider metadata and snippets', async () => {
+  const manifest = await json('package.json');
+  assert.ok(manifest.activationEvents.includes('onDebug'));
+  const debugContribution = manifest.contributes.debuggers.find(item => item.type === 'talewright');
+  assert.ok(debugContribution);
+  assert.deepEqual(debugContribution.languages, ['tale', 'yaml']);
+  const launch = debugContribution.configurationAttributes.launch;
+  assert.deepEqual(launch.required, ['type', 'request']);
+  assert.equal(launch.properties.request.enum[0], 'launch');
+  assert.equal(launch.properties.type.enum[0], 'talewright');
+  assert.deepEqual(launch.properties.mode.enum, ['debug', 'run']);
+  assert.equal(launch.properties.scene.type, 'string');
+  assert.ok(debugContribution.configurationSnippets.some(snippet =>
+    snippet.body.type === 'talewright' && snippet.body.request === 'launch' &&
+    ['debug', 'run'].includes(snippet.body.mode)));
+});
+
 test('Play From This Scene has gated menus, a default-enabled code lens, and an optional debug task scene', async () => {
   const manifest = await json('package.json');
   assert.ok(manifest.contributes.commands.some(command =>
