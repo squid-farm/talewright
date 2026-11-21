@@ -34,6 +34,9 @@ internal sealed record WebHostingSize(long TotalBytes, long LargestFileBytes, in
             .Select(path => new FileInfo(path).Length));
 
     internal void WriteWarning(TextWriter output, bool estimate)
+        => WriteWarning(output, estimate, null);
+
+    internal void WriteWarning(TextWriter output, bool estimate, string? target)
     {
         if (TotalBytes <= TotalWarningBytes && LargestFileBytes <= FileWarningBytes && FileCount <= FileWarningCount)
             return;
@@ -41,8 +44,9 @@ internal sealed record WebHostingSize(long TotalBytes, long LargestFileBytes, in
         var basis = estimate
             ? "source-only estimate (UTF-8 text and supported images; excludes generated runtime and compression copies)"
             : "final extracted web payload (includes generated runtime and precompressed copies)";
+        var targetLabel = target is null ? "" : $" [{target} target]";
         output.WriteLine(FormattableString.Invariant(
-            $"Warning: itch.io HTML5 hosting guidance exceeded; {basis}: total {TotalBytes} bytes, largest file {LargestFileBytes} bytes, {FileCount} files. Recorded guidance: 500 MB total, 200 MB per file, 1,000 files (MB compared as decimal bytes)."));
+            $"Warning{targetLabel}: itch.io HTML5 hosting guidance exceeded; {basis}: total {TotalBytes} bytes, largest file {LargestFileBytes} bytes, {FileCount} files. Recorded guidance: 500 MB total, 200 MB per file, 1,000 files (MB compared as decimal bytes)."));
         output.WriteLine("Advisory only: this warning does not prevent publication. Check your host's current requirements: https://itch.io/docs/creators/html5");
     }
 }

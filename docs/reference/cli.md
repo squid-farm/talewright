@@ -208,18 +208,20 @@ talewright publish path/to/story -a --target web --output game-web.zip
 talewright publish path/to/story -a --target desktop --output game-desktop.zip
 talewright publish path/to/story -a --target desktop --runtime win-x64 --output game-windows.zip
 talewright publish path/to/story -a --target desktop --split --output desktop-builds/
+talewright publish path/to/story -a --target all --output builds/
 ```
 
 Validates first, then builds. For a walkthrough, see [Sharing your story](../guide/sharing-your-story.md).
 
 | Option | Effect |
 |---|---|
-| `-o`, `--output <path>` | Output ZIP, or output directory with `--split`. |
+| `-o`, `--output <path>` | Output ZIP, or output directory with `--split` or `--target all`. |
 | `-a`, `--all-in-one` | Include the player and engine, opening only this story (no samples). Without it, the zip holds `story.talewright.yaml`, `.tale` files and safe, supported files from `images/` in their folder layout. `--a` is not accepted. |
 | `--target web` | Default. A static site with a root `index.html` and relative URLs. |
 | `--target desktop` | A self-contained desktop app. |
+| `--target all` | With `-a`, publish both targets after one validation, into `web/` and `desktop/` under the output directory. Cannot be combined with `--runtime`. |
 | `--runtime <rid>` | Desktop only: a single platform instead of all six. `linux-x64`, `linux-arm64`, `win-x64`, `win-arm64`, `osx-x64` or `osx-arm64`. |
-| `--split` | With `-a --target desktop`, write one self-contained ZIP per supported runtime into the `--output` directory. Cannot be combined with `--runtime`; it is not supported for story-only or web output. Filenames are `<story-id>-<rid>.zip`. |
+| `--split` | With `-a --target desktop`, write one self-contained ZIP per supported runtime into the `--output` directory. With `--target all`, put those ZIPs in its `desktop/` directory. Cannot be combined with `--runtime`; it is not supported for story-only or web output. Filenames are `<story-id>-<rid>.zip`. |
 | `--force` | Authorize replacement without asking, independently of `--non-interactive`. |
 
 ### Advanced: split desktop output
@@ -247,6 +249,12 @@ failure during that final replacement phase can expose a partial set; ordinary r
 trigger best-effort rollback, retaining recovery backups if rollback itself fails. Concurrent
 publishers targeting the same directory are not locked out. Do not rely on cross-file atomicity or
 crash durability. Each ZIP independently retains the published-output limits.
+
+For `--target all`, an existing `web/` or `desktop/` is listed for confirmation (or requires
+`--force` when non-interactive). The whole target directory is replaced, including any other files
+inside it. Both targets are staged before replacement; ordinary replacement errors trigger
+best-effort rollback. Concurrent publishers are not locked out, and replacement of both targets is
+not an atomic or crash-durable transaction.
 
 ### Advanced: replacing an existing archive
 
