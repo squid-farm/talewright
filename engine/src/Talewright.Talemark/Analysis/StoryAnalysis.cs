@@ -274,6 +274,7 @@ public static class StoryAnalyzer
         var previousSymbols = snapshot?.Symbols ?? [];
         var context = snapshot?.SymbolContext;
         var previousWorld = context?.World ?? EmptyWorld();
+        collector.TalemarkVersion = snapshot?.TalemarkVersion ?? previousWorld.TalemarkVersion;
         if (context is null) collector.Registrations();
 
         if (StorySource.IsConfigurationFile(file))
@@ -308,7 +309,8 @@ public static class StoryAnalyzer
                         if (flag) localFlags.Add(new FlagId(name));
                         else localVariables.Add(new VarId(name));
                     },
-                    typedDeclaration: declarations.Add, location: location);
+                    typedDeclaration: declarations.Add, location: location,
+                    talemarkVersion: collector.TalemarkVersion);
 
             TaleDeclarations.Collect(file, syntax, (id, location) =>
             {
@@ -1091,6 +1093,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal void World(WorldDefinition world, IReadOnlySet<VarId>? unresolved = null)
     {
         AuthoredWorld = world;
+        TalemarkVersion = world.TalemarkVersion;
         var numberType = world.TalemarkVersion == 1
             ? ManifestVocabulary.SymbolInteger
             : ManifestVocabulary.SymbolNumber;
