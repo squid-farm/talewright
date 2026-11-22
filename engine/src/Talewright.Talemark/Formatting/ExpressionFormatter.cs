@@ -90,7 +90,13 @@ public static class ExpressionFormatter
         HasItem item => $"{Character(item.Character)} {Has} {Name(item.Item.Value)}",
         Visited visited => $"{Player} {ExpressionVocabulary.Visited} {Name(visited.Scene.Value)}",
         SceneVisitCountRef visits => Reference(
-            visits.Scene is { } scene ? Name(scene.Value) : ExpressionVocabulary.Scene, Player, Visits),
+            visits.IsSceneAlias
+                ? ExpressionVocabulary.Scene
+                : visits.Scene is { } scene
+                    ? Name(scene.Value)
+                    : ExpressionVocabulary.Scene,
+            Player,
+            Visits),
         InventoryCountRef count => Reference(
             Character(count.Character), Inventory, Name(count.Item.Value), Count),
         SkillCheckExpr check => SkillCheck(check),
