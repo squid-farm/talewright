@@ -9,7 +9,7 @@ public static class DesktopStoryPack
 {
     public const string FileExtension = ".storypack";
     private static readonly byte[] Magic = "TWRPACK1"u8.ToArray();
-    private const int PayloadVersion = 1;
+    private const int PayloadVersion = 2;
 
     public static void Write(Stream output, StorySource source)
     {
@@ -135,31 +135,61 @@ public static class DesktopStoryPack
 
     private static void WriteString(BinaryWriter writer, string value)
     {
-        var bytes = Encoding.UTF8.GetBytes(value);
-        writer.Write(bytes.Length);
-        writer.Write(bytes);
+        var prefixPosition = writer.BaseStream.Position;
+        writer.Write((long)0);
+
+        var encoded = new byte[81920];
+        var encoder = Encoding.UTF8.GetEncoder();
+        var charOffset = 0;
+        var byteLength = (long)0;
+        while (charOffset < value.Length)
+        {
+            var charCount = Math.Min(encoded.Length, value.Length - charOffset);
+            var flush = charOffset + charCount == value.Length;
+            encoder.Convert(value.AsSpan(charOffset, charCount), encoded, flush,
+                out var charsUsed, out var bytesUsed, out _);
+            if (charsUsed == 0)
+                throw new InvalidOperationException("The UTF-8 encoder made no progress.");
+            writer.Write(encoded, 0, bytesUsed);
+            byteLength = checked(byteLength + bytesUsed);
+            charOffset += charsUsed;
+        }
+
+        var endPosition = writer.BaseStream.Position;
+        writer.BaseStream.Position = prefixPosition;
+        Span<byte> length = stackalloc byte[8];
+        BinaryPrimitives.WriteInt64LittleEndian(length, byteLength);
+        writer.BaseStream.Write(length);
+        writer.BaseStream.Position = endPosition;
     }
 
     private static string ReadString(BinaryReader reader)
     {
-        var length = reader.ReadInt32();
+        var length = reader.ReadInt64();
         if (length < 0)
             throw new InvalidDataException("The story pack contains an invalid string length.");
-        using var output = new MemoryStream();
-        var bytes = new byte[Math.Min(length, 81920)];
-        var offset = 0;
-        while (offset < length)
-        {
-            var count = Math.Min(bytes.Length, length - offset);
-            var read = reader.Read(bytes, 0, count);
-            if (read == 0)
-                throw new InvalidDataException("The story pack is truncated.");
-            output.Write(bytes, 0, read);
-            offset += read;
-        }
+        var output = new System.Text.StringBuilder();
+        var bytes = new byte[81920];
+        var chars = new char[81920];
+        var decoder = new UTF8Encoding(false, true).GetDecoder();
+        var remaining = length;
         try
         {
-            return new UTF8Encoding(false, true).GetString(output.GetBuffer(), 0, checked((int)output.Length));
+            while (remaining > 0)
+            {
+                var count = (int)Math.Min(bytes.Length, remaining);
+                var read = reader.Read(bytes, 0, count);
+                if (read == 0)
+                    throw new InvalidDataException("The story pack is truncated.");
+                decoder.Convert(bytes.AsSpan(0, read), chars, flush: false,
+                    out _, out var charsUsed, out _);
+                output.Append(chars, 0, charsUsed);
+                remaining -= read;
+            }
+            decoder.Convert(ReadOnlySpan<byte>.Empty, chars, flush: true,
+                out _, out var flushedCharsUsed, out _);
+            output.Append(chars, 0, flushedCharsUsed);
+            return output.ToString();
         }
         catch (DecoderFallbackException ex)
         {

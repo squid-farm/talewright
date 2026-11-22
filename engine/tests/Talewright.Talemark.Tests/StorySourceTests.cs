@@ -143,9 +143,9 @@ public sealed class StorySourceTests : IDisposable
         using var payload = new MemoryStream();
         using (var writer = new BinaryWriter(payload, System.Text.Encoding.UTF8, leaveOpen: true))
         {
+            writer.Write(2);
             writer.Write(1);
-            writer.Write(1);
-            writer.Write(int.MaxValue);
+            writer.Write(long.MaxValue);
         }
 
         using var buffer = new MemoryStream();
