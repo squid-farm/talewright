@@ -6,8 +6,7 @@ Do not put Talemark scene headers inside YAML.
 
 - Root `game:` holds `id`, `title`, `start` and optional settings such as `version`, `talemark: 1`, `seed`,
   `randomness: off` (no dice), `undo: false` or `autosave: false`.
-  Pin `talemark: 1` to preserve the current integer behavior; see the
-  [language-version migration guide](language-versions.md).
+  Pin `talemark: 1` to preserve the current integer behavior.
 - `characters:` must declare `player`. Declare every other speaker, item and faction before use.
   `ruleset: rpg` under `game:` opts into built-in RPG stats and levelling; without it, no stats
   exist unless declared under `game.ruleset.stats`.

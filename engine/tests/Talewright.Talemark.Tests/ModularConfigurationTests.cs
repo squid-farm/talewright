@@ -11,7 +11,7 @@ namespace Talewright.Talemark.Tests;
 
 public sealed class ModularConfigurationTests
 {
-    private const string Game = "game: { id: modular, title: Modular, start: start, seed: 42 }\n";
+    private const string Game = "game: { id: modular, title: Modular, start: start, seed: 42, talemark: 1 }\n";
     private const string Characters = """
         characters:
           player: { first-name: Ada, inventory: [rope] }
@@ -126,7 +126,7 @@ public sealed class ModularConfigurationTests
         var files = new Dictionary<string, string>
         {
             [StorySource.ManifestFileName] = """
-                game: { id: dynamic-keys, title: Dynamic keys, start: start }
+                game: { id: dynamic-keys, title: Dynamic keys, start: start, talemark: 1 }
                 characters:
                   player: { first-name: Ada }
                   plural: { first-name: Bea }
@@ -226,7 +226,9 @@ public sealed class ModularConfigurationTests
         Assert.Contains("images/camp-art.jpeg", source.ImagePaths);
         var result = StoryCompiler.Compile(source);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
-        Assert.Empty(result.Diagnostics);
+        var notice = Assert.Single(result.Diagnostics);
+        Assert.Equal("TW4008", notice.Code);
+        Assert.Equal(DiagnosticSeverity.Information, notice.Severity);
         Assert.Equal("Tomas Okafor", result.Story!.World.Characters[new("guide")].FullName);
         var files = source.Files.ToDictionary();
         const string guide = "  guide:\n";
@@ -237,7 +239,7 @@ public sealed class ModularConfigurationTests
         files["characters/guide.talewright.yaml"] = "characters:\n" + manifest[start..end];
         var split = StoryCompiler.Compile(new StorySource(files.Reverse().ToDictionary(), source.ImagePaths));
         Assert.True(split.Success, string.Join("\n", split.Diagnostics));
-        Assert.Empty(split.Diagnostics);
+        Assert.Equal(result.Diagnostics, split.Diagnostics);
         Assert.Equal(result.Story.World.Characters[new("guide")].FullName, split.Story!.World.Characters[new("guide")].FullName);
         Assert.Equal(result.Story.Triggers.Select(trigger => trigger.Id), split.Story.Triggers.Select(trigger => trigger.Id));
         Assert.Equal(result.Story.Scenes.Select(scene => scene.Id), split.Story.Scenes.Select(scene => scene.Id));
@@ -252,6 +254,9 @@ public sealed class ModularConfigurationTests
         var source = StorySource.FromDirectory(Path.Combine(root.FullName, "samples", "LostRelic"));
         var original = StoryCompiler.Compile(source);
         Assert.True(original.Success, string.Join("\n", original.Diagnostics));
+        var notice = Assert.Single(original.Diagnostics);
+        Assert.Equal("TW4008", notice.Code);
+        Assert.Equal(DiagnosticSeverity.Information, notice.Severity);
         Assert.Equal(new[] { "guild-wary", "courage-earned", "watch-bell", "dream-ready" },
             original.Story!.Triggers.Select(trigger => trigger.Id));
         var files = source.Files.ToDictionary();
@@ -259,7 +264,7 @@ public sealed class ModularConfigurationTests
         files.Remove("dream/dream.talewright.yaml");
         var moved = StoryCompiler.Compile(new StorySource(files.Reverse().ToDictionary(), source.ImagePaths));
         Assert.True(moved.Success, string.Join("\n", moved.Diagnostics));
-        Assert.Empty(moved.Diagnostics);
+        Assert.Equal(original.Diagnostics, moved.Diagnostics);
         Assert.Equal(original.Story.World.Characters.Keys.OrderBy(id => id.Value),
             moved.Story!.World.Characters.Keys.OrderBy(id => id.Value));
         Assert.Equal("Ines Varga", moved.Story.World.Characters[new("ines")].FullName);

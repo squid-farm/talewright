@@ -16,6 +16,7 @@ YAML. Do not invent predicate or manipulator registrations.
 game:
   id: evidence
   title: The Evidence
+  talemark: 1
   start: study
   seed: 42
   ruleset:

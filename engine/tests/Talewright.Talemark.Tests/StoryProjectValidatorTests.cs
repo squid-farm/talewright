@@ -2,6 +2,7 @@ using Talewright.Core.Rulesets;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Expressions;
 using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Diagnostics;
 
 namespace Talewright.Talemark.Tests;
 
@@ -13,7 +14,7 @@ public sealed class StoryProjectValidatorTests : IDisposable
     {
         Directory.CreateDirectory(_root);
         File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"),
-            "game:\n  id: build\n  title: Build\n  start: a\n  ruleset: {base: custom}\ncharacters:\n  player: {first-name: Author}\n");
+            "game:\n  id: build\n  title: Build\n  talemark: 1\n  start: a\n  ruleset: {base: custom}\ncharacters:\n  player: {first-name: Author}\n");
         File.WriteAllText(Path.Combine(_root, "main.tale"),
             "=== a\n{player:first-name#greeting}\n* [Continue] (requires @Ready) -> END\n* -> END\n");
     }
@@ -58,7 +59,9 @@ public sealed class StoryProjectValidatorTests : IDisposable
         var result = StoryCompiler.Compile(source, Options());
 
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
-        Assert.Empty(result.Diagnostics);
+        var notice = Assert.Single(result.Diagnostics);
+        Assert.Equal("TW4008", notice.Code);
+        Assert.Equal(DiagnosticSeverity.Information, notice.Severity);
     }
 
     [Fact]

@@ -26,7 +26,7 @@ public static class SlowInputStories
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(size);
 
-        var manifest = new ManifestFaker("slow-input", "Slow input", "start", 42);
+        var manifest = new ManifestFaker("slow-input", "Slow input", "start", 42) { Talemark = null };
         manifest.Character("player", "Tester");
         var x = manifest.Number("x", 1);
         var count = manifest.Number("count", 1);

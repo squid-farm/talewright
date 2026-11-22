@@ -88,7 +88,7 @@ public sealed class StoryStageRenderTests
     public async Task Speech_paragraphs_and_spacers_render_inside_one_panel_per_turn()
     {
         var yaml = """
-            game: {id: speech-render, title: Speech Render, start: start}
+            game: {id: speech-render, title: Speech Render, start: start, talemark: 1}
             characters:
               player: {first-name: Ada}
               guide: {first-name: Bea}
@@ -268,6 +268,7 @@ public sealed class StoryStageRenderTests
             game:
               id: visibility-render
               title: Visibility render
+              talemark: 1
               start: beginning
               ruleset: rpg
               character-sheet:

@@ -85,7 +85,7 @@ public sealed class RealisticStory
 
     private void Generate()
     {
-        _files[StorySource.ManifestFileName] = _cast.Manifest("realistic-story", "c0.open", _profile.Seed);
+        _files[StorySource.ManifestFileName] = _cast.Manifest("realistic-story", "c0.open", _profile.Seed, talemark: null);
         for (var chapter = 0; chapter < _profile.Chapters; chapter++)
         {
             var text = new StringBuilder(Chapter(chapter));

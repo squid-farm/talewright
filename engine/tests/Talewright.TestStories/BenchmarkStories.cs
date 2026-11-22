@@ -12,7 +12,7 @@ public static class BenchmarkStories
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(scenes);
 
-        var manifest = new ManifestFaker("benchmark", "Benchmark", "scene.0", 42);
+        var manifest = new ManifestFaker("benchmark", "Benchmark", "scene.0", 42) { Talemark = null };
         var player = manifest.Character("player", "Tester");
         // The original benchmark leaves this variable undeclared in the manifest.
         var visits = new TaleVariableRef("visits");

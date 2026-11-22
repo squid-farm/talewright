@@ -1,5 +1,6 @@
 using Talewright.Player.Library;
 using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Diagnostics;
 
 namespace Talewright.Player.E2E.Tests;
 
@@ -42,7 +43,9 @@ public sealed class EmbeddedStoryLibraryTests
         }
         var result = StoryCompiler.Compile(source);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
-        Assert.Empty(result.Diagnostics);
+        var notice = Assert.Single(result.Diagnostics);
+        Assert.Equal("TW4008", notice.Code);
+        Assert.Equal(DiagnosticSeverity.Information, notice.Severity);
         Assert.Equal("Tomas Okafor", result.Story!.World.Characters[new("guide")].FullName);
         Assert.Equal("0.6.0", result.Story.Version);
         Assert.Equal(8, result.Story.World.Characters.Count);

@@ -191,6 +191,7 @@ public sealed class PerformanceCorpus : IDisposable
         {
             Version = "1.0.0",
             BaseRuleset = "rpg",
+            Talemark = null,
         };
         manifest.Number(Visits.Id, 0);
         manifest.Character(TaleCharacterRef.Player.Id, "Tester");

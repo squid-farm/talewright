@@ -614,7 +614,7 @@ async function testLiveDiagnostics() {
   try {
     renderer = await openRenderer();
     await fs.writeFile(path.join(folder, 'story.talewright.yaml'),
-      'game:\n  id: live\n  title: Live\n  start: start\ncharacters:\n  player: {first-name: Ada}\nflags: [ready]\nvars: {choice: 1}\n');
+      'game:\n  id: live\n  title: Live\n  start: start\n  talemark: 1\ncharacters:\n  player: {first-name: Ada}\nflags: [ready]\nvars: {choice: 1}\n');
     const file = path.join(folder, 'start.tale');
     await fs.writeFile(file, '=== start\n* [Go] -> missing\n');
     const document = await vscode.workspace.openTextDocument(file);
@@ -849,7 +849,7 @@ async function testLiveDiagnostics() {
 
     const manifestBuffer = await vscode.workspace.openTextDocument(path.join(folder, 'story.talewright.yaml'));
     await vscode.window.showTextDocument(manifestBuffer);
-    const flagManifest = 'game:\n  id: live\n  title: Live\n  start: start\n  ruleset: rpg\nflags: [ready]\ncharacters:\n  player: {first-name: Ada}\n  guide: {first-name: Bea}\n';
+    const flagManifest = 'game:\n  id: live\n  title: Live\n  start: start\n  talemark: 1\n  ruleset: rpg\nflags: [ready]\ncharacters:\n  player: {first-name: Ada}\n  guide: {first-name: Bea}\n';
     const flagManifestEdit = new vscode.WorkspaceEdit();
     flagManifestEdit.replace(manifestBuffer.uri,
       new vscode.Range(manifestBuffer.positionAt(0), manifestBuffer.positionAt(manifestBuffer.getText().length)),

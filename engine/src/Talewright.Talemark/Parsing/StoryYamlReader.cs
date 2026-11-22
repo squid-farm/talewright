@@ -70,7 +70,7 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
             _yaml.Diagnostics.Information(
                 CompilerDiagnosticCodes.MissingTalemarkVersion,
                 "game.talemark is not set. Add 'talemark: 1' to preserve the current integer arithmetic. " +
-                "See the language-version migration guide: https://github.com/squid-farm/talewright/blob/main/docs/guide/talemark/language-versions.md",
+                "See the language-version migration guide: https://github.com/squid-farm/talewright/blob/main/docs/guide/language-versions.md",
                 _yaml.At(game));
         }
         else if (talemark is not YamlScalarNode scalar ||
