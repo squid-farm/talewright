@@ -157,7 +157,7 @@ public sealed class CompilerDiagnosticCoverageTests
         })),
         new("TW4008", Story("=== start\n-> END", MinimalYaml), DiagnosticSeverity.Information,
             Valid: Story("=== start\n-> END", """
-                game: {id: coverage, title: Coverage, start: start, talemark: 1}
+                game: {id: coverage, title: Coverage, start: start, talemark: "1"}
                 characters: {player: {first-name: Ada}}
                 """)),
     ];

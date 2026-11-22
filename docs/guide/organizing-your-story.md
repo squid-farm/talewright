@@ -24,7 +24,7 @@ night-ferry/
 game:
   id: night-ferry
   title: The Night Ferry
-  talemark: 1
+  talemark: "1"
   start: dock
 
 characters:
@@ -80,7 +80,7 @@ night-ferry/
 game:
   id: night-ferry
   title: The Night Ferry
-  talemark: 1
+  talemark: "1"
   start: dock
 ```
 

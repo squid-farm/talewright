@@ -13,7 +13,7 @@ write invented function syntax in a hub selector.
 `story.talewright.yaml`:
 
 ```yaml
-game: { id: investigation, title: An Investigation, start: office, talemark: 1 }
+game: { id: investigation, title: An Investigation, start: office, talemark: "1" }
 characters:
   player: { first-name: Ada }
 flags: [murder-happened]

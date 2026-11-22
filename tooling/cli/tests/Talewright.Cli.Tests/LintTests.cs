@@ -184,7 +184,7 @@ public sealed class LintTests : IDisposable
     private void WriteStory(string id, string scene, string tale)
     {
         File.WriteAllText(Path.Combine(_root, StorySource.ManifestFileName),
-            $"game:\n  id: {id}\n  title: Night Ferry\n  version: 1\n  start: {scene}\n  talemark: 1\ncharacters:\n  player: {{first-name: Ada}}\n");
+            $"game:\n  id: {id}\n  title: Night Ferry\n  version: 1\n  start: {scene}\n  talemark: \"1\"\ncharacters:\n  player: {{first-name: Ada}}\n");
         File.WriteAllText(Path.Combine(_root, "main.tale"), $"=== {scene}\n{tale}");
     }
 

@@ -4,9 +4,9 @@ A story is a folder with one root `story.talewright.yaml` and one or more `.tale
 The YAML manifest declares the world; Talemark contains the narrative and executable story logic.
 Do not put Talemark scene headers inside YAML.
 
-- Root `game:` holds `id`, `title`, `start` and optional settings such as `version`, `talemark: 1`, `seed`,
+- Root `game:` holds `id`, `title`, `start` and optional settings such as `version`, `talemark: "1"`, `seed`,
   `randomness: off` (no dice), `undo: false` or `autosave: false`.
-  Pin `talemark: 1` to preserve the current integer behavior.
+  Pin `talemark: "1"` to preserve the current integer behavior.
 - `characters:` must declare `player`. Declare every other speaker, item and faction before use.
   `ruleset: rpg` under `game:` opts into built-in RPG stats and levelling; without it, no stats
   exist unless declared under `game.ruleset.stats`.
@@ -30,7 +30,7 @@ game:
   id: night-ferry
   title: The Night Ferry
   version: 0.1.0
-  talemark: 1
+  talemark: "1"
   start: dock
 characters:
   player: { first-name: Ada, inventory: [coin] }

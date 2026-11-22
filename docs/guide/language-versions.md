@@ -9,7 +9,7 @@ During Talewright v0, pin a story to the existing behavior:
 game:
   id: my-story
   title: My Story
-  talemark: 1
+  talemark: "1"
   start: beginning
 ```
 
@@ -17,7 +17,7 @@ Version `1` preserves the current integer behavior: int32 saturation, division t
 division by zero returning `0`.
 
 When `game.talemark` is omitted, Talewright v0 uses version 1 and shows an informational migration
-notice. Pinning `1` is recommended so a future default or player cannot change this story's arithmetic
+notice. Pinning `"1"` is recommended so a future default or player cannot change this story's arithmetic
 accidentally. The key is not a warning: validation and publishing succeed with `--warnings-as-errors`.
 Malformed values and values this release does not support are errors.
 

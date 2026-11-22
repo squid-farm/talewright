@@ -158,7 +158,7 @@ public static class TestStories
         game:
           id: custom
           title: Custom Player
-          talemark: 1
+          talemark: "1"
           start: start
           randomness: off
           ruleset:
@@ -180,7 +180,7 @@ public static class TestStories
         game:
           id: no-stats
           title: Quiet Player
-          talemark: 1
+          talemark: "1"
           start: start
           randomness: off
           ruleset: { base: none }

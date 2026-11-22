@@ -86,7 +86,7 @@ public sealed class StoryQuickFixesTests
     [Fact]
     public void Applying_a_reserved_flag_fix_declares_it_as_a_string()
     {
-        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\n  talemark: 1\nflags: []\ncharacters:\n  player: {first-name: Ada}\n";
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\n  talemark: \"1\"\nflags: []\ncharacters:\n  player: {first-name: Ada}\n";
         const string story = "=== start\n{if flag:true}Never.{/if}\n-> END\n";
         var analysis = AnalyzeFlag(manifest, story);
         var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2004");

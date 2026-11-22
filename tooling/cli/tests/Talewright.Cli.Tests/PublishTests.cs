@@ -165,7 +165,7 @@ public sealed class PublishTests : IDisposable
     {
         var manifestPath = Path.Combine(Story, "story.talewright.yaml");
         File.WriteAllText(manifestPath,
-            File.ReadAllText(manifestPath).Replace("  talemark: 1\n", "", StringComparison.Ordinal));
+            File.ReadAllText(manifestPath).Replace("  talemark: \"1\"\n", "", StringComparison.Ordinal));
 
         var result = Run("-a", "--target", "web");
 

@@ -61,12 +61,17 @@ test('schema validates every shipped story configuration', async () => {
   }
 });
 
-test('schema accepts YAML numeric forms equivalent to Talemark version one', () => {
-  for (const value of ['1e0', '+1', '0x01', '0o01']) {
+test('schema requires the exact quoted Talemark version string', () => {
+  const valid = parsedYaml(
+    `game:\n  id: language-version\n  title: Language version\n  start: beginning\n  talemark: "1"\n`,
+    'quoted Talemark version',
+  );
+  assertValid(validateManifest, valid, 'quoted Talemark version');
+
+  for (const value of ['1', '1.0', '1e0', '+1', '0x01', '0o01', '"1.0"', '"2"', 'one']) {
     const name = `Talemark version ${value}`;
     const manifest = parsedYaml(`game:\n  id: language-version\n  title: Language version\n  start: beginning\n  talemark: ${value}\n`, name);
-    assert.equal(manifest.game.talemark, 1, `${name} should normalize to the integer 1`);
-    assertValid(validateManifest, manifest, name);
+    assertInvalid(validateManifest, manifest, name);
   }
 });
 
@@ -447,19 +452,4 @@ test('schema rejects missing required fields, wrong types, and invalid closed en
     },
     characters: { player: { 'first-name': 'Ada' } },
   }, 'creation value constraints');
-});
-
-test('schema and YAML parser accept Talemark 1.0 as integer version 1', () => {
-  const manifest = parsedYaml(`
-game:
-  id: talemark-decimal
-  title: Talemark decimal
-  start: beginning
-  talemark: 1.0
-characters:
-  player:
-    first-name: Ada
-`, 'Talemark decimal manifest');
-
-  assertValid(validateManifest, manifest, 'Talemark decimal manifest');
 });

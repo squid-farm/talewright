@@ -285,7 +285,10 @@ public sealed class ManifestFaker
         }
         if (Talemark is not null)
         {
-            Add(game, "talemark", Talemark.Value);
+            Add(game, "talemark", new YamlScalarNode(Talemark.Value.ToString(CultureInfo.InvariantCulture))
+            {
+                Style = ScalarStyle.DoubleQuoted,
+            });
         }
         Add(game, "start", Start);
         if (Randomness is not null)
@@ -500,6 +503,7 @@ public sealed class ManifestFaker
     private static YamlNode ToYamlNode(object? value) => value switch
     {
         Dictionary<string, object?> mapping => ToYamlMapping(mapping),
+        YamlNode node => node,
         string text => new YamlScalarNode(text),
         int number => new YamlScalarNode(number.ToString(CultureInfo.InvariantCulture)) { Style = ScalarStyle.Plain },
         ulong number => new YamlScalarNode(number.ToString(CultureInfo.InvariantCulture)) { Style = ScalarStyle.Plain },

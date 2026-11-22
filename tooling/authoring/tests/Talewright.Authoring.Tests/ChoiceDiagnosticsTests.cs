@@ -11,7 +11,7 @@ public sealed class ChoiceDiagnosticsTests
           id: choice-diagnostics
           title: Choice diagnostics
           start: start
-          talemark: 1
+          talemark: "1"
         characters:
           player: { first-name: Ada }
         items: { weapon.knife: Knife, weapon.sword: Sword, rope: Rope }

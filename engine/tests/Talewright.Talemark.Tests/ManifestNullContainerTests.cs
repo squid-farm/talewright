@@ -7,7 +7,7 @@ namespace Talewright.Talemark.Tests;
 public sealed class ManifestNullContainerTests
 {
     private const string Marker = "__container_value__";
-    private const string Game = "game:\n  id: null-containers\n  title: Null containers\n  start: beginning\n  talemark: 1\n";
+    private const string Game = "game:\n  id: null-containers\n  title: Null containers\n  start: beginning\n  talemark: \"1\"\n";
     private const string Player = "characters:\n  player:\n    first-name: Ada\n";
 
     public static IEnumerable<object[]> InvalidContainers()
@@ -113,7 +113,7 @@ public sealed class ManifestNullContainerTests
               id: empty-containers
               title: Empty containers
               start: beginning
-              talemark: 1
+              talemark: "1"
               ruleset: {disable: [], stats: []}
               creation: {pronouns: [], stats: {}, presets: {}}
             characters:

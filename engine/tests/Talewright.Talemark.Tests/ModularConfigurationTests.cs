@@ -11,7 +11,7 @@ namespace Talewright.Talemark.Tests;
 
 public sealed class ModularConfigurationTests
 {
-    private const string Game = "game: { id: modular, title: Modular, start: start, seed: 42, talemark: 1 }\n";
+    private const string Game = "game: { id: modular, title: Modular, start: start, seed: 42, talemark: \"1\" }\n";
     private const string Characters = """
         characters:
           player: { first-name: Ada, inventory: [rope] }
@@ -126,7 +126,7 @@ public sealed class ModularConfigurationTests
         var files = new Dictionary<string, string>
         {
             [StorySource.ManifestFileName] = """
-                game: { id: dynamic-keys, title: Dynamic keys, start: start, talemark: 1 }
+                game: { id: dynamic-keys, title: Dynamic keys, start: start, talemark: "1" }
                 characters:
                   player: { first-name: Ada }
                   plural: { first-name: Bea }

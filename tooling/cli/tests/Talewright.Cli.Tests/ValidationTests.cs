@@ -128,7 +128,7 @@ public sealed class ValidationTests : IDisposable
     {
         var manifestPath = Path.Combine(_root, "story.talewright.yaml");
         File.WriteAllText(manifestPath,
-            File.ReadAllText(manifestPath).Replace("  talemark: 1\n", "", StringComparison.Ordinal));
+            File.ReadAllText(manifestPath).Replace("  talemark: \"1\"\n", "", StringComparison.Ordinal));
 
         using var output = new StringWriter();
         using var error = new StringWriter();
@@ -140,7 +140,7 @@ public sealed class ValidationTests : IDisposable
         Assert.True(json.RootElement.GetProperty("success").GetBoolean());
         Assert.Equal("TW4008", notice.GetProperty("code").GetString());
         Assert.Equal("information", notice.GetProperty("severity").GetString());
-        Assert.Contains("talemark: 1", notice.GetProperty("message").GetString());
+        Assert.Contains("talemark: \"1\"", notice.GetProperty("message").GetString());
     }
 
     [Theory]
