@@ -9,21 +9,34 @@
                 @onkeydown="args => MoveFocus(args, buttonIndex)">@node.Name</button>
     }
 </div>
+@if (_triggers.Length > 0)
+{
+    <div class="map-triggers visually-hidden" role="group" aria-label="Triggers on the map">
+        @foreach (var trigger in _triggers)
+        {
+            <button @key="trigger.Id" type="button" @onfocus="() => OnFocusTrigger.InvokeAsync(trigger.Id)"
+                    @onblur="() => OnBlur.InvokeAsync(trigger.Id)">@trigger.Name</button>
+        }
+    </div>
+}
 
 @code {
     [Parameter, EditorRequired] public MapView View { get; set; } = null!;
     [Parameter] public string? SelectedNodeId { get; set; }
     [Parameter] public EventCallback<string> OnFocus { get; set; }
+    [Parameter] public EventCallback<string> OnFocusTrigger { get; set; }
     [Parameter] public EventCallback<string> OnBlur { get; set; }
 
     private MapNode[] _nodes = [];
+    private MapNode[] _triggers = [];
     // Keyed by scene: Blazor captures a reference only when its keyed button is first inserted, not when it moves.
     private readonly Dictionary<string, ElementReference> _buttons = [];
     private int _tabStopIndex;
 
     protected override void OnParametersSet()
     {
-        _nodes = View.Nodes.Where(node => !node.Stub).ToArray();
+        _nodes = View.Nodes.Where(node => !node.Stub && node.TriggerId is null).ToArray();
+        _triggers = View.Nodes.Where(node => node.TriggerId is not null).ToArray();
         foreach (var removed in _buttons.Keys.Except(_nodes.Select(node => node.Id)).ToArray())
             _buttons.Remove(removed);
         _tabStopIndex = Array.FindIndex(_nodes, node => node.Id == SelectedNodeId);

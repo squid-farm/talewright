@@ -29,7 +29,7 @@ public sealed partial class StoryHistory
     public const int MaxAutomaticTransitions = 1_000;
     public const int MaxSaveBytes = SaveFormat.MaxSaveBytes;
     private const string AutomaticContinuationErrorMessage =
-        "Stopped after 1,000 automatic scene transitions to prevent a runaway chain. Check the story for a loop of bare diverts.";
+        "Stopped after 1,000 automatic scene transitions to prevent a runaway chain. Check the story for a loop of bare or trigger diverts.";
     private readonly List<string> _choices = [];
     private readonly List<bool> _automaticChoices = [];
     private List<byte[]>? _evidence;

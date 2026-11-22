@@ -110,6 +110,48 @@ public sealed class MapTabTests : BunitContext, IAsyncLifetime
     }
 
     [Fact]
+    public void Trigger_declarations_have_keyboard_accessible_full_details()
+    {
+        var files = new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = """
+            game:
+              id: trigger-map
+              title: Trigger map
+              start: hall
+              ruleset: {base: rpg}
+            flags: [ready]
+            vars: {count: 0}
+            characters:
+              player: {first-name: Ada}
+            triggers:
+              - id: redirect
+                when: var:count > 0
+                do:
+                  effect: set flag:ready
+                  divert: cave
+            """,
+            ["main.tale"] = ComponentStory.Tale,
+        };
+        using var model = ComponentStory.Load(files);
+        var map = Show(model);
+
+        var trigger = map.Find(".map-triggers button");
+        Assert.Contains("Trigger redirect", trigger.TextContent);
+        Assert.Contains("when var:count > 0", trigger.TextContent);
+        Assert.Contains("effects: set flag:ready", trigger.TextContent);
+        Assert.Contains("diverts to cave", trigger.TextContent);
+        Assert.Contains("story.talewright.yaml:", trigger.TextContent);
+
+        trigger.Focus();
+
+        Assert.Equal("trigger:redirect", map.Instance.CurrentSelection);
+        Assert.Equal("trigger:redirect", Assert.Single(JSInterop.Invocations["talewrightMap.setFocused"]).Arguments[1]);
+        trigger.Blur();
+        Assert.Equal("trigger:redirect", Assert.Single(JSInterop.Invocations["talewrightMap.clearFocused"]).Arguments[1]);
+    }
+
+    [Fact]
     public async Task Selecting_the_end_or_an_unknown_scene_updates_selection()
     {
         using var model = ComponentStory.Start();

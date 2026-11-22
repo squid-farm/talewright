@@ -643,6 +643,12 @@ public sealed class StoryCompletionTests
     [InlineData("game:\n  creation:\n    presets:\n      strong:\n        stats: {h|: 15}", "hp")]
     [InlineData("characters:\n  player:\n    first-name: Ada\n    inventory: {ro|: 1}", "rope")]
     [InlineData("triggers:\n  - id: check\n    when: 'flag:re|'\n    do: set flag:ready", "ready")]
+    [InlineData("triggers:\n  - id: redirect\n    when: true\n    do:\n      divert: sec|", "second")]
+    [InlineData("triggers:\n  - id: redirect\n    when: true\n    do:\n      divert: \"sec|ond\"", "second")]
+    [InlineData("triggers:\n  - id: redirect\n    when: true\n    do:\n      divert: \"\\u0073ec|ond\"", "second")]
+    [InlineData("triggers:\n  - id: redirect\n    when: true\n    do:\n      divert: |", "second")]
+    [InlineData("triggers:\n  - id: redirect\n    when: true\n    do:\n      divert: |", "END")]
+    [InlineData("triggers:\n  - id: redirect\n    when: true\n    do:\n      divert: E|", "END")]
     public void Completes_manifest_story_values_and_expressions(string fragment, string expected)
     {
         // Replace duplicate top-level declarations so YAML remains parseable.

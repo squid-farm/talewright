@@ -321,6 +321,7 @@ test('schema rejects unknown keys at every closed reader mapping', async () => {
     ['creation', schema.definitions.creation, {}],
     ['preset', schema.definitions.preset, {}],
     ['trigger', schema.definitions.trigger, { id: 't', when: 'true', do: 'set flag:ready' }],
+    ['triggerAction', schema.definitions.triggerAction, { divert: 'next' }],
   ];
 
   const schemaSets = closed.map(([name, target]) => {
@@ -415,6 +416,22 @@ test('preset IDs use the shared identifier rule and retain the existing 80-chara
   }
   for (const id of ['x', 'x'.repeat(80), 'custom-preset']) {
     assertValid(validate, { [id]: {} }, `valid preset ID ${JSON.stringify(id)}`);
+  }
+});
+
+test('trigger do accepts scalar effects and effect/divert mappings', () => {
+  const validate = compileSubschema(schema.definitions.trigger);
+  const trigger = { id: 'ending', when: 'true' };
+  for (const action of [
+    'set flag:ready',
+    { effect: 'set flag:ready' },
+    { divert: 'death-ending' },
+    { divert: 'END', effect: 'player:hp += 10' },
+  ]) {
+    assertValid(validate, { ...trigger, do: action }, `trigger do ${JSON.stringify(action)}`);
+  }
+  for (const action of [{}, { effect: '' }, { divert: '' }, { effect: 'set flag:ready', target: 'END' }]) {
+    assertInvalid(validate, { ...trigger, do: action }, `invalid trigger do ${JSON.stringify(action)}`);
   }
 });
 

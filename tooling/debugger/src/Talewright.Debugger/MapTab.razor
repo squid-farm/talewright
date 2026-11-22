@@ -21,7 +21,7 @@
         @if (_view is not null)
         {
             <MapSceneNavigator @ref="_sceneNavigator" View="_view" SelectedNodeId="@_selectedNodeId"
-                               OnFocus="FocusScene" OnBlur="BlurScene" />
+                               OnFocus="FocusScene" OnFocusTrigger="FocusTrigger" OnBlur="BlurScene" />
         }
     </div>
 </div>
@@ -33,7 +33,7 @@
     [Parameter] public AuthorInspection? Inspection { get; set; }
     [Parameter] public string? SelectedNodeId { get; set; }
     [Parameter] public bool Active { get; set; }
-    [Parameter] public EventCallback<string?> OnSelectScene { get; set; }
+    [Parameter] public EventCallback<string?> OnSelectNode { get; set; }
 
     private ElementReference _host;
     private ElementReference _canvas;
@@ -192,19 +192,25 @@
 
     private async Task SelectNode(string scene)
     {
-        if (scene != "END" && !Story.Scenes.Any(candidate => candidate.Id.Value == scene))
-            throw new ArgumentException($"Unknown scene '{scene}'.", nameof(scene));
+        if (_view is null || !_view.Nodes.Any(node => node.Id == scene && !node.Stub))
+            throw new ArgumentException($"Unknown map node '{scene}'.", nameof(scene));
 
         _selectedNodeId = scene;
         _selectionNeedsPublishing = false;
         await InvokeAsync(StateHasChanged);
-        await InvokeAsync(() => OnSelectScene.InvokeAsync(scene));
+        await InvokeAsync(() => OnSelectNode.InvokeAsync(scene));
     }
 
     private async Task FocusScene(string scene)
     {
         await SelectNode(scene);
         await InvokeMapAsync("talewrightMap.setFocused", "The focused map scene could not be updated", scene);
+    }
+
+    private async Task FocusTrigger(string trigger)
+    {
+        await SelectNode(trigger);
+        await InvokeMapAsync("talewrightMap.setFocused", "The focused map trigger could not be updated", trigger);
     }
 
     private Task BlurScene(string scene) =>
@@ -255,7 +261,7 @@
             return;
 
         _selectionNeedsPublishing = false;
-        await OnSelectScene.InvokeAsync(_selectedNodeId);
+        await OnSelectNode.InvokeAsync(_selectedNodeId);
     }
 
     public string? CurrentSelection => _selectedNodeId;

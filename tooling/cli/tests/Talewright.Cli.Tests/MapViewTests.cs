@@ -1,3 +1,4 @@
+using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Core.State;
 using Talewright.Debugger;
@@ -230,6 +231,62 @@ public sealed class MapViewTests
     }
 
     [Fact]
+    public void Shows_trigger_declarations_and_redirects_without_treating_conditions_as_reachability()
+    {
+        var yaml = Yaml + """
+
+            triggers:
+              - id: effect-only
+                when: false
+                do: set flag:lit
+              - id: divert-only
+                when: false
+                do:
+                  divert: trigger-only
+              - id: combined
+                when: false
+                do:
+                  effect: var:visits += 1
+                  divert: trigger-only
+            """;
+        var view = MapView.Build(CompileStory("""
+            === start
+            -> start
+            === trigger-only
+            -> downstream
+            === downstream
+            -> END
+            === orphan
+            -> END
+            """, yaml));
+
+        var triggers = view.Nodes.Where(node => node.TriggerId is not null).ToArray();
+        Assert.Equal(["effect-only", "divert-only", "combined"], triggers.Select(node => node.TriggerId));
+        Assert.Equal(["trigger:effect-only", "trigger:divert-only", "trigger:combined"], triggers.Select(node => node.Id));
+        Assert.Contains("when false", triggers[0].Name);
+        Assert.Contains("effects: set flag:lit", triggers[0].Name);
+        Assert.Contains("diverts to trigger-only", triggers[1].Name);
+        Assert.Contains("effects: var:visits += 1; diverts to trigger-only", triggers[2].Name);
+        Assert.Contains("story.talewright.yaml:", triggers[0].Name);
+        Assert.All(triggers, node => Assert.Equal(MapView.TriggerGroupId, node.Group));
+        Assert.Equal(new MapGroup(MapView.TriggerGroupId, MapView.MainArea, "Triggers", true), Assert.Single(view.Groups));
+
+        var triggerLines = view.Lines.Where(line => line.Kind == MapView.TriggerKind).ToArray();
+        Assert.Equal(2, triggerLines.Length);
+        Assert.Equal(["trigger:divert-only", "trigger:combined"], triggerLines.Select(line => line.From));
+        Assert.Equal(["trigger-only", "trigger-only"], triggerLines.Select(line => line.To));
+        Assert.NotEqual(triggerLines[0].Id, triggerLines[1].Id);
+        Assert.Contains("divert-on", triggerLines[0].Label);
+        Assert.Contains("false", triggerLines[0].Label);
+        Assert.All(triggerLines, line => Assert.Equal(MapView.MainArea, line.Area));
+        Assert.Equal(["start", "trigger-only", "downstream"],
+            view.Nodes.Where(node => node.Reachable && node.Scene is not null).Select(node => node.Scene));
+        Assert.True(Assert.Single(view.Nodes, node => node.End).Reachable);
+        Assert.Equal(["orphan"], view.Nodes.Where(node => node.Area == MapView.UnreachableArea && !node.Stub)
+            .Select(node => node.Scene));
+    }
+
+    [Fact]
     public void Omits_diverts_on_lines_that_cannot_run()
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
@@ -302,6 +359,58 @@ public sealed class MapViewTests
 
         Assert.Contains(DecisionReason.CheckSucceeded, outcomes);
         Assert.Contains(DecisionReason.CheckFailed, outcomes);
+    }
+
+    [Fact]
+    public void Current_run_highlights_only_the_winning_trigger_redirect_and_its_origin_after_history_navigation()
+    {
+        var yaml = Yaml + """
+
+            triggers:
+              - id: overridden
+                when: var:visits >= 1
+                do:
+                  divert: overridden
+              - id: winner
+                when: var:visits >= 1
+                do:
+                  divert: destination
+            """;
+        var story = CompileStory("""
+            === start
+            * [Go] { var:visits += 1 } -> original
+            === original
+            -> END
+            === overridden
+            -> END
+            === destination
+            -> END
+            """, yaml);
+        var map = MapView.Build(story);
+        var session = AuthorSession.Create(story, new SceneId("start"), captureDecisions: true, seed: 42);
+
+        session.Choose("c0");
+
+        MapRunView Route() => MapRunView.Build(story, map, session);
+        void AssertWinningRedirect(MapRunView route, AuthorSession current)
+        {
+            Assert.Equal(["start", "destination", "END"], route.Steps.Select(step => step.Scene));
+            var destination = route.Steps[1];
+            Assert.Equal("winner", destination.TakenItemId);
+            Assert.Equal("start", destination.TriggerSourceScene);
+            Assert.Equal("destination", Assert.Single(current.Events.OfType<TriggerDiverted>()).Target!.Value.Value);
+            Assert.Equal(MapView.TriggerNodeId("winner"),
+                Assert.Single(map.Lines, line => line.Id == destination.LineId).From);
+            Assert.DoesNotContain("overridden", route.Steps.Select(step => step.TakenItemId));
+        }
+
+        AssertWinningRedirect(Route(), session);
+        var replayed = session.Reload(story, out _);
+        AssertWinningRedirect(MapRunView.Build(story, map, replayed), replayed);
+        session.Back();
+        Assert.Equal(["start"], Route().Steps.Select(step => step.Scene));
+        session.Forward();
+        AssertWinningRedirect(Route(), session);
     }
 
     [Fact]

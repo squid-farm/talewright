@@ -45,6 +45,7 @@ public sealed class StorySession : IStorySession
         (Action<List<RenderedBlock>> Execute, ReadOnlyMemory<byte>? ReplayIdentity, ChoiceExecution Execution)> _actions = new(StringComparer.Ordinal);
     private IReadOnlyList<RenderedBlock> _pendingNotes = [];
     private IReadOnlyList<RenderedBlock> _entryPrelude = [];
+    private DivertTarget? _pendingEntryRedirect;
     private readonly List<RenderedBlock> _editNotes = [];
     private readonly List<bool?> _statVisibilityBeforeEvents = [];
     private bool? _nextStatVisibility;
@@ -252,6 +253,7 @@ public sealed class StorySession : IStorySession
             LastEntry = LastEntry,
             _pendingNotes = _pendingNotes,
             _entryPrelude = _entryPrelude,
+            _pendingEntryRedirect = _pendingEntryRedirect,
         };
         foreach (var (key, action) in _actions)
         {
@@ -276,8 +278,33 @@ public sealed class StorySession : IStorySession
         RequireAuthorBoundary();
         var mark = _log.Events.Count;
         values.Apply(_log);
-        AfterBatch();
+        var triggerDivert = AfterBatch();
         _editNotes.AddRange(NotesSince(mark));
+        if (triggerDivert is not null)
+        {
+            var pending = new List<RenderedBlock>(_pendingNotes);
+            pending.AddRange(_entryPrelude);
+            pending.AddRange(_editNotes);
+            Enter(triggerDivert, pending);
+            return;
+        }
+        if (_pendingEntryRedirect is { } pendingRedirect)
+        {
+            var redirectScene = Story.GetScene(Current!.Scene!.Value);
+            var redirectBlocks = new List<RenderedBlock>(_pendingNotes);
+            redirectBlocks.AddRange(_entryPrelude);
+            redirectBlocks.AddRange(_editNotes);
+            if (pendingRedirect.IsEnd)
+            {
+                EndStory(redirectBlocks, redirectScene);
+                return;
+            }
+            Present(redirectScene, redirectBlocks,
+                BuildMenu(redirectScene, ContinueTo(redirectScene, pendingRedirect), includeHubOffers: false),
+                automaticallyContinue: true);
+            return;
+        }
+
         var scene = Story.GetScene(Current!.Scene!.Value);
         var execution = _executor.Run(scene, refresh: true);
         var blocks = new List<RenderedBlock>(_pendingNotes);
@@ -414,6 +441,7 @@ public sealed class StorySession : IStorySession
     private StoryFrame Enter(DivertTarget target, List<RenderedBlock> pending)
     {
         BeforeTransition();
+        _pendingEntryRedirect = null;
         LastEntry = new PlayerEntryBoundary(target, _log.Events.Count, _triggers.CaptureEdgeMemory(),
             pending.Count == 0 ? [] : Array.AsReadOnly(pending.ToArray()));
         if (target.IsEnd)
@@ -430,7 +458,7 @@ public sealed class StorySession : IStorySession
             _beforeEntry?.Invoke(EntryBoundary, _log.Events);
         }
         _log.Append(new SceneEntered(scene.Id));
-        AfterBatch();
+        var triggerDivert = AfterBatch();
         var prelude = NotesSince(mark).ToArray();
         if (_captureEntry)
         {
@@ -438,6 +466,23 @@ public sealed class StorySession : IStorySession
             _entryPrelude = prelude;
             _editNotes.Clear();
         }
+        if (triggerDivert is not null)
+        {
+            _executor.ResetEntry();
+            _afterEntry?.Invoke(scene.Id, []);
+            _pendingEntryRedirect = triggerDivert;
+            var redirectBlocks = new List<RenderedBlock>(pending);
+            redirectBlocks.AddRange(prelude);
+            if (triggerDivert.IsEnd)
+            {
+                return EndStory(redirectBlocks, scene);
+            }
+
+            return Present(scene, redirectBlocks,
+                BuildMenu(scene, ContinueTo(scene, triggerDivert), includeHubOffers: false),
+                automaticallyContinue: true);
+        }
+
         var execution = _executor.Run(scene);
         _afterEntry?.Invoke(scene.Id, _executor.EntryReplay);
         var blocks = new List<RenderedBlock>(pending);
@@ -524,8 +569,9 @@ public sealed class StorySession : IStorySession
         var choice = step.Choice;
         var mark = _log.Events.Count;
         _log.Append(new ChoiceMade(scene.Id, choice.Key));
-        _executor.ApplyBatch(choice.Effects);
-        var target = choice.Check is { } check ? _executor.ResolveCheck(check, step.Id) : choice.Divert;
+        var triggerDivert = _executor.ApplyBatch(choice.Effects);
+        var target = triggerDivert
+            ?? (choice.Check is { } check ? _executor.ResolveCheck(check, step.Id).Target : choice.Divert);
         notes.AddRange(NotesSince(mark));
         if (target is null)
         {
@@ -538,32 +584,54 @@ public sealed class StorySession : IStorySession
     // ---- helpers ---------------------------------------------------------------------------------------------------
 
     /// <summary>Runs triggers, then applies any level-ups, after any batch of changes.</summary>
-    private void AfterBatch()
+    private DivertTarget? AfterBatch()
     {
+        TriggerRedirect? redirect = null;
+        void RunTriggers()
+        {
+            var result = _triggers.RunWithResult(_log);
+            redirect = result.Redirect ?? redirect;
+        }
+
         if (Story.World.Ruleset.LevelingRule is null)
         {
-            _triggers.Run(_log);
-            return;
+            RunTriggers();
         }
-
-        for (var pass = 0; pass < TriggerEngine.MaxPasses; pass++)
+        else
         {
-            _triggers.Run(_log);
-            var levelChanges = LevelChanges();
-            if (levelChanges.Count == 0)
+            var settled = false;
+            for (var pass = 0; pass < TriggerEngine.MaxPasses; pass++)
             {
-                return;
+                RunTriggers();
+                var levelChanges = LevelChanges();
+                if (levelChanges.Count == 0)
+                {
+                    settled = true;
+                    break;
+                }
+
+                _log.AppendRange(levelChanges);
             }
 
-            _log.AppendRange(levelChanges);
+            if (!settled)
+            {
+                RunTriggers();
+                if (LevelChanges().Count > 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Level-up consequences did not settle after {TriggerEngine.MaxPasses} passes.");
+                }
+            }
         }
 
-        _triggers.Run(_log);
-        if (LevelChanges().Count > 0)
+        if (redirect is not { } finalRedirect)
         {
-            throw new InvalidOperationException(
-                $"Level-up consequences did not settle after {TriggerEngine.MaxPasses} passes.");
+            return null;
         }
+
+        var target = finalRedirect.Destination.Scene;
+        _log.Append(new TriggerDiverted(_log.State.CurrentScene, finalRedirect.TriggerId, target));
+        return new DivertTarget(target);
     }
 
     private Value ResolveTriggerSkillCheck(SkillCheckExpr expression) =>

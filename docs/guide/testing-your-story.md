@@ -101,15 +101,24 @@ compilation. It opens focused on the current playtest scene, or the story's star
 playtest. Click a scene to see its details and a compact preview of its text and choices in the
 workspace Inspector. Selecting a connection there also selects and centers its destination. Scenes
 the start scene can't reach are drawn in a separate area on the right.
-Reachability follows diverts and hubs, but doesn't check whether their conditions can ever be met.
-The preview doesn't run entry effects or skill checks. Choices and hub offers written with `shown`
-use dotted lines; their map details and hover text say “shown when unavailable.”
+Stories with triggers have a separate **Triggers** section. Each trigger gets its own synthetic node,
+including effect-only triggers; these nodes describe declarations, not scenes the player entered.
+The node shows its condition and effects or divert, and each trigger divert connects directly to
+its destination with the condition on the line. Select a trigger to read its full condition, outcome
+and source location. The map doesn't draw a connection from every scene to a trigger.
 
-While you play in the debugger, the scenes you've visited and the choices you've taken are
-highlighted in order, and the map follows the current scene. Manually pan or zoom to pause following;
-choose **Focus current scene** to resume. Use **Fit map** to see the whole map, and **Export SVG** or
-**Export PNG** in the map toolbar to save it. SVG stays sharp at any size; a very large map may be too
-big for PNG, and the debugger will suggest SVG instead.
+Reachability follows diverts, trigger diverts and hubs, but doesn't check whether their conditions
+can ever be met or whether a trigger will fire. The preview doesn't run entry effects or skill
+checks. Choices and hub offers written with `shown` use dotted lines; their map details and hover
+text say “shown when unavailable.”
+
+While you play in the debugger, the scenes you've visited, choices you've taken and trigger divert
+that won are highlighted in order, and the map follows the current scene. The route names the
+trigger's originating scene; trigger divert requests that were overridden aren't shown as visited.
+Back and Forward update the route with the selected history step. Manually pan or zoom to pause
+following; choose **Focus current scene** to resume. Use **Fit map** to see the whole map, and
+**Export SVG** or **Export PNG** in the map toolbar to save it. SVG stays sharp at any size; a very
+large map may be too big for PNG, and the debugger will suggest SVG instead.
 
 ![The Lost Relic's full story map, with the route from camp.arrival through camp.hub to trail.river highlighted](../images/author-debugger-map.png)
 

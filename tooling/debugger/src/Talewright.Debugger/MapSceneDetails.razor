@@ -3,8 +3,13 @@
     var diverts = selectedNode?.Items.Where(item => !item.HubOffer).ToArray() ?? [];
     var offers = selectedNode?.Items.Where(item => item.HubOffer).ToArray() ?? [];
 }
-<section class="map-details" aria-label="Scene details">
-    @if (selectedNode is null)
+<section class="map-details" aria-label="@(selectedNode?.TriggerId is null ? "Scene details" : "Trigger details")">
+    @if (selectedNode?.TriggerId is { } triggerId)
+    {
+        <h3>Trigger: @triggerId</h3>
+        <p>@selectedNode.Name</p>
+    }
+    else if (selectedNode is null)
     {
         <p>Select a scene to list its diverts and hub offers.</p>
     }

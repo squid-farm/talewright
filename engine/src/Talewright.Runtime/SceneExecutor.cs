@@ -12,16 +12,18 @@ namespace Talewright.Runtime;
 
 internal sealed record SceneExecution(IReadOnlyList<RenderedBlock> Blocks,
     IReadOnlyList<VisibleChoice> Choices, DivertTarget? Target, bool AutomaticallyContinue);
+internal sealed record CheckExecution(DivertTarget? Target, bool TriggerDiverted);
 
 /// <summary>Executes authored steps; StorySession owns entry, transitions, history and presentation.</summary>
 internal sealed class SceneExecutor(StoryDefinition story, EventLog log, TemplateRenderer renderer,
-    Action afterBatch, Action<RuleDecision>? observer, bool rememberEntry,
+    Func<DivertTarget?> afterBatch, Action<RuleDecision>? observer, bool rememberEntry,
     Action<SceneDefinition, ChoiceStep, List<RenderedBlock>> makeChoice,
     Func<int, IEnumerable<RenderedBlock>> notesSince)
 {
     private readonly ReplayIdentityTable _replayIdentities = story.ReplayIdentities;
     private readonly Dictionary<string, IReadOnlyList<RenderedBlock>> _notes = new(StringComparer.Ordinal);
-    private readonly Dictionary<string, DivertTarget?> _checks = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, CheckExecution> _checks = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, DivertTarget?> _effectDiverts = new(StringComparer.Ordinal);
     private readonly Dictionary<string, IReadOnlyList<RenderedBlock>> _prose = new(StringComparer.Ordinal);
     private readonly Dictionary<string, bool> _branches = new(StringComparer.Ordinal);
     private readonly List<string> _visits = [];
@@ -49,13 +51,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
     {
         if (!refresh)
         {
-            _notes.Clear();
-            _checks.Clear();
-            _prose.Clear();
-            _branches.Clear();
-            _visits.Clear();
-            _settled.Clear();
-            _entryReplay.Clear();
+            ResetEntry();
         }
         var blocks = new List<RenderedBlock>();
         var choices = new List<VisibleChoice>();
@@ -68,6 +64,19 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
         }
         return new(new RenderedDocument(blocks).TrimUnboundedBlankLines().Blocks, choices, target,
             target is not null && stopReason == DecisionReason.EarlierDivert);
+    }
+
+    public void ResetEntry()
+    {
+        _notes.Clear();
+        _checks.Clear();
+        _effectDiverts.Clear();
+        _prose.Clear();
+        _branches.Clear();
+        _visits.Clear();
+        _settled.Clear();
+        _replayChoices.Clear();
+        _entryReplay.Clear();
     }
 
     private DivertTarget? Execute(SceneDefinition scene, IReadOnlyList<SceneStep> steps, List<RenderedBlock> blocks,
@@ -109,15 +118,21 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                     {
                         if (rememberEntry) _entryReplay.Add(new("effect", effect.Effects));
                         var mark = log.Events.Count;
-                        ApplyBatch(effect.Effects);
+                        target = ApplyBatch(effect.Effects);
+                        if (rememberEntry) _effectDiverts[step.Id] = target;
                         Observe(DecisionKind.EntryEffect, step.Id, DecisionOutcome.Applied,
                             DecisionReason.Unconditional, null, mark);
                         AppendNotes(step.Id, mark, blocks);
+                        if (target is not null)
+                            stopReason = DecisionReason.EarlierDivert;
                     }
                     else
                     {
                         RequireSettled(settled);
                         blocks.AddRange(_notes[step.Id]);
+                        target = _effectDiverts.GetValueOrDefault(step.Id);
+                        if (target is not null)
+                            stopReason = DecisionReason.EarlierDivert;
                     }
                     break;
                 case ConditionalStep branch:
@@ -200,17 +215,24 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                     {
                         if (rememberEntry) _entryReplay.Add(new("check", check.Check));
                         var mark = log.Events.Count;
-                        target = ResolveCheck(check.Check, step.Id);
-                        if (rememberEntry) _checks[step.Id] = target;
+                        var result = ResolveCheck(check.Check, step.Id);
+                        target = result.Target;
+                        if (rememberEntry) _checks[step.Id] = result;
                         AppendNotes(step.Id, mark, blocks);
+                        stopReason = result.TriggerDiverted
+                            ? DecisionReason.EarlierDivert
+                            : DecisionReason.EntryCheck;
                     }
                     else
                     {
                         RequireSettled(settled);
-                        target = _checks[step.Id];
+                        var result = _checks[step.Id];
+                        target = result.Target;
                         blocks.AddRange(_notes[step.Id]);
+                        stopReason = result.TriggerDiverted
+                            ? DecisionReason.EarlierDivert
+                            : DecisionReason.EntryCheck;
                     }
-                    stopReason = DecisionReason.EntryCheck;
                     break;
                 default:
                     throw new NotSupportedException($"Unknown scene step '{step.GetType().Name}'.");
@@ -219,13 +241,13 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
         return target;
     }
 
-    public void ApplyBatch(IReadOnlyList<Effect> effects)
+    public DivertTarget? ApplyBatch(IReadOnlyList<Effect> effects)
     {
         EffectExecutor.ExecuteAll(effects, log, story.Predicates, ExpressionCheckResolver);
-        afterBatch();
+        return afterBatch();
     }
 
-    public DivertTarget? ResolveCheck(CheckBranch check, string stepId)
+    public CheckExecution ResolveCheck(CheckBranch check, string stepId)
     {
         var result = SkillCheckResolver.Resolve(check.Check, check.Identity, log, story.Randomness, story.Predicates,
             observer is null ? null : decision => observer(decision with { Subject = stepId }));
@@ -233,10 +255,10 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
             ?? throw new InvalidOperationException("A check with no difficulty cannot select a success or failure outcome.");
         var outcome = success ? check.Success : check.Failure;
         var mark = log.Events.Count;
-        ApplyBatch(outcome.Effects);
+        var triggerDivert = ApplyBatch(outcome.Effects);
         Observe(DecisionKind.CheckOutcome, stepId, DecisionOutcome.Applied,
             success ? DecisionReason.CheckSucceeded : DecisionReason.CheckFailed, null, mark);
-        return outcome.Divert;
+        return new CheckExecution(triggerDivert ?? outcome.Divert, triggerDivert is not null);
     }
 
     public ChoiceView View(ChoiceDefinition choice) =>
