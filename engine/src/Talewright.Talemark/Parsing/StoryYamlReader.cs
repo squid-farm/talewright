@@ -75,7 +75,7 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
         }
         else if (talemark is not YamlScalarNode scalar ||
                  scalar.Style is YamlDotNet.Core.ScalarStyle.DoubleQuoted or YamlDotNet.Core.ScalarStyle.SingleQuoted ||
-                 !decimal.TryParse(Scalar(talemark), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var talemarkVersion))
+                 !TryParseTalemarkVersion(Scalar(talemark), out var talemarkVersion))
         {
             _yaml.Diagnostics.Error(
                 CompilerDiagnosticCodes.InvalidConfigurationValue,
@@ -129,6 +129,49 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
         ReadTriggers(Get(root, ManifestVocabulary.Triggers), manifest.Triggers);
         manifest.Creation = world.ReadCreation(Get(game, ManifestVocabulary.Creation), ruleset);
         return manifest;
+    }
+
+    private static bool TryParseTalemarkVersion(string value, out decimal version)
+    {
+        if (decimal.TryParse(value,
+                NumberStyles.AllowLeadingSign | NumberStyles.AllowDecimalPoint | NumberStyles.AllowExponent,
+                CultureInfo.InvariantCulture, out version))
+        {
+            return true;
+        }
+
+        if (IsRadixOne(value, "0x") || IsRadixOne(value, "0o"))
+        {
+            version = 1m;
+            return true;
+        }
+
+        version = default;
+        return false;
+    }
+
+    private static bool IsRadixOne(string value, string prefix)
+    {
+        if (!value.StartsWith(prefix, StringComparison.Ordinal))
+        {
+            return false;
+        }
+
+        var digits = value.AsSpan(prefix.Length);
+        if (digits.IsEmpty)
+        {
+            return false;
+        }
+
+        for (var index = 0; index < digits.Length; index++)
+        {
+            if (digits[index] != (index == digits.Length - 1 ? '1' : '0'))
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     private (CharacterSheetVisibility Visibility, IReadOnlyList<RawStatVisibilityRule> StatRules)

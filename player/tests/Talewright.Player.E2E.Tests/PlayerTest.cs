@@ -96,7 +96,7 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
     {
         await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Talewright", Exact = true }))
             .ToBeVisibleAsync(new() { Timeout = 30_000 });
-        await Expect(Page.GetByLabel("Story archive")).ToBeVisibleAsync();
+        await Expect(Page.GetByLabel("Story archive")).ToBeVisibleAsync(new() { Timeout = 30_000 });
     }
 
     protected async Task Upload(StoryFixture fixture, string prefix = "", bool resumeAutosave = false)

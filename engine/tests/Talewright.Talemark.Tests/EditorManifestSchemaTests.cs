@@ -68,16 +68,21 @@ public class EditorManifestSchemaTests
         Assert.Contains("language-versions.md", notice.Message);
     }
 
-    [Fact]
-    public void Talemark_accepts_decimal_integer_form_used_by_yaml_schema()
+    [Theory]
+    [InlineData("1.0")]
+    [InlineData("1e0")]
+    [InlineData("+1")]
+    [InlineData("0x01")]
+    [InlineData("0o01")]
+    public void Talemark_accepts_yaml_numeric_forms_equivalent_to_version_one(string value)
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = """
+            ["story.talewright.yaml"] = $$"""
                 game:
                   id: language
                   title: Language
-                  talemark: 1.0
+                  talemark: {{value}}
                   start: beginning
                 characters: { player: { first-name: Ada } }
                 """,

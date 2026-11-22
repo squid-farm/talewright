@@ -61,6 +61,15 @@ test('schema validates every shipped story configuration', async () => {
   }
 });
 
+test('schema accepts YAML numeric forms equivalent to Talemark version one', () => {
+  for (const value of ['1e0', '+1', '0x01', '0o01']) {
+    const name = `Talemark version ${value}`;
+    const manifest = parsedYaml(`game:\n  id: language-version\n  title: Language version\n  start: beginning\n  talemark: ${value}\n`, name);
+    assert.equal(manifest.game.talemark, 1, `${name} should normalize to the integer 1`);
+    assertValid(validateManifest, manifest, name);
+  }
+});
+
 test('player declarations may be in the root or a supporting configuration file', () => {
   const game = { id: 'root', title: 'Root', start: 'beginning' };
   assertValid(validateManifest, { game }, 'root with declarations in supporting files');
