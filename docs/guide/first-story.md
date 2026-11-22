@@ -24,7 +24,7 @@ game:
   id: night-ferry
   title: The Night Ferry
   version: 0.1.0
-  talemark: "1"
+  talemark: 1
   start: dock
   ruleset: rpg
 

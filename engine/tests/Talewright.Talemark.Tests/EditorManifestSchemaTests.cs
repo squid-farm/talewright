@@ -23,9 +23,9 @@ public class EditorManifestSchemaTests
             Path.Combine(root.FullName, "tooling", "vscode-talewright", "schemas", "story.schema.json")));
         var talemark = document.RootElement.GetProperty("properties").GetProperty("game")
             .GetProperty("properties").GetProperty("talemark");
-        Assert.Equal("string", talemark.GetProperty("type").GetString());
-        Assert.Equal("[\"1\"]", talemark.GetProperty("enum").GetRawText());
-        Assert.Equal("1", talemark.GetProperty("default").GetString());
+        Assert.Equal("integer", talemark.GetProperty("type").GetString());
+        Assert.Equal([1], talemark.GetProperty("enum").EnumerateArray().Select(value => value.GetInt32()).ToArray());
+        Assert.Equal(1, talemark.GetProperty("default").GetInt32());
     }
 
     [Fact]
@@ -49,7 +49,7 @@ public class EditorManifestSchemaTests
                 game:
                   id: language
                   title: Language
-                  talemark: "1"
+                  talemark: 1
                   start: beginning
                 characters: { player: { first-name: Ada } }
                 """,
@@ -64,23 +64,17 @@ public class EditorManifestSchemaTests
         var notice = Assert.Single(omitted.Diagnostics);
         Assert.Equal(DiagnosticSeverity.Information, notice.Severity);
         Assert.Equal("TW4008", notice.Code);
-        Assert.Contains("talemark: \"1\"", notice.Message);
+        Assert.Contains("talemark: 1", notice.Message);
         Assert.Contains("language-versions.md", notice.Message);
     }
 
     [Theory]
-    [InlineData("1")]
     [InlineData("1.0")]
     [InlineData("1e0")]
     [InlineData("+1")]
     [InlineData("0x01")]
     [InlineData("0o01")]
-    [InlineData("\"1.0\"")]
-    [InlineData("0")]
-    [InlineData("2")]
-    [InlineData("3")]
-    [InlineData("one")]
-    public void Talemark_rejects_noncanonical_values(string value)
+    public void Talemark_rejects_non_integer_spellings(string value)
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
@@ -104,9 +98,15 @@ public class EditorManifestSchemaTests
     }
 
     [Theory]
+    [InlineData("0")]
+    [InlineData("2")]
+    [InlineData("3")]
     [InlineData("\"1\"")]
     [InlineData("'1'")]
-    public void Talemark_accepts_only_the_quoted_version_one_string(string value)
+    [InlineData("null")]
+    [InlineData("[1]")]
+    [InlineData("one")]
+    public void Talemark_rejects_malformed_unsupported_and_future_values(string value)
     {
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
@@ -121,9 +121,12 @@ public class EditorManifestSchemaTests
             ["main.tale"] = "=== beginning\nHello.\n-> END\n",
         }));
 
-        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
-        Assert.Empty(result.Diagnostics);
-        Assert.Equal(1, result.Story!.TalemarkVersion);
+        Assert.False(result.Success);
+        Assert.Null(result.Story);
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal("TW4003", diagnostic.Code);
+        Assert.Contains("game.talemark", diagnostic.Message);
     }
 
     [Theory]

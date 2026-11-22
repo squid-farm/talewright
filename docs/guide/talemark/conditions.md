@@ -15,7 +15,7 @@ evaluated when its prose line renders. Nest `{if}` blocks for additional tests; 
 `story.talewright.yaml`:
 
 ```yaml
-game: { id: festival, title: The Letter, start: hall, talemark: "1" }
+game: { id: festival, title: The Letter, start: hall, talemark: 1 }
 characters:
   player: { first-name: Ada }
 flags: [festival-happened]

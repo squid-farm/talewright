@@ -21,7 +21,7 @@ public sealed class GoverningAttributeTests
                     disable: {{disable}}
                     stats:
                 {{stats}}
-                  talemark: "1"
+                  talemark: 1
                 characters:
                   player: {first-name: Ada}
                 """,

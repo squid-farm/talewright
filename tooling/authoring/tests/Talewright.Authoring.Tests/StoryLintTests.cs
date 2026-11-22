@@ -13,7 +13,7 @@ public sealed class StoryLintTests
     private static StorySource Source(string id = "night-ferry", string scene = "ending.empty-handed") => new(
         new Dictionary<string, string>
         {
-            [StorySource.ManifestFileName] = $"game:\n  id: {id}\n  title: Night Ferry\n  version: 1\n  start: {scene}\n  talemark: \"1\"\ncharacters:\n  player: {{first-name: Ada}}\n",
+            [StorySource.ManifestFileName] = $"game:\n  id: {id}\n  title: Night Ferry\n  version: 1\n  start: {scene}\n  talemark: 1\ncharacters:\n  player: {{first-name: Ada}}\n",
             ["main.tale"] = $"=== {scene}\n-> END",
         });
 

@@ -69,17 +69,23 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
         {
             _yaml.Diagnostics.Information(
                 CompilerDiagnosticCodes.MissingTalemarkVersion,
-                "game.talemark is not set. Add 'talemark: \"1\"' to preserve the current integer arithmetic. " +
+                "game.talemark is not set. Add 'talemark: 1' to preserve the current integer arithmetic. " +
                 "See the language-version migration guide: https://github.com/squid-farm/talewright/blob/main/docs/guide/language-versions.md",
                 _yaml.At(game));
         }
-        else if (talemark is not YamlScalarNode scalar ||
-                 scalar.Style is not (YamlDotNet.Core.ScalarStyle.DoubleQuoted or YamlDotNet.Core.ScalarStyle.SingleQuoted) ||
-                 Scalar(talemark) != "1")
+        else if (talemark is not YamlScalarNode { Style: YamlDotNet.Core.ScalarStyle.Plain } scalar ||
+                 !int.TryParse(scalar.Value, NumberStyles.None, CultureInfo.InvariantCulture, out var talemarkVersion))
         {
             _yaml.Diagnostics.Error(
                 CompilerDiagnosticCodes.InvalidConfigurationValue,
-                "game.talemark must be the quoted string \"1\".",
+                "game.talemark must be the integer 1; quoted or other values are invalid.",
+                _yaml.At(talemark));
+        }
+        else if (talemarkVersion != 1)
+        {
+            _yaml.Diagnostics.Error(
+                CompilerDiagnosticCodes.InvalidConfigurationValue,
+                $"Talemark version {talemarkVersion} is not supported by this release. Use 1 or omit game.talemark to use version 1.",
                 _yaml.At(talemark));
         }
         else

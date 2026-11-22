@@ -358,7 +358,7 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
         story = root / "tool-story"
         story.mkdir()
         (story / "story.talewright.yaml").write_text(
-            "game:\n  id: tool-smoke\n  title: Tool smoke\n  talemark: \"1\"\n  start: a\n")
+            "game:\n  id: tool-smoke\n  title: Tool smoke\n  talemark: 1\n  start: a\n")
         (story / "characters").mkdir()
         (story / "characters/player.talewright.yaml").write_text("characters:\n  player: {first-name: Tester}\n")
         (story / "main.tale").write_text("=== a\nHello, {player:first-name}.\n-> translated\n")

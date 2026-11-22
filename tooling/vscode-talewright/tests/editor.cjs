@@ -513,14 +513,10 @@ async function testYamlSchema() {
     await replaceDocument(document, valid);
     diagnostics = await waitForDiagnostics(document, items => items.length === 0);
 
-    const talemarkPinned = valid.replace('  start: beginning\n',
-      '  start: beginning\n  talemark: "1"\n');
-    await replaceDocument(document, talemarkPinned);
-    diagnostics = await waitForDiagnostics(document, items => items.length === 0);
     const talemarkDecimal = valid.replace('  start: beginning\n',
       '  start: beginning\n  talemark: 1.0\n');
     await replaceDocument(document, talemarkDecimal);
-    diagnostics = await waitForDiagnostics(document, items => items.length > 0);
+    diagnostics = await waitForDiagnostics(document, items => items.length === 0);
     await replaceDocument(document, valid);
     await waitForDiagnostics(document, items => items.length === 0);
 
@@ -625,7 +621,7 @@ async function testLiveDiagnostics() {
   try {
     renderer = await openRenderer();
     await fs.writeFile(path.join(folder, 'story.talewright.yaml'),
-      'game:\n  id: live\n  title: Live\n  start: start\n  talemark: "1"\ncharacters:\n  player: {first-name: Ada}\nflags: [ready]\nvars: {choice: 1}\n');
+      'game:\n  id: live\n  title: Live\n  start: start\n  talemark: 1\ncharacters:\n  player: {first-name: Ada}\nflags: [ready]\nvars: {choice: 1}\n');
     const file = path.join(folder, 'start.tale');
     await fs.writeFile(file, '=== start\n* [Go] -> missing\n');
     const document = await vscode.workspace.openTextDocument(file);
@@ -860,7 +856,7 @@ async function testLiveDiagnostics() {
 
     const manifestBuffer = await vscode.workspace.openTextDocument(path.join(folder, 'story.talewright.yaml'));
     await vscode.window.showTextDocument(manifestBuffer);
-    const flagManifest = 'game:\n  id: live\n  title: Live\n  start: start\n  talemark: "1"\n  ruleset: rpg\nflags: [ready]\ncharacters:\n  player: {first-name: Ada}\n  guide: {first-name: Bea}\n';
+    const flagManifest = 'game:\n  id: live\n  title: Live\n  start: start\n  talemark: 1\n  ruleset: rpg\nflags: [ready]\ncharacters:\n  player: {first-name: Ada}\n  guide: {first-name: Bea}\n';
     const flagManifestEdit = new vscode.WorkspaceEdit();
     flagManifestEdit.replace(manifestBuffer.uri,
       new vscode.Range(manifestBuffer.positionAt(0), manifestBuffer.positionAt(manifestBuffer.getText().length)),

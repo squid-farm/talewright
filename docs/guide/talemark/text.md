@@ -35,7 +35,7 @@ narrative voice.
 `story.talewright.yaml`:
 
 ```yaml
-game: { id: lantern, title: The Lantern, start: camp, talemark: "1" }
+game: { id: lantern, title: The Lantern, start: camp, talemark: 1 }
 characters:
   player: { first-name: Ada, pronouns: they, inventory: { lantern: 1 } }
   guide: { first-name: Sam, pronouns: she }

@@ -23,10 +23,10 @@
           "description": "Author-defined story version. Defaults to 0.0.0."
         },
         "talemark": {
-          "type": "string",
-          "enum": ["1"],
-          "default": "1",
-          "description": "Talemark language version. Omit it during v0 to preserve version 1 behavior with an informational migration notice; pin it to the string \"1\" for the current integer arithmetic."
+          "type": "integer",
+          "enum": [1],
+          "default": 1,
+          "description": "Talemark language version. Omit it during v0 to preserve version 1 behavior with an informational migration notice; pin it to 1 for the current integer arithmetic."
         },
         "start": {
           "$ref": "#/definitions/identifier",

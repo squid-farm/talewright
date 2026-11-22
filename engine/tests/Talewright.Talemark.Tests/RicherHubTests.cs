@@ -130,7 +130,7 @@ public sealed class RicherHubTests(ITestOutputHelper output)
         var timer = Stopwatch.StartNew();
         var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = "game:\n  id: ring\n  title: Ring\n  start: s0\n  talemark: \"1\"\ncharacters:\n  player: {first-name: Tester}",
+            ["story.talewright.yaml"] = "game:\n  id: ring\n  title: Ring\n  start: s0\n  talemark: 1\ncharacters:\n  player: {first-name: Tester}",
             ["main.tale"] = text,
         }));
         output.WriteLine($"{count} sparse hubs: {timer.Elapsed.TotalMilliseconds:F1} ms");

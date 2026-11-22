@@ -13,7 +13,7 @@ the terminal divert. Each choice needs its own `-> scene-id` or `-> END`.
 `story.talewright.yaml`:
 
 ```yaml
-game: { id: locked-gate, title: The Gate, start: gate, talemark: "1" }
+game: { id: locked-gate, title: The Gate, start: gate, talemark: 1 }
 characters:
   player: { first-name: Ada, inventory: { coin: 2 } }
 items:
