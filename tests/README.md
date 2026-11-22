@@ -76,6 +76,11 @@ updating the UI. Before taking a one-shot accessibility snapshot, use `AssertSta
 visible after closing Settings: an open modal excludes the transcript from the
 accessibility tree.
 
+Browser document navigation can finish before Blazor renders. `PlayerTest` waits for the
+library after initial navigation and reload when the test starts in the library; standalone
+tests wait for their own startup state. Wait for the expected UI state rather than sleeping
+or retrying an entire test.
+
 ## Fast .NET tests
 
 ```bash
