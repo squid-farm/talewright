@@ -133,6 +133,22 @@ public sealed class ConcurrencyTests
     }
 
     [Fact]
+    public async Task Real_timer_publishes_diagnostics_after_an_edit()
+    {
+        var control = new AnalysisControl();
+        await using var client = new InProcessClient(control, realServer: true);
+        await client.Initialize();
+        await client.Open("start.tale", Original, 1);
+        var initial = await client.Diagnostics("start.tale", 1);
+        Assert.Empty(initial.GetProperty("params").GetProperty("diagnostics").EnumerateArray());
+
+        await client.Change("start.tale", Reference, 2);
+        var updated = await client.Diagnostics("start.tale", 2);
+        Assert.Contains(updated.GetProperty("params").GetProperty("diagnostics").EnumerateArray(),
+            diagnostic => diagnostic.GetProperty("code").GetString() == "TW2002");
+    }
+
+    [Fact]
     public async Task Real_analyzer_reuses_syntax_across_watch_reload_and_disk_fallback_on_close()
     {
         var control = new AnalysisControl();
@@ -1008,7 +1024,8 @@ public sealed class ConcurrencyTests
 
         public string Root { get; } = Path.Combine(Path.GetTempPath(), $"talewright-lsp-concurrency-{Guid.NewGuid():N}");
 
-        public InProcessClient(AnalysisControl control, bool realAnalyzer = false, Func<Task>? beforeRequestFinished = null)
+        public InProcessClient(AnalysisControl control, bool realAnalyzer = false, Func<Task>? beforeRequestFinished = null,
+            bool realServer = false)
         {
             _control = control;
             Directory.CreateDirectory(Root);
@@ -1018,9 +1035,12 @@ public sealed class ConcurrencyTests
             _serverInput = new AnonymousPipeClientStream(PipeDirection.In, _toServer.ClientSafePipeHandle);
             _serverOutput = new AnonymousPipeClientStream(PipeDirection.Out, _fromServer.ClientSafePipeHandle);
             _protocol = new Protocol(_fromServer, _toServer);
-            _server = new LanguageServer(_serverInput, _serverOutput, _errors,
-                realAnalyzer ? null : control.Analyze, control.Delay, realAnalyzer ? control.Measure : null,
-                beforeRequestFinished).RunAsync();
+            var server = realServer
+                ? new LanguageServer(_serverInput, _serverOutput, _errors)
+                : new LanguageServer(_serverInput, _serverOutput, _errors,
+                    realAnalyzer ? null : control.Analyze, control.Delay, realAnalyzer ? control.Measure : null,
+                    beforeRequestFinished);
+            _server = server.RunAsync();
         }
 
         private string PathOf(string name) => Path.Combine(Root, name);
