@@ -22,15 +22,16 @@ From that release on, compatibility guarantees apply within a major Talewright v
   the [golden save tests](engine/tests/Talewright.Runtime.Tests/SaveSamples/golden/README.md)
   pass unchanged.
 - A breaking change within the major version is allowed only for a severe defect, such as a security
-  or data-loss bug. It needs a project-lead decision, advance notice, a version bump and migration
-  guidance, and the detectable old form must fail with an actionable message that names its replacement.
-- A deliberate major-version break requires the same project-lead decision and advance notice,
-  plus migration guidance and a release-gated version bump.
+  or data-loss bug. It needs a project-lead decision, advance notice, an explicit version bump and
+  migration guidance. A detectable incompatible old form must fail with an actionable message that
+  names its replacement.
+- A deliberate major-version break does not require a severe defect, but it must be part of a
+  deliberate major release with a project-lead decision, advance notice and migration guidance.
+  Detectable incompatible inputs must fail with an actionable message.
 
 These guarantees cover the author-facing story format, saves and replay evidence. Author Debugger
 scenario files, tooling, C# extension APIs and NuGet APIs remain outside this format guarantee,
-although failed loads must preserve the active session and original stored bytes. Existing save bytes
-must remain loadable; failed loads must not replace active state or the stored bytes.
+although failed loads must preserve the active session and original stored bytes.
 
 ## Set up
 
