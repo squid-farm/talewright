@@ -50,8 +50,11 @@ public static class EffectExecutor
     {
         var state = log.State;
         var context = new EvaluationContext(state, predicates) { ResolveSkillCheck = resolveSkillCheck };
+        var integerArithmetic = state.World.TalemarkVersion == 1;
         ExactNumber Eval(Expr e) => ExpressionEvaluator.EvaluateExactNumber(e, context);
-        int EvalWhole(Expr e) => Eval(e).ToInt32RoundedAwayFromZero();
+        int EvalWhole(Expr e) => integerArithmetic
+            ? ExpressionEvaluator.EvaluateNumber(e, context)
+            : Eval(e).ToInt32RoundedAwayFromZero();
 
         IEnumerable<GameEvent> events = effect switch
         {
@@ -59,6 +62,8 @@ public static class EffectExecutor
                 Apply(state.GetBaseStat(e.Character, e.Stat), e.Op, EvalWhole(e.Amount))),
             ChangeStanding e => StateChanges.SetStanding(state, e.Faction,
                 Apply(state.GetStanding(e.Faction), e.Op, EvalWhole(e.Amount))),
+            ChangeVariable e when integerArithmetic => StateChanges.SetVariable(state, e.Variable,
+                Apply(state.GetVariable(e.Variable), e.Op, EvalWhole(e.Amount))),
             ChangeVariable e => StateChanges.SetVariable(state, e.Variable,
                 Apply(state, state.GetExactVariable(e.Variable), e.Op, Eval(e.Amount))),
             SetTextVariable e when e.Value.Type == ExprType.Text =>
