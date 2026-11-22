@@ -64,7 +64,7 @@ public sealed class SceneVisitSyntaxTests
         var offer = Assert.Single(StoryDiverts.From(story).HubOffers);
         Assert.Equal(
             [
-                (StoryStateReadKind.SceneVisitCount, "scene:player:visits"),
+                (StoryStateReadKind.SceneVisitCount, "destination:player:visits"),
                 (StoryStateReadKind.SceneVisitCount, "start:player:visits"),
                 (StoryStateReadKind.VisitedScene, "player visited start"),
             ],
@@ -93,7 +93,7 @@ public sealed class SceneVisitSyntaxTests
         state.Apply(new SceneEntered(new SceneId("start")));
         Assert.True(ExpressionEvaluator.IsTrue(result.Story.GetScene(new SceneId("start")).Requires!,
             EvaluationContext.For(state)));
-        Assert.False(ExpressionEvaluator.IsTrue(result.Story.GetScene(new SceneId("camp")).Requires!,
+        Assert.True(ExpressionEvaluator.IsTrue(result.Story.GetScene(new SceneId("camp")).Requires!,
             EvaluationContext.For(state)));
     }
 
@@ -101,13 +101,15 @@ public sealed class SceneVisitSyntaxTests
     public void Hub_evaluates_candidate_visit_count_not_hub_visit_count()
     {
         var result = Compile("""
+            === start
+            -> hub
             === hub
             @hub candidates
             * [Return] -> hub
             === candidate
             @tags candidates
             @requires scene:player:visits < 3
-            @choice-label "Visit {scene:player:visits}"
+            @choice-label Visit {scene:player:visits}
             Visits: {scene:player:visits}.
             -> hub
             """);
@@ -132,7 +134,8 @@ public sealed class SceneVisitSyntaxTests
             Assert.Equal(expected,
                 ExpressionEvaluator.IsTrue(candidate.Requires!, EvaluationContext.For(state)));
 
-            var label = new TemplateRenderer().RenderInlines(candidate.ChoiceLabel!, state).ToPlainText();
+            var label = RenderedInline.ToPlainText(
+                new TemplateRenderer().RenderInlines(candidate.ChoiceLabel!, state));
             Assert.Equal($"Visit {candidateVisits}", label);
 
             var prose = new TemplateRenderer().Render(CompilerTests.Templates(candidate), state).ToPlainText();

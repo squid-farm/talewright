@@ -1,3 +1,4 @@
+using Talewright.Core.Identity;
 using Talewright.Narrative.Templates;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Analysis;
