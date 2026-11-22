@@ -101,6 +101,47 @@ public sealed class NewStoryCommandTests : IDisposable
         Assert.Equal(0, Invoke(["lint", story]).Code);
     }
 
+    [Fact]
+    public void Next_steps_use_a_shell_neutral_command_for_special_folder_names()
+    {
+        var marker = Path.Combine(_root, "shell-expansion-marker");
+        var folderName = OperatingSystem.IsWindows()
+            ? "story with spaces $HOME `touch shell-expansion-marker` $(touch shell-expansion-marker)"
+            : "story with 'quotes' $HOME `touch shell-expansion-marker` $(touch shell-expansion-marker)";
+        var story = Path.Combine(_root, folderName);
+
+        var result = Invoke(["new", story, "--id", "safe-story"]);
+
+        Assert.Equal(0, result.Code);
+        Assert.Contains("In a terminal opened in the story folder, run:", result.Output);
+        var suggestedCommands = result.Output
+            .Split(Environment.NewLine, StringSplitOptions.RemoveEmptyEntries)
+            .Where(line => line.TrimStart().StartsWith("talewright run ", StringComparison.Ordinal))
+            .ToArray();
+        Assert.Equal(new[] { "    talewright run ." }, suggestedCommands);
+        Assert.False(File.Exists(marker));
+        Assert.True(File.Exists(Path.Combine(story, "story.talewright.yaml")));
+
+        var previousDirectory = Directory.GetCurrentDirectory();
+        string? launchedStory = null;
+        try
+        {
+            Directory.SetCurrentDirectory(story);
+            var run = Invoke(["run", "."], new NativeHostLauncher.Operations((_, root, _, _, _, _) =>
+            {
+                launchedStory = root;
+                return 0;
+            }));
+
+            Assert.Equal(0, run.Code);
+            Assert.Equal(Path.GetFullPath(story), launchedStory);
+        }
+        finally
+        {
+            Directory.SetCurrentDirectory(previousDirectory);
+        }
+    }
+
     [Theory]
     [InlineData("Invalid")]
     [InlineData("has_underscore")]

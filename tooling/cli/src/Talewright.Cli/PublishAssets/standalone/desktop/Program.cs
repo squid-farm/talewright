@@ -35,12 +35,15 @@ internal static class Program
         builder.Services.AddScoped<PlayerDiagnostics>();
         builder.Services.AddScoped<PlayerPreferencesStore>();
         builder.RootComponents.Add<App>("app");
-        var app = builder.Build();
+        var app = builder.Build(services => services.GetRequiredService<PhotinoWindow>().LogVerbosity = 0);
         window = app.MainWindow;
         options.SetTitle = title => app.MainWindow.SetTitle(title);
         app.MainWindow.SetTitle("Talewright").SetSize(1200, 850).SetUseOsDefaultSize(false).Center();
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            Console.Error.WriteLine(e.ExceptionObject);
             app.MainWindow.ShowMessage("Talewright error", e.ExceptionObject.ToString());
+        };
         app.Run();
     }
 }

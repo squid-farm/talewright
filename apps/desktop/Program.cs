@@ -55,7 +55,7 @@ internal static class Program
         builder.Services.AddScoped<PlayerPreferencesStore>();
         builder.RootComponents.Add<App>("app");
 
-        var app = builder.Build();
+        var app = builder.Build(services => services.GetRequiredService<PhotinoWindow>().LogVerbosity = 0);
         window = app.MainWindow;
         options.SetTitle = title => app.MainWindow.SetTitle(title);
         app.MainWindow
@@ -65,7 +65,10 @@ internal static class Program
             .Center();
 
         AppDomain.CurrentDomain.UnhandledException += (_, e) =>
+        {
+            Console.Error.WriteLine(e.ExceptionObject);
             app.MainWindow.ShowMessage("Talewright error", e.ExceptionObject.ToString());
+        };
 
         app.Run();
         return 0;

@@ -108,8 +108,9 @@ public sealed class NewStoryCommand : Command<NewStorySettings>
         writers.Output.WriteLine($"  {scenePath}");
         writers.Output.WriteLine();
         writers.Output.WriteLine("Next steps:");
-        writers.Output.WriteLine($"  talewright run {QuotePath(root)}");
-        writers.Output.WriteLine($"  Open {QuotePath(root)} in VS Code.");
+        writers.Output.WriteLine("  In a terminal opened in the story folder, run:");
+        writers.Output.WriteLine("    talewright run .");
+        writers.Output.WriteLine("  Open the story folder in VS Code.");
         return 0;
     }
 
@@ -229,8 +230,6 @@ public sealed class NewStoryCommand : Command<NewStorySettings>
 
         return failures.Count == 0 ? null : string.Join("; ", failures);
     }
-
-    private static string QuotePath(string path) => $"\"{path.Replace("\"", "\\\"", StringComparison.Ordinal)}\"";
 
     private static bool IsFileSystemError(Exception exception) =>
         exception is IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException or SecurityException;

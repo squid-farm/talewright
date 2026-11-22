@@ -99,32 +99,53 @@ public sealed class ConcurrencyTests
     [Fact]
     public async Task Paced_typing_burst_does_not_restart_analysis_for_each_edit()
     {
-        var control = new AnalysisControl(realDelays: true);
+        var control = new AnalysisControl(virtualDelays: true);
         await using var client = new InProcessClient(control);
         await client.Initialize();
-        await client.Open("start.tale", Original, 1);
-        (await control.NextAnalysis()).Release();
-        await client.Diagnostics("start.tale", 1);
+        await PublishInitial(control, client, Original);
 
         await client.Change("start.tale", Changed, 2);
+        (await control.NextDelay()).Release();
         var running = await control.NextAnalysis();
         Assert.Equal(2, control.AnalysisCount);
 
         for (var version = 3; version <= 8; version++)
         {
-            await Task.Delay(TimeSpan.FromMilliseconds(60));
+            control.Advance(TimeSpan.FromMilliseconds(60));
             Assert.Equal(2, control.AnalysisCount);
             await client.Change("start.tale", Tale($"Paced {version}."), version);
+            var delay = await control.NextDelay();
+            Assert.Equal(TimeSpan.FromMilliseconds(150), delay.Duration);
             await client.Barrier(version);
             Assert.Equal(2, control.AnalysisCount);
         }
 
         Assert.True(running.CancellationRequested);
+        control.Advance(TimeSpan.FromMilliseconds(149));
+        await client.Barrier(9);
+        Assert.Equal(2, control.AnalysisCount);
+        control.Advance(TimeSpan.FromMilliseconds(1));
         var settled = await control.NextAnalysis();
         Assert.Equal(Tale("Paced 8."), settled.Source.Files["start.tale"]);
         settled.Release();
         await client.Diagnostics("start.tale", 8);
         Assert.Equal(3, control.AnalysisCount);
+    }
+
+    [Fact]
+    public async Task Real_timer_publishes_diagnostics_after_an_edit()
+    {
+        var control = new AnalysisControl();
+        await using var client = new InProcessClient(control, realServer: true);
+        await client.Initialize();
+        await client.Open("start.tale", Original, 1);
+        var initial = await client.Diagnostics("start.tale", 1);
+        Assert.Empty(initial.GetProperty("params").GetProperty("diagnostics").EnumerateArray());
+
+        await client.Change("start.tale", Reference, 2);
+        var updated = await client.Diagnostics("start.tale", 2);
+        Assert.Contains(updated.GetProperty("params").GetProperty("diagnostics").EnumerateArray(),
+            diagnostic => diagnostic.GetProperty("code").GetString() == "TW2002");
     }
 
     [Fact]
@@ -905,21 +926,37 @@ public sealed class ConcurrencyTests
         private readonly Channel<AnalysisCall> _analyses = Channel.CreateUnbounded<AnalysisCall>();
         private readonly Channel<LanguageServer.DiagnosticPublication> _publications =
             Channel.CreateUnbounded<LanguageServer.DiagnosticPublication>();
-        private readonly bool _realDelays;
+        private readonly bool _virtualDelays;
+        private readonly List<(TimeSpan Due, TaskCompletionSource Completion)> _scheduledDelays = [];
+        private TimeSpan _elapsed;
         private bool _releaseAll;
         private int _analysisCount;
 
-        public AnalysisControl(bool realDelays = false) => _realDelays = realDelays;
+        public AnalysisControl(bool virtualDelays = false) => _virtualDelays = virtualDelays;
 
         public int AnalysisCount => Volatile.Read(ref _analysisCount);
 
         public Task Delay(TimeSpan delay, CancellationToken cancellationToken)
         {
             if (delay == TimeSpan.Zero) return Task.CompletedTask;
-            if (_realDelays) return Task.Delay(delay, cancellationToken);
             var gate = NewGate();
+            if (_virtualDelays)
+            {
+                lock (_gate) _scheduledDelays.Add((_elapsed + delay, gate));
+            }
             _delays.Writer.TryWrite(new Gate(gate, delay));
             return gate.Task.WaitAsync(cancellationToken);
+        }
+
+        public void Advance(TimeSpan elapsed)
+        {
+            lock (_gate)
+            {
+                _elapsed += elapsed;
+                foreach (var scheduled in _scheduledDelays.Where(scheduled => scheduled.Due <= _elapsed))
+                    scheduled.Completion.TrySetResult();
+                _scheduledDelays.RemoveAll(scheduled => scheduled.Due <= _elapsed);
+            }
         }
 
         public async Task<StoryAnalysis> Analyze(StorySource source, CompilerOptions options, CancellationToken cancellationToken)
@@ -987,7 +1024,8 @@ public sealed class ConcurrencyTests
 
         public string Root { get; } = Path.Combine(Path.GetTempPath(), $"talewright-lsp-concurrency-{Guid.NewGuid():N}");
 
-        public InProcessClient(AnalysisControl control, bool realAnalyzer = false, Func<Task>? beforeRequestFinished = null)
+        public InProcessClient(AnalysisControl control, bool realAnalyzer = false, Func<Task>? beforeRequestFinished = null,
+            bool realServer = false)
         {
             _control = control;
             Directory.CreateDirectory(Root);
@@ -997,9 +1035,12 @@ public sealed class ConcurrencyTests
             _serverInput = new AnonymousPipeClientStream(PipeDirection.In, _toServer.ClientSafePipeHandle);
             _serverOutput = new AnonymousPipeClientStream(PipeDirection.Out, _fromServer.ClientSafePipeHandle);
             _protocol = new Protocol(_fromServer, _toServer);
-            _server = new LanguageServer(_serverInput, _serverOutput, _errors,
-                realAnalyzer ? null : control.Analyze, control.Delay, realAnalyzer ? control.Measure : null,
-                beforeRequestFinished).RunAsync();
+            var server = realServer
+                ? new LanguageServer(_serverInput, _serverOutput, _errors)
+                : new LanguageServer(_serverInput, _serverOutput, _errors,
+                    realAnalyzer ? null : control.Analyze, control.Delay, realAnalyzer ? control.Measure : null,
+                    beforeRequestFinished);
+            _server = server.RunAsync();
         }
 
         private string PathOf(string name) => Path.Combine(Root, name);
