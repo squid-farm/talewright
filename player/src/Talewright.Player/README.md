@@ -63,7 +63,7 @@ libraries keep working. The compiler's source and pure renderer never own image 
 | Implementation | Used by | Notes |
 |---|---|---|
 | `EmbeddedStoryLibrary(assembly, prefix = "stories/", enableImages = false)` | both hosts | Reads manifest resources named `stories/<Story>/<path>`; a story needs a `story.talewright.yaml`. Built-in sample hosts opt into lazy image resource streams with `enableImages: true`. No HTTP, works in WASM. |
-| `FileSystemStoryLibrary(paths)` | desktop | Each path is a story folder or `.zip`. Unreadable entries are listed with the error rather than hidden. |
+| `FileSystemStoryLibrary(paths)` | desktop | Each path is a story folder, `.zip`, or `.storypack`. Unreadable entries are listed with the error rather than hidden. |
 | `CompositeStoryLibrary(params libraries)` | desktop | Concatenates lists; ids become `"<index>|<inner id>"`. |
 
 Register one as a singleton `IStoryLibrary` in the host.
@@ -89,13 +89,14 @@ and save contents. See [collecting diagnostics](../../../docs/guide/troubleshoot
 | Native Author Debugger, story folder | Supported: accepted-source image generations |
 | Built-in desktop/web samples | Supported: opt-in lazy embedded resource streams |
 | Desktop ZIP / browser upload | Retained compressed archive with lazy, bounded image reads |
-| Generated published desktop/web host | Supported: external `story/` directory; native safe file streams or viewport-lazy HTTP, including static web subpaths |
+| Generated published desktop host | Supported: packed manifest/story text in `story.storypack`; safe external images in the adjacent `story/` directory |
+| Generated published web host | Supported: external `story/` directory; viewport-lazy HTTP, including static web subpaths |
 | Custom library using only `LoadAsync` | Text works; images show unavailable unless it supplies a capability |
 
 Generated hosts reuse the publisher's validated staging and shared image presentation. They
 do not embed story text or images in program files. Desktop uses `FileSystemStoryLibrary` over
-the adjacent `story/` directory (one directory shared above the universal runtime folders).
-The standalone web overlay registers `PublishedStoryLibrary` with a page-base-relative
+`story.storypack`, with images from the adjacent `story/` directory (one directory shared above
+the universal runtime folders). The standalone web overlay registers `PublishedStoryLibrary` with a page-base-relative
 `story/` HTTP client. Its `index.json` lists staged paths and individual SHA-256 versions,
 so static hosts need no directory listing. Discovery is refreshed per page load; text is
 loaded before compilation, while image HTTP streams open only when an occurrence acquires
