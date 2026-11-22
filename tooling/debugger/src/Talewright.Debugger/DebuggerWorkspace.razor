@@ -4,7 +4,6 @@
 @using Talewright.Rules.Diagnostics
 @using Talewright.Runtime
 @using Talewright.Talemark.Model
-@using Talewright.Talemark.Vocabulary
 @inject IJSRuntime JS
 @inject Talewright.Player.Preferences.PlayerPreferencesStore Preferences
 @implements IAsyncDisposable
@@ -47,7 +46,7 @@
                                 <div id="map-panel" class="map-panel" role="tabpanel" aria-labelledby="map-tab" hidden="@(!_mapSelected)">
                                     <MapTab @ref="_mapTab" Story="story" View="_routeMap" Session="Model.Session"
                                             Inspection="Model.Inspection" SelectedNodeId="@_mapSelectedNodeId"
-                                            Active="_mapSelected" OnSelectScene="MapSelectionChanged" />
+                                            Active="_mapSelected" OnSelectNode="MapSelectionChanged" />
                                 </div>
                             }
                         }
@@ -330,9 +329,10 @@
     private void MapSelectionChanged(string? scene)
     {
         _mapSelectedNodeId = scene;
-        _selection = scene is not null && scene != SceneVocabulary.End
-            ? new InspectorSelection(new SceneId(scene))
-            : null;
+        var selectedScene = scene is null
+            ? null
+            : Model.Story?.Scenes.FirstOrDefault(candidate => candidate.Id.Value == scene);
+        _selection = selectedScene is null ? null : new InspectorSelection(selectedScene.Id);
     }
 
     private async Task InspectConnectedScene(SceneId scene)

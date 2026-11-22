@@ -38,6 +38,20 @@ public sealed class MapRouteTests : BunitContext
     }
 
     [Fact]
+    public void Names_the_origin_of_a_winning_trigger_redirect()
+    {
+        var route = Show(new MapRunView("hall", false, false, "safe", [
+            new MapRunStep(1, "hall", null, null, null),
+            new MapRunStep(2, "safe", "rescue", "Trigger rescue, when flag:ready, diverts to safe", "line0", "hall"),
+        ]));
+
+        Assert.Equal([
+            "Started at hall",
+            "Trigger redirect from scene hall: Trigger rescue, when flag:ready, diverts to safe",
+        ], route.FindAll("ol > li").Select(item => item.TextContent));
+    }
+
+    [Fact]
     public void A_mid_story_start_names_its_setup_scene()
     {
         var route = Show(new MapRunView("cave", true, false, "cave", [new MapRunStep(1, "cave", null, null, null)]));

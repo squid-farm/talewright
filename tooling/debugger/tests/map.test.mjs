@@ -42,7 +42,7 @@ function transform(k = 1, x = 0, y = 0) {
   };
 }
 
-async function renderMap(nodes) {
+async function renderMap(nodes, groups = []) {
   const graphs = [];
   const canvases = [];
   class ELK {
@@ -50,6 +50,17 @@ async function renderMap(nodes) {
       graphs.push(graph);
       let y = 20;
       const children = graph.children.map(child => {
+        if (child.children) {
+          let childY = 30;
+          const nested = child.children.map(grandchild => {
+            const placed = { ...grandchild, x: 30, y: y + childY };
+            childY += grandchild.height + 12;
+            return placed;
+          });
+          const placed = { ...child, x: 20, y, width: 360, height: childY + 12, children: nested };
+          y += placed.height + 30;
+          return placed;
+        }
         const placed = { ...child, x: 20, y };
         y += child.height + 30;
         return placed;
@@ -116,7 +127,7 @@ async function renderMap(nodes) {
   });
   vm.runInContext(source, sandbox);
 
-  const view = { nodes, groups: [], lines: [], unreachableScenes: 0 };
+  const view = { nodes, groups, lines: [], unreachableScenes: 0 };
   const map = window.talewrightMap;
   await map.render(host, canvas, tooltip, view, null, null, dotnet, false);
   return { map, host, canvas, tooltip, view, graphs, canvases, canvasContext, dotnetCalls, dotnet };
@@ -197,6 +208,29 @@ test('IDs wrap at dots, middle-ellipsize long segments, and collapse beyond four
   assert.equal(dottedSize.height, 20 + (3 + 2) * 15);
   assert.equal(layout.boxes.get(manySegments).height, 20 + (4 + 2) * 15);
   assert.equal(rendered.view.nodes[0].text[0], dotted);
+});
+
+test('trigger declarations are grouped separately and expose their full description on hover', async () => {
+  const name = 'Trigger rescue, when flag:ready, effects: set flag:safe; diverts to refuge, source story.talewright.yaml:12:9.';
+  const trigger = {
+    id: 'trigger:rescue', triggerId: 'rescue', scene: null, area: 'main',
+    text: ['rescue', 'when flag:ready', 'do set flag:safe; → refuge'], name,
+    group: 'group:triggers', start: false, end: false, hub: false, once: false,
+    reachable: true, stub: false, items: [],
+  };
+  const group = { id: 'group:triggers', area: 'main', label: 'Triggers', triggerSection: true };
+  const rendered = await renderMap([scene('start'), trigger], [group]);
+  const layoutGroup = rendered.graphs[0].children.find(child => child.id === group.id);
+
+  assert.equal(layoutGroup.labels[0].text, 'Triggers');
+  assert.deepEqual(Array.from(layoutGroup.children, child => child.id), [trigger.id]);
+
+  const box = rendered.host.talewrightMap.laid.boxes.get(trigger.id);
+  const screenX = rendered.host.talewrightMap.transform.x + (box.x + box.width / 2) * rendered.host.talewrightMap.transform.k;
+  const screenY = rendered.host.talewrightMap.transform.y + (box.y + box.height / 2) * rendered.host.talewrightMap.transform.k;
+  rendered.canvas.onmousemove({ offsetX: screenX, offsetY: screenY, buttons: 0 });
+
+  assert.equal(rendered.tooltip.children[0].textContent, name);
 });
 
 test('long stub IDs wrap without changing hover descriptions or selection targets', async () => {

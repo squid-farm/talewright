@@ -11,7 +11,8 @@ public sealed record MapRunStep(
     string Scene,
     string? TakenItemId,
     string? TakenItemName,
-    string? LineId);
+    string? LineId,
+    string? TriggerSourceScene = null);
 
 /// <summary>Preview of the current playtest route using visited scenes and selected map items.</summary>
 public sealed record MapRunView(
@@ -32,8 +33,15 @@ public sealed record MapRunView(
         var divertItems = storyMap.Diverts
             .Where(divert => items.ContainsKey(divert.Id))
             .ToDictionary(divert => divert.Id, divert => items[divert.Id], StringComparer.Ordinal);
+        var triggerItems = map.Nodes
+            .Where(node => node.TriggerId is not null)
+            .SelectMany(node => map.Lines
+                .Where(line => line.Kind == MapView.TriggerKind && line.From == node.Id)
+                .Select(line => new MapItem(node.TriggerId!, line.Id, line.To, node.Name, false)))
+            .ToDictionary(item => item.Id, StringComparer.Ordinal);
         var steps = new List<MapRunStep>();
         MapItem? pendingItem = null;
+        string? pendingTriggerSource = null;
 
         MapItem? ItemFor(StoryDivert? divert) =>
             divert is not null && divertItems.TryGetValue(divert.Id, out var item) ? item : null;
@@ -65,8 +73,10 @@ public sealed record MapRunView(
 
         void AddScene(string scene)
         {
-            steps.Add(new(steps.Count + 1, scene, pendingItem?.Id, pendingItem?.Name, pendingItem?.Line));
+            steps.Add(new(steps.Count + 1, scene, pendingItem?.Id, pendingItem?.Name, pendingItem?.Line,
+                pendingTriggerSource));
             pendingItem = null;
+            pendingTriggerSource = null;
         }
 
         var decisions = session.Decisions.Where(decision => decision.EventStart is not null)
@@ -102,6 +112,10 @@ public sealed record MapRunView(
                         : null;
                     break;
                 }
+                case TriggerDiverted diverted:
+                    pendingItem = triggerItems.GetValueOrDefault(diverted.TriggerId);
+                    pendingTriggerSource = diverted.Source?.Value;
+                    break;
                 case SceneEntered entered:
                     AddScene(entered.Scene.Value);
                     break;

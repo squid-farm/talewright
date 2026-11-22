@@ -1,6 +1,6 @@
 // Debugger Map tab. ELK lays out each area in a Web Worker, d3-zoom pans and zooms, and the map is painted on a
 // canvas. The canvas is hidden from assistive technology: a roving group of scene buttons and the details panel carry
-// the same scenes, diverts and hub offers, and stay synchronized with what the canvas highlights.
+// the same scenes, trigger declarations, diverts and hub offers, and stay synchronized with what the canvas highlights.
 window.talewrightMap = (() => {
   const NODE_MIN_WIDTH = 200;
   const NODE_MAX_WIDTH = 320;
@@ -14,7 +14,10 @@ window.talewrightMap = (() => {
   const DETAIL_ZOOM = 0.35;
   const SANS = `system-ui, "DejaVu Sans", sans-serif`;
   const SCENE_NAVIGATION_KEYS = new Set(["ArrowRight", "ArrowDown", "ArrowLeft", "ArrowUp", "Home", "End"]);
-  const kindColors = { Scene: "#57606a", Choice: "#0969da", Success: "#1a7f37", Failure: "#cf222e", HubOffer: "#8250df" };
+  const kindColors = {
+    Scene: "#57606a", Choice: "#0969da", Success: "#1a7f37", Failure: "#cf222e",
+    HubOffer: "#8250df", Trigger: "#0f766e",
+  };
 
   let elk = null;
   const layoutEngine = () => elk || (elk = new ELK({ workerUrl: "map/vendor/elk-worker.min.js" }));
@@ -195,7 +198,8 @@ window.talewrightMap = (() => {
     }
   }
 
-  const lineColor = line => kindColors[line.kind === "HubOffer" ? "HubOffer" : line.outcome || (line.kind === "Scene" || line.kind === "EntryCheck" ? "Scene" : "Choice")];
+  const lineColor = line => kindColors[line.kind === "HubOffer" || line.kind === "Trigger"
+    ? line.kind : line.outcome || (line.kind === "Scene" || line.kind === "EntryCheck" ? "Scene" : "Choice")];
   const lineDash = line => line.shownWhenUnavailable ? [2, 3]
     : line.kind === "HubOffer" ? [6, 4] : line.kind === "EntryCheck" ? [5, 3] : [];
 
@@ -299,7 +303,7 @@ window.talewrightMap = (() => {
       rect(area, 12, null, colors.error, 1.5, [8, 5]);
       if (detail) {
         text(`Unreachable from the start: ${view.unreachableScenes}`, area.x + 16, area.y + 24, `bold 14px ${SANS}`, colors.error);
-        text("Reachability follows diverts and hub offers; it doesn't check whether conditions can be met.",
+        text("Reachability follows scene and trigger diverts and hub offers; it doesn't check whether conditions can be met.",
           area.x + 16, area.y + 44, `11px ${SANS}`, colors.muted);
       }
     }
@@ -307,11 +311,14 @@ window.talewrightMap = (() => {
     for (const group of view.groups) {
       const b = laid.boxes.get(group.id);
       if (!visible(b)) continue;
+      const color = group.triggerSection ? kindColors.Trigger : kindColors.HubOffer;
+      const noun = group.triggerSection ? "triggers" : "scenes";
       ctx.globalAlpha = 0.12;
-      rect(b, 8, kindColors.HubOffer);
+      rect(b, 8, color);
       ctx.globalAlpha = 1;
-      rect(b, 8, null, kindColors.HubOffer, 1.2);
-      if (detail) text(`${group.label}  ·  ${state.groupSizes.get(group.id)} scenes`, b.x + 10, b.y + 18, `bold 12px ${SANS}`, kindColors.HubOffer);
+      rect(b, 8, null, color, 1.2);
+      if (detail) text(`${group.label}  ·  ${state.groupSizes.get(group.id)} ${noun}`, b.x + 10, b.y + 18,
+        `bold 12px ${SANS}`, color);
     }
 
     const labels = [];
@@ -321,7 +328,7 @@ window.talewrightMap = (() => {
       const taken = state.routeLines.has(line.id);
       const color = highlighted ? colors.accent : taken ? kindColors.Success : lineColor(line);
       ctx.strokeStyle = color;
-      ctx.lineWidth = width(highlighted ? 4 : taken ? 3 : line.kind === "HubOffer" ? 1.4 : 1.2);
+      ctx.lineWidth = width(highlighted ? 4 : taken ? 3 : line.kind === "HubOffer" ? 1.4 : line.kind === "Trigger" ? 1.8 : 1.2);
       ctx.setLineDash((highlighted || taken) && !line.shownWhenUnavailable ? [] : lineDash(line));
       for (const section of sections) {
         ctx.beginPath();
@@ -347,8 +354,9 @@ window.talewrightMap = (() => {
       ctx.globalAlpha = 0.9;
       rect({ x: label.x, y: label.y, width: label.width, height: 14 }, 3, colors.background);
       ctx.globalAlpha = 1;
-      text(line.label, label.x + 4, label.y + 10.5, `${line.kind === "HubOffer" || highlighted ? "bold " : ""}10px monospace`,
-        highlighted ? colors.accent : line.kind === "HubOffer" ? kindColors.HubOffer : colors.muted);
+      text(line.label, label.x + 4, label.y + 10.5,
+        `${line.kind === "HubOffer" || line.kind === "Trigger" || highlighted ? "bold " : ""}10px monospace`,
+        highlighted ? colors.accent : line.kind === "HubOffer" || line.kind === "Trigger" ? lineColor(line) : colors.muted);
     }
     if (detail) {
       for (const [id, orders] of state.routeLines) {
@@ -375,6 +383,7 @@ window.talewrightMap = (() => {
       const b = laid.boxes.get(node.id);
       if (!visible(b)) continue;
       let fill = colors.background, stroke = colors.muted, lineWidth = 1.2, dash = [];
+      if (node.triggerId) { fill = colors.panel; stroke = kindColors.Trigger; lineWidth = 1.8; }
       if (node.hub) { fill = colors.panel; stroke = colors.warning; lineWidth = 1.6; }
       if (node.start) { stroke = kindColors.Choice; lineWidth = 2.5; }
       if (node.end) fill = stroke = colors.text;
@@ -404,10 +413,11 @@ window.talewrightMap = (() => {
       textLines.forEach((line, i) => {
         const isId = i < idLineCount;
         const originalIndex = i - idLineCount + 1;
-        const isRequirement = !isId && originalIndex === 2;
+        const isRequirement = !node.triggerId && !isId && originalIndex === 2;
+        const isTriggerCondition = node.triggerId && !isId && originalIndex === 1;
         text(line, b.x + 8, b.y + NODE_TEXT_TOP + i * LINE_HEIGHT,
-          isId ? "10.5px monospace" : isRequirement ? "10px monospace" : `11px ${SANS}`,
-          isId ? colors.muted : isRequirement ? kindColors.HubOffer : colors.text);
+          isId || isTriggerCondition || isRequirement ? "10px monospace" : `11px ${SANS}`,
+          isId ? colors.muted : isTriggerCondition ? kindColors.Trigger : isRequirement ? kindColors.HubOffer : colors.text);
       });
       if (detail && visits) {
         const label = `${visits.first}${visits.count > 1 ? ` ×${visits.count}` : ""}`;
@@ -419,6 +429,7 @@ window.talewrightMap = (() => {
         state.run?.currentScene === node.id && "CURRENT",
         node.id === state.selected && state.run?.currentScene !== node.id && "SELECTED",
         node.hub && "HUB",
+        node.triggerId && "TRIGGER",
         node.once && "ONCE",
         !node.reachable && "UNREACHABLE",
       ].filter(Boolean);
@@ -683,12 +694,14 @@ window.talewrightMap = (() => {
     state.highlighted = null;
     if (!state.nodes.has(state.selected)) state.selected = null;
     if (!state.nodes.has(state.focused)) state.focused = null;
-    const scenes = view.nodes.filter(node => !node.end && !node.stub).length;
+    const scenes = view.nodes.filter(node => !node.end && !node.stub && !node.triggerId).length;
     const diverts = view.nodes.reduce((sum, node) => sum + node.items.filter(item => !item.hubOffer).length, 0);
     const offers = view.nodes.reduce((sum, node) => sum + node.items.length, 0) - diverts;
+    const triggers = view.nodes.filter(node => node.triggerId).length;
     const count = (n, one, many) => `${n} ${n === 1 ? one : many}`;
     state.summary = `${count(scenes, "scene", "scenes")}, ${count(diverts, "divert", "diverts")}, ` +
-      `${count(offers, "hub offer", "hub offers")}, ${view.unreachableScenes} unreachable.`;
+      `${count(offers, "hub offer", "hub offers")}${triggers ? `, ${count(triggers, "trigger", "triggers")}` : ""}, ` +
+      `${view.unreachableScenes} unreachable.`;
     if (!state.fitted) {
       const current = run?.currentScene || selected;
       if (active && state.followsCurrent && current && state.nodes.has(current)) {
