@@ -132,7 +132,7 @@ public sealed record Visited(SceneId Scene) : Expr
 }
 
 /// <summary><c>scene:player:visits</c> or <c>camp:player:visits</c>: number of player visits.</summary>
-public sealed record SceneVisitCountRef(SceneId? Scene) : Expr
+public sealed record SceneVisitCountRef(SceneId? Scene, bool IsSceneAlias = false) : Expr
 {
     public override ExprType Type => ExprType.Number;
 }

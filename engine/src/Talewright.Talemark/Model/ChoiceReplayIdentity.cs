@@ -386,7 +386,7 @@ internal static class ChoiceReplayIdentity
                 break;
             case SceneVisitCountRef value:
                 writer.WriteStringValue("scene-visit-count-ref");
-                writer.WriteStringValue(value.Scene?.Value);
+                writer.WriteStringValue(value.IsSceneAlias ? null : value.Scene?.Value);
                 break;
             case InventoryCountRef value:
                 writer.WriteStringValue("inventory-count-ref");

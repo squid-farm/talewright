@@ -18,25 +18,28 @@ internal sealed class ExpressionBinder
     private readonly StorySymbols _symbols;
     private readonly DiagnosticBag _diagnostics;
     private readonly Func<EntityId, StatId, SkillCheckIdentity>? _createSkillCheckIdentity;
+    private readonly SceneId? _sceneOwner;
 
     private ExpressionBinder(TokenBuffer tokens, Func<int, SourceLocation> locate, StorySymbols symbols,
-        DiagnosticBag diagnostics, Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null)
+        DiagnosticBag diagnostics, Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null,
+        SceneId? sceneOwner = null)
     {
         _tokens = tokens;
         _locate = locate;
         _symbols = symbols;
         _diagnostics = diagnostics;
         _createSkillCheckIdentity = createSkillCheckIdentity;
+        _sceneOwner = sceneOwner;
     }
 
     private sealed class BindingException : Exception;
 
     internal static Expr? Bind(ExpressionSyntaxTree syntax, StorySymbols symbols, DiagnosticBag diagnostics,
         Func<int, SourceLocation> locate, ExprType? expectedType = null,
-        Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null)
+        Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null, SceneId? sceneOwner = null)
     {
         if (syntax.HasErrors) return null;
-        var binder = new ExpressionBinder(syntax.Tokens, locate, symbols, diagnostics, createSkillCheckIdentity);
+        var binder = new ExpressionBinder(syntax.Tokens, locate, symbols, diagnostics, createSkillCheckIdentity, sceneOwner);
         try
         {
             var value = binder.Bind(syntax.Root);
@@ -62,10 +65,11 @@ internal sealed class ExpressionBinder
     }
 
     internal static TemplateInline? Bind(SubstitutionSyntaxTree syntax, StorySymbols symbols,
-        DiagnosticBag diagnostics, Func<int, SourceLocation> locate, bool allowFormattedOutput = true)
+        DiagnosticBag diagnostics, Func<int, SourceLocation> locate, bool allowFormattedOutput = true,
+        SceneId? sceneOwner = null)
     {
         if (syntax.HasErrors) return null;
-        var binder = new ExpressionBinder(syntax.Tokens, locate, symbols, diagnostics);
+        var binder = new ExpressionBinder(syntax.Tokens, locate, symbols, diagnostics, sceneOwner: sceneOwner);
         try
         {
             var value = binder.Bind(syntax.Value);
@@ -152,10 +156,11 @@ internal sealed class ExpressionBinder
     }
 
     internal static List<Effect>? Bind(EffectsSyntaxTree syntax, StorySymbols symbols, DiagnosticBag diagnostics,
-        Func<int, SourceLocation> locate, Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null)
+        Func<int, SourceLocation> locate, Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null,
+        SceneId? sceneOwner = null)
     {
         if (syntax.HasErrors) return null;
-        var binder = new ExpressionBinder(syntax.Tokens, locate, symbols, diagnostics, createSkillCheckIdentity);
+        var binder = new ExpressionBinder(syntax.Tokens, locate, symbols, diagnostics, createSkillCheckIdentity, sceneOwner);
         try
         {
             var effects = new List<Effect>(syntax.Effects.Length);
@@ -279,7 +284,7 @@ internal sealed class ExpressionBinder
         if (path == ExpressionVocabulary.Player && member == ExpressionVocabulary.Visits)
         {
             if (ns == ExpressionVocabulary.Scene)
-                return new SceneVisitCountRef(null);
+                return new SceneVisitCountRef(_sceneOwner, true);
 
             var scene = new SceneId(ns);
             if (_symbols.Scenes.Contains(scene))

@@ -4,7 +4,7 @@ export function initialize(dialog, reference) {
     const cancel = event => {
         event.preventDefault();
         if (dialog.dataset.busy !== "true") {
-            reference.invokeMethodAsync("DismissAsync");
+            dialog.querySelector(".tw-saves-close")?.click();
         }
     };
     const keydown = event => {
