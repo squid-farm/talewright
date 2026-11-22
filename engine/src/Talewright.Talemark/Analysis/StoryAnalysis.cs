@@ -934,7 +934,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                 Symbols.FirstOrDefault(symbol => symbol.Kind == AuthoringSymbolKind.Stat && symbol.Name == stat.Id.Value)?.Declaration))
             .ToArray());
 
-    private void ReferenceNode(YamlNode node, AuthoringSymbolKind kind, IReadOnlyList<AuthoringSymbol>? candidates = null,
+    internal void ReferenceNode(YamlNode node, AuthoringSymbolKind kind, IReadOnlyList<AuthoringSymbol>? candidates = null,
         string file = StorySource.ManifestFileName)
     {
         if (node is YamlSequenceNode sequence)

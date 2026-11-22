@@ -45,6 +45,7 @@ public sealed class StorySession : IStorySession
         (Action<List<RenderedBlock>> Execute, ReadOnlyMemory<byte>? ReplayIdentity, ChoiceExecution Execution)> _actions = new(StringComparer.Ordinal);
     private IReadOnlyList<RenderedBlock> _pendingNotes = [];
     private IReadOnlyList<RenderedBlock> _entryPrelude = [];
+    private DivertTarget? _pendingEntryRedirect;
     private readonly List<RenderedBlock> _editNotes = [];
     private readonly List<bool?> _statVisibilityBeforeEvents = [];
     private bool? _nextStatVisibility;
@@ -252,6 +253,7 @@ public sealed class StorySession : IStorySession
             LastEntry = LastEntry,
             _pendingNotes = _pendingNotes,
             _entryPrelude = _entryPrelude,
+            _pendingEntryRedirect = _pendingEntryRedirect,
         };
         foreach (var (key, action) in _actions)
         {
@@ -284,6 +286,22 @@ public sealed class StorySession : IStorySession
             pending.AddRange(_entryPrelude);
             pending.AddRange(_editNotes);
             Enter(triggerDivert, pending);
+            return;
+        }
+        if (_pendingEntryRedirect is { } pendingRedirect)
+        {
+            var redirectScene = Story.GetScene(Current!.Scene!.Value);
+            var redirectBlocks = new List<RenderedBlock>(_pendingNotes);
+            redirectBlocks.AddRange(_entryPrelude);
+            redirectBlocks.AddRange(_editNotes);
+            if (pendingRedirect.IsEnd)
+            {
+                EndStory(redirectBlocks, redirectScene);
+                return;
+            }
+            Present(redirectScene, redirectBlocks,
+                BuildMenu(redirectScene, ContinueTo(redirectScene, pendingRedirect), includeHubOffers: false),
+                automaticallyContinue: true);
             return;
         }
 
@@ -423,6 +441,7 @@ public sealed class StorySession : IStorySession
     private StoryFrame Enter(DivertTarget target, List<RenderedBlock> pending)
     {
         BeforeTransition();
+        _pendingEntryRedirect = null;
         LastEntry = new PlayerEntryBoundary(target, _log.Events.Count, _triggers.CaptureEdgeMemory(),
             pending.Count == 0 ? [] : Array.AsReadOnly(pending.ToArray()));
         if (target.IsEnd)
@@ -451,6 +470,7 @@ public sealed class StorySession : IStorySession
         {
             _executor.ResetEntry();
             _afterEntry?.Invoke(scene.Id, []);
+            _pendingEntryRedirect = triggerDivert;
             var redirectBlocks = new List<RenderedBlock>(pending);
             redirectBlocks.AddRange(prelude);
             if (triggerDivert.IsEnd)
