@@ -13,6 +13,49 @@ public sealed class StorySourceTests : IDisposable
     public StorySourceTests() => Directory.CreateDirectory(_root);
 
     [Fact]
+    public void Desktop_story_pack_round_trips_text_and_image_catalogue()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = "id: round-trip\ntitle: Round Trip",
+            ["chapters/main.tale"] = "=== start\nHello.",
+            ["characters/guide.talewright.yaml"] = "name: Guide",
+        }, ["images/camp.png", "images/maps/camp.PNG"]);
+
+        using var buffer = new MemoryStream();
+        DesktopStoryPack.Write(buffer, source);
+        buffer.Position = 0;
+        var loaded = DesktopStoryPack.Read(buffer);
+
+        Assert.Equal(source.Files, loaded.Files);
+        Assert.True(source.ImagePaths.SetEquals(loaded.ImagePaths));
+    }
+
+    [Fact]
+    public void Desktop_story_pack_rejects_truncated_malformed_and_missing_manifest_packs()
+    {
+        using var buffer = new MemoryStream();
+        DesktopStoryPack.Write(buffer, new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = "id: damaged",
+        }));
+        var bytes = buffer.ToArray();
+
+        Assert.Throws<InvalidDataException>(() => DesktopStoryPack.Read(new MemoryStream(bytes[..(bytes.Length / 2)])));
+
+        Array.Fill<byte>(bytes, 0, 0, 8);
+        Assert.Throws<InvalidDataException>(() => DesktopStoryPack.Read(new MemoryStream(bytes)));
+
+        using var missingManifest = new MemoryStream();
+        DesktopStoryPack.Write(missingManifest, new StorySource(new Dictionary<string, string>
+        {
+            ["main.tale"] = "Hello.",
+        }));
+        missingManifest.Position = 0;
+        Assert.Throws<InvalidDataException>(() => DesktopStoryPack.Read(missingManifest));
+    }
+
+    [Fact]
     public void Archive_text_accounting_includes_actual_fragment_encoding_and_bom_bytes()
     {
         using var buffer = new MemoryStream();

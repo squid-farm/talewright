@@ -161,4 +161,28 @@ public sealed class StoryImagesTests
         Assert.True(StoryCompiler.Compile(archived.Source).Success);
         Assert.NotNull(archived.Images);
     }
+
+    [Fact]
+    public async Task Desktop_story_pack_loads_text_and_external_images_and_reports_damage()
+    {
+        using var files = new ImageStoryFiles();
+        var source = StorySource.FromDirectory(files.Root);
+        var pack = Path.Combine(files.Root, "story" + DesktopStoryPack.FileExtension);
+        var externalImageDirectory = Path.Combine(files.Root, "story", "images");
+        Directory.CreateDirectory(externalImageDirectory);
+        File.Copy(files.ImagePath, Path.Combine(externalImageDirectory, "photo.jpeg"), overwrite: true);
+        using (var output = File.Create(pack))
+            DesktopStoryPack.Write(output, source);
+        using var loaded = await new FileSystemStoryLibrary([pack]).OpenAsync(pack);
+        Assert.True(StoryCompiler.Compile(loaded.Source).Success);
+        Assert.NotNull(loaded.Images);
+        await using var image = await loaded.Images.OpenAsync("images/photo.jpeg");
+        Assert.True(image.CanRead);
+
+        var damaged = Path.Combine(files.Root, "damaged" + DesktopStoryPack.FileExtension);
+        var bytes = await File.ReadAllBytesAsync(pack);
+        await File.WriteAllBytesAsync(damaged, bytes[..(bytes.Length / 2)]);
+        await Assert.ThrowsAsync<InvalidDataException>(() =>
+            new FileSystemStoryLibrary([damaged]).OpenAsync(damaged));
+    }
 }

@@ -717,6 +717,24 @@ public sealed class PublishCommand : Command<PublishSettings>
         }
     }
 
+    private static void PackDesktopStory(string sourceDirectory, string packPath, string imageDirectory)
+    {
+        var source = StorySource.FromDirectory(sourceDirectory);
+        using (var output = File.Create(packPath))
+        {
+            DesktopStoryPack.Write(output, source);
+        }
+
+        Directory.CreateDirectory(imageDirectory);
+        foreach (var path in StoryImageResolver.CompletionPaths(source))
+        {
+            var relative = "images/" + path;
+            var destination = Path.Combine(imageDirectory, "images", path.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(Path.Combine(sourceDirectory, relative), destination);
+        }
+    }
+
     private static string BuildStandalone(string working, string story, string storyTitle, string storyId,
         string target, string? runtime, TextWriter output, TextWriter error, Operations publication,
         bool universalDesktop = false)
@@ -747,9 +765,10 @@ public sealed class PublishCommand : Command<PublishSettings>
     private static void PrepareDesktopRuntime(string content, string runtime, string story, string storyTitle, string storyId)
     {
         MoveDesktopRuntimeToInternal(content, runtime);
-        var internalStory = Path.Combine(content, "internal", "story");
+        var internalDirectory = Path.Combine(content, "internal");
+        var internalStory = Path.Combine(internalDirectory, "story");
         Directory.CreateDirectory(internalStory);
-        CopyDirectory(story, internalStory);
+        PackDesktopStory(story, Path.Combine(internalDirectory, "story" + DesktopStoryPack.FileExtension), internalStory);
         CreateSplitLauncher(content, storyTitle, storyId, runtime);
     }
 
@@ -773,7 +792,8 @@ public sealed class PublishCommand : Command<PublishSettings>
             Directory.Move(built, Path.Combine(internalDirectory, runtime));
         }
 
-        CopyDirectory(story, Path.Combine(bundle, "story"));
+        PackDesktopStory(story, Path.Combine(bundle, "story" + DesktopStoryPack.FileExtension),
+            Path.Combine(bundle, "story"));
         CreateUniversalLaunchers(bundle, storyTitle, storyId);
         return bundle;
     }
@@ -907,17 +927,17 @@ public sealed class PublishCommand : Command<PublishSettings>
         if (runtime?.StartsWith("win-", StringComparison.Ordinal) == true)
         {
             File.WriteAllText(Path.Combine(content, name + ".cmd"),
-                "@echo off\r\nsetlocal\r\n\"%~dp0internal\\" + runtime + "\\Talewright.Host.Desktop.exe\" --no-library \"%~dp0internal\\story\" %*\r\nexit /b %errorlevel%\r\n");
+                "@echo off\r\nsetlocal\r\n\"%~dp0internal\\" + runtime + "\\Talewright.Host.Desktop.exe\" --no-library \"%~dp0internal\\story" + DesktopStoryPack.FileExtension + "\" %*\r\nexit /b %errorlevel%\r\n");
         }
         else if (runtime?.StartsWith("osx-", StringComparison.Ordinal) == true)
         {
             File.WriteAllText(Path.Combine(content, name + ".command"),
-                "#!/bin/sh\nset -eu\nbase=$(CDPATH= cd -P \"$(dirname \"$0\")\" && pwd)\nexec \"$base/internal/" + runtime + "/Talewright.Host.Desktop\" --no-library \"$base/internal/story\" \"$@\"\n");
+                "#!/bin/sh\nset -eu\nbase=$(CDPATH= cd -P \"$(dirname \"$0\")\" && pwd)\nexec \"$base/internal/" + runtime + "/Talewright.Host.Desktop\" --no-library \"$base/internal/story" + DesktopStoryPack.FileExtension + "\" \"$@\"\n");
         }
         else
         {
             File.WriteAllText(Path.Combine(content, name + ".sh"),
-                "#!/bin/sh\nset -eu\nbase=$(CDPATH= cd -P \"$(dirname \"$0\")\" && pwd)\nexec \"$base/internal/" + runtime + "/Talewright.Host.Desktop\" --no-library \"$base/internal/story\" \"$@\"\n");
+                "#!/bin/sh\nset -eu\nbase=$(CDPATH= cd -P \"$(dirname \"$0\")\" && pwd)\nexec \"$base/internal/" + runtime + "/Talewright.Host.Desktop\" --no-library \"$base/internal/story" + DesktopStoryPack.FileExtension + "\" \"$@\"\n");
         }
     }
 
@@ -925,9 +945,9 @@ public sealed class PublishCommand : Command<PublishSettings>
     {
         var name = SafeDesktopName(storyTitle, storyId);
         File.WriteAllText(Path.Combine(bundle, name + ".cmd"),
-            "@echo off\r\nsetlocal\r\nset \"RID=\"\r\nset \"ARCH=%PROCESSOR_ARCHITECTURE%\"\r\nif defined PROCESSOR_ARCHITEW6432 set \"ARCH=%PROCESSOR_ARCHITEW6432%\"\r\nif /i \"%ARCH%\"==\"AMD64\" set \"RID=win-x64\"\r\nif /i \"%ARCH%\"==\"ARM64\" set \"RID=win-arm64\"\r\nif not defined RID (echo Unsupported Windows architecture. 1>&2 & exit /b 1)\r\n\"%~dp0internal\\%RID%\\Talewright.Host.Desktop.exe\" --no-library \"%~dp0story\" %*\r\nexit /b %errorlevel%\r\n");
+            "@echo off\r\nsetlocal\r\nset \"RID=\"\r\nset \"ARCH=%PROCESSOR_ARCHITECTURE%\"\r\nif defined PROCESSOR_ARCHITEW6432 set \"ARCH=%PROCESSOR_ARCHITEW6432%\"\r\nif /i \"%ARCH%\"==\"AMD64\" set \"RID=win-x64\"\r\nif /i \"%ARCH%\"==\"ARM64\" set \"RID=win-arm64\"\r\nif not defined RID (echo Unsupported Windows architecture. 1>&2 & exit /b 1)\r\n\"%~dp0internal\\%RID%\\Talewright.Host.Desktop.exe\" --no-library \"%~dp0story" + DesktopStoryPack.FileExtension + "\" %*\r\nexit /b %errorlevel%\r\n");
         File.WriteAllText(Path.Combine(bundle, name + ".sh"),
-            "#!/bin/sh\nset -eu\nbase=$(CDPATH= cd -P \"$(dirname \"$0\")\" && pwd)\ncase \"$(uname -s):$(uname -m)\" in\n  Linux:x86_64) rid=linux-x64 ;; Linux:aarch64|Linux:arm64) rid=linux-arm64 ;; Darwin:x86_64) rid=osx-x64 ;; Darwin:arm64) rid=osx-arm64 ;; *) printf '%s\\n' 'Unsupported platform.' >&2; exit 1 ;; esac\nexec \"$base/internal/$rid/Talewright.Host.Desktop\" --no-library \"$base/story\" \"$@\"\n");
+            "#!/bin/sh\nset -eu\nbase=$(CDPATH= cd -P \"$(dirname \"$0\")\" && pwd)\ncase \"$(uname -s):$(uname -m)\" in\n  Linux:x86_64) rid=linux-x64 ;; Linux:aarch64|Linux:arm64) rid=linux-arm64 ;; Darwin:x86_64) rid=osx-x64 ;; Darwin:arm64) rid=osx-arm64 ;; *) printf '%s\\n' 'Unsupported platform.' >&2; exit 1 ;; esac\nexec \"$base/internal/$rid/Talewright.Host.Desktop\" --no-library \"$base/story" + DesktopStoryPack.FileExtension + "\" \"$@\"\n");
         File.WriteAllText(Path.Combine(bundle, name + ".command"),
             "#!/bin/sh\nset -eu\nbase=$(CDPATH= cd -P \"$(dirname \"$0\")\" && pwd)\nexec sh \"$base/" + name + ".sh\" \"$@\"\n");
         CopyDirectory(Path.Combine(AssetsRoot, "launchers"), bundle);

@@ -1,0 +1,183 @@
+using System.IO.Compression;
+using System.Text;
+
+namespace Talewright.Talemark.Compilation;
+
+/// <summary>A compressed binary publication format for desktop story text; images remain external.</summary>
+public static class DesktopStoryPack
+{
+    public const string FileExtension = ".storypack";
+    private static readonly byte[] Magic = "TWRPACK1"u8.ToArray();
+    private const int PayloadVersion = 1;
+
+    public static void Write(Stream output, StorySource source)
+    {
+        ArgumentNullException.ThrowIfNull(output);
+        ArgumentNullException.ThrowIfNull(source);
+
+        using var payload = new MemoryStream();
+        using (var writer = new BinaryWriter(payload, Encoding.UTF8, leaveOpen: true))
+        {
+            writer.Write(PayloadVersion);
+            writer.Write(source.Files.Count);
+            foreach (var (path, text) in source.Files.OrderBy(entry => entry.Key, StringComparer.Ordinal))
+            {
+                WriteString(writer, ValidateTextPath(path));
+                WriteString(writer, text);
+            }
+            writer.Write(source.ImagePaths.Count);
+            foreach (var path in source.ImagePaths.Where(path => path.StartsWith("images/", StringComparison.Ordinal))
+                         .Order(StringComparer.Ordinal))
+            {
+                WriteString(writer, ValidateTextPath(path));
+            }
+        }
+
+        output.Write(Magic);
+        Span<byte> length = stackalloc byte[8];
+        if (!BitConverter.TryWriteBytes(length, (ulong)payload.Length))
+            throw new InvalidDataException("The story pack is too large.");
+        output.Write(length);
+        using var gzip = new GZipStream(output, CompressionLevel.SmallestSize, leaveOpen: true);
+        payload.Position = 0;
+        payload.CopyTo(gzip);
+    }
+
+    public static StorySource Read(Stream input)
+    {
+        ArgumentNullException.ThrowIfNull(input);
+
+        var header = new byte[16];
+        ReadExactly(input, header);
+        if (!header.AsSpan(0, Magic.Length).SequenceEqual(Magic))
+            throw new InvalidDataException("Unsupported or damaged story pack.");
+
+        var payloadLength = checked((long)BitConverter.ToUInt64(header, Magic.Length));
+        if (payloadLength < 4)
+            throw new InvalidDataException("The story pack payload is truncated.");
+
+        using var gzip = new GZipStream(input, CompressionMode.Decompress, leaveOpen: true);
+        using var counting = new CountingReadStream(gzip);
+        using var reader = new BinaryReader(counting, Encoding.UTF8, leaveOpen: true);
+        var version = reader.ReadInt32();
+        if (version != PayloadVersion)
+            throw new InvalidDataException($"Unsupported story pack version '{version}'.");
+
+        var fileCount = reader.ReadInt32();
+        if (fileCount < 0)
+            throw new InvalidDataException("The story pack has an invalid file count.");
+        var files = new Dictionary<string, string>(StringComparer.Ordinal);
+        for (var index = 0; index < fileCount; index++)
+        {
+            var path = ReadString(reader);
+            ValidateTextPath(path);
+            var text = ReadString(reader);
+            if (!files.TryAdd(path, text))
+                throw new InvalidDataException($"The story pack contains duplicate file '{path}'.");
+        }
+
+        var imageCount = reader.ReadInt32();
+        if (imageCount < 0)
+            throw new InvalidDataException("The story pack has an invalid image count.");
+        var images = new HashSet<string>(StringComparer.Ordinal);
+        for (var index = 0; index < imageCount; index++)
+        {
+            var path = ReadString(reader);
+            ValidateTextPath(path);
+            if (!path.StartsWith("images/", StringComparison.Ordinal) || !images.Add(path))
+                throw new InvalidDataException($"The story pack contains an invalid image path '{path}'.");
+        }
+
+        if (counting.BytesRead != payloadLength)
+            throw new InvalidDataException("The story pack payload length is invalid.");
+        if (gzip.ReadByte() != -1)
+            throw new InvalidDataException("The story pack has trailing payload data.");
+        if (!files.ContainsKey(StorySource.ManifestFileName))
+            throw new InvalidDataException("The story pack has no root manifest.");
+
+        return new StorySource(files, images);
+    }
+
+    private static void WriteString(BinaryWriter writer, string value)
+    {
+        var bytes = Encoding.UTF8.GetBytes(value);
+        writer.Write(bytes.Length);
+        writer.Write(bytes);
+    }
+
+    private static string ReadString(BinaryReader reader)
+    {
+        var length = reader.ReadInt32();
+        if (length < 0)
+            throw new InvalidDataException("The story pack contains an invalid string length.");
+        var bytes = new byte[length];
+        var offset = 0;
+        while (offset < length)
+        {
+            var read = reader.Read(bytes, offset, length - offset);
+            if (read == 0)
+                throw new InvalidDataException("The story pack is truncated.");
+            offset += read;
+        }
+        try
+        {
+            return new UTF8Encoding(false, true).GetString(bytes);
+        }
+        catch (DecoderFallbackException ex)
+        {
+            throw new InvalidDataException("The story pack contains invalid text.", ex);
+        }
+    }
+
+    private static string ValidateTextPath(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path)
+            || path.StartsWith('/')
+            || path.Any(c => c is '\\' or ':' or '?' or '#' || char.IsControl(c))
+            || path.Split('/').Any(part => part.Length == 0 || part is "." or ".."))
+            throw new InvalidDataException($"Unsafe story pack path '{path}'.");
+        return path;
+    }
+
+    private static void ReadExactly(Stream input, byte[] bytes)
+    {
+        var offset = 0;
+        while (offset < bytes.Length)
+        {
+            var read = input.Read(bytes, offset, bytes.Length - offset);
+            if (read == 0)
+                throw new InvalidDataException("The story pack is truncated.");
+            offset += read;
+        }
+    }
+
+    private sealed class CountingReadStream(Stream inner) : Stream
+    {
+        public long BytesRead { get; private set; }
+        public override bool CanRead => true;
+        public override bool CanSeek => false;
+        public override bool CanWrite => false;
+        public override long Length => throw new NotSupportedException();
+        public override long Position
+        {
+            get => throw new NotSupportedException();
+            set => throw new NotSupportedException();
+        }
+        public override int Read(byte[] buffer, int offset, int count)
+        {
+            var read = inner.Read(buffer, offset, count);
+            BytesRead += read;
+            return read;
+        }
+        public override int Read(Span<byte> buffer)
+        {
+            var read = inner.Read(buffer);
+            BytesRead += read;
+            return read;
+        }
+        public override void Flush() { }
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+        public override void SetLength(long value) => throw new NotSupportedException();
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+}

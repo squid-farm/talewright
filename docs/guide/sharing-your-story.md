@@ -106,6 +106,10 @@ them. A web game avoids this.
 Runtime libraries and other implementation files are kept in an `internal/` folder inside the game
 folder. Keep the extracted files together.
 
+Desktop publications pack the manifest and story text into `story.storypack`, so extracted
+packages do not expose `.tale` or `.talewright.yaml` story text as loose files. Images remain
+external in the package's `story/images/` folder. Universal packages share one pack across runtimes.
+
 That ZIP is large because it contains versions for six kinds of computer. To make smaller,
 separate downloads instead, use `--split` with a folder for `--output`:
 
