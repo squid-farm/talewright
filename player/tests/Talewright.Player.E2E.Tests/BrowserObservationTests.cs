@@ -89,9 +89,35 @@ public sealed class BrowserObservationTests(WebHostFixture host, ITestOutputHelp
                 <ol aria-label="Story choices"><li><button onclick="this.dataset.clicked = 'true'">1. Continue</button></li></ol>
             </main>
             """);
-        Context.SetDefaultTimeout(500);
+        var driver = Assert.IsType<BrowserPlayerDriver>(Driver);
+        await Assert.ThrowsAsync<TimeoutException>(() => driver.ChooseAsync("Continue", passageTimeout: 500));
+        Assert.Equal("true", await Page.Locator("button").GetAttributeAsync("data-clicked"));
+        Assert.Equal("Unchanged", (await Driver.ObserveAsync()).Passage);
+    }
 
-        await Assert.ThrowsAsync<TimeoutException>(() => Choose("Continue"));
+    [Fact]
+    public async Task Choosing_allows_slow_click_before_timing_out_on_unchanged_passage()
+    {
+        await SetSyntheticPageContentAsync("""
+            <!DOCTYPE html>
+            <main aria-label="Story transcript">
+                <section aria-label="Current passage">Unchanged</section>
+                <ol aria-label="Story choices"><li><button>1. Continue</button></li></ol>
+            </main>
+            """);
+        await Page.EvaluateAsync("""
+            () => {
+                const button = document.querySelector('button');
+                button.addEventListener('pointerdown', () => {
+                    const until = performance.now() + 700;
+                    while (performance.now() < until) {}
+                });
+                button.addEventListener('click', () => button.dataset.clicked = 'true');
+            }
+            """);
+
+        var driver = Assert.IsType<BrowserPlayerDriver>(Driver);
+        await Assert.ThrowsAsync<TimeoutException>(() => driver.ChooseAsync("Continue", passageTimeout: 500));
         Assert.Equal("true", await Page.Locator("button").GetAttributeAsync("data-clicked"));
         Assert.Equal("Unchanged", (await Driver.ObserveAsync()).Passage);
     }
