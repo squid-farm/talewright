@@ -21,6 +21,8 @@ public sealed class StoryDefinition
     public required string Id { get; init; }
     public required string Title { get; init; }
     public required string Version { get; init; }
+    /// <summary>The selected Talemark language behavior: 1 preserves the v0 integer arithmetic.</summary>
+    public int TalemarkVersion { get; init; } = 1;
     public string? ContentFingerprint { get; init; }
     /// <summary>Identity of the replay semantics and registered extensions, independent of story content.</summary>
     public string? ReplayCompatibilityId { get; init; }

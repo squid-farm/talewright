@@ -102,7 +102,7 @@ public class StoryAnalysisTests
         Assert.Equal("ready", Slice(source, flag.Declaration!));
         var effects = Assert.Single(analysis.Expressions, context => context.Kind == ExpressionContextKind.Effects);
         Assert.StartsWith("set", Slice(source, effects.Range));
-        Assert.Equal(11, effects.Range.Start.Line - (scalar.StartsWith('"') ? 0 : 1));
+        Assert.Equal(12, effects.Range.Start.Line - (scalar.StartsWith('"') ? 0 : 1));
     }
 
     [Theory]
@@ -302,8 +302,8 @@ public class StoryAnalysisTests
         Assert.Equal(new SourceLocation("main.tale", 1, 7), scene.Declaration!.Start);
         Assert.Equal(new SourceLocation("main.tale", 1, 12), scene.Declaration.End);
         var player = Assert.Single(result.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Character);
-        Assert.Equal(new SourceLocation("story.talewright.yaml", 7, 3), player.Declaration!.Start);
-        Assert.Equal(new SourceLocation("story.talewright.yaml", 7, 9), player.Declaration.End);
+        Assert.Equal(new SourceLocation("story.talewright.yaml", 8, 3), player.Declaration!.Start);
+        Assert.Equal(new SourceLocation("story.talewright.yaml", 8, 9), player.Declaration.End);
         Assert.Contains(result.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Item && symbol.Name == "coin");
         Assert.Contains(result.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Faction && symbol.Name == "guild");
         Assert.Contains(result.Symbols, symbol => symbol.Kind == AuthoringSymbolKind.Stat && symbol.Name == "str");

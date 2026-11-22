@@ -6,6 +6,7 @@ the same way: choose whichever is easier to write.
 
 To keep a name or other recurring text the same everywhere, see
 [names and recurring text](authoring-recipes.md#change-a-character-or-ship-name-in-one-place).
+For arithmetic compatibility and migration, see [Talemark language versions](language-versions.md).
 
 ## A small story: two files
 
@@ -23,6 +24,7 @@ night-ferry/
 game:
   id: night-ferry
   title: The Night Ferry
+  talemark: 1
   start: dock
 
 characters:
@@ -78,6 +80,7 @@ night-ferry/
 game:
   id: night-ferry
   title: The Night Ferry
+  talemark: 1
   start: dock
 ```
 

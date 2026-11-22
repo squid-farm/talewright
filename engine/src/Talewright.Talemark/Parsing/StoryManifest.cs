@@ -16,6 +16,7 @@ internal sealed class StoryManifest
     public string Id { get; set; } = string.Empty;
     public string Title { get; set; } = string.Empty;
     public string Version { get; set; } = "0.0.0";
+    public int TalemarkVersion { get; set; } = 1;
     public string Start { get; set; } = string.Empty;
     public SourceLocation StartLocation { get; set; }
     public RandomnessMode Randomness { get; set; } = RandomnessMode.ChecksOnly;

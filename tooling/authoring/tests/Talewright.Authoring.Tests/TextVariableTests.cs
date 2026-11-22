@@ -11,6 +11,7 @@ public class TextVariableTests
           id: text-editor
           title: Text editor
           start: a
+          talemark: 1
         characters:
           player: { first-name: Ada }
         vars:

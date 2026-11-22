@@ -19,6 +19,7 @@ Both branches below read the same character name and ship name.
 game:
   id: harbour-names
   title: A Ship by Any Name
+  talemark: 1
   start: harbour
 
 characters:
@@ -74,6 +75,7 @@ stats. Declare **Nerve** and roll against it:
 game:
   id: rope-bridge
   title: The Rope Bridge
+  talemark: 1
   start: bridge
   ruleset:
     stats:
@@ -131,6 +133,7 @@ Use `category: skill` so it can link to an attribute, as shown in
 game:
   id: piloting-lesson
   title: Through the Asteroids
+  talemark: 1
   start: approach
   ruleset:
     base: rpg
@@ -186,6 +189,7 @@ For a wilderness adventure, let **Tracking** use a custom **Grit** attribute:
 game:
   id: tracking-lesson
   title: Follow the Trail
+  talemark: 1
   start: trail
   randomness: off
   ruleset:

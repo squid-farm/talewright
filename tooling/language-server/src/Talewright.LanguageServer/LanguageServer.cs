@@ -1371,7 +1371,12 @@ public sealed class LanguageServer
                 start = new { line = position.Line, character = position.Character },
                 end = new { line = endPosition.Line, character = endPosition.Character }
             },
-            severity = diagnostic.Severity == DiagnosticSeverity.Error ? 1 : 2,
+            severity = diagnostic.Severity switch
+            {
+                DiagnosticSeverity.Error => 1,
+                DiagnosticSeverity.Warning => 2,
+                _ => 3,
+            },
             code = diagnostic.Code,
             source = "talewright",
             message = diagnostic.Message
@@ -1387,7 +1392,12 @@ public sealed class LanguageServer
         return new
         {
             range = new { start, end },
-            severity = diagnostic.Severity == DiagnosticSeverity.Error ? 1 : 2,
+            severity = diagnostic.Severity switch
+            {
+                DiagnosticSeverity.Error => 1,
+                DiagnosticSeverity.Warning => 2,
+                _ => 3,
+            },
             code = diagnostic.Code,
             source = "talewright",
             message = diagnostic.Message

@@ -1,5 +1,6 @@
 using Talewright.Core.Events;
 using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Model;
 using Talewright.Core.Identity;
 using Talewright.Narrative.Rendering;
@@ -36,7 +37,9 @@ public partial class LostRelicTests
         }
         var result = StoryCompiler.Compile(source);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
-        Assert.Empty(result.Diagnostics);
+        var notice = Assert.Single(result.Diagnostics);
+        Assert.Equal("TW4008", notice.Code);
+        Assert.Equal(DiagnosticSeverity.Information, notice.Severity);
         return result.Story!;
     }
 
