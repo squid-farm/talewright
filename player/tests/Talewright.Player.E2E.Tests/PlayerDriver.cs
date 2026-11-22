@@ -59,7 +59,9 @@ public sealed class BrowserPlayerDriver(IPage page) : IPlayerDriver
 
     public Task OpenBundledAsync() => page.Locator(".tw-story-list").GetByRole(AriaRole.Button).First.ClickAsync();
     public Task ClickAsync(string name) => page.GetByRole(AriaRole.Button, new() { Name = name, Exact = true }).ClickAsync();
-    public async Task ChooseAsync(string label)
+    public Task ChooseAsync(string label) => ChooseAsync(label, passageTimeout: null);
+
+    public async Task ChooseAsync(string label, float? passageTimeout)
     {
         var previous = await page.GetByRole(AriaRole.Region, new() { Name = "Current passage" }).ElementHandleAsync()
             ?? throw new InvalidOperationException("Cannot choose without a current passage.");
@@ -81,7 +83,7 @@ public sealed class BrowserPlayerDriver(IPage page) : IPlayerDriver
                         (current !== previous.element || (previous.index !== null &&
                             current.getAttribute('data-tw-passage-index') !== previous.index));
                 }
-                """, new { element = previous, index = previousIndex });
+                """, new { element = previous, index = previousIndex }, new() { Timeout = passageTimeout });
         }
         finally
         {
