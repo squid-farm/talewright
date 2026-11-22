@@ -62,7 +62,7 @@ def verify_desktop_archive(path):
                 and any(name.endswith(".cmd") for name in story_launchers)):
             raise ValueError("Universal desktop archive is missing a story-named launcher for every platform")
         required = {"start.sh", "start.cmd", "start.command", "ENGINE-LICENSE.txt", "DEPLOYMENT.txt",
-                    "story/story.talewright.yaml", *story_launchers}
+                    "story.storypack", *story_launchers}
         for os_name, native, runtime in [("linux", "Photino.Native.so", "libcoreclr.so"),
                                         ("win", "Photino.Native.dll", "coreclr.dll"),
                                         ("osx", "Photino.Native.dylib", "libcoreclr.dylib")]:
@@ -409,9 +409,12 @@ Console.WriteLine("Original engine assemblies compiled and executed the package 
                                                 "map/vendor/THIRD-PARTY-NOTICES.md"))
                    for name in published.namelist()):
                 raise ValueError("Published game includes author-only tooling")
-            for name in ["chapter.fr.tale", "characters/player.talewright.yaml"]:
-                if published.read(desktop_prefix + "story/" + name) != (story / name).read_bytes():
-                    raise ValueError(f"Published desktop story lost source file {name}")
+            names = set(published.namelist())
+            if desktop_prefix + "story.storypack" not in names:
+                raise ValueError("Universal desktop archive is missing the shared story pack")
+            for name in ["story.talewright.yaml", "chapter.fr.tale", "characters/player.talewright.yaml"]:
+                if desktop_prefix + "story/" + name in names:
+                    raise ValueError(f"Universal desktop archive contains loose story file {name}")
             if any(name.startswith(tuple(f"{desktop_prefix}internal/{rid}/story/" for rid in
                        ["linux-x64", "linux-arm64", "win-x64", "win-arm64", "osx-x64", "osx-arm64"]))
                    for name in published.namelist()):
