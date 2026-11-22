@@ -486,9 +486,18 @@ internal sealed class ExpressionBinder
                     Fail(CompilerDiagnosticCodes.TypeMismatch, $"'{ExpressionVocabulary.Minus}' needs a number.", unary.OperatorSpan.Start);
                 }
 
-                return operand is NumberLiteral number
-                    ? new NumberLiteral(number.Value == int.MinValue ? int.MaxValue : -number.Value)
-                    : new UnaryExpr(UnaryOp.Negate, operand);
+                if (operand is NumberLiteral number)
+                {
+                    if (_symbols.World.TalemarkVersion == 1)
+                    {
+                        var integer = number.Value.ToInt32RoundedAwayFromZero();
+                        return new NumberLiteral(integer == int.MinValue ? int.MaxValue : -integer);
+                    }
+
+                    return new NumberLiteral(-number.Value);
+                }
+
+                return new UnaryExpr(UnaryOp.Negate, operand);
             default:
                 throw new InvalidOperationException($"Unsupported unary operator '{unary.Operator}'.");
         }
@@ -700,7 +709,7 @@ internal sealed class ExpressionBinder
             }
 
             Fail(CompilerDiagnosticCodes.TypeMismatch, effect.Kind == ReferenceNamespace.Variable
-                ? $"Variable '{targetName}' has a fixed integer type and needs a number, not {Describe(amount.Type)}."
+                ? $"Variable '{targetName}' has a fixed numeric type and needs a number, not {Describe(amount.Type)}."
                 : "Only numbers can be assigned to stats or faction standings.", effect.Amount.Span.Start);
         }
 

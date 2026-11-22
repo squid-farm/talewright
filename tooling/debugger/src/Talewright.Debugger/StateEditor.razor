@@ -190,6 +190,8 @@
 
     private RenderFragment NumberInput(SetupNumber? field, string label) => field is null
         ? @<span class="state-muted">—</span>
-        : @<input class="state-number" aria-label="@($"Edit {label}")" inputmode="numeric" value="@field.Value"
+        : @<input class="state-number" aria-label="@($"Edit {label}")"
+                  inputmode="@(field.Kind == SetupNumberKind.Variable && Model.Story?.TalemarkVersion == 2 ? "decimal" : "numeric")"
+                  value="@field.Value"
                   disabled="@Session.Current.IsEnded" @oninput="args => field.Edit(args.Value?.ToString() ?? string.Empty)" />;
 }

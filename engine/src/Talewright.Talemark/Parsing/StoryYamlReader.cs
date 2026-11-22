@@ -42,6 +42,8 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
             ManifestVocabulary.Start, ManifestVocabulary.Randomness, ManifestVocabulary.Seed,
             ManifestVocabulary.Undo, ManifestVocabulary.Autosave, ManifestVocabulary.CharacterSheet,
             ManifestVocabulary.Ruleset, ManifestVocabulary.Creation);
+        var talemarkVersion = ReadTalemarkVersion(game);
+        if (_analysis is not null) _analysis.TalemarkVersion = talemarkVersion;
 
         var ruleset = new StoryYamlRulesetReader(_yaml, _options, _statGuidance, _analysis)
             .Read(Get(game, ManifestVocabulary.Ruleset));
@@ -51,47 +53,20 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
         var characters = world.ReadCharacters(Get(root, ManifestVocabulary.Characters), root, ruleset, items);
         var flags = world.ReadFlags(Get(root, ManifestVocabulary.Flags));
         var declaredFlags = flags.Keys.ToArray();
-        var (numericVars, textVars) = world.ReadVars(Get(root, ManifestVocabulary.Vars));
+        var (numericVars, textVars) = world.ReadVars(Get(root, ManifestVocabulary.Vars), talemarkVersion);
 
         var manifest = new StoryManifest
         {
             World = new WorldDefinition(ruleset, characters, items.Values, factions, declaredFlags,
-                numericVars, textVars, flags),
+                numericVars, textVars, flags, talemarkVersion),
             CharacterLocations = world.CharacterLocations,
             Id = _yaml.RequiredIdentifier(game, ManifestVocabulary.Id) ?? string.Empty,
             Title = _yaml.RequiredScalar(game, ManifestVocabulary.Title) ?? string.Empty,
             Version = Scalar(Get(game, ManifestVocabulary.Version)) ?? "0.0.0",
             Start = _yaml.RequiredIdentifier(game, ManifestVocabulary.Start) ?? string.Empty,
             StartLocation = Get(game, ManifestVocabulary.Start) is { } startNode ? _yaml.At(startNode) : _yaml.At(game),
+            TalemarkVersion = talemarkVersion,
         };
-
-        if (Get(game, ManifestVocabulary.Talemark) is not { } talemark)
-        {
-            _yaml.Diagnostics.Information(
-                CompilerDiagnosticCodes.MissingTalemarkVersion,
-                "game.talemark is not set. Add 'talemark: 1' to preserve the current integer arithmetic. " +
-                "See the language-version migration guide: https://github.com/squid-farm/talewright/blob/main/docs/guide/language-versions.md",
-                _yaml.At(game));
-        }
-        else if (talemark is not YamlScalarNode { Style: YamlDotNet.Core.ScalarStyle.Plain } scalar ||
-                 !int.TryParse(scalar.Value, NumberStyles.None, CultureInfo.InvariantCulture, out var talemarkVersion))
-        {
-            _yaml.Diagnostics.Error(
-                CompilerDiagnosticCodes.InvalidConfigurationValue,
-                "game.talemark must be the integer 1; quoted or other values are invalid.",
-                _yaml.At(talemark));
-        }
-        else if (talemarkVersion != 1)
-        {
-            _yaml.Diagnostics.Error(
-                CompilerDiagnosticCodes.InvalidConfigurationValue,
-                $"Talemark version {talemarkVersion} is not supported by this release. Use 1 or omit game.talemark to use version 1.",
-                _yaml.At(talemark));
-        }
-        else
-        {
-            manifest.TalemarkVersion = 1;
-        }
 
         if (Get(game, ManifestVocabulary.Randomness) is { } randomness)
         {
@@ -128,6 +103,32 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
         ReadTriggers(Get(root, ManifestVocabulary.Triggers), manifest.Triggers);
         manifest.Creation = world.ReadCreation(Get(game, ManifestVocabulary.Creation), ruleset);
         return manifest;
+    }
+
+    private int ReadTalemarkVersion(YamlMappingNode game)
+    {
+        if (Get(game, ManifestVocabulary.Talemark) is not { } talemark)
+        {
+            _yaml.Diagnostics.Information(
+                CompilerDiagnosticCodes.MissingTalemarkVersion,
+                "game.talemark is not set. Add 'talemark: 1' to preserve the current integer arithmetic. " +
+                "See the language-version migration guide: https://github.com/squid-farm/talewright/blob/main/docs/guide/language-versions.md",
+                _yaml.At(game));
+            return 1;
+        }
+
+        if (talemark is YamlScalarNode { Style: YamlDotNet.Core.ScalarStyle.Plain } scalar &&
+            int.TryParse(scalar.Value, NumberStyles.None, CultureInfo.InvariantCulture, out var version) &&
+            version is 1 or 2)
+        {
+            return version;
+        }
+
+        _yaml.Diagnostics.Error(
+            CompilerDiagnosticCodes.InvalidConfigurationValue,
+            "game.talemark must be the plain integer 1 or 2; quoted or other values are invalid.",
+            _yaml.At(talemark));
+        return 1;
     }
 
     private (CharacterSheetVisibility Visibility, IReadOnlyList<RawStatVisibilityRule> StatRules)

@@ -97,6 +97,7 @@ internal static class ManifestVocabulary
     internal const string SymbolItem = ExpressionVocabulary.Item;
     internal const string SymbolFaction = ExpressionVocabulary.Faction;
     internal const string SymbolInteger = "integer";
+    internal const string SymbolNumber = "number";
     internal const string SymbolBoolean = "boolean";
     internal const string SymbolText = "text";
     internal const string SymbolUnresolved = "unresolved";
@@ -125,6 +126,6 @@ internal static class ManifestVocabulary
     internal static readonly ImmutableArray<string> AuthoringSymbolTypes =
     [
         SymbolScene, SymbolStory, SymbolCharacter, SymbolItem, SymbolFaction,
-        SymbolInteger, SymbolBoolean, SymbolText, SymbolUnresolved, StatCategoryAttribute, Ruleset,
+        SymbolInteger, SymbolNumber, SymbolBoolean, SymbolText, SymbolUnresolved, StatCategoryAttribute, Ruleset,
     ];
 }

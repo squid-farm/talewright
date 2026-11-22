@@ -14,7 +14,7 @@ namespace Talewright.Talemark.Tests;
 public class EditorManifestSchemaTests
 {
     [Fact]
-    public void Editor_schema_accepts_only_talemark_version_one()
+    public void Editor_schema_accepts_supported_talemark_versions()
     {
         var root = new DirectoryInfo(AppContext.BaseDirectory);
         while (root is not null && !File.Exists(Path.Combine(root.FullName, "Talewright.slnx"))) root = root.Parent;
@@ -24,7 +24,7 @@ public class EditorManifestSchemaTests
         var talemark = document.RootElement.GetProperty("properties").GetProperty("game")
             .GetProperty("properties").GetProperty("talemark");
         Assert.Equal("integer", talemark.GetProperty("type").GetString());
-        Assert.Equal([1], talemark.GetProperty("enum").EnumerateArray().Select(value => value.GetInt32()).ToArray());
+        Assert.Equal([1, 2], talemark.GetProperty("enum").EnumerateArray().Select(value => value.GetInt32()).ToArray());
         Assert.Equal(1, talemark.GetProperty("default").GetInt32());
     }
 
@@ -99,7 +99,6 @@ public class EditorManifestSchemaTests
 
     [Theory]
     [InlineData("0")]
-    [InlineData("2")]
     [InlineData("3")]
     [InlineData("\"1\"")]
     [InlineData("'1'")]

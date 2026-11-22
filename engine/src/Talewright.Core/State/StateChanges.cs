@@ -1,5 +1,6 @@
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
+using Talewright.Core;
 
 namespace Talewright.Core.State;
 
@@ -57,11 +58,21 @@ public static class StateChanges
     }
 
     public static IEnumerable<GameEvent> SetVariable(IGameStateView state, VarId variable, int value)
+        => SetVariable(state, variable, ExactNumber.FromInteger(value));
+
+    public static IEnumerable<GameEvent> SetVariable(IGameStateView state, VarId variable, ExactNumber value)
     {
-        var old = state.GetVariable(variable);
-        if (old != value)
+        var old = state.GetExactVariable(variable);
+        if (old == value) yield break;
+
+        if (state.World.TalemarkVersion == 1)
         {
-            yield return new VariableChanged(variable, old, value);
+            yield return new VariableChanged(variable, old.ToInt32RoundedAwayFromZero(),
+                value.ToInt32RoundedAwayFromZero());
+        }
+        else
+        {
+            yield return new ExactVariableChanged(variable, old.ToCanonicalString(), value.ToCanonicalString());
         }
     }
 

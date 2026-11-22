@@ -1,6 +1,7 @@
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Core.State;
+using Talewright.Core;
 using Talewright.Rules.Expressions;
 
 namespace Talewright.Rules.Effects;
@@ -49,19 +50,23 @@ public static class EffectExecutor
     {
         var state = log.State;
         var context = new EvaluationContext(state, predicates) { ResolveSkillCheck = resolveSkillCheck };
-        int Eval(Expr e) => ExpressionEvaluator.EvaluateNumber(e, context);
+        ExactNumber Eval(Expr e) => ExpressionEvaluator.EvaluateExactNumber(e, context);
+        int EvalWhole(Expr e) => Eval(e).ToInt32RoundedAwayFromZero();
 
         IEnumerable<GameEvent> events = effect switch
         {
-            ChangeStat e => StateChanges.SetStat(state, e.Character, e.Stat, Apply(state.GetBaseStat(e.Character, e.Stat), e.Op, Eval(e.Amount))),
-            ChangeStanding e => StateChanges.SetStanding(state, e.Faction, Apply(state.GetStanding(e.Faction), e.Op, Eval(e.Amount))),
-            ChangeVariable e => StateChanges.SetVariable(state, e.Variable, Apply(state.GetVariable(e.Variable), e.Op, Eval(e.Amount))),
+            ChangeStat e => StateChanges.SetStat(state, e.Character, e.Stat,
+                Apply(state.GetBaseStat(e.Character, e.Stat), e.Op, EvalWhole(e.Amount))),
+            ChangeStanding e => StateChanges.SetStanding(state, e.Faction,
+                Apply(state.GetStanding(e.Faction), e.Op, EvalWhole(e.Amount))),
+            ChangeVariable e => StateChanges.SetVariable(state, e.Variable,
+                Apply(state, state.GetExactVariable(e.Variable), e.Op, Eval(e.Amount))),
             SetTextVariable e when e.Value.Type == ExprType.Text =>
                 StateChanges.SetTextVariable(state, e.Variable, ExpressionEvaluator.Evaluate(e.Value, context).Text
                     ?? throw new InvalidOperationException("A text expression produced no text.")),
             SetFlag e => StateChanges.SetFlag(state, e.Flag, e.Value),
-            GiveItem e => StateChanges.GiveItem(e.Character, e.Item, Eval(e.Quantity)),
-            TakeItem e => StateChanges.TakeItem(state, e.Character, e.Item, Eval(e.Quantity)),
+            GiveItem e => StateChanges.GiveItem(e.Character, e.Item, EvalWhole(e.Quantity)),
+            TakeItem e => StateChanges.TakeItem(state, e.Character, e.Item, EvalWhole(e.Quantity)),
             _ => throw new NotSupportedException($"Unknown effect {effect.GetType().Name}."),
         };
         log.AppendRange(events.ToArray());
@@ -74,4 +79,19 @@ public static class EffectExecutor
         AssignOp.Subtract => Arithmetic.Saturate((long)current - amount),
         _ => throw new ArgumentOutOfRangeException(nameof(op), op, "Unknown assignment operation."),
     };
+
+    private static ExactNumber Apply(IGameStateView state, ExactNumber current, AssignOp op, ExactNumber amount)
+    {
+        if (state.World.TalemarkVersion == 1)
+            return ExactNumber.FromInteger(Apply(current.ToInt32RoundedAwayFromZero(), op,
+                amount.ToInt32RoundedAwayFromZero()));
+
+        return op switch
+        {
+            AssignOp.Set => amount,
+            AssignOp.Add => current + amount,
+            AssignOp.Subtract => current - amount,
+            _ => throw new ArgumentOutOfRangeException(nameof(op), op, "Unknown assignment operation."),
+        };
+    }
 }

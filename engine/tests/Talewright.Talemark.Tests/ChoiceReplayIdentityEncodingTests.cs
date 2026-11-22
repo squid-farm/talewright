@@ -1,4 +1,5 @@
 using System.Text;
+using Talewright.Core;
 using Talewright.Core.Identity;
 using Talewright.Core.Randomness;
 using Talewright.Core.Rulesets;
@@ -42,6 +43,8 @@ public sealed class ChoiceReplayIdentityEncodingTests
     public static TheoryData<string, Expr, string> Expressions => new()
     {
         { "number", new NumberLiteral(-4), """["number",-4]""" },
+        { "fractional number", new NumberLiteral(ExactNumber.FromFraction(1, 4)),
+            """["number","1/4"]""" },
         { "bool", new BoolLiteral(false), """["bool",false]""" },
         { "escaped text", new TextLiteral("Joel \"big\" <&>"), """["text","Joel \u0022big\u0022 \u003C\u0026\u003E"]""" },
         { "tier", new TierLiteral(new ReputationTier("trusted", "Trusted", 10)), """["tier","trusted"]""" },

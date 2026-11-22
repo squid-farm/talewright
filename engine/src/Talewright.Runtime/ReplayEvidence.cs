@@ -319,7 +319,14 @@ internal static class ReplayEvidence
         {
             writer.WriteStartArray();
             writer.WriteStringValue(variable.Value);
-            writer.WriteNumberValue(state.GetVariable(variable));
+            if (state.World.TalemarkVersion == 1)
+            {
+                writer.WriteNumberValue(state.GetVariable(variable));
+            }
+            else
+            {
+                writer.WriteStringValue(state.GetExactVariable(variable).ToCanonicalString());
+            }
             writer.WriteEndArray();
         }
         writer.WriteEndArray();
@@ -391,6 +398,7 @@ internal static class ReplayEvidence
         StandingChanged => "StandingChanged",
         FlagChanged => "FlagChanged",
         VariableChanged => "VariableChanged",
+        ExactVariableChanged => "ExactVariableChanged",
         TextVariableChanged => "TextVariableChanged",
         SceneEntered => "SceneEntered",
         ChoiceMade => "ChoiceMade",

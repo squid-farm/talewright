@@ -133,7 +133,7 @@ internal static class VariableUsageInference
     private static VariableUsageType DeclaredType(StoryAnalysis analysis, string name) =>
         analysis.Symbols.FirstOrDefault(symbol => symbol.Kind == AuthoringSymbolKind.Variable && symbol.Name == name)?.Type switch
         {
-            ManifestVocabulary.SymbolInteger => VariableUsageType.Number,
+            ManifestVocabulary.SymbolInteger or ManifestVocabulary.SymbolNumber => VariableUsageType.Number,
             ManifestVocabulary.SymbolText => VariableUsageType.Text,
             _ => VariableUsageType.Unknown
         };

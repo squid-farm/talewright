@@ -1,12 +1,21 @@
 using Talewright.Core.Rulesets;
 using Talewright.Core.State;
+using Talewright.Core;
 
 namespace Talewright.Rules.Expressions;
 
 /// <summary>Result of evaluating an <see cref="Expr"/>. Exactly one payload is meaningful, per <see cref="Type"/>.</summary>
 public readonly record struct Value(ExprType Type, int Number, bool Bool, string? Text, ReputationTier? Tier)
 {
+    public ExactNumber ExactNumber { get; init; } =
+        Talewright.Core.ExactNumber.FromInteger(Number);
+
     public static Value Of(int number) => new(ExprType.Number, number, false, null, null);
+    public static Value Of(ExactNumber number) =>
+        new(ExprType.Number, number.ToInt32RoundedAwayFromZero(), false, null, null)
+        {
+            ExactNumber = number,
+        };
     public static Value Of(bool value) => new(ExprType.Bool, 0, value, null, null);
     public static Value Of(string text) => new(ExprType.Text, 0, false, text, null);
     public static Value Of(ReputationTier tier) => new(ExprType.Tier, 0, false, null, tier);
@@ -14,7 +23,7 @@ public readonly record struct Value(ExprType Type, int Number, bool Bool, string
     /// <summary>Display form used by the template renderer.</summary>
     public override string ToString() => Type switch
     {
-        ExprType.Number => Number.ToString(System.Globalization.CultureInfo.InvariantCulture),
+        ExprType.Number => ExactNumber.ToCanonicalString(),
         ExprType.Bool => Bool ? "true" : "false",
         ExprType.Text => Text ?? string.Empty,
         ExprType.Tier => Tier?.Name ?? string.Empty,
@@ -38,6 +47,9 @@ public static class ExpressionEvaluator
     public static bool IsTrue(Expr expr, EvaluationContext context) => Evaluate(expr, context).Bool;
 
     public static int EvaluateNumber(Expr expr, EvaluationContext context) => Evaluate(expr, context).Number;
+
+    public static ExactNumber EvaluateExactNumber(Expr expr, EvaluationContext context) =>
+        Evaluate(expr, context).ExactNumber;
 
     public static Value Evaluate(Expr expr, EvaluationContext context)
     {
@@ -69,7 +81,9 @@ public static class ExpressionEvaluator
                     returnedValue = unary.Op switch
                     {
                         UnaryOp.Not => Value.Of(!returnedValue.Bool),
-                        UnaryOp.Negate => Value.Of(Arithmetic.Saturate(-(long)returnedValue.Number)),
+                        UnaryOp.Negate => context.State.World.TalemarkVersion == 1
+                            ? Value.Of(Arithmetic.Saturate(-(long)returnedValue.Number))
+                            : Value.Of(-returnedValue.ExactNumber),
                         _ => throw new NotSupportedException(unary.Op.ToString()),
                     };
                     Complete(frame, returnedValue);
@@ -149,7 +163,7 @@ public static class ExpressionEvaluator
                 ? Value.Of(tier)
                 : throw new InvalidOperationException("The ruleset defines no reputation tiers."),
             FlagRef e => Value.Of(state.GetFlag(e.Flag)),
-            VarRef e => Value.Of(state.GetVariable(e.Variable)),
+            VarRef e => Value.Of(state.GetExactVariable(e.Variable)),
             TextVarRef e => Value.Of(state.GetTextVariable(e.Variable)),
             NameRef e => Value.Of(Name(state, e)),
             PronounRef e => Value.Of(Pronoun(state, e)),
@@ -172,10 +186,10 @@ public static class ExpressionEvaluator
     {
         return e.Op switch
         {
-            BinaryOp.Add => Value.Of(Arithmetic.Saturate((long)left.Number + right.Number)),
-            BinaryOp.Subtract => Value.Of(Arithmetic.Saturate((long)left.Number - right.Number)),
-            BinaryOp.Multiply => Value.Of(Arithmetic.Saturate((long)left.Number * right.Number)),
-            BinaryOp.Divide => Value.Of(right.Number == 0 ? 0 : Arithmetic.Saturate((long)left.Number / right.Number)),
+            BinaryOp.Add => Numeric(left, right, context, BinaryOp.Add),
+            BinaryOp.Subtract => Numeric(left, right, context, BinaryOp.Subtract),
+            BinaryOp.Multiply => Numeric(left, right, context, BinaryOp.Multiply),
+            BinaryOp.Divide => Numeric(left, right, context, BinaryOp.Divide),
             BinaryOp.Equal => Value.Of(Compare(left, right, context) == 0),
             BinaryOp.NotEqual => Value.Of(Compare(left, right, context) != 0),
             BinaryOp.Less => Value.Of(Compare(left, right, context) < 0),
@@ -190,12 +204,38 @@ public static class ExpressionEvaluator
 
     private static int Compare(Value left, Value right, EvaluationContext context) => left.Type switch
     {
-        ExprType.Number => left.Number.CompareTo(right.Number),
+        ExprType.Number => left.ExactNumber.CompareTo(right.ExactNumber),
         ExprType.Bool => left.Bool.CompareTo(right.Bool),
         ExprType.Text => string.CompareOrdinal(left.Text, right.Text),
         ExprType.Tier => context.State.Ruleset.TierIndex(left.Tier!).CompareTo(context.State.Ruleset.TierIndex(right.Tier!)),
         _ => 0,
     };
+
+    private static Value Numeric(Value left, Value right, EvaluationContext context, BinaryOp op)
+    {
+        if (context.State.World.TalemarkVersion == 1)
+        {
+            var value = op switch
+            {
+                BinaryOp.Add => Arithmetic.Saturate((long)left.Number + right.Number),
+                BinaryOp.Subtract => Arithmetic.Saturate((long)left.Number - right.Number),
+                BinaryOp.Multiply => Arithmetic.Saturate((long)left.Number * right.Number),
+                BinaryOp.Divide => right.Number == 0 ? 0 :
+                    Arithmetic.Saturate((long)left.Number / right.Number),
+                _ => throw new NotSupportedException(op.ToString()),
+            };
+            return Value.Of(value);
+        }
+
+        return Value.Of(op switch
+        {
+            BinaryOp.Add => left.ExactNumber + right.ExactNumber,
+            BinaryOp.Subtract => left.ExactNumber - right.ExactNumber,
+            BinaryOp.Multiply => left.ExactNumber * right.ExactNumber,
+            BinaryOp.Divide => left.ExactNumber / right.ExactNumber,
+            _ => throw new NotSupportedException(op.ToString()),
+        });
+    }
 
     private static string Name(IGameStateView state, NameRef e)
     {

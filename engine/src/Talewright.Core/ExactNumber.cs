@@ -204,6 +204,8 @@ public readonly struct ExactNumber : IEquatable<ExactNumber>, IComparable<ExactN
 
     public override string ToString() => ToCanonicalString();
 
+    public string ToString(IFormatProvider? formatProvider) => ToCanonicalString();
+
     public int ToInt32RoundedAwayFromZero()
     {
         var quotient = BigInteger.DivRem(Numerator, Denominator, out var remainder);

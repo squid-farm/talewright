@@ -1,5 +1,6 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
+using Talewright.Core;
 using Talewright.Core.Identity;
 using Talewright.Core.State;
 using Talewright.Talemark.Model;
@@ -14,6 +15,8 @@ public sealed record AuthorSetup
 {
     public IReadOnlyDictionary<FlagId, bool> Flags { get; init; } = new Dictionary<FlagId, bool>();
     public IReadOnlyDictionary<VarId, int> Variables { get; init; } = new Dictionary<VarId, int>();
+    public IReadOnlyDictionary<VarId, ExactNumber> ExactVariables { get; init; } =
+        new Dictionary<VarId, ExactNumber>();
     public IReadOnlyDictionary<VarId, string> TextVariables { get; init; } = new Dictionary<VarId, string>();
     public IReadOnlyDictionary<FactionId, int> Standings { get; init; } = new Dictionary<FactionId, int>();
     public IReadOnlyList<AuthorStatValue> Stats { get; init; } = [];
@@ -25,6 +28,7 @@ public sealed record AuthorSetup
         ArgumentNullException.ThrowIfNull(story);
         ArgumentNullException.ThrowIfNull(Flags);
         ArgumentNullException.ThrowIfNull(Variables);
+        ArgumentNullException.ThrowIfNull(ExactVariables);
         ArgumentNullException.ThrowIfNull(TextVariables);
         ArgumentNullException.ThrowIfNull(Standings);
         ArgumentNullException.ThrowIfNull(Stats);
@@ -44,6 +48,17 @@ public sealed record AuthorSetup
                 throw new ArgumentException(world.TextVariables.ContainsKey(id)
                     ? $"Setup variable '{id}' requires text, not an integer."
                     : $"Unknown setup variable '{id}'.");
+            }
+        }
+        foreach (var id in ExactVariables.Keys)
+        {
+            if (!world.ExactVariables.ContainsKey(id) || Variables.ContainsKey(id))
+            {
+                throw new ArgumentException($"Setup exact variable '{id}' must name a declared numeric variable and not duplicate an integer setup value.");
+            }
+            if (story.TalemarkVersion == 1 && ExactVariables[id].Denominator != System.Numerics.BigInteger.One)
+            {
+                throw new ArgumentException($"Talemark version 1 variable '{id}' must be a whole number.");
             }
         }
         foreach (var (id, value) in TextVariables)
@@ -90,6 +105,7 @@ public sealed record AuthorSetup
         {
             Flags = new ReadOnlyDictionary<FlagId, bool>(Flags.ToDictionary()),
             Variables = new ReadOnlyDictionary<VarId, int>(Variables.ToDictionary()),
+            ExactVariables = new ReadOnlyDictionary<VarId, ExactNumber>(ExactVariables.ToDictionary()),
             TextVariables = new ReadOnlyDictionary<VarId, string>(TextVariables.ToDictionary()),
             Standings = new ReadOnlyDictionary<FactionId, int>(Standings.ToDictionary()),
             Stats = Array.AsReadOnly(Stats.OrderBy(v => v.Character.Value, StringComparer.Ordinal)
@@ -124,6 +140,10 @@ public sealed record AuthorSetup
         {
             log.AppendRange(StateChanges.SetVariable(log.State, id, value));
         }
+        foreach (var (id, value) in ExactVariables.OrderBy(v => v.Key.Value, StringComparer.Ordinal))
+        {
+            log.AppendRange(StateChanges.SetVariable(log.State, id, value));
+        }
         foreach (var (id, value) in TextVariables.OrderBy(v => v.Key.Value, StringComparer.Ordinal))
         {
             log.AppendRange(StateChanges.SetTextVariable(log.State, id, value));
@@ -139,6 +159,10 @@ public sealed record AuthorSetup
         foreach (var id in Variables.Keys)
         {
             yield return new($"var:{id}", state.GetVariable(id).ToString(CultureInfo.InvariantCulture));
+        }
+        foreach (var id in ExactVariables.Keys)
+        {
+            yield return new($"var:{id}", state.GetExactVariable(id).ToCanonicalString());
         }
         foreach (var id in TextVariables.Keys)
         {

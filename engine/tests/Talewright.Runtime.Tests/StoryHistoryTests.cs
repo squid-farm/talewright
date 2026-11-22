@@ -16,11 +16,13 @@ public class StoryHistoryTests
     private static readonly string Tale = BuildTale();
 
     private static ManifestFaker BuildManifest(bool declareVariables = false, bool? undo = null,
-        bool saveTrigger = false, bool multipleSavingTriggers = false, bool repeatedSavingTrigger = false)
+        bool saveTrigger = false, bool multipleSavingTriggers = false, bool repeatedSavingTrigger = false,
+        int talemarkVersion = 1)
     {
         var manifest = new ManifestFaker("history", "History", "a")
         {
             Version = "1",
+            Talemark = talemarkVersion,
             Undo = undo,
             BaseRuleset = "rpg",
         };
@@ -116,6 +118,18 @@ public class StoryHistoryTests
         Assert.Null(withoutDetails.Summary);
         Assert.Equal(entry.ProgressKey, withoutDetails.ProgressKey);
         Assert.Null(SaveFormat.Read(history.Save()).Summary);
+    }
+
+    [Fact]
+    public void Save_rejects_talemark_2_values_that_integer_checkpoints_cannot_preserve()
+    {
+        var yaml = BuildManifest(declareVariables: true, talemarkVersion: 2).Build()
+            .Replace("visits: 0", "visits: 0.25", StringComparison.Ordinal);
+        var history = new StoryHistory(Compile(yaml), 42);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => history.Save());
+
+        Assert.Contains("cannot preserve", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]

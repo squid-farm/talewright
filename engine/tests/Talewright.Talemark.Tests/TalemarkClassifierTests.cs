@@ -167,6 +167,45 @@ public sealed class TalemarkClassifierTests
     }
 
     [Fact]
+    public void Version_two_decimal_classifications_preserve_authored_ranges()
+    {
+        const string tale = "=== start\n@requires .25 == 0.25 and player:hp - 3 > 0\n";
+        var classifications = TalemarkClassifier.Classify("main.tale", tale,
+            talemarkVersion: 2);
+
+        Assert.Contains(classifications, classification =>
+            classification.Kind == TalemarkClassificationKind.Number && TextOf(tale, classification) == ".25");
+        Assert.Contains(classifications, classification =>
+            classification.Kind == TalemarkClassificationKind.Number && TextOf(tale, classification) == "0.25");
+        Assert.Contains(classifications, classification =>
+            classification.Kind == TalemarkClassificationKind.Operator && TextOf(tale, classification) == "-");
+    }
+
+    [Fact]
+    public void Story_analysis_uses_the_manifest_version_for_decimal_classifications()
+    {
+        const string tale = "=== start\n@requires .25 == 0.25\n-> END\n";
+        var analysis = StoryAnalyzer.Analyze(new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = """
+                game:
+                  id: decimal-classification
+                  title: Decimal Classification
+                  talemark: 2
+                  start: start
+                characters:
+                  player: { first-name: Ada }
+                """,
+            ["main.tale"] = tale,
+        }));
+
+        Assert.Equal(2, analysis.TalemarkVersion);
+        Assert.Equal([".25", "0.25"], analysis.Classifications
+            .Where(classification => classification.Kind == TalemarkClassificationKind.Number)
+            .Select(classification => TextOf(tale, classification)).ToArray());
+    }
+
+    [Fact]
     public void Formatting_ranges_match_the_inline_renderers_pairing_rules()
     {
         const string tale = """

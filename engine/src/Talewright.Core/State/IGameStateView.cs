@@ -1,6 +1,7 @@
 using Talewright.Core.Identity;
 using Talewright.Core.Rulesets;
 using Talewright.Core.World;
+using Talewright.Core;
 
 namespace Talewright.Core.State;
 
@@ -42,7 +43,13 @@ public interface IGameStateView
 
     bool GetFlag(FlagId flag);
 
+    /// <summary>Returns the legacy int32 projection of a numeric variable.</summary>
     int GetVariable(VarId variable);
+
+    /// <summary>Returns the exact numeric value. Version-2 state views must implement this member.</summary>
+    ExactNumber GetExactVariable(VarId variable) => World.TalemarkVersion == 1
+        ? ExactNumber.FromInteger(GetVariable(variable))
+        : throw new NotSupportedException("This state view does not expose exact numeric variables.");
 
     string GetTextVariable(VarId variable);
 

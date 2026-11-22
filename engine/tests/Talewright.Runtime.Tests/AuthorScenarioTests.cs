@@ -1,5 +1,6 @@
 using System.Text;
 using System.Text.Json.Nodes;
+using Talewright.Core;
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Narrative.Rendering;
@@ -190,6 +191,47 @@ public sealed class AuthorScenarioTests
         var restored = AuthorScenario.Import(story, bytes, Extensions).Session;
 
         Assert.Equal("First.\n\n\nGuide: Hello.\n\n\nGoodbye.", restored.Current.Document.ToPlainText());
+        Assert.Equal(bytes, AuthorScenario.Export(restored, Extensions));
+    }
+
+    [Fact]
+    public void Scenario_roundtrip_preserves_fractional_setup_and_edit_values()
+    {
+        var story = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = """
+                game:
+                  id: exact-scenario
+                  title: Exact Scenario
+                  talemark: 2
+                  start: start
+                characters:
+                  player: { first-name: Tester }
+                vars:
+                  amount: 0.25
+                """,
+            ["main.tale"] = "=== start\n* [Finish] -> END\n",
+        })).Story ?? throw new InvalidOperationException("Invalid exact scenario test fixture.");
+        var source = AuthorSession.Create(story, new("start"), captureDecisions: true, seed: 42,
+            setup: new()
+            {
+                ExactVariables = new Dictionary<VarId, ExactNumber>
+                {
+                    [new("amount")] = ExactNumber.FromFraction(1, 4),
+                },
+            });
+        source.Edit(new()
+        {
+            ExactVariables = new Dictionary<VarId, ExactNumber>
+            {
+                [new("amount")] = ExactNumber.FromFraction(1, 2),
+            },
+        });
+
+        var bytes = AuthorScenario.Export(source, Extensions);
+        var restored = AuthorScenario.Import(story, bytes, Extensions).Session;
+
+        Assert.Equal(ExactNumber.FromFraction(1, 2), restored.State.GetExactVariable(new("amount")));
         Assert.Equal(bytes, AuthorScenario.Export(restored, Extensions));
     }
 

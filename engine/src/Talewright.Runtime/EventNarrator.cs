@@ -14,7 +14,8 @@ public static class EventNarrator
 {
     // Unknown event types take the normal path; these types must remain silent in DescribeCore.
     internal static bool MayDescribe(GameEvent gameEvent) =>
-        gameEvent is not (ChoiceMade or SceneEntered or VariableChanged or TextVariableChanged or FlagChanged);
+        gameEvent is not (ChoiceMade or SceneEntered or VariableChanged or ExactVariableChanged
+            or TextVariableChanged or FlagChanged);
 
     /// <summary>Describes <paramref name="events"/>; <paramref name="state"/> supplies display names.</summary>
     public static IEnumerable<RenderedNote> Describe(IEnumerable<GameEvent> events, IGameStateView state) =>

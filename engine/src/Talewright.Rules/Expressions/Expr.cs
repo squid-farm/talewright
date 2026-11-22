@@ -1,6 +1,7 @@
 using Talewright.Core.Identity;
 using Talewright.Core.Randomness;
 using Talewright.Core.Rulesets;
+using Talewright.Core;
 
 namespace Talewright.Rules.Expressions;
 
@@ -23,8 +24,10 @@ public abstract record Expr
     public abstract ExprType Type { get; }
 }
 
-public sealed record NumberLiteral(int Value) : Expr
+public sealed record NumberLiteral(ExactNumber Value) : Expr
 {
+    public NumberLiteral(int value) : this(ExactNumber.FromInteger(value)) { }
+
     public override ExprType Type => ExprType.Number;
 }
 

@@ -2,6 +2,7 @@ using System.Reflection;
 using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
+using Talewright.Core;
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Narrative.Rendering;
@@ -18,7 +19,7 @@ public static class AuthorScenario
     // A damaged-file guard, about two million commands; not an author timeline limit.
     public const int MaxBytes = 64 * 1024 * 1024;
     public const int MaxIdentifierLength = 512;
-    private const int FormatVersion = 2;
+    private const int FormatVersion = 3;
     public static string EngineCompatibility => "author-replay-v3/"
         + typeof(AuthorSession).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()!.InformationalVersion.Split('+')[0];
 
@@ -84,11 +85,11 @@ public static class AuthorScenario
             commands, commands.Length, captureDecisions);
         var current = data.Cursor == commands.Length ? end
             : AuthorSession.RestoreTimeline(story, new(data.Target), setup, data.Seed, character, commands, data.Cursor, captureDecisions);
-        if (Digest(current) != data.CurrentDigest)
+        if (Digest(current, data.FormatVersion >= 3) != data.CurrentDigest)
         {
             differences.Add("Current state/event history, dice or presentation diverged.");
         }
-        if (Digest(end) != data.EndDigest)
+        if (Digest(end, data.FormatVersion >= 3) != data.EndDigest)
         {
             differences.Add("Full timeline including redo diverged.");
         }
@@ -154,7 +155,7 @@ public static class AuthorScenario
 
     private static void ValidateShape(ScenarioData data)
     {
-        if (data.FormatVersion != FormatVersion || !data.Synthetic)
+        if (data.FormatVersion is not (2 or FormatVersion) || !data.Synthetic)
         {
             throw new InvalidDataException("Unsupported author scenario format or missing synthetic marker.");
         }
@@ -209,7 +210,7 @@ public static class AuthorScenario
         }
     }
 
-    private static string Digest(AuthorSession session)
+    private static string Digest(AuthorSession session, bool includeExactVariables = true)
     {
         using var hash = SHA256.Create();
         using var stream = new CryptoStream(Stream.Null, hash, CryptoStreamMode.Write);
@@ -228,7 +229,8 @@ public static class AuthorScenario
             }
             var state = session.Inspect();
             JsonSerializer.Serialize(writer, new ScenarioState(state.Characters, state.Factions, state.Flags,
-                state.Variables, state.TextVariables, state.Scenes, state.Triggers), ScenarioJsonContext.Default.ScenarioState);
+                state.Variables, state.TextVariables, state.Scenes, state.Triggers,
+                includeExactVariables ? state.ExactVariables : null), ScenarioJsonContext.Default.ScenarioState);
             writer.WriteStartArray();
             foreach (var block in session.Current.Document.Blocks)
             {
@@ -316,7 +318,9 @@ internal sealed class ScenarioOutput(int maxBytes) : MemoryStream
 internal sealed record ScenarioState(IReadOnlyList<AuthorCharacterInspection> Characters,
     IReadOnlyList<AuthorFactionInspection> Factions, IReadOnlyList<KeyValuePair<FlagId, bool>> Flags,
     IReadOnlyList<KeyValuePair<VarId, int>> Variables, IReadOnlyList<KeyValuePair<VarId, string>> TextVariables,
-    IReadOnlyList<AuthorSceneInspection> Scenes, IReadOnlyList<AuthorTriggerInspection> Triggers);
+    IReadOnlyList<AuthorSceneInspection> Scenes, IReadOnlyList<AuthorTriggerInspection> Triggers,
+    [property: JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    IReadOnlyList<KeyValuePair<VarId, ExactNumber>>? ExactVariables);
 
 internal sealed record ScenarioIdentity(string StoryId, string StoryVersion, string Fingerprint, string Extensions, string Engine);
 
@@ -342,6 +346,7 @@ internal sealed class ScenarioValues
 {
     public required Dictionary<string, bool> Flags { get; init; }
     public required Dictionary<string, int> Variables { get; init; }
+    public Dictionary<string, string>? ExactVariables { get; init; }
     public required Dictionary<string, string> TextVariables { get; init; }
     public required Dictionary<string, int> Standings { get; init; }
     public required ScenarioStat[] Stats { get; init; }
@@ -351,6 +356,9 @@ internal sealed class ScenarioValues
     {
         Flags = setup.Flags.ToDictionary(pair => pair.Key.Value, pair => pair.Value),
         Variables = setup.Variables.ToDictionary(pair => pair.Key.Value, pair => pair.Value),
+        ExactVariables = setup.ExactVariables.Count == 0
+            ? null
+            : setup.ExactVariables.ToDictionary(pair => pair.Key.Value, pair => pair.Value.ToCanonicalString()),
         TextVariables = setup.TextVariables.ToDictionary(pair => pair.Key.Value, pair => pair.Value),
         Standings = setup.Standings.ToDictionary(pair => pair.Key.Value, pair => pair.Value),
         Stats = setup.Stats.Select(value => new ScenarioStat(value.Character.Value, value.Stat.Value, value.Value)).ToArray(),
@@ -366,6 +374,18 @@ internal sealed class ScenarioValues
         foreach (var id in Flags.Keys.Concat(Variables.Keys).Concat(TextVariables.Keys).Concat(Standings.Keys))
         {
             AuthorScenario.Identifier(id);
+        }
+        if (ExactVariables is not null)
+        {
+            foreach (var (id, value) in ExactVariables)
+            {
+                AuthorScenario.Identifier(id);
+                if (value is null || Variables.ContainsKey(id) || TextVariables.ContainsKey(id) ||
+                    !ExactNumber.TryParse(value, out _))
+                {
+                    throw new InvalidDataException("Scenario exact variables must be valid numbers with unique numeric variable IDs.");
+                }
+            }
         }
         if (TextVariables.Values.Any(value => value is null) || TextVariables.Keys.Any(Variables.ContainsKey))
         {
@@ -395,6 +415,8 @@ internal sealed class ScenarioValues
     {
         Flags = Flags.ToDictionary(pair => new FlagId(pair.Key), pair => pair.Value),
         Variables = Variables.ToDictionary(pair => new VarId(pair.Key), pair => pair.Value),
+        ExactVariables = ExactVariables?.ToDictionary(pair => new VarId(pair.Key),
+            pair => ExactNumber.Parse(pair.Value)) ?? new Dictionary<VarId, ExactNumber>(),
         TextVariables = TextVariables.ToDictionary(pair => new VarId(pair.Key), pair => pair.Value),
         Standings = Standings.ToDictionary(pair => new FactionId(pair.Key), pair => pair.Value),
         Stats = Stats.Select(value => new AuthorStatValue(new(value.Character), new(value.Stat), value.Value)).ToArray(),
@@ -458,6 +480,7 @@ internal sealed class ScenarioCommand
 [JsonSerializable(typeof(StandingChanged))]
 [JsonSerializable(typeof(FlagChanged))]
 [JsonSerializable(typeof(VariableChanged))]
+[JsonSerializable(typeof(ExactVariableChanged))]
 [JsonSerializable(typeof(TextVariableChanged))]
 [JsonSerializable(typeof(SceneEntered))]
 [JsonSerializable(typeof(ChoiceMade))]

@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
+using Talewright.Core;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
@@ -331,7 +332,7 @@ internal sealed class ExpressionSyntaxParser
             var op = Next();
             if (TryReadMinimumMagnitude())
             {
-                return new NumberExpressionNode(int.MinValue,
+                return new NumberExpressionNode(ExactNumber.FromInteger(int.MinValue),
                     new(op.Offset, TokenAt(_position - 1).Offset + TokenAt(_position - 1).Length - op.Offset));
             }
 
@@ -358,7 +359,7 @@ internal sealed class ExpressionSyntaxParser
             position++;
         }
 
-        if (TokenAt(position) is not { Kind: TokenKind.Number } number ||
+        if (_tokens.TalemarkVersion != 1 || TokenAt(position) is not { Kind: TokenKind.Number } number ||
             !long.TryParse(number.Text, out var magnitude) || magnitude != -(long)int.MinValue)
         {
             return false;
@@ -384,9 +385,18 @@ internal sealed class ExpressionSyntaxParser
         {
             case TokenKind.Number:
                 Next();
-                return int.TryParse(token.Text, out var number)
-                    ? new NumberExpressionNode(number, Span(token))
-                    : Fail<ExpressionNode>(CompilerDiagnosticCodes.NumberTooLarge, $"Number '{token.Text}' is too large.", token.Offset);
+                if (_tokens.TalemarkVersion == 1)
+                {
+                    return int.TryParse(token.Text, out var integer)
+                        ? new NumberExpressionNode(ExactNumber.FromInteger(integer), Span(token))
+                        : Fail<ExpressionNode>(CompilerDiagnosticCodes.NumberTooLarge,
+                            $"Number '{token.Text}' is too large.", token.Offset);
+                }
+
+                return ExactNumber.TryParse(token.Text.ToString(), out var exact)
+                    ? new NumberExpressionNode(exact, Span(token))
+                    : Fail<ExpressionNode>(CompilerDiagnosticCodes.InvalidExpression,
+                        $"Invalid decimal number '{token.Text}'.", token.Offset, token.Length);
             case TokenKind.String:
                 Next();
                 return new TextExpressionNode(token.Value, Span(token));

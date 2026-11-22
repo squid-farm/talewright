@@ -63,7 +63,7 @@ internal static class AuthorReloadComparison
         Require(oldWorld.Flags.All(id => !newWorld.Flags.Contains(id)
                 || oldWorld.InitialFlags[id] == newWorld.InitialFlags[id]),
             "an existing flag changed its initial value");
-        Require(oldWorld.Variables.All(pair => !newWorld.Variables.TryGetValue(pair.Key, out var value)
+        Require(oldWorld.ExactVariables.All(pair => !newWorld.ExactVariables.TryGetValue(pair.Key, out var value)
                 || value == pair.Value)
             && oldWorld.TextVariables.All(pair => !newWorld.TextVariables.TryGetValue(pair.Key, out var value)
                 || value == pair.Value),
@@ -100,7 +100,7 @@ internal static class AuthorReloadComparison
         Require(oldWorld.Flags.All(id => !newWorld.Flags.Contains(id)
                 || oldWorld.InitialFlags[id] == newWorld.InitialFlags[id]),
             "an active flag changed its initial value");
-        Require(oldWorld.Variables.All(pair => !newWorld.Variables.TryGetValue(pair.Key, out var value)
+        Require(oldWorld.ExactVariables.All(pair => !newWorld.ExactVariables.TryGetValue(pair.Key, out var value)
                 || value == pair.Value)
             && oldWorld.TextVariables.All(pair => !newWorld.TextVariables.TryGetValue(pair.Key, out var value)
                 || value == pair.Value),
@@ -183,7 +183,8 @@ internal static class AuthorReloadComparison
                 && ReferenceEquals(left, right);
         }
         var type = left.GetType();
-        if (type.IsPrimitive || type.IsEnum || left is string or decimal)
+        if (type.IsValueType && !(type.IsGenericType && type.GetGenericTypeDefinition() == typeof(KeyValuePair<,>))
+            || left is string)
         {
             return left.Equals(right);
         }

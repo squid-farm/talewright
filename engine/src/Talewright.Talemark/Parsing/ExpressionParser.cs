@@ -1,5 +1,6 @@
 using Talewright.Core.Identity;
 using Talewright.Core.Randomness;
+using Talewright.Core;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
@@ -30,11 +31,33 @@ internal static class ExpressionParser
 
     internal static void CollectDeclarations(string text, ISet<FlagId> flags, IDictionary<VarId, int> variables,
         Action<string, bool, int>? declaration = null,
-        Action<VariableDeclaration>? typedDeclaration = null, SourceLocation location = default) =>
-        CollectDeclarations(Lexer.Tokenize(text), text.Length, flags, variables, declaration, typedDeclaration, location);
+        Action<VariableDeclaration>? typedDeclaration = null, SourceLocation location = default)
+    {
+        var exact = variables.ToDictionary(pair => pair.Key, pair => ExactNumber.FromInteger(pair.Value));
+        CollectDeclarations(Lexer.Tokenize(text), text.Length, flags, exact, declaration, typedDeclaration, location);
+        foreach (var (id, value) in exact)
+            variables.TryAdd(id, value.ToInt32RoundedAwayFromZero());
+    }
+
+    internal static void CollectDeclarations(string text, ISet<FlagId> flags,
+        IDictionary<VarId, ExactNumber> variables, Action<string, bool, int>? declaration = null,
+        Action<VariableDeclaration>? typedDeclaration = null, SourceLocation location = default,
+        int talemarkVersion = 1) =>
+        CollectDeclarations(Lexer.Tokenize(text, talemarkVersion), text.Length, flags, variables, declaration,
+            typedDeclaration, location);
 
     internal static void CollectDeclarations(TokenBuffer tokens, int expressionLength, ISet<FlagId> flags,
         IDictionary<VarId, int> variables, Action<string, bool, int>? declaration = null,
+        Action<VariableDeclaration>? typedDeclaration = null, SourceLocation location = default)
+    {
+        var exact = variables.ToDictionary(pair => pair.Key, pair => ExactNumber.FromInteger(pair.Value));
+        CollectDeclarations(tokens, expressionLength, flags, exact, declaration, typedDeclaration, location);
+        foreach (var (id, value) in exact)
+            variables.TryAdd(id, value.ToInt32RoundedAwayFromZero());
+    }
+
+    internal static void CollectDeclarations(TokenBuffer tokens, int expressionLength, ISet<FlagId> flags,
+        IDictionary<VarId, ExactNumber> variables, Action<string, bool, int>? declaration = null,
         Action<VariableDeclaration>? typedDeclaration = null, SourceLocation location = default)
     {
         for (var start = 0; start < tokens.Count - 1;)
@@ -64,7 +87,7 @@ internal static class ExpressionParser
                 .. var amount])
             {
                 var name = variable.Value;
-                variables.TryAdd(new VarId(name), 0);
+                variables.TryAdd(new VarId(name), ExactNumber.Zero);
                 declaration?.Invoke(name, false, variable.Offset);
                 if (amount.Length == 0)
                 {
@@ -91,7 +114,7 @@ internal static class ExpressionParser
         Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null, SceneId? sceneOwner = null)
     {
         var tokens = symbols.Analysis?.Expression(ExpressionContextKind.Condition, text,
-            authoringLocation ?? location, locate) ?? Lexer.Tokenize(text);
+            authoringLocation ?? location, locate) ?? Lexer.Tokenize(text, symbols.World.TalemarkVersion);
         var syntax = ExpressionSyntaxParser.ParseExpression(tokens, text.Length, locate ?? location.Offset, diagnostics,
             highlightUnexpectedTokens: highlightUnexpectedTokens, allowSkillChecks: allowSkillChecks);
         return ExpressionBinder.Bind(syntax, symbols, diagnostics, locate ?? location.Offset, ExprType.Bool,
@@ -103,7 +126,7 @@ internal static class ExpressionParser
         DiagnosticBag diagnostics, SceneId? sceneOwner = null)
     {
         var tokens = symbols.Analysis?.Expression(ExpressionContextKind.Number, text, location)
-            ?? Lexer.Tokenize(text);
+            ?? Lexer.Tokenize(text, symbols.World.TalemarkVersion);
         var syntax = ExpressionSyntaxParser.ParseExpression(tokens, text.Length, location.Offset, diagnostics);
         return ExpressionBinder.Bind(syntax, symbols, diagnostics, location.Offset, ExprType.Number,
             sceneOwner: sceneOwner);
@@ -115,7 +138,7 @@ internal static class ExpressionParser
         SceneId? sceneOwner = null)
     {
         var tokens = symbols.Analysis?.Expression(ExpressionContextKind.Substitution, text, location, locate)
-            ?? Lexer.Tokenize(text);
+            ?? Lexer.Tokenize(text, symbols.World.TalemarkVersion);
         var syntax = ExpressionSyntaxParser.ParseSubstitution(tokens, text.Length, locate ?? location.Offset,
             diagnostics);
         return ExpressionBinder.Bind(syntax, symbols, diagnostics, locate ?? location.Offset, allowFormattedOutput,
@@ -128,7 +151,7 @@ internal static class ExpressionParser
         SceneId? sceneOwner = null)
     {
         var tokens = symbols.Analysis?.Expression(ExpressionContextKind.Effects, text, location)
-            ?? Lexer.Tokenize(text);
+            ?? Lexer.Tokenize(text, symbols.World.TalemarkVersion);
         var syntax = ExpressionSyntaxParser.ParseEffects(tokens, text.Length, location.Offset, diagnostics,
             allowSkillChecks: createSkillCheckIdentity is not null);
         return ExpressionBinder.Bind(syntax, symbols, diagnostics, location.Offset, createSkillCheckIdentity, sceneOwner);

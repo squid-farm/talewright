@@ -1,5 +1,6 @@
 using Talewright.Core.Identity;
 using Talewright.Core.Rulesets;
+using Talewright.Core;
 
 namespace Talewright.Core.World;
 
@@ -49,17 +50,38 @@ public sealed class WorldDefinition
         IEnumerable<FlagId> flags,
         IReadOnlyDictionary<VarId, int> variables,
         IReadOnlyDictionary<VarId, string>? textVariables = null,
-        IReadOnlyDictionary<FlagId, bool>? initialFlags = null)
+        IReadOnlyDictionary<FlagId, bool>? initialFlags = null,
+        int talemarkVersion = 1)
+        : this(ruleset, characters, items, factions, flags,
+            variables.ToDictionary(pair => pair.Key, pair => ExactNumber.FromInteger(pair.Value)),
+            textVariables, initialFlags, talemarkVersion)
     {
+    }
+
+    public WorldDefinition(
+        Ruleset ruleset,
+        IEnumerable<CharacterDefinition> characters,
+        IEnumerable<ItemDefinition> items,
+        IEnumerable<FactionDefinition> factions,
+        IEnumerable<FlagId> flags,
+        IReadOnlyDictionary<VarId, ExactNumber> variables,
+        IReadOnlyDictionary<VarId, string>? textVariables = null,
+        IReadOnlyDictionary<FlagId, bool>? initialFlags = null,
+        int talemarkVersion = 1)
+    {
+        if (talemarkVersion is not (1 or 2))
+            throw new ArgumentOutOfRangeException(nameof(talemarkVersion), talemarkVersion, "Unsupported Talemark version.");
+        TalemarkVersion = talemarkVersion;
         Ruleset = ruleset;
         Characters = characters.ToDictionary(c => c.Id);
         Items = items.ToDictionary(i => i.Id);
         Factions = factions.ToDictionary(f => f.Id);
         Flags = flags.ToHashSet();
         InitialFlags = Flags.ToDictionary(id => id, id => initialFlags?.GetValueOrDefault(id) ?? false);
-        Variables = variables;
+        ExactVariables = variables;
+        Variables = variables.ToDictionary(pair => pair.Key, pair => pair.Value.ToInt32RoundedAwayFromZero());
         TextVariables = textVariables ?? new Dictionary<VarId, string>();
-        if (Variables.Keys.Any(TextVariables.ContainsKey))
+        if (ExactVariables.Keys.Any(TextVariables.ContainsKey))
         {
             throw new ArgumentException("A variable cannot be both integer and text.", nameof(textVariables));
         }
@@ -70,6 +92,7 @@ public sealed class WorldDefinition
     }
 
     public Ruleset Ruleset { get; }
+    public int TalemarkVersion { get; }
     public IReadOnlyDictionary<EntityId, CharacterDefinition> Characters { get; }
     public IReadOnlyDictionary<ItemId, ItemDefinition> Items { get; }
     public IReadOnlyDictionary<FactionId, FactionDefinition> Factions { get; }
@@ -78,8 +101,11 @@ public sealed class WorldDefinition
     /// <summary>Declared flags and their values before any events are applied.</summary>
     public IReadOnlyDictionary<FlagId, bool> InitialFlags { get; }
 
-    /// <summary>Declared variables with their initial values.</summary>
+    /// <summary>Declared variables with their legacy int32-projected initial values.</summary>
     public IReadOnlyDictionary<VarId, int> Variables { get; }
+
+    /// <summary>Declared numeric variables with their authoritative exact initial values.</summary>
+    public IReadOnlyDictionary<VarId, ExactNumber> ExactVariables { get; }
 
     public IReadOnlyDictionary<VarId, string> TextVariables { get; }
 }

@@ -1,4 +1,5 @@
 using Talewright.Core.Events;
+using Talewright.Core;
 using Talewright.Core.Identity;
 using Talewright.Core.Rulesets;
 using Talewright.Core.World;
@@ -17,7 +18,7 @@ public sealed class GameState : IGameStateView
     private readonly Dictionary<EntityId, CharacterState> _characters = [];
     private readonly Dictionary<FactionId, int> _standings = [];
     private readonly HashSet<FlagId> _flags = [];
-    private readonly Dictionary<VarId, int> _variables = [];
+    private readonly Dictionary<VarId, ExactNumber> _variables = [];
     private readonly Dictionary<VarId, string> _textVariables = [];
     private readonly Dictionary<SceneId, int> _visits = [];
     private readonly HashSet<string> _firedTriggers = [];
@@ -65,7 +66,7 @@ public sealed class GameState : IGameStateView
             if (value) state._flags.Add(id);
         }
 
-        foreach (var (id, value) in world.Variables)
+        foreach (var (id, value) in world.ExactVariables)
         {
             state._variables[id] = value;
         }
@@ -163,7 +164,14 @@ public sealed class GameState : IGameStateView
                 {
                     throw new InvalidOperationException($"Variable '{e.Variable}' holds text, not an integer.");
                 }
-                _variables[e.Variable] = e.NewValue;
+                _variables[e.Variable] = ExactNumber.FromInteger(e.NewValue);
+                break;
+            case ExactVariableChanged e:
+                if (World.TextVariables.ContainsKey(e.Variable))
+                {
+                    throw new InvalidOperationException($"Variable '{e.Variable}' holds text, not a number.");
+                }
+                _variables[e.Variable] = ExactNumber.Parse(e.NewValue);
                 break;
             case TextVariableChanged e:
                 if (!World.TextVariables.ContainsKey(e.Variable) || e.NewValue is null)
@@ -230,9 +238,11 @@ public sealed class GameState : IGameStateView
 
     public bool GetFlag(FlagId flag) => _flags.Contains(flag);
 
-    public int GetVariable(VarId variable) => World.TextVariables.ContainsKey(variable)
+    public int GetVariable(VarId variable) => GetExactVariable(variable).ToInt32RoundedAwayFromZero();
+
+    public ExactNumber GetExactVariable(VarId variable) => World.TextVariables.ContainsKey(variable)
         ? throw new InvalidOperationException($"Variable '{variable}' holds text, not an integer.")
-        : _variables.GetValueOrDefault(variable);
+        : _variables.GetValueOrDefault(variable, ExactNumber.Zero);
 
     public string GetTextVariable(VarId variable) => _textVariables.TryGetValue(variable, out var value)
         ? value
