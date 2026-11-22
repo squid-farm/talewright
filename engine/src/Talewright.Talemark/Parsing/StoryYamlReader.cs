@@ -283,7 +283,7 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
                 if (divertNode is not null)
                 {
                     _analysis?.ReferenceNode(divertNode, AuthoringSymbolKind.Scene,
-                        file: _yaml.At(divertNode).File);
+                        file: _yaml.At(divertNode).File, keywords: [SceneVocabulary.End]);
                     var target = _yaml.RequiredScalar(action, ManifestVocabulary.Divert);
                     if (target is not null)
                     {

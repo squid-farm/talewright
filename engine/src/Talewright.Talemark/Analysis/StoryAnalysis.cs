@@ -935,7 +935,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             .ToArray());
 
     internal void ReferenceNode(YamlNode node, AuthoringSymbolKind kind, IReadOnlyList<AuthoringSymbol>? candidates = null,
-        string file = StorySource.ManifestFileName)
+        string file = StorySource.ManifestFileName, IReadOnlyList<string>? keywords = null)
     {
         if (node is YamlSequenceNode sequence)
         {
@@ -955,7 +955,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                         if (opened && (char.IsWhiteSpace(character) || character == ']'))
                         {
                             var point = new SourceLocation(file, line, column);
-                            AddSite(new("", new(point, point), [kind], [], [point], Candidates: candidates));
+                            AddSite(new("", new(point, point), [kind], keywords ?? [], [point], Candidates: candidates));
                         }
                         if (character == ']') return;
                         if (!opened && character == '[') opened = true;
@@ -963,7 +963,8 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                     }
                 }
             }
-            foreach (var child in sequence.Children.OfType<YamlScalarNode>()) ReferenceNode(child, kind, candidates, file);
+            foreach (var child in sequence.Children.OfType<YamlScalarNode>())
+                ReferenceNode(child, kind, candidates, file, keywords);
             return;
         }
         if (node is not YamlScalarNode scalar) return;
@@ -973,10 +974,10 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         var text = scalar.Value ?? "";
         if (text.Length == 0)
         {
-            ReferenceCore("", mapping.Range(0, 0).Start, kind, [], candidates);
+            ReferenceCore("", mapping.Range(0, 0).Start, kind, keywords ?? [], candidates);
             return;
         }
-        AddSite(new(text, mapping.Range(0, text.Length), [kind], [],
+        AddSite(new(text, mapping.Range(0, text.Length), [kind], keywords ?? [],
             Enumerable.Range(0, text.Length + 1).Select(index => mapping.Range(index, 0).Start).ToArray(),
             Candidates: candidates));
     }

@@ -647,6 +647,8 @@ public sealed class StoryCompletionTests
     [InlineData("triggers:\n  - id: redirect\n    when: true\n    do:\n      divert: \"sec|ond\"", "second")]
     [InlineData("triggers:\n  - id: redirect\n    when: true\n    do:\n      divert: \"\\u0073ec|ond\"", "second")]
     [InlineData("triggers:\n  - id: redirect\n    when: true\n    do:\n      divert: |", "second")]
+    [InlineData("triggers:\n  - id: redirect\n    when: true\n    do:\n      divert: |", "END")]
+    [InlineData("triggers:\n  - id: redirect\n    when: true\n    do:\n      divert: E|", "END")]
     public void Completes_manifest_story_values_and_expressions(string fragment, string expected)
     {
         // Replace duplicate top-level declarations so YAML remains parseable.
