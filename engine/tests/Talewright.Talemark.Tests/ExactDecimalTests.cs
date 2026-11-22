@@ -60,6 +60,21 @@ public class ExactDecimalTests
         Assert.Equal(ExactNumber.FromFraction(-1, 4), log.State.GetExactVariable(new VarId("amount")));
     }
 
+    [Fact]
+    public void Version_two_accepts_exponent_notation_for_manifest_initial_values()
+    {
+        var result = Compile(2, """
+            vars: { hundred: 1e2, tiny: 1.25e-2 }
+            """, """
+            === a
+            -> END
+            """);
+
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        Assert.Equal(ExactNumber.FromInteger(100), result.Story!.World.ExactVariables[new VarId("hundred")]);
+        Assert.Equal(ExactNumber.FromFraction(1, 80), result.Story.World.ExactVariables[new VarId("tiny")]);
+    }
+
     [Theory]
     [InlineData(".")]
     [InlineData("1.")]

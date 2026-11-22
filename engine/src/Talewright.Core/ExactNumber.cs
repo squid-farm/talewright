@@ -79,6 +79,34 @@ public readonly struct ExactNumber : IEquatable<ExactNumber>, IComparable<ExactN
             return false;
 
         value = value.Trim();
+        var exponentIndex = value.IndexOfAny(['e', 'E']);
+        if (exponentIndex >= 0)
+        {
+            if (exponentIndex == 0 || exponentIndex != value.LastIndexOfAny(['e', 'E']) ||
+                exponentIndex == value.Length - 1)
+                return false;
+
+            var mantissa = value[..exponentIndex];
+            var exponentText = value[(exponentIndex + 1)..];
+            if (!int.TryParse(exponentText, NumberStyles.AllowLeadingSign,
+                    CultureInfo.InvariantCulture, out var exponent) ||
+                exponent == int.MinValue ||
+                !TryParseMantissa(mantissa, out var mantissaNumber))
+                return false;
+
+            if (exponent >= 0)
+            {
+                number = new(mantissaNumber.Numerator * BigInteger.Pow(new BigInteger(10), exponent),
+                    mantissaNumber.Denominator);
+            }
+            else
+            {
+                number = new(mantissaNumber.Numerator,
+                    mantissaNumber.Denominator * BigInteger.Pow(new BigInteger(10), checked(-exponent)));
+            }
+            return true;
+        }
+
         var slash = value.IndexOf('/');
         if (slash >= 0)
         {
@@ -202,6 +230,45 @@ public readonly struct ExactNumber : IEquatable<ExactNumber>, IComparable<ExactN
             ? Numerator.ToString(CultureInfo.InvariantCulture)
             : $"{Numerator.ToString(CultureInfo.InvariantCulture)}/{Denominator.ToString(CultureInfo.InvariantCulture)}";
 
+    public string ToDecimalString()
+    {
+        if (Denominator == BigInteger.One)
+            return Numerator.ToString(CultureInfo.InvariantCulture);
+
+        var denominator = Denominator;
+        var twos = 0;
+        var fives = 0;
+        while ((denominator % 2).IsZero)
+        {
+            denominator /= 2;
+            twos++;
+        }
+        while ((denominator % 5).IsZero)
+        {
+            denominator /= 5;
+            fives++;
+        }
+        if (!denominator.IsOne)
+            return ToCanonicalString();
+
+        var scale = Math.Max(twos, fives);
+        var factor = BigInteger.Pow(new BigInteger(10), scale) / Denominator;
+        var scaled = Numerator * factor;
+        var negative = scaled.Sign < 0;
+        if (negative)
+            scaled = -scaled;
+
+        var digits = scaled.ToString(CultureInfo.InvariantCulture);
+        if (digits.Length < scale + 1)
+            digits = digits.PadLeft(scale + 1, '0');
+
+        var split = digits.Length - scale;
+        var whole = digits[..split];
+        var fraction = digits[split..].TrimEnd('0');
+        var rendered = fraction.Length == 0 ? whole : $"{whole}.{fraction}";
+        return negative ? $"-{rendered}" : rendered;
+    }
+
     public override string ToString() => ToCanonicalString();
 
     public string ToString(IFormatProvider? formatProvider) => ToCanonicalString();
@@ -240,6 +307,51 @@ public readonly struct ExactNumber : IEquatable<ExactNumber>, IComparable<ExactN
             ? BigInteger.One
             : BigInteger.GreatestCommonDivisor(BigInteger.Abs(numerator), commonDivisor);
         return CreateReduced(numerator / reduction, left.Denominator * leftFactor / reduction);
+    }
+
+    private static bool TryParseMantissa(string value, out ExactNumber number)
+    {
+        number = Zero;
+        var sign = 1;
+        var index = 0;
+        if (value[index] is '+' or '-')
+        {
+            if (value[index] == '-')
+                sign = -1;
+            index++;
+        }
+
+        if (index == value.Length)
+            return false;
+
+        var dot = value.IndexOf('.');
+        if (dot >= 0 && dot != value.LastIndexOf('.'))
+            return false;
+
+        var wholeText = dot < 0 ? value[index..] : value[index..dot];
+        var fractionText = dot < 0 ? string.Empty : value[(dot + 1)..];
+        if (wholeText.Length == 0 && fractionText.Length == 0)
+            return false;
+        if (wholeText.Length > 0 && !ContainsOnlyDigits(wholeText))
+            return false;
+        if (dot >= 0 && fractionText.Length == 0)
+            return false;
+        if (fractionText.Length > 0 && !ContainsOnlyDigits(fractionText))
+            return false;
+
+        var whole = wholeText.Length == 0
+            ? BigInteger.Zero
+            : BigInteger.Parse(wholeText, NumberStyles.None, CultureInfo.InvariantCulture);
+        var fraction = fractionText.Length == 0
+            ? BigInteger.Zero
+            : BigInteger.Parse(fractionText, NumberStyles.None, CultureInfo.InvariantCulture);
+        var scale = BigInteger.Pow(new BigInteger(10), fractionText.Length);
+        var parsedNumerator = whole * scale + fraction;
+        if (sign < 0)
+            parsedNumerator = -parsedNumerator;
+
+        number = new(parsedNumerator, scale);
+        return true;
     }
 
     private static bool ContainsOnlyDigits(string value)

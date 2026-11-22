@@ -30,7 +30,8 @@ paths. Older players continue to run stories bundled with their published player
 loaded by a future player may follow that future player's documented omission default.
 
 Version `2` adds exact decimal arithmetic and numeric variables. For example, `1 / 4` and `.25`
-represent the same exact value, and numeric variables may start with decimal values. Version 2 is
+represent the same exact value, and numeric variables may start with decimal values or exponent
+notation. Version 2 is
 still under development: resource and inventory behavior, exact save preservation, and player
 presentation are not complete. The current player rejects saves when a version-2 numeric variable
 is fractional or outside the int32 range. Do not select version 2 for an author-facing story until

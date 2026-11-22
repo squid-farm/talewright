@@ -705,8 +705,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
             switch (field.Kind)
             {
                 case SetupNumberKind.Variable:
-                    if (talemarkVersion == 2 && !field.Value.Contains('/') &&
-                        ExactNumber.TryParse(field.Value, out var exact))
+                    if (talemarkVersion == 2 && ExactNumber.TryParse(field.Value, out var exact))
                         exactVariables.Add(new(field.Id), exact);
                     else if (talemarkVersion == 1 && int.TryParse(field.Value, NumberStyles.AllowLeadingSign,
                                  CultureInfo.InvariantCulture, out var variable))

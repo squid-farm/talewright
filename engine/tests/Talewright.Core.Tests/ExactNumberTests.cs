@@ -34,6 +34,22 @@ public class ExactNumberTests
     }
 
     [Fact]
+    public void Decimal_presentation_terminates_when_possible_and_falls_back_to_fraction()
+    {
+        Assert.Equal("0.25", ExactNumber.Parse("1/4").ToDecimalString());
+        Assert.Equal("3.5", ExactNumber.Parse("7/2").ToDecimalString());
+        Assert.Equal("-0.125", ExactNumber.Parse("-1/8").ToDecimalString());
+        Assert.Equal("1/3", ExactNumber.Parse("1/3").ToDecimalString());
+    }
+
+    [Fact]
+    public void Exponent_notation_is_an_exact_manifest_number()
+    {
+        Assert.Equal(ExactNumber.FromInteger(100), ExactNumber.Parse("1e2"));
+        Assert.Equal(ExactNumber.FromFraction(1, 80), ExactNumber.Parse("1.25e-2"));
+    }
+
+    [Fact]
     public void Addition_and_comparison_work_for_negative_values()
     {
         var negativeHalf = ExactNumber.Parse("-1/2");

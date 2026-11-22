@@ -85,6 +85,9 @@ test('schema validates Talemark versions and version-specific numeric variables'
   const v2 = parsedYaml(`game:\n  id: decimal-vars\n  title: Decimal vars\n  start: beginning\n  talemark: 2\nvars:\n  short: .25\n  leading-zero: 0.25\n`, 'version 2 decimal variables');
   assertValid(validateManifest, v2, 'version 2 decimal variables');
 
+  const v2Exponent = parsedYaml(`game:\n  id: exponent-vars\n  title: Exponent vars\n  start: beginning\n  talemark: 2\nvars:\n  hundred: 1e2\n`, 'version 2 exponent variable');
+  assertValid(validateManifest, v2Exponent, 'version 2 exponent variable');
+
   const v1 = parsedYaml(`game:\n  id: integer-vars\n  title: Integer vars\n  start: beginning\n  talemark: 1\nvars:\n  amount: .25\n`, 'version 1 decimal variable');
   assertInvalid(validateManifest, v1, 'version 1 decimal variable');
 });

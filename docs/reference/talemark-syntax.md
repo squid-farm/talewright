@@ -859,7 +859,8 @@ hostile … allied          reputation tier names (compare with faction:<id>:tie
 Types are checked at compile time (number, bool, text, tier).
 Version 1 uses integer literals and arithmetic. Version 2 additionally accepts
 decimal literals such as `.25` and `0.25`; numeric variables may use decimal
-initial values and remain exact through arithmetic and comparisons. For example:
+initial values, including exponent notation such as `1e2`, and remain exact through
+arithmetic and comparisons. For example:
 
 ```yaml
 game:

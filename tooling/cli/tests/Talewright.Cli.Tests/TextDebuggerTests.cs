@@ -11,6 +11,44 @@ namespace Talewright.Cli.Tests;
 
 public class TextDebuggerTests
 {
+    [Fact]
+    public void Version_two_setup_accepts_canonical_exact_fraction_values()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = """
+                game:
+                  id: exact-debugger
+                  title: Exact debugger
+                  talemark: 2
+                  start: a
+                characters:
+                  player: { first-name: Ada }
+                vars:
+                  amount: 0.25
+                """,
+            ["main.tale"] = """
+                === a
+                Amount [{var:amount}].
+                -> END
+                """,
+        });
+        var compilation = StoryCompiler.Compile(source);
+        Assert.True(compilation.Success, string.Join("\n", compilation.Diagnostics));
+
+        var model = new WorkbenchModel("unused");
+        Assert.True(model.ApplySource(new SourceCompilation(source, compilation, null), restart: true));
+        var field = Assert.Single(model.Numbers);
+        field.Enabled = true;
+        field.Value = "1/4";
+
+        model.Start();
+
+        Assert.Null(model.Error);
+        Assert.Equal(Talewright.Core.ExactNumber.FromFraction(1, 4),
+            model.Session!.Setup.ExactVariables[new("amount")]);
+    }
+
     private static SourceCompilation Compile(bool implicitDeclarations = false, bool number = false)
     {
         var source = new StorySource(new Dictionary<string, string>
