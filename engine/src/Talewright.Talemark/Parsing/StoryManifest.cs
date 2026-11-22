@@ -6,8 +6,18 @@ using Talewright.Talemark.Model;
 
 namespace Talewright.Talemark.Parsing;
 
-/// <summary>An expression or effect list written in story configuration, parsed later once all symbols are known.</summary>
-internal sealed record RawTrigger(string Id, string When, SourceLocation WhenLocation, string Do, SourceLocation DoLocation, bool Once, bool Save);
+/// <summary>A trigger written in story configuration, parsed later once all symbols are known.</summary>
+internal sealed record RawTrigger(
+    string Id,
+    string When,
+    SourceLocation WhenLocation,
+    string? Effect,
+    SourceLocation? EffectLocation,
+    string? Divert,
+    SourceLocation? DivertLocation,
+    bool Once,
+    bool Save,
+    SourceLocation Source);
 internal sealed record RawStatVisibilityRule(StatId Stat, bool? Visible, string? Condition, SourceLocation Location);
 
 /// <summary>Core settings and declarations assembled from the story's configuration inputs.</summary>
@@ -31,5 +41,6 @@ internal sealed class StoryManifest
     public List<RawTrigger> Triggers { get; } = [];
 
     /// <summary>Raw trigger text, for the flag/variable pre-scan.</summary>
-    public IEnumerable<string> EffectText => Triggers.Select(t => t.Do);
+    public IEnumerable<string> EffectText => Triggers.Where(trigger => trigger.Effect is not null)
+        .Select(trigger => trigger.Effect!);
 }

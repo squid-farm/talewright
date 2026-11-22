@@ -424,6 +424,46 @@ public class StoryHistoryTests
             history.Events.OfType<ChoiceMade>().Count(choice => choice.ChoiceKey == StorySession.ContinueKey));
     }
 
+    [Fact]
+    public void Trigger_divert_cycles_are_bounded_and_reported()
+    {
+        const string yaml = """
+            game: { id: trigger-loop, title: Trigger loop, start: a }
+            characters: { player: { first-name: Ada } }
+            triggers:
+              - id: redirect-a
+                when: flag:a
+                do:
+                  divert: b
+                  effect: clear flag:a
+              - id: redirect-b
+                when: flag:b
+                do:
+                  effect: clear flag:b
+                  divert: a
+            """;
+        const string tale = """
+            === a
+            ~ set flag:a
+            -> END
+            === b
+            ~ set flag:b
+            -> END
+            """;
+        var story = Compile(yaml, tale);
+        var history = new StoryHistory(story, 42);
+
+        Assert.NotNull(history.AutomaticContinuationError);
+        Assert.Contains("trigger diverts", history.AutomaticContinuationError, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(StoryHistory.MaxAutomaticTransitions, history.Cursor);
+        Assert.Equal(StoryHistory.MaxAutomaticTransitions + 1,
+            history.Events.OfType<TriggerDiverted>().Count());
+
+        var restored = StoryHistory.Restore(story, history.Save());
+        Assert.Equal(history.Current.Scene, restored.Current.Scene);
+        Assert.Equal(history.AutomaticContinuationError, restored.AutomaticContinuationError);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]

@@ -8,7 +8,7 @@ namespace Talewright.Talemark.Model;
 /// <param name="Scene">The scene id, or null for END.</param>
 /// <param name="Title">The scene's title, or null for END.</param>
 /// <param name="Tags">The scene's tags in ordinal order, or an empty list for END.</param>
-/// <param name="IsReachable">Whether the start scene can reach this node through diverts and hub offers.</param>
+/// <param name="IsReachable">Whether the start scene can reach this node through scene/trigger diverts and hub offers.</param>
 public sealed record StoryMapNode(
     string Id,
     SceneId? Scene,
@@ -42,8 +42,8 @@ public sealed record StorySceneConnections(
     IReadOnlyList<StoryConnection> Outgoing);
 
 /// <summary>
-/// Preview. Read-only map data for a successfully compiled story: its scenes and END, diverts, hub offers and reachability.
-/// Reachability follows every divert and hub offer without evaluating whether their conditions can be met.
+/// Preview. Read-only map data for a successfully compiled story: its scenes and END, diverts, triggers, hub offers and
+/// reachability. Reachability follows every scene/trigger divert and hub offer without evaluating their conditions.
 /// </summary>
 public sealed class StoryMap
 {
@@ -54,22 +54,27 @@ public sealed class StoryMap
         IReadOnlyList<StoryMapNode> nodes,
         IReadOnlyList<StoryDivert> diverts,
         IReadOnlyList<HubOffer> hubOffers,
+        IReadOnlyList<StoryTrigger> triggers,
         IReadOnlyList<SceneDefinition> scenes)
     {
         Nodes = nodes;
         Diverts = diverts;
         HubOffers = hubOffers;
+        Triggers = triggers;
         _connections = BuildConnections(scenes, diverts, hubOffers);
     }
 
     /// <summary>Scene nodes in declaration order, followed by END.</summary>
     public IReadOnlyList<StoryMapNode> Nodes { get; }
 
-    /// <summary>Every divert, in scene declaration order and then source order.</summary>
+    /// <summary>Every scene divert, in scene declaration order and then source order.</summary>
     public IReadOnlyList<StoryDivert> Diverts { get; }
 
     /// <summary>Every hub offer, in hub declaration order and then offered-scene declaration order.</summary>
     public IReadOnlyList<HubOffer> HubOffers { get; }
+
+    /// <summary>Every story-wide trigger in manifest order, with its compiled effects, optional divert and source.</summary>
+    public IReadOnlyList<StoryTrigger> Triggers { get; }
 
     /// <summary>Returns the incoming and outgoing diverts and hub offers for a scene.</summary>
     /// <param name="scene">The scene to look up.</param>
@@ -92,12 +97,15 @@ public sealed class StoryMap
             Array.AsReadOnly(scene.Tags.Order(StringComparer.Ordinal).ToArray()),
             reachability.IsReached(scene.Id))).ToList();
         var endIsReachable = diverts.Any(divert =>
-            divert.Target.IsEnd && reachability.IsReached(divert.From));
+                divert.Target.IsEnd && reachability.IsReached(divert.From))
+            || reachability.Diverts.Triggers.Any(trigger =>
+                trigger.Divert?.IsEnd == true && reachability.IsReached(story.Start));
         nodes.Add(new StoryMapNode(SceneVocabulary.End, null, null, Array.Empty<string>(), endIsReachable));
         return new StoryMap(
             Array.AsReadOnly(nodes.ToArray()),
             diverts,
             reachability.Diverts.HubOffers,
+            reachability.Diverts.Triggers,
             story.Scenes);
     }
 

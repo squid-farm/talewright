@@ -68,7 +68,36 @@ explicitly when they matter. Implicit flags start false, numbers zero and text e
 assignment does not execute it before its scene is visited.
 
 Triggers belong in one YAML `triggers:` list, in authored order. Each has an `id`, boolean `when`
-and effect list `do`; `once: true` prevents repeated firing and optional `save: true` makes a
-checkpoint. `when` cannot contain a skill check. Do not create triggers that keep making each
-other eligible forever. YAML quoting is a separate layer: quote a whole scalar when YAML would
-interpret its punctuation; Talemark strings themselves use double quotes with `\"` and `\\`.
+and `do`. The existing scalar `do: set flag:ready` form remains available. A mapping can provide
+`effect`, `divert`, or both:
+
+~~~yaml
+triggers:
+  - id: resurrection-charm
+    when: player has charm-of-life and player:hp <= 0
+    do:
+      effect: player:hp += 10; take player charm-of-life
+  - id: death
+    when: player:hp <= 0
+    do:
+      divert: death-ending
+  - id: finish-the-ritual
+    when: flag:ritual-complete
+    do:
+      divert: END
+      effect: set flag:ritual-recorded
+~~~
+
+Triggers are checked in authored order after each complete effect batch. An earlier trigger's effects
+are visible when later triggers are checked, so the charm prevents the death trigger from firing.
+With both mapping keys present, the effect always runs before the redirect, regardless of YAML key
+order. All eligible triggers finish settling; the last redirect requested wins, and it overrides the
+scene or choice continuation. `END` is a valid target. A redirect stops later scene steps. Trigger
+destinations and their downstream scenes count as reachable without claiming that the trigger's
+condition will occur.
+
+`once: true` prevents repeated firing and optional `save: true` makes a checkpoint. `when` cannot
+contain a skill check. Do not create triggers that keep making each other eligible forever; automatic
+redirect loops are bounded and reported. YAML quoting is a separate layer: quote a whole scalar when
+YAML would interpret its punctuation; Talemark strings themselves use double quotes with `\"` and
+`\\`.

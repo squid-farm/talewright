@@ -568,8 +568,15 @@
           "description": "Talemark predicate that activates the trigger."
         },
         "do": {
-          "$ref": "#/definitions/nonEmptyString",
-          "description": "Talemark effect applied when the trigger activates."
+          "oneOf": [
+            {
+              "$ref": "#/definitions/nonEmptyString"
+            },
+            {
+              "$ref": "#/definitions/triggerAction"
+            }
+          ],
+          "description": "Talemark effects, optionally paired with a redirect. When both are present, effects run first."
         },
         "once": {
           "$ref": "#/definitions/booleanScalar",
@@ -582,6 +589,21 @@
           "description": "When true, firing this trigger creates or replaces the story's single Trigger checkpoint after the current step settles."
         }
       },
+      "additionalProperties": false
+    },
+    "triggerAction": {
+      "type": "object",
+      "properties": {
+        "effect": {
+          "$ref": "#/definitions/nonEmptyString",
+          "description": "Talemark effects applied when the trigger activates."
+        },
+        "divert": {
+          "$ref": "#/definitions/identifier",
+          "description": "Scene to enter after the trigger effect and trigger settlement, or END."
+        }
+      },
+      "minProperties": 1,
       "additionalProperties": false
     }
   }

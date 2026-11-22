@@ -1,11 +1,13 @@
 using Talewright.Core.Identity;
 using Talewright.Core.Randomness;
 using Talewright.Core.World;
+using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
 using Talewright.Rules.Triggers;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Model;
 using Talewright.Talemark.Parsing;
+using Talewright.Talemark.Vocabulary;
 using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text;
@@ -114,7 +116,10 @@ public static class StoryCompiler
 
         foreach (var trigger in manifest.Triggers)
         {
-            DiscoverEffects(trigger.Do, trigger.DoLocation);
+            if (trigger.Effect is { } effect)
+            {
+                DiscoverEffects(effect, trigger.EffectLocation!.Value);
+            }
         }
 
         var unresolved = VariableDiscovery.Resolve(manifest.World, flags, scenes.Keys.ToHashSet(),
@@ -160,6 +165,7 @@ public static class StoryCompiler
         }
 
         var triggers = new List<TriggerDefinition>();
+        var triggerSources = new Dictionary<string, SourceLocation>(StringComparer.Ordinal);
         foreach (var raw in manifest.Triggers)
         {
             cancellationToken.ThrowIfCancellationRequested();
@@ -174,15 +180,23 @@ public static class StoryCompiler
                 return new SkillCheckIdentity(triggerScene, actor, skill, occurrence);
             }
 
-            var effects = ExpressionParser.ParseEffects(raw.Do, raw.DoLocation, symbols, diagnostics,
-                CreateSkillCheckIdentity);
-            if (when is not null && effects is not null)
+            IReadOnlyList<Effect>? effects = raw.Effect is { } effectText
+                ? ExpressionParser.ParseEffects(effectText, raw.EffectLocation!.Value, symbols, diagnostics,
+                    CreateSkillCheckIdentity)
+                : [];
+            var divert = raw.Divert is null ? null : BindTriggerDivert(raw, symbols, diagnostics);
+            if (when is not null && effects is not null && (raw.Divert is null || divert is not null))
             {
-                triggers.Add(new TriggerDefinition(raw.Id, when, effects, raw.Once) { Save = raw.Save });
+                triggers.Add(new TriggerDefinition(raw.Id, when, effects, raw.Once)
+                {
+                    Save = raw.Save,
+                    Divert = divert,
+                });
+                triggerSources.Add(raw.Id, raw.Source);
             }
         }
 
-        var reachability = StoryValidator.Validate(manifest, parsed, diagnostics, cancellationToken);
+        var reachability = StoryValidator.Validate(manifest, parsed, diagnostics, cancellationToken, triggers, triggerSources);
         cancellationToken.ThrowIfCancellationRequested();
 
         if (diagnostics.HasErrors)
@@ -193,7 +207,7 @@ public static class StoryCompiler
         cancellationToken.ThrowIfCancellationRequested();
         var sceneDefinitions = parsed.Select(p => p.Definition).ToList();
         // Editor analysis never replays; a story it produces builds its identities on first playback instead.
-        var replayIdentities = analysis is null ? ChoiceReplayIdentity.Assign(sceneDefinitions) : null;
+        var replayIdentities = analysis is null ? ChoiceReplayIdentity.Assign(sceneDefinitions, triggers) : null;
         var story = new StoryDefinition
         {
             Id = manifest.Id,
@@ -212,6 +226,7 @@ public static class StoryCompiler
             World = world,
             Scenes = sceneDefinitions,
             Triggers = triggers,
+            TriggerSources = triggerSources,
             Predicates = options.Predicates,
             Reachability = reachability,
             ReplayIdentities = replayIdentities,
@@ -221,6 +236,25 @@ public static class StoryCompiler
             SourceMap = new StorySourceMap(source, parsed.ToDictionary(scene => scene.Definition.Id,
                 scene => new SceneSourceRange(scene.Location.File, scene.Location.Line, scene.EndLine))),
         };
+    }
+
+    private static TriggerDestination? BindTriggerDivert(RawTrigger raw, StorySymbols symbols, DiagnosticBag diagnostics)
+    {
+        var target = raw.Divert!;
+        if (target == SceneVocabulary.End)
+        {
+            return TriggerDestination.End;
+        }
+
+        var scene = new SceneId(target);
+        if (!symbols.Scenes.Contains(scene))
+        {
+            diagnostics.Error(CompilerDiagnosticCodes.UnknownScene,
+                $"Trigger '{raw.Id}' diverts to unknown scene '{target}'.", raw.DivertLocation ?? raw.Source);
+            return null;
+        }
+
+        return new TriggerDestination(scene);
     }
 
     private static CharacterSheetVisibility CompileCharacterSheet(StoryManifest manifest, StorySymbols symbols,

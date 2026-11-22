@@ -42,7 +42,9 @@ public sealed class StoryReferencesTests
             triggers:
               - id: rich
                 when: var:coins > 5
-                do: set flag:rich
+                do:
+                  effect: set flag:rich
+                  divert: town.square
             """,
         ["town.tale"] = """
             === town.gate
@@ -127,6 +129,14 @@ public sealed class StoryReferencesTests
     }
 
     [Fact]
+    public void Trigger_divert_targets_resolve_as_scene_references()
+    {
+        AssertReferences("town.square",
+            [("gate.tale", "=== |town.square")],
+            [(Supporting, "divert: |town.square"), ("town.tale", "success: -> |town.square")]);
+    }
+
+    [Fact]
     public void Inventory_item_name_forms_index_character_and_item_references()
     {
         var source = new StorySource(new Dictionary<string, string>
@@ -166,7 +176,7 @@ public sealed class StoryReferencesTests
             ]);
         AssertReferences("town.square",
             [("gate.tale", "=== |town.square")],
-            [("town.tale", "success: -> |town.square")]);
+            [(Supporting, "divert: |town.square"), ("town.tale", "success: -> |town.square")]);
     }
 
     [Fact]

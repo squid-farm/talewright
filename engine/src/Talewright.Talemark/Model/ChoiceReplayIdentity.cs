@@ -6,6 +6,7 @@ using Talewright.Core.Identity;
 using Talewright.Rules.Checks;
 using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
+using Talewright.Rules.Triggers;
 using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Talemark.Model;
@@ -16,22 +17,30 @@ internal static class ChoiceReplayIdentity
     internal const int FullLength = 32;
 
     /// <summary>Computes identities for compiler-owned definitions and records them on those definitions.</summary>
-    internal static ReplayIdentityTable Assign(IEnumerable<SceneDefinition> scenes) =>
-        AssignCore(scenes, hash: null, attach: true);
+    internal static ReplayIdentityTable Assign(IEnumerable<SceneDefinition> scenes,
+        IReadOnlyList<TriggerDefinition>? triggers = null) =>
+        AssignCore(scenes, triggers, hash: null, attach: true);
 
     internal static ReplayIdentityTable Assign(IEnumerable<SceneDefinition> scenes, Func<byte[], byte[]> hash) =>
-        AssignCore(scenes, hash, attach: true);
+        AssignCore(scenes, triggers: null, hash: hash, attach: true);
 
     /// <summary>Computes identities for one story without changing definitions that other stories may share.</summary>
-    internal static ReplayIdentityTable Build(IEnumerable<SceneDefinition> scenes) =>
-        AssignCore(scenes, hash: null, attach: false);
+    internal static ReplayIdentityTable Build(IEnumerable<SceneDefinition> scenes,
+        IReadOnlyList<TriggerDefinition>? triggers = null) =>
+        AssignCore(scenes, triggers, hash: null, attach: false);
 
-    private static ReplayIdentityTable AssignCore(IEnumerable<SceneDefinition> scenes, Func<byte[], byte[]>? hash,
-        bool attach)
+    private static ReplayIdentityTable AssignCore(IEnumerable<SceneDefinition> scenes,
+        IReadOnlyList<TriggerDefinition>? triggers, Func<byte[], byte[]>? hash, bool attach)
     {
         var allScenes = scenes.ToArray();
+        var triggerTargets = triggers?
+            .Select(trigger => trigger.Divert?.Scene)
+            .OfType<SceneId>()
+            .Distinct()
+            .ToArray() ?? [];
         var identityCapacity = allScenes.Sum(scene =>
             (scene.Hub is null ? 0 : allScenes.Length - 1)
+            + triggerTargets.Length
             + SceneSteps.Walk(scene.Steps).Sum(step => step switch
             {
                 DivertStep { Target.IsEnd: false } => 1,
@@ -63,7 +72,7 @@ internal static class ChoiceReplayIdentity
                     Add(scene, choice.Choice.Divert?.Scene, choice.Choice.Effects, choice.Choice.Check, choice.Choice);
                 }
             }
-            foreach (var target in SyntheticTargets(scene, allScenes))
+            foreach (var target in SyntheticTargets(scene, allScenes, triggerTargets))
             {
                 if (!table.Offsets.ContainsKey((scene.Id, target)))
                 {
@@ -158,8 +167,13 @@ internal static class ChoiceReplayIdentity
         new($"Replay identity for divert from '{source}' to '{target}' was not precomputed.");
 
     private static IEnumerable<SceneId> SyntheticTargets(SceneDefinition scene,
-        IReadOnlyList<SceneDefinition> allScenes)
+        IReadOnlyList<SceneDefinition> allScenes, IReadOnlyList<SceneId> triggerTargets)
     {
+        foreach (var target in triggerTargets)
+        {
+            yield return target;
+        }
+
         if (scene.Hub is not null)
         {
             foreach (var storylet in allScenes)

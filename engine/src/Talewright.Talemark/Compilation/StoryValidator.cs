@@ -1,4 +1,5 @@
 using Talewright.Core.Identity;
+using Talewright.Rules.Triggers;
 using Talewright.Rules.Storylets;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Model;
@@ -16,7 +17,8 @@ internal static class StoryValidator
 {
     /// <summary>Returns the reachability TW3009 used, or null when the story has errors.</summary>
     public static StoryReachability? Validate(StoryManifest manifest, IReadOnlyList<ParsedScene> scenes, DiagnosticBag diagnostics,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, IReadOnlyList<TriggerDefinition>? triggers = null,
+        IReadOnlyDictionary<string, SourceLocation>? triggerSources = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var checkpoint = cancellationToken.CanBeCanceled ? new CancellationCheckpoint(cancellationToken) : null;
@@ -72,7 +74,9 @@ internal static class StoryValidator
 
         cancellationToken.ThrowIfCancellationRequested();
         var definitions = scenes.Select(scene => scene.Definition).ToArray();
-        var reachability = StoryReachability.Find(definitions, StoryDiverts.From(definitions, checkpoint), start, checkpoint);
+        var reachability = StoryReachability.Find(definitions,
+            StoryDiverts.From(definitions, triggers ?? Array.Empty<TriggerDefinition>(), triggerSources, checkpoint),
+            start, checkpoint);
         foreach (var (scene, location) in scenes)
         {
             cancellationToken.ThrowIfCancellationRequested();

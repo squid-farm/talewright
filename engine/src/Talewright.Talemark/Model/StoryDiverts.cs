@@ -1,8 +1,11 @@
 using Talewright.Core.Identity;
 using Talewright.Narrative.Templates;
+using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
 using Talewright.Rules.Storylets;
+using Talewright.Rules.Triggers;
 using Talewright.Talemark.Analysis;
+using Talewright.Talemark.Diagnostics;
 
 namespace Talewright.Talemark.Model;
 
@@ -84,27 +87,45 @@ public sealed record HubOffer(
     ShownDefinition? Shown,
     bool Once);
 
+/// <summary>Compiled story-wide trigger data for authoring tools, including its optional redirect and source.</summary>
+public sealed record StoryTrigger(
+    string Id,
+    Expr Condition,
+    IReadOnlyList<Effect> Effects,
+    DivertTarget? Divert,
+    bool Once,
+    bool Save,
+    SourceLocation? Source);
+
 /// <summary>
-/// Preview. Every divert and hub offer in a story, from the lines that can run. Diverts follow scene declaration
-/// order, then source order; hub offers follow hub, then offered scene, declaration order.
+/// Preview. Every scene divert, trigger and hub offer in a story. Diverts follow scene declaration order, then source
+/// order; triggers follow manifest order; hub offers follow hub, then offered scene, declaration order.
 /// </summary>
 public sealed class StoryDiverts
 {
-    private StoryDiverts(IReadOnlyList<StoryDivert> diverts, IReadOnlyList<HubOffer> hubOffers)
+    private StoryDiverts(IReadOnlyList<StoryDivert> diverts, IReadOnlyList<HubOffer> hubOffers,
+        IReadOnlyList<StoryTrigger> triggers)
     {
         Diverts = diverts;
         HubOffers = hubOffers;
+        Triggers = triggers;
     }
 
     public IReadOnlyList<StoryDivert> Diverts { get; }
     public IReadOnlyList<HubOffer> HubOffers { get; }
+    public IReadOnlyList<StoryTrigger> Triggers { get; }
 
-    /// <summary>The story's diverts and hub offers, built once per story.</summary>
+    /// <summary>The story's scene diverts, triggers and hub offers, built once per story.</summary>
     public static StoryDiverts From(StoryDefinition story) => story.Reachability.Diverts;
 
-    public static StoryDiverts From(IReadOnlyList<SceneDefinition> scenes) => From(scenes, null);
+    public static StoryDiverts From(IReadOnlyList<SceneDefinition> scenes) =>
+        From(scenes, Array.Empty<TriggerDefinition>(), null, null);
 
-    internal static StoryDiverts From(IReadOnlyList<SceneDefinition> scenes, CancellationCheckpoint? checkpoint)
+    internal static StoryDiverts From(IReadOnlyList<SceneDefinition> scenes, CancellationCheckpoint? checkpoint) =>
+        From(scenes, Array.Empty<TriggerDefinition>(), null, checkpoint);
+
+    internal static StoryDiverts From(IReadOnlyList<SceneDefinition> scenes, IReadOnlyList<TriggerDefinition> triggers,
+        IReadOnlyDictionary<string, SourceLocation>? triggerSources, CancellationCheckpoint? checkpoint = null)
     {
         var order = new Dictionary<SceneId, int>();
         var scenesById = new Dictionary<SceneId, SceneDefinition>();
@@ -152,8 +173,21 @@ public sealed class StoryDiverts
             checkpoint?.Token.ThrowIfCancellationRequested();
             diverts.AddRange(SceneSteps.Diverts(scene, checkpoint));
         }
+
+        var storyTriggers = new List<StoryTrigger>(triggers.Count);
+        foreach (var trigger in triggers)
+        {
+            checkpoint?.Token.ThrowIfCancellationRequested();
+            var divert = trigger.Divert is { } destination ? new DivertTarget(destination.Scene) : null;
+            var source = triggerSources is not null && triggerSources.TryGetValue(trigger.Id, out var location)
+                ? location
+                : (SourceLocation?)null;
+            storyTriggers.Add(new StoryTrigger(trigger.Id, trigger.When, trigger.Effects, divert, trigger.Once,
+                trigger.Save, source));
+        }
+
         checkpoint?.Token.ThrowIfCancellationRequested();
-        var result = new StoryDiverts(diverts.ToArray(), hubOffers);
+        var result = new StoryDiverts(diverts.ToArray(), hubOffers, storyTriggers.ToArray());
         checkpoint?.Token.ThrowIfCancellationRequested();
         return result;
     }

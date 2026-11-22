@@ -3,12 +3,13 @@ using Talewright.Graphs;
 
 namespace Talewright.Talemark.Model;
 
-/// <summary>A divert or hub offer that leads from one scene to another.</summary>
-internal readonly record struct StoryRoute(StoryDivert? Divert, HubOffer? HubOffer);
+/// <summary>A scene divert, trigger divert, or hub offer that leads to another scene.</summary>
+internal readonly record struct StoryRoute(StoryDivert? Divert, HubOffer? HubOffer, StoryTrigger? Trigger);
 
 /// <summary>
-/// Scenes reachable from a start scene by following <see cref="StoryDiverts"/>: every divert and hub offer.
-/// It doesn't check whether a player can meet a divert's conditions. TW3009 reports the scenes it doesn't reach.
+/// Scenes reachable from a start scene by following <see cref="StoryDiverts"/>: every scene/trigger divert and hub
+/// offer. It doesn't check whether a player can meet a condition or whether a trigger will fire. TW3009 reports the
+/// scenes it doesn't reach.
 /// </summary>
 internal sealed class StoryReachability
 {
@@ -26,7 +27,7 @@ internal sealed class StoryReachability
 
     public StoryDiverts Diverts { get; }
 
-    /// <summary>One vertex per scene in declaration order, with one entry per divert to a scene and per hub offer.</summary>
+    /// <summary>One vertex per scene in declaration order, with edges for scene/trigger diverts and hub offers.</summary>
     public Graph<SceneId, StoryRoute> Graph { get; }
 
     public static StoryReachability Find(IReadOnlyList<SceneDefinition> scenes, StoryDiverts diverts, SceneId start,
@@ -47,17 +48,27 @@ internal sealed class StoryReachability
         {
             checkpoint?.Check();
             if (divert.Target.Scene is { } target && vertices.TryGetValue(target, out var to))
-                builder.AddEdge(vertices[divert.From], to, new StoryRoute(divert, null));
+                builder.AddEdge(vertices[divert.From], to, new StoryRoute(divert, null, null));
         }
 
         foreach (var offer in diverts.HubOffers)
         {
             checkpoint?.Check();
-            builder.AddEdge(vertices[offer.Hub], vertices[offer.Scene], new StoryRoute(null, offer));
+            builder.AddEdge(vertices[offer.Hub], vertices[offer.Scene], new StoryRoute(null, offer, null));
+        }
+
+        if (vertices.TryGetValue(start, out var root))
+        {
+            foreach (var trigger in diverts.Triggers)
+            {
+                checkpoint?.Check();
+                if (trigger.Divert?.Scene is { } target && vertices.TryGetValue(target, out var to))
+                    builder.AddEdge(root, to, new StoryRoute(null, null, trigger));
+            }
         }
 
         var graph = builder.Build(cancellationToken);
-        VertexId[] roots = vertices.TryGetValue(start, out var root) ? [root] : [];
+        VertexId[] roots = vertices.TryGetValue(start, out var rootVertex) ? [rootVertex] : [];
         var result = GraphReachability.Find(graph, roots, GraphDirection.Outgoing, null, cancellationToken);
         cancellationToken.ThrowIfCancellationRequested();
         return new StoryReachability(diverts, graph, vertices, result);

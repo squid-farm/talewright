@@ -465,4 +465,227 @@ public class StorySessionTests
         Assert.True(session.State.GetFlag(new FlagId("leveled")));
         Assert.Contains(session.Events, e => e is TriggerFired { TriggerId: "level-two" });
     }
+
+    [Fact]
+    public void Trigger_effects_are_evaluated_sequentially_before_later_triggers()
+    {
+        const string yaml = """
+            game: { id: trigger-charm, title: Trigger charm, start: start, randomness: off, ruleset: rpg }
+            characters:
+              player: { first-name: Ada, inventory: { charm-of-life: 1 } }
+            items:
+              charm-of-life: { name: charm of life }
+            triggers:
+              - id: resurrection-charm
+                when: player has charm-of-life and player:hp <= 0
+                do:
+                  effect: player:hp += 10; take player charm-of-life
+              - id: death
+                when: player:hp <= 0
+                do:
+                  divert: death-ending
+            """;
+        const string tale = """
+            === start
+            ~ player:hp = 0
+            Still standing.
+            * [Continue] -> safe
+            === safe
+            You survived.
+            -> END
+            === death-ending
+            The death ending.
+            -> END
+            """;
+
+        var living = new StoryHistory(Compile(tale, yaml), 42);
+        Assert.Equal("start", living.Current.Scene!.Value.Value);
+        Assert.Equal(10, living.State.GetStat(EntityId.Player, new StatId("hp")));
+        Assert.Equal(0, living.State.GetItemCount(EntityId.Player, new ItemId("charm-of-life")));
+        Assert.DoesNotContain(living.Events, gameEvent => gameEvent is TriggerDiverted);
+        Assert.Equal(["resurrection-charm"], living.Events.OfType<TriggerFired>().Select(trigger => trigger.TriggerId));
+
+        var withoutCharm = yaml.Replace("inventory: { charm-of-life: 1 }", "inventory: {}",
+            StringComparison.Ordinal);
+        var doomed = new StoryHistory(Compile(tale, withoutCharm), 42);
+        Assert.Equal("death-ending", doomed.Current.Scene!.Value.Value);
+        Assert.Contains("The death ending.", doomed.Current.Document.ToPlainText());
+        Assert.Equal("death-ending", Assert.Single(doomed.Events.OfType<TriggerDiverted>()).Target!.Value.Value);
+    }
+
+    [Fact]
+    public void Combined_trigger_effect_runs_before_its_divert_and_replaces_the_choice_target()
+    {
+        const string yaml = """
+            game: { id: trigger-choice, title: Trigger choice, start: start, randomness: off }
+            characters: { player: { first-name: Ada } }
+            items: { relic: { name: relic } }
+            triggers:
+              - id: reroute
+                when: flag:ready
+                do:
+                  divert: redirected
+                  effect: give player relic
+            """;
+        const string tale = """
+            === start
+            * [Go] { set flag:ready } -> original
+            === original
+            The original destination.
+            -> END
+            === redirected
+            The redirected passage.
+            -> END
+            """;
+        var story = Compile(tale, yaml);
+        var history = new StoryHistory(story, 42);
+
+        history.Choose("c0");
+
+        Assert.Equal("redirected", history.Current.Scene!.Value.Value);
+        Assert.Contains("[Gained: relic]", history.Current.Document.ToPlainText());
+        Assert.DoesNotContain(history.Events.OfType<SceneEntered>(), entered => entered.Scene.Value == "original");
+        var redirect = Assert.Single(history.Events.OfType<TriggerDiverted>());
+        Assert.Equal("reroute", redirect.TriggerId);
+        Assert.Equal("start", redirect.Source!.Value.Value);
+        Assert.Equal("redirected", redirect.Target!.Value.Value);
+
+        var restored = StoryHistory.Restore(story, history.Save());
+        Assert.Equal(history.Current.Scene, restored.Current.Scene);
+        Assert.Equal(history.Current.Document.ToPlainText(), restored.Current.Document.ToPlainText());
+        Assert.Equal(history.Events.OfType<TriggerDiverted>(), restored.Events.OfType<TriggerDiverted>());
+    }
+
+    [Fact]
+    public void Last_trigger_divert_wins_across_cascade_passes_without_skipping_effects()
+    {
+        const string yaml = """
+            game: { id: trigger-cascade, title: Trigger cascade, start: start, randomness: off }
+            characters: { player: { first-name: Ada } }
+            items:
+              relic: { name: relic }
+              rope: { name: rope }
+            triggers:
+              - id: later
+                when: flag:second
+                do:
+                  divert: final
+                  effect: give player rope
+              - id: first
+                when: flag:first
+                do:
+                  divert: intermediate
+                  effect: give player relic; set flag:second
+            """;
+        const string tale = """
+            === start
+            ~ set flag:first
+            This line must be interrupted.
+            -> END
+            === intermediate
+            This destination is overridden.
+            -> END
+            === final
+            Final destination.
+            -> END
+            """;
+        var history = new StoryHistory(Compile(tale, yaml), 42);
+
+        Assert.Equal("final", history.Current.Scene!.Value.Value);
+        Assert.Equal(1, history.State.GetItemCount(EntityId.Player, new ItemId("relic")));
+        Assert.Equal(1, history.State.GetItemCount(EntityId.Player, new ItemId("rope")));
+        Assert.Equal(["first", "later"], history.Events.OfType<TriggerFired>().Select(trigger => trigger.TriggerId));
+        Assert.Equal("final", Assert.Single(history.Events.OfType<TriggerDiverted>()).Target!.Value.Value);
+        Assert.DoesNotContain(history.Events.OfType<SceneEntered>(), entered => entered.Scene.Value == "intermediate");
+    }
+
+    [Fact]
+    public void Trigger_divert_after_scene_entry_consequences_skips_the_entered_scene_body()
+    {
+        const string yaml = """
+            game: { id: trigger-entry, title: Trigger entry, start: start }
+            characters: { player: { first-name: Ada } }
+            triggers:
+              - id: redirect-on-entry
+                when: scene:player:visits >= 1
+                do:
+                  divert: destination
+            """;
+        const string tale = """
+            === start
+            This body must not run.
+            -> END
+            === destination
+            Destination reached.
+            -> END
+            """;
+        var history = new StoryHistory(Compile(tale, yaml), 42);
+
+        Assert.Equal("destination", history.Current.Scene!.Value.Value);
+        Assert.Contains("Destination reached.", history.Current.Document.ToPlainText());
+        Assert.DoesNotContain("This body must not run.",
+            string.Join("\n", history.Transcript.Select(entry => entry.Frame.Document.ToPlainText())));
+        Assert.Equal("start", Assert.Single(history.Events.OfType<TriggerDiverted>()).Source!.Value.Value);
+    }
+
+    [Fact]
+    public void Trigger_divert_after_entry_check_outcome_overrides_its_authored_target()
+    {
+        const string yaml = """
+            game: { id: trigger-check, title: Trigger check, start: start, randomness: off, ruleset: rpg }
+            characters: { player: { first-name: Ada } }
+            triggers:
+              - id: redirect-on-success
+                when: flag:success
+                do:
+                  divert: redirected
+            """;
+        const string tale = """
+            === start
+            ::: skill-check athletics dc 1
+            success: { set flag:success } -> original
+            failure: -> original
+            :::
+            This line must not run.
+            -> END
+            === original
+            The check destination.
+            -> END
+            === redirected
+            Redirected after the check.
+            -> END
+            """;
+        var history = new StoryHistory(Compile(tale, yaml), 42);
+
+        Assert.Equal("redirected", history.Current.Scene!.Value.Value);
+        Assert.Contains("Redirected after the check.", history.Current.Document.ToPlainText());
+        Assert.DoesNotContain(history.Events.OfType<SceneEntered>(), entered => entered.Scene.Value == "original");
+        Assert.Equal("redirected", Assert.Single(history.Events.OfType<TriggerDiverted>()).Target!.Value.Value);
+    }
+
+    [Fact]
+    public void Trigger_can_divert_to_END()
+    {
+        const string yaml = """
+            game: { id: trigger-end, title: Trigger end, start: start }
+            characters: { player: { first-name: Ada } }
+            triggers:
+              - id: finish
+                when: flag:finished
+                do:
+                  divert: END
+            """;
+        const string tale = """
+            === start
+            ~ set flag:finished
+            This line must not run.
+            -> END
+            """;
+        var history = new StoryHistory(Compile(tale, yaml), 42);
+
+        Assert.True(history.Current.IsEnded);
+        Assert.Equal("finish", Assert.Single(history.Events.OfType<TriggerDiverted>()).TriggerId);
+        Assert.Null(Assert.Single(history.Events.OfType<TriggerDiverted>()).Target);
+        Assert.DoesNotContain("This line must not run.", history.Current.Document.ToPlainText());
+    }
 }
