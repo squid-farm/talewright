@@ -138,7 +138,7 @@ public sealed class StoryCondition
                 StandingTierRef value => Create(StoryStateReadKind.StandingTier, value),
                 FlagRef value => Create(StoryStateReadKind.Flag, value),
                 VarRef value => Create(StoryStateReadKind.NumberVariable, value),
-                SceneVisitCountRef value => Create(StoryStateReadKind.SceneVisitCount, value),
+                SceneVisitCountRef value => CreateSceneVisitRead(value),
                 InventoryCountRef value => Create(StoryStateReadKind.InventoryCount, value),
                 TextVarRef value => Create(StoryStateReadKind.TextVariable, value),
                 NameRef value => Create(StoryStateReadKind.CharacterName, value),
@@ -157,4 +157,9 @@ public sealed class StoryCondition
 
     private static StoryStateRead Create(StoryStateReadKind kind, Expr expression, bool isOpaque = false) =>
         new(kind, ExpressionFormatter.Format(expression), isOpaque);
+
+    private static StoryStateRead CreateSceneVisitRead(SceneVisitCountRef value) =>
+        new(StoryStateReadKind.SceneVisitCount,
+            ExpressionFormatter.Format(new SceneVisitCountRef(value.Scene)),
+            false);
 }
