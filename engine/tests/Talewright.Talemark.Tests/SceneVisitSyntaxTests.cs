@@ -97,6 +97,49 @@ public sealed class SceneVisitSyntaxTests
             EvaluationContext.For(state)));
     }
 
+    [Fact]
+    public void Hub_evaluates_candidate_visit_count_not_hub_visit_count()
+    {
+        var result = Compile("""
+            === hub
+            @hub candidates
+            * [Return] -> hub
+            === candidate
+            @tags candidates
+            @requires scene:player:visits < 3
+            @choice-label "Visit {scene:player:visits}"
+            Visits: {scene:player:visits}.
+            -> hub
+            """);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+
+        var story = result.Story!;
+        var candidate = story.GetScene(new SceneId("candidate"));
+        var state = GameState.CreateInitial(story.World, 1);
+        state.Apply(new SceneEntered(new SceneId("hub")));
+        state.Apply(new SceneEntered(new SceneId("hub")));
+        state.Apply(new SceneEntered(new SceneId("hub")));
+
+        Assert.Equal(3, state.VisitCount(new SceneId("hub")));
+        Assert.True(ExpressionEvaluator.IsTrue(candidate.Requires!, EvaluationContext.For(state)));
+
+        for (var candidateVisits = 0; candidateVisits <= 3; candidateVisits++)
+        {
+            while (state.VisitCount(new SceneId("candidate")) < candidateVisits)
+                state.Apply(new SceneEntered(new SceneId("candidate")));
+
+            var expected = candidateVisits < 3;
+            Assert.Equal(expected,
+                ExpressionEvaluator.IsTrue(candidate.Requires!, EvaluationContext.For(state)));
+
+            var label = new TemplateRenderer().RenderInlines(candidate.ChoiceLabel!, state).ToPlainText();
+            Assert.Equal($"Visit {candidateVisits}", label);
+
+            var prose = new TemplateRenderer().Render(CompilerTests.Templates(candidate), state).ToPlainText();
+            Assert.Contains($"Visits: {candidateVisits}.", prose);
+        }
+    }
+
     [Theory]
     [InlineData("true")]
     [InlineData("false")]

@@ -127,7 +127,7 @@ New callables follow this guideline. Existing exceptions are listed below.
 | Callable | Family and result | Arguments (slot kind) | Contexts | Notes |
 |---|---|---|---|---|
 | `player visited scene` | Expression predicate; boolean. | One scene name. | Expressions. | True when the player has entered the scene at least once. |
-| `scene:player:visits`, `<scene>:player:visits` | Expression reference; number. | Current-scene alias or one scene name. | Expressions. | Counts player entries, including repeated entries; other-character visit counts are unsupported. |
+| `scene:player:visits`, `<scene>:player:visits` | Expression reference; number. | Owning-scene alias or one scene name. | Expressions. | Counts player entries, including repeated entries. In a scene, `scene` means the containing scene; in hub candidates and their labels/text it remains the candidate scene. Manifest triggers and character rules with no scene owner read the current scene. Other-character visit counts are unsupported. |
 | `character:inventory:item`, `character:inventory:item:name` | Expression reference; text. | Character ID and item ID. | Expressions. | Same shared item display name as `item:<id>`, whether or not the character holds it. |
 | `character:inventory:item:count` | Expression reference; number. | Character ID and item ID. | Expressions. | Reads the held quantity, or 0 when not held; read-only, changed with `give` or `take`. |
 | `character has item` | Expression predicate; boolean. | Character name, item name. | Expressions. | Infix word, not a call. |
@@ -225,7 +225,7 @@ using the quoted-text rules when it is inside syntax.
 | `or` | At least one boolean condition must hold. | 8 | `{if flag:ready or player:hp > 0}Go.{/if}` | TW2003 non-booleans; TW2004 undeclared flag. |
 | `has` | Inventory predicate: character ID on the left, item ID on the right. Item counts live only in inventory, not variables. | 1 | `{if player has rope}Equipped.{/if}` | TW2001 unknown character/item. |
 | `player visited <scene>` | Boolean predicate with one bare scene ID. | 1 | `{if player visited camp}Back again.{/if}` | TW2002 unknown scene; other-character subjects are unsupported. |
-| `scene:player:visits`, `<scene>:player:visits` | Numeric visit count for the current or named scene. | 1 | `{if camp:player:visits > 1}Back again.{/if}` | TW2002 unknown scene; TW2003 non-number in numeric operations. |
+| `scene:player:visits`, `<scene>:player:visits` | Numeric visit count for the owning or named scene. | 1 | `{if camp:player:visits > 1}Back again.{/if}` | TW2002 unknown scene; TW2003 non-number in numeric operations. Manifest expressions with no owner use the current scene. |
 | `character:inventory:item`, `character:inventory:item:name` | Shared item display name for any declared character. | 1 | `{if player:inventory:rope == item:rope}Found it.{/if}` | Reads the definition even when not held; unknown character or item is TW2001. |
 | `character:inventory:item:count` | Numeric quantity of an item held by any declared character. | 1 | `{if player:inventory:rope:count >= 2}Enough rope.{/if}` | Reads 0 when not held; unknown character, item or property is TW2001; read-only, use `give` or `take`. |
 | `@` in expressions | Named boolean predicate registered by a C# story project; no arguments. Distinct from line metadata. | 1 | `{if @CanPickLock}Try the lock.{/if}` | TW2005 unregistered predicate. |

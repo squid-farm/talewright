@@ -88,46 +88,50 @@ internal static class ExpressionParser
     public static Expr? ParseCondition(string text, SourceLocation location, StorySymbols symbols,
         DiagnosticBag diagnostics, SourceLocation? authoringLocation = null, Func<int, SourceLocation>? locate = null,
         bool highlightUnexpectedTokens = false, bool allowSkillChecks = false,
-        Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null)
+        Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null, SceneId? sceneOwner = null)
     {
         var tokens = symbols.Analysis?.Expression(ExpressionContextKind.Condition, text,
             authoringLocation ?? location, locate) ?? Lexer.Tokenize(text);
         var syntax = ExpressionSyntaxParser.ParseExpression(tokens, text.Length, locate ?? location.Offset, diagnostics,
             highlightUnexpectedTokens: highlightUnexpectedTokens, allowSkillChecks: allowSkillChecks);
         return ExpressionBinder.Bind(syntax, symbols, diagnostics, locate ?? location.Offset, ExprType.Bool,
-            createSkillCheckIdentity);
+            createSkillCheckIdentity, sceneOwner);
     }
 
     /// <summary>Parses and binds a numeric expression.</summary>
     public static Expr? ParseNumber(string text, SourceLocation location, StorySymbols symbols,
-        DiagnosticBag diagnostics)
+        DiagnosticBag diagnostics, SceneId? sceneOwner = null)
     {
         var tokens = symbols.Analysis?.Expression(ExpressionContextKind.Number, text, location)
             ?? Lexer.Tokenize(text);
         var syntax = ExpressionSyntaxParser.ParseExpression(tokens, text.Length, location.Offset, diagnostics);
-        return ExpressionBinder.Bind(syntax, symbols, diagnostics, location.Offset, ExprType.Number);
+        return ExpressionBinder.Bind(syntax, symbols, diagnostics, location.Offset, ExprType.Number,
+            sceneOwner: sceneOwner);
     }
 
     /// <summary>Parses and binds the inside of <c>{reference#modifier…}</c>.</summary>
     public static TemplateInline? ParseSubstitution(string text, SourceLocation location, StorySymbols symbols,
-        DiagnosticBag diagnostics, Func<int, SourceLocation>? locate = null, bool allowFormattedOutput = true)
+        DiagnosticBag diagnostics, Func<int, SourceLocation>? locate = null, bool allowFormattedOutput = true,
+        SceneId? sceneOwner = null)
     {
         var tokens = symbols.Analysis?.Expression(ExpressionContextKind.Substitution, text, location, locate)
             ?? Lexer.Tokenize(text);
         var syntax = ExpressionSyntaxParser.ParseSubstitution(tokens, text.Length, locate ?? location.Offset,
             diagnostics);
-        return ExpressionBinder.Bind(syntax, symbols, diagnostics, locate ?? location.Offset, allowFormattedOutput);
+        return ExpressionBinder.Bind(syntax, symbols, diagnostics, locate ?? location.Offset, allowFormattedOutput,
+            sceneOwner);
     }
 
     /// <summary>Parses and binds semicolon-separated effects.</summary>
     public static List<Effect>? ParseEffects(string text, SourceLocation location, StorySymbols symbols,
-        DiagnosticBag diagnostics, Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null)
+        DiagnosticBag diagnostics, Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null,
+        SceneId? sceneOwner = null)
     {
         var tokens = symbols.Analysis?.Expression(ExpressionContextKind.Effects, text, location)
             ?? Lexer.Tokenize(text);
         var syntax = ExpressionSyntaxParser.ParseEffects(tokens, text.Length, location.Offset, diagnostics,
             allowSkillChecks: createSkillCheckIdentity is not null);
-        return ExpressionBinder.Bind(syntax, symbols, diagnostics, location.Offset, createSkillCheckIdentity);
+        return ExpressionBinder.Bind(syntax, symbols, diagnostics, location.Offset, createSkillCheckIdentity, sceneOwner);
     }
 
     /// <summary>True for words that can't be used as ids.</summary>

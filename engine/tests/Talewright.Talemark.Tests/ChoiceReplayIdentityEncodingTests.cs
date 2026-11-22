@@ -59,6 +59,8 @@ public sealed class ChoiceReplayIdentityEncodingTests
         { "has item", new HasItem(Player, Rope), """["has-item","player","rope"]""" },
         { "visited", new Visited(new SceneId("cave")), """["visited","cave"]""" },
         { "current scene visits", new SceneVisitCountRef(null), """["scene-visit-count-ref",null]""" },
+        { "bound scene alias", new SceneVisitCountRef(new SceneId("cave"), true),
+            """["scene-visit-count-ref",null]""" },
         { "scene visits", new SceneVisitCountRef(new SceneId("cave")), """["scene-visit-count-ref","cave"]""" },
         { "inventory count", new InventoryCountRef(Player, Torch),
             """["inventory-count-ref","player","torch"]""" },

@@ -104,7 +104,7 @@ internal static class ImageSyntax
     }
 
     internal static MediaTemplate? Parse(SourceText source, int start, int end, bool closed, DiagnosticBag diagnostics,
-        StorySymbols symbols, CancellationToken cancellationToken = default)
+        StorySymbols symbols, CancellationToken cancellationToken = default, SceneId? sceneOwner = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         ArgumentNullException.ThrowIfNull(symbols.ImageSource);
@@ -266,7 +266,8 @@ internal static class ImageSyntax
             {
                 decoded = alt.Plain;
                 var parsed = InlineParser.Parse(alt.ToSource(), symbols, diagnostics,
-                    allowImages: false, cancellationToken: cancellationToken, allowFormattedOutput: false);
+                    allowImages: false, cancellationToken: cancellationToken, allowFormattedOutput: false,
+                    sceneOwner: sceneOwner);
                 if (parsed.Count > 0 && !IsPlain(parsed, decoded)) template = parsed;
 
                 return true;
@@ -302,7 +303,8 @@ internal static class ImageSyntax
                 }
                 mapped.Add(source.Locate(endAt));
                 InlineParser.Parse(SourceText.Mapped(authored, mapped), symbols, new DiagnosticBag(),
-                    allowImages: false, cancellationToken: cancellationToken, allowFormattedOutput: false);
+                    allowImages: false, cancellationToken: cancellationToken, allowFormattedOutput: false,
+                    sceneOwner: sceneOwner);
             }
         }
 

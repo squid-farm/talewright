@@ -51,7 +51,7 @@ finding the letter again on later visits; use a separate discovery flag if reque
 | Holds an item | `player has key` |
 | Has at least two items | `player:inventory:coin:count >= 2` |
 | Entered a scene / visit count | `player visited hall` / `hall:player:visits > 1` |
-| Current scene visit count | `scene:player:visits == 1` |
+| Owning scene visit count | `scene:player:visits == 1` |
 | Text / number variable | `var:weather == "rain"` / `var:clues >= 3` |
 | Stat / faction | `player:hp > 0` / `faction:guild:tier >= friendly` |
 | Combine | `flag:festival-happened and (var:clues >= 3 or player has key)` |

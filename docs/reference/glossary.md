@@ -16,7 +16,7 @@ For the design rules behind new syntax, see the
 | hub | A scene that offers other scenes with a tag as choices. | `@hub camp` |
 | location | Planned, not yet available ([#163](https://github.com/squid-farm/talewright/issues/163)). There is no location syntax today; use scenes and hubs. | — |
 | visit | The player's entry into a scene, including a hub. Talewright counts visits automatically. | `player visited camp` |
-| visit count | The number of times the player has entered a scene. `scene:player:visits` counts entries into the current scene. The count increases on entry, before the scene's text runs. | `camp:player:visits` |
+| visit count | The number of times the player has entered a scene. In a scene-owned expression, `scene:player:visits` counts entries into the scene that contains the expression, even when it is offered by a hub. The count increases on entry, before the scene's text runs. Manifest expressions without a scene owner read the player's current scene. | `camp:player:visits` |
 | choice | An option offered to the reader, on a line starting with `*`. | `* [Go home] -> END` |
 | divert | `->`: moving to another scene, or ending the story with `-> END`. | `-> forest` |
 | id | An author-chosen name, unique within its kind. Scene ids cannot match character ids, `scene` is reserved, and `inventory` cannot be an item id. | `temple.entrance` |

@@ -146,7 +146,8 @@ internal static class InlineParser
         bool allowFormattedOutput,
         CancellationToken cancellationToken,
         List<TalemarkClassification>? classifications = null,
-        Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null)
+        Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null,
+        SceneId? sceneOwner = null)
     {
         private int _remaining = CancellationInterval;
 
@@ -159,6 +160,7 @@ internal static class InlineParser
         public List<TalemarkClassification>? Classifications { get; } = classifications;
         public Func<EntityId, StatId, SkillCheckIdentity>? CreateSkillCheckIdentity { get; } =
             createSkillCheckIdentity;
+        public SceneId? SceneOwner { get; } = sceneOwner;
         public int WorkUnits { get; set; }
 
         public void Check()
@@ -187,17 +189,17 @@ internal static class InlineParser
 
     internal static IReadOnlyList<TemplateInline> Parse(SourceText source, StorySymbols symbols, DiagnosticBag diagnostics,
         bool allowImages = true, CancellationToken cancellationToken = default, bool allowFormattedOutput = true,
-        Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null) =>
+        Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null, SceneId? sceneOwner = null) =>
         ParseWithWork(source, symbols, diagnostics, allowImages, cancellationToken, allowFormattedOutput,
-            createSkillCheckIdentity).Inlines;
+            createSkillCheckIdentity, sceneOwner).Inlines;
 
     internal static InlineParseResult ParseWithWork(SourceText source, StorySymbols symbols, DiagnosticBag diagnostics,
         bool allowImages = true, CancellationToken cancellationToken = default, bool allowFormattedOutput = true,
-        Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null)
+        Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null, SceneId? sceneOwner = null)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var context = new Context(source, symbols, diagnostics, allowImages, allowFormattedOutput, cancellationToken,
-            createSkillCheckIdentity: createSkillCheckIdentity);
+            createSkillCheckIdentity: createSkillCheckIdentity, sceneOwner: sceneOwner);
         var text = source.Text;
         var scan = DelimiterScanner.Scan(text, DelimiterScanMode.ReaderText, cancellationToken: cancellationToken);
         context.WorkUnits += scan.WorkUnits;
@@ -509,7 +511,7 @@ internal static class InlineParser
             else
             {
                 ImageSyntax.Parse(context.Source, start, text.Length, false, context.Diagnostics,
-                        context.Symbols!, context.CancellationToken);
+                        context.Symbols!, context.CancellationToken, context.SceneOwner);
             }
 
             return;
@@ -583,7 +585,7 @@ internal static class InlineParser
                     context.Source.Locate(sourceOffset + lead + ExpressionVocabulary.Image.Length)))
                 { Kind = AuthoringTokenKind.Image });
             var media = ImageSyntax.Parse(context.Source, sourceOffset, close, true, context.Diagnostics,
-                context.Symbols!, context.CancellationToken);
+                context.Symbols!, context.CancellationToken, context.SceneOwner);
             return media is null ? null : new InlinePiece(media);
         }
 
@@ -627,14 +629,16 @@ internal static class InlineParser
                 symbols, context.Diagnostics,
                 locate: offset => source.Locate(sourceOffset + lead + SceneVocabulary.IfPrefix.Length + offset),
                 allowSkillChecks: context.CreateSkillCheckIdentity is not null,
-                createSkillCheckIdentity: context.CreateSkillCheckIdentity);
+                createSkillCheckIdentity: context.CreateSkillCheckIdentity,
+                sceneOwner: context.SceneOwner);
             return condition is null
                 ? null
                 : new IfPiece(condition, location, context.Source.Locate(sourceOffset - 1));
         }
 
         var substitution = ExpressionParser.ParseSubstitution(inner, location, symbols, context.Diagnostics,
-            offset => source.Locate(sourceOffset + offset), context.AllowFormattedOutput);
+            offset => source.Locate(sourceOffset + offset), context.AllowFormattedOutput,
+            sceneOwner: context.SceneOwner);
         return substitution is null ? null : new InlinePiece(substitution);
     }
 

@@ -844,7 +844,7 @@ player:inventory:rope:count
 player visited temple.hall
                           whether the player has entered the scene
 temple.hall:player:visits  number of times the player has entered the scene
-scene:player:visits       number of times the player has entered the current scene
+scene:player:visits       number of times the player has entered the expression's owning scene
 true false 12 "text"      literals
 hostile … allied          reputation tier names (compare with faction:<id>:tier)
 @CanPickLock              named predicate registered from C# (see C# extensions)
@@ -852,7 +852,9 @@ hostile … allied          reputation tier names (compare with faction:<id>:tie
 
 Types are checked at compile time (number, bool, text, tier).
 Only player visits are tracked. Scene visit counts are numeric, including for hubs; `scene` refers
-to the current scene, while `<scene-id>:player:visits` refers to a named scene.
+to the scene that owns the expression, even when that expression is evaluated in a hub offer.
+`<scene-id>:player:visits` refers to a named scene. Manifest triggers and character-sheet rules have
+no containing scene, so `scene:player:visits` continues to read the player's current scene there.
 Inventory counts are numeric, read-only references for any declared character and item. An item
 not held has a count of `0`; use `give` or `take` effects to change inventory.
 Choice history is replay input, not directly queryable in Talemark. There is no general choice or
