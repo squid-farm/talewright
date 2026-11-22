@@ -26,6 +26,10 @@ Saves use per-user local application data under `Talewright/saves` (normally
 Slot replacement is explicit and atomic; incompatible/corrupt loads leave the current playthrough intact.
 Export uses a native save dialog with the story-and-save filename prefilled.
 
+Photino's verbose window and web-message logs are disabled in desktop hosts, including
+published games. Unhandled exceptions are still reported to stderr and in a dialog.
+Native WebView and system warnings may still appear on the console.
+
 ## Files
 
 | File | Contents |

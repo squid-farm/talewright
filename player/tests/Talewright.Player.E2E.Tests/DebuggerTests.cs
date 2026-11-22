@@ -6,6 +6,53 @@ namespace Talewright.Player.E2E.Tests;
 [Collection(SerialCollection.Name)]
 public sealed class DebuggerTests
 {
+    [Theory]
+    [InlineData("desktop")]
+    [InlineData("debugger")]
+    [InlineData("run")]
+    public async Task Native_hosts_do_not_log_photino_web_messages(string mode)
+    {
+        var executableVariable = mode switch
+        {
+            "desktop" => "TALEWRIGHT_DESKTOP_EXECUTABLE",
+            "debugger" => "TALEWRIGHT_DEBUGGER_EXECUTABLE",
+            _ => "TALEWRIGHT_CLI_EXECUTABLE",
+        };
+        var executable = Environment.GetEnvironmentVariable(executableVariable)
+            ?? throw new InvalidOperationException($"Set {executableVariable} or use player/tests/run_e2e.py linux.");
+        var root = Path.Combine(Path.GetTempPath(), "talewright-quiet-host-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(root);
+        var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? root,
+            "quiet-host", Guid.NewGuid().ToString("N"));
+        try
+        {
+            await File.WriteAllTextAsync(Path.Combine(root, "story.talewright.yaml"),
+                $"game:\n  id: quiet-{Guid.NewGuid():N}\n  title: Quiet host\n  start: start\ncharacters:\n  player: {{first-name: Tester}}\n");
+            await File.WriteAllTextAsync(Path.Combine(root, "main.tale"),
+                "=== start\nFirst passage.\n* [Continue] -> next\n=== next\nSecond passage.\n* [Finish] -> END\n");
+            await using var driver = new NativePlayerDriver(artifacts, executable, windowInChildProcess: mode == "run");
+            if (mode == "run")
+                await driver.StartAsync("run", root);
+            else
+                await driver.StartAsync(root);
+
+            if (mode == "debugger")
+            {
+                await WaitFor(driver, "Scene setup");
+                await driver.ClickAsync("Start selected scene");
+            }
+            await WaitFor(driver, "First passage.");
+            await driver.ChooseAsync("Continue");
+            await WaitFor(driver, "Second passage.");
+            Assert.Equal(0, await driver.CloseWindowAsync());
+            Assert.DoesNotContain("Photino.NET:", await File.ReadAllTextAsync(Path.Combine(artifacts, "app.log")));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
     [Fact]
     public async Task Native_cli_debug_launches_selected_scene_plays_and_exits_when_the_window_closes()
     {
