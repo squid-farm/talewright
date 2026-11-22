@@ -29,9 +29,11 @@ public static class DesktopStoryPack
                     WriteString(writer, ValidateTextPath(path));
                     WriteString(writer, text);
                 }
-                writer.Write(source.ImagePaths.Count);
-                foreach (var path in source.ImagePaths.Where(path => path.StartsWith("images/", StringComparison.Ordinal))
-                             .Order(StringComparer.Ordinal))
+                var imagePaths = StoryImageResolver.CompletionPaths(source)
+                    .Select(path => "images/" + path)
+                    .ToArray();
+                writer.Write(imagePaths.Length);
+                foreach (var path in imagePaths)
                 {
                     WriteString(writer, ValidateImagePath(path));
                 }

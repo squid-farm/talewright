@@ -360,6 +360,23 @@ public sealed class PublishTests : IDisposable
         }
     }
 
+    [Fact]
+    public void Desktop_publication_ignores_unused_unsafe_or_unsupported_images()
+    {
+        Directory.CreateDirectory(Path.Combine(Story, "images"));
+        File.WriteAllText(Path.Combine(Story, "images", "unused#draft.png"), "not published");
+        File.WriteAllText(Path.Combine(Story, "images", "unused.txt"), "not published");
+
+        var result = RunControlled(new UnreadableInput(), inputRedirected: true,
+            publication: SplitBuilds(), args: ["-a", "--target", "desktop"]);
+
+        Assert.Equal(0, result.Code);
+        using var archive = ZipFile.OpenRead(Zip);
+        using var pack = archive.GetEntry("Publish/story.storypack")!.Open();
+        var source = DesktopStoryPack.Read(pack);
+        Assert.Empty(source.ImagePaths);
+    }
+
     [Theory]
     [InlineData(false, false)]
     [InlineData(false, true)]

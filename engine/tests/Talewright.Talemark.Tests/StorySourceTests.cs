@@ -32,6 +32,27 @@ public sealed class StorySourceTests : IDisposable
     }
 
     [Fact]
+    public void Desktop_story_pack_ignores_unused_unsafe_or_unsupported_images()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = "id: image-filter",
+        }, [
+            "images/camp.png",
+            "images/unused#draft.png",
+            "images/unused.txt",
+            "private-notes.txt",
+        ]);
+
+        using var buffer = new MemoryStream();
+        DesktopStoryPack.Write(buffer, source);
+        buffer.Position = 0;
+        var loaded = DesktopStoryPack.Read(buffer);
+
+        Assert.Equal(["images/camp.png"], loaded.ImagePaths);
+    }
+
+    [Fact]
     public void Desktop_story_pack_rejects_truncated_malformed_and_missing_manifest_packs()
     {
         using var buffer = new MemoryStream();
