@@ -488,5 +488,6 @@ internal sealed class ScenarioCommand
 [JsonSerializable(typeof(SkillCheckResolved))]
 [JsonSerializable(typeof(LevelChanged))]
 [JsonSerializable(typeof(TriggerFired))]
+[JsonSerializable(typeof(TriggerDiverted))]
 [JsonSerializable(typeof(StoryEnded))]
 internal partial class ScenarioJsonContext : JsonSerializerContext;

@@ -73,6 +73,40 @@ public sealed class AuthorTimelineTests
     private static AuthorSetup Flag(bool value) => new() { Flags = new Dictionary<FlagId, bool> { [new("ready")] = value } };
 
     [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Editing_entry_redirect_frame_preserves_destination_without_rerunning_start(bool withEffect)
+    {
+        var manifest = BuildManifest(includeChainFlag: true).Build();
+        manifest = manifest[..manifest.IndexOf("triggers:", StringComparison.Ordinal)] + """
+            triggers:
+              - id: redirect
+                when: scene:player:visits >= 1
+                do:
+                  divert: destination
+                once: true
+            """;
+        var tale = $$"""
+            === start
+            {{(withEffect ? "~ set flag:chain-0" : "")}}
+            Start body must not run.
+            * [Stay] -> start
+            === destination
+            Destination reached.
+            * [Finish] -> END
+            """;
+        var story = Compile(tale, manifest);
+        var session = AuthorSession.Create(story, new("start"), captureDecisions: true, seed: 42);
+        Assert.DoesNotContain("Start body must not run.", session.Current.Document.ToPlainText());
+        Assert.Single(session.Current.Choices);
+        session.Edit(Flag(false));
+
+        Assert.DoesNotContain("Start body must not run.", session.Current.Document.ToPlainText());
+        Assert.Single(session.Current.Choices);
+        Assert.False(session.State.GetFlag(new("chain-0")));
+    }
+
+    [Theory]
     [InlineData("flag", "flag:str")]
     [InlineData("var", "var:str")]
     [InlineData("faction", "faction:str")]

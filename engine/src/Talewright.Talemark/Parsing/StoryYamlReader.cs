@@ -233,34 +233,75 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
             }
 
             _yaml.CheckKeys(map, ManifestVocabulary.Id, ManifestVocabulary.When, ManifestVocabulary.Do, ManifestVocabulary.Once, ManifestVocabulary.Save);
-            if (_analysis is not null)
-            {
-                foreach (var (key, kind) in new[] { (ManifestVocabulary.When, ExpressionContextKind.Condition), (ManifestVocabulary.Do, ExpressionContextKind.Effects) })
-                {
-                    if (Get(map, key) is not YamlScalarNode scalar) continue;
-                    _analysis.Scalar(scalar, _yaml.At(scalar).File);
-                    _analysis.Expression(kind, scalar.Value ?? string.Empty, _yaml.At(scalar), cacheForReuse: true);
-                }
-            }
+            AnalyzeExpression(Get(map, ManifestVocabulary.When), ExpressionContextKind.Condition);
             var idNode = Get(map, ManifestVocabulary.Id);
             var id = _yaml.RequiredIdentifier(map, ManifestVocabulary.Id);
-            if (id is null)
-            {
-                continue;
-            }
-
-            if (idNode is YamlScalarNode idScalar)
+            if (id is not null && idNode is YamlScalarNode idScalar)
                 _analysis?.NameDeclaration(idScalar, AuthoringSymbolKind.Trigger, _yaml.At(idScalar).File);
 
-            if (!ids.Add(id))
+            var duplicate = id is not null && !ids.Add(id);
+            if (duplicate)
             {
                 _yaml.Diagnostics.Error(CompilerDiagnosticCodes.DuplicateConfigurationDeclaration, $"Trigger id '{id}' is declared more than once.", _yaml.At(idNode ?? item));
-                continue;
             }
 
             var when = _yaml.RequiredScalar(map, ManifestVocabulary.When);
-            var effects = _yaml.RequiredScalar(map, ManifestVocabulary.Do);
-            if (when is null || effects is null)
+            var actionNode = Get(map, ManifestVocabulary.Do);
+            string? effect = null;
+            SourceLocation? effectLocation = null;
+            string? divert = null;
+            SourceLocation? divertLocation = null;
+            var actionIsValid = true;
+            if (actionNode is null)
+            {
+                _yaml.RequiredScalar(map, ManifestVocabulary.Do);
+            }
+            else if (actionNode is YamlScalarNode)
+            {
+                effect = _yaml.RequiredScalar(map, ManifestVocabulary.Do);
+                effectLocation = _yaml.At(actionNode);
+                AnalyzeExpression(actionNode, ExpressionContextKind.Effects);
+            }
+            else if (actionNode is YamlMappingNode action)
+            {
+                _yaml.CheckKeys(action, ManifestVocabulary.Effect, ManifestVocabulary.Divert);
+                var effectNode = Get(action, ManifestVocabulary.Effect);
+                var divertNode = Get(action, ManifestVocabulary.Divert);
+                if (effectNode is null && divertNode is null)
+                {
+                    _yaml.Error(actionNode, CompilerDiagnosticCodes.InvalidConfigurationValue,
+                        "'do' must include at least an 'effect' or a 'divert'.", 0);
+                    actionIsValid = false;
+                }
+
+                if (effectNode is not null)
+                {
+                    effect = _yaml.RequiredScalar(action, ManifestVocabulary.Effect);
+                    effectLocation = _yaml.At(effectNode);
+                    AnalyzeExpression(effectNode, ExpressionContextKind.Effects);
+                }
+
+                if (divertNode is not null)
+                {
+                    _analysis?.ReferenceNode(divertNode, AuthoringSymbolKind.Scene,
+                        file: _yaml.At(divertNode).File, keywords: [SceneVocabulary.End]);
+                    var target = _yaml.RequiredScalar(action, ManifestVocabulary.Divert);
+                    if (target is not null)
+                    {
+                        divert = _yaml.Identifier(divertNode, $"'{ManifestVocabulary.Divert}'");
+                        divertLocation = _yaml.At(divertNode);
+                    }
+                }
+            }
+            else
+            {
+                _yaml.Error(actionNode, CompilerDiagnosticCodes.InvalidConfigurationValue,
+                    "'do' must be an effect string or a mapping with 'effect' and/or 'divert'.", 0);
+                actionIsValid = false;
+            }
+
+            if (when is null || !actionIsValid || actionNode is null || effect is null && divert is null
+                || id is null || duplicate)
             {
                 continue;
             }
@@ -271,7 +312,17 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
             var save = Get(map, ManifestVocabulary.Save) is { } saveNode
                 ? _yaml.Boolean(saveNode, ManifestVocabulary.Save, false)
                 : false;
-            triggers.Add(new RawTrigger(id, when, _yaml.At(Get(map, ManifestVocabulary.When)!), effects, _yaml.At(Get(map, ManifestVocabulary.Do)!), once, save));
+            triggers.Add(new RawTrigger(id, when, _yaml.At(Get(map, ManifestVocabulary.When)!),
+                effect, effectLocation, divert, divertLocation, once, save, _yaml.At(item)));
+        }
+
+        void AnalyzeExpression(YamlNode? node, ExpressionContextKind kind)
+        {
+            if (_analysis is not null && node is YamlScalarNode scalar)
+            {
+                _analysis.Scalar(scalar, _yaml.At(scalar).File);
+                _analysis.Expression(kind, scalar.Value ?? string.Empty, _yaml.At(scalar), cacheForReuse: true);
+            }
         }
     }
 }

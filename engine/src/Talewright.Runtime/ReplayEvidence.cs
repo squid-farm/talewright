@@ -406,6 +406,7 @@ internal static class ReplayEvidence
         SkillCheckResolved => "SkillCheckResolved",
         LevelChanged => "LevelChanged",
         TriggerFired => "TriggerFired",
+        TriggerDiverted => "TriggerDiverted",
         StoryEnded => "StoryEnded",
         _ => throw new NotSupportedException($"Game event '{gameEvent.GetType().Name}' has no replay evidence token."),
     };

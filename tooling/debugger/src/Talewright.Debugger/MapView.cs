@@ -1,5 +1,6 @@
 using Talewright.Core.Identity;
 using Talewright.Narrative.Templates;
+using Talewright.Rules.Effects;
 using Talewright.Talemark.Formatting;
 using Talewright.Talemark.Model;
 
@@ -10,9 +11,9 @@ namespace Talewright.Debugger;
 /// accessible scene and detail controls announce. <c>map.js</c> lays out each area separately with ELK.
 /// </summary>
 /// <param name="Title">Story title.</param>
-/// <param name="Nodes">Scenes and END in declaration order, then stubs.</param>
-/// <param name="Groups">Hub-offer tag groups.</param>
-/// <param name="Lines">Drawn diverts and hub offers. Duplicate diverts share one line marked ×N.</param>
+/// <param name="Nodes">Scenes and END in declaration order, then stubs and trigger declarations.</param>
+/// <param name="Groups">Hub-offer tag groups and the optional trigger section.</param>
+/// <param name="Lines">Drawn diverts, trigger redirects and hub offers. Duplicate diverts share one line marked ×N.</param>
 /// <param name="UnreachableScenes">Scenes, including END, that the start scene can't reach.</param>
 public sealed record MapView(
     string Title,
@@ -24,9 +25,13 @@ public sealed record MapView(
     public const string MainArea = "main";
     public const string UnreachableArea = "unreachable";
     public const string HubOfferKind = "HubOffer";
+    public const string TriggerKind = "Trigger";
+    public const string TriggerGroupId = "group:triggers";
 
     private const int LabelConditionLength = 26;
     private const int NodeTextLength = 30;
+    private const int TriggerIdLabelLength = 10;
+    private const int TriggerConditionLabelLength = 18;
 
     /// <summary>Builds the Map tab data for a successfully compiled story.</summary>
     public static MapView Build(StoryDefinition story)
@@ -38,6 +43,7 @@ public sealed record MapView(
         var items = map.Nodes.ToDictionary(node => node.Id, _ => new List<MapItem>(), StringComparer.Ordinal);
         var lines = new List<MapLine>();
         var stubs = new List<MapNode>();
+        var triggerNodes = new List<MapNode>();
 
         // A stub stands in, inside the unreachable area, for a reachable scene that an unreachable scene leads to.
         string Endpoint(string from, string to)
@@ -83,6 +89,39 @@ public sealed record MapView(
         // A hub-offered scene sits in the group of the tag that matched its first hub offer from its own area.
         var groupOf = new Dictionary<string, string>(StringComparer.Ordinal);
         var groups = new List<MapGroup>();
+        if (map.Triggers.Count > 0)
+            groups.Add(new MapGroup(TriggerGroupId, MainArea, "Triggers", true));
+
+        foreach (var trigger in map.Triggers)
+        {
+            var condition = ExpressionFormatter.Format(trigger.Condition);
+            var effects = trigger.Effects.Select(EffectText).ToArray();
+            var target = trigger.Divert?.ToString();
+            var outcomeParts = new List<string>();
+            if (effects.Length > 0)
+                outcomeParts.Add($"effects: {string.Join("; ", effects)}");
+            if (target is not null)
+                outcomeParts.Add($"diverts to {target}");
+            var outcome = outcomeParts.Count == 0 ? "no outcome" : string.Join("; ", outcomeParts);
+            var source = trigger.Source is { } location
+                ? $"{location.File}:{location.Line}:{location.Column}"
+                : "source location unavailable";
+            var name = $"Trigger {trigger.Id}, when {condition}, {outcome}, source {source}.";
+            var id = TriggerNodeId(trigger.Id);
+            var shortOutcome = string.Join("; ", new[]
+            {
+                effects.Length > 0 ? $"do {string.Join("; ", effects)}" : null,
+                target is null ? null : $"→ {target}",
+            }.OfType<string>());
+            triggerNodes.Add(new MapNode(id, null, MainArea,
+                [trigger.Id, Shorten($"when {condition}", NodeTextLength), Shorten(shortOutcome, NodeTextLength)],
+                name, TriggerGroupId, false, false, false, false, true, false, [], trigger.Id));
+
+            if (target is not null)
+                lines.Add(new MapLine($"t{lines.Count}", id, target, MainArea, TriggerKind, null,
+                    $"{Shorten(trigger.Id, TriggerIdLabelLength)}: {Shorten(condition, TriggerConditionLabelLength)}", [name]));
+        }
+
         foreach (var offer in map.HubOffers)
         {
             var scene = offer.Scene.Value;
@@ -133,9 +172,12 @@ public sealed record MapView(
                     node.IsReachable, false, items[node.Id])
                 : SceneNode(node, scenes[node.Id], story.Start, areas[node.Id], groupOf.GetValueOrDefault(node.Id), items[node.Id]))
             .Concat(stubs)
+                .Concat(triggerNodes)
             .ToArray();
         return new MapView(story.Title, nodes, groups, lines, map.Nodes.Count(node => !node.IsReachable));
     }
+
+    public static string TriggerNodeId(string triggerId) => $"trigger:{triggerId}";
 
     private static MapNode SceneNode(StoryMapNode node, SceneDefinition scene, SceneId start, string area, string? group,
         IReadOnlyList<MapItem> items)
@@ -212,6 +254,26 @@ public sealed record MapView(
     private static string ChoiceLabel(StoryDivert divert) =>
         divert.ChoiceLabel is null ? " (textless)" : $" “{PlainText(divert.ChoiceLabel)}”";
 
+    private static string EffectText(Effect effect) => effect switch
+    {
+        ChangeStat change => $"{change.Character.Value}:{change.Stat.Value} {Assignment(change.Op)} {ExpressionFormatter.Format(change.Amount)}",
+        ChangeStanding change => $"faction:{change.Faction.Value}:standing {Assignment(change.Op)} {ExpressionFormatter.Format(change.Amount)}",
+        ChangeVariable change => $"var:{change.Variable.Value} {Assignment(change.Op)} {ExpressionFormatter.Format(change.Amount)}",
+        SetTextVariable change => $"var:{change.Variable.Value} = {ExpressionFormatter.Format(change.Value)}",
+        SetFlag change => $"{(change.Value ? "set" : "clear")} flag:{change.Flag.Value}",
+        GiveItem change => $"give {change.Character.Value} {change.Item.Value} {ExpressionFormatter.Format(change.Quantity)}",
+        TakeItem change => $"take {change.Character.Value} {change.Item.Value} {ExpressionFormatter.Format(change.Quantity)}",
+        _ => throw new NotSupportedException($"Effect kind '{effect.GetType().Name}' has no debugger map description."),
+    };
+
+    private static string Assignment(AssignOp op) => op switch
+    {
+        AssignOp.Set => "=",
+        AssignOp.Add => "+=",
+        AssignOp.Subtract => "-=",
+        _ => throw new ArgumentOutOfRangeException(nameof(op), op, "Unknown assignment operator."),
+    };
+
     internal static string PlainText(IReadOnlyList<TemplateInline> inlines) => string.Concat(inlines.Select(inline => inline switch
     {
         TextTemplate text => text.Text,
@@ -227,20 +289,21 @@ public sealed record MapView(
         text.Length <= length ? text : string.Concat(text.AsSpan(0, length - 1), "…");
 }
 
-/// <summary>A scene, END or stub on the map.</summary>
-/// <param name="Id">Layout id: the scene id, <c>END</c>, or <c>stub:</c> and the scene a stub stands for.</param>
-/// <param name="Scene">The scene id, or null for END and stubs.</param>
+/// <summary>A scene, END, stub or trigger declaration on the map.</summary>
+/// <param name="Id">Layout id: a scene id, <c>END</c>, <c>stub:</c> and its target, or <c>trigger:</c> and its ID.</param>
+/// <param name="Scene">The scene id, or null for END, stubs and trigger declarations.</param>
 /// <param name="Area"><see cref="MapView.MainArea"/> or <see cref="MapView.UnreachableArea"/>.</param>
 /// <param name="Text">Lines drawn inside the node.</param>
 /// <param name="Name">Accessible name.</param>
-/// <param name="Group">The hub-offer tag group containing the scene, if any.</param>
+/// <param name="Group">The hub-offer tag group or trigger section containing this node, if any.</param>
 /// <param name="Start">Whether this is the start scene.</param>
 /// <param name="End">Whether this is END.</param>
 /// <param name="Hub">Whether the scene has <c>@hub</c>.</param>
 /// <param name="Once">Whether the scene has <c>@once</c>.</param>
-/// <param name="Reachable">Whether the start scene reaches it through diverts and hub offers.</param>
+/// <param name="Reachable">Whether this node belongs to the reachable map area; this does not mean a trigger will fire.</param>
 /// <param name="Stub">Whether this stands in for a reachable scene inside the unreachable area.</param>
-/// <param name="Items">The scene's diverts and then hub offers.</param>
+/// <param name="Items">The scene's diverts and then hub offers; empty for END, stubs and trigger declarations.</param>
+/// <param name="TriggerId">The trigger ID when this is a synthetic trigger declaration node.</param>
 public sealed record MapNode(
     string Id,
     string? Scene,
@@ -254,12 +317,13 @@ public sealed record MapNode(
     bool Once,
     bool Reachable,
     bool Stub,
-    IReadOnlyList<MapItem> Items);
+    IReadOnlyList<MapItem> Items,
+    string? TriggerId = null);
 
-/// <summary>A box around the scenes offered through one tag.</summary>
-public sealed record MapGroup(string Id, string Area, string Label);
+/// <summary>A box around scenes offered through a tag or the trigger declaration section.</summary>
+public sealed record MapGroup(string Id, string Area, string Label, bool TriggerSection = false);
 
-/// <summary>A drawn divert or hub offer. <see cref="Items"/> holds the full description of each one it stands for.</summary>
+/// <summary>A drawn divert, trigger redirect or hub offer. <see cref="Items"/> holds its full description.</summary>
 public sealed record MapLine(
     string Id,
     string From,

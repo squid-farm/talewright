@@ -9,6 +9,7 @@ using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
 using Talewright.Rules.Storylets;
 using Talewright.Rules.Triggers;
+using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Talemark.Model;
@@ -44,6 +45,10 @@ public sealed class StoryDefinition
     public required IReadOnlyList<SceneDefinition> Scenes { get; init; }
 
     public required IReadOnlyList<TriggerDefinition> Triggers { get; init; }
+
+    /// <summary>Source locations for the story-wide triggers, keyed by trigger ID.</summary>
+    public IReadOnlyDictionary<string, SourceLocation> TriggerSources { get; init; } =
+        new Dictionary<string, SourceLocation>(StringComparer.Ordinal);
 
     /// <summary>Predicates referenced by <c>@Name</c> expressions; the runtime evaluates with the same registry.</summary>
     public required NamedPredicateRegistry Predicates { get; init; }
@@ -100,7 +105,8 @@ public sealed class StoryDefinition
     [AllowNull]
     internal StoryReachability Reachability
     {
-        get => _reachability ??= StoryReachability.Find(Scenes, StoryDiverts.From(Scenes), Start);
+        get => _reachability ??= StoryReachability.Find(Scenes,
+            StoryDiverts.From(Scenes, Triggers, TriggerSources), Start);
         init => _reachability = value;
     }
 
@@ -117,7 +123,7 @@ public sealed class StoryDefinition
             if (Volatile.Read(ref _replayIdentities) is { } identities) return identities;
             lock (_replayIdentityGate)
             {
-                return _replayIdentities ??= CompiledReplayIdentities() ?? ChoiceReplayIdentity.Build(Scenes);
+                return _replayIdentities ??= CompiledReplayIdentities() ?? ChoiceReplayIdentity.Build(Scenes, Triggers);
             }
         }
         init => _replayIdentities = value;
@@ -133,6 +139,14 @@ public sealed class StoryDefinition
         foreach (var scene in Scenes)
         {
             if (!ReferenceEquals(scene.ReplayIdentityCache, table))
+            {
+                return null;
+            }
+        }
+        foreach (var trigger in Triggers)
+        {
+            if (trigger.Divert?.Scene is { } target
+                && Scenes.Any(scene => !table.Offsets.ContainsKey((scene.Id, target))))
             {
                 return null;
             }

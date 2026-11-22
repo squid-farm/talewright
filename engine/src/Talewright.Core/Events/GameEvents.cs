@@ -68,4 +68,10 @@ public sealed record LevelChanged(EntityId Character, int OldLevel, int NewLevel
 /// <summary>A story trigger fired (recorded so <c>once</c> triggers stay fired after replay).</summary>
 public sealed record TriggerFired(string TriggerId) : GameEvent;
 
+/// <summary>The winning redirect requested by a story trigger after the current trigger settlement.</summary>
+/// <param name="Source">The scene where the trigger fired, when a scene was active.</param>
+/// <param name="TriggerId">The trigger that supplied the final destination.</param>
+/// <param name="Target">The destination scene, or null for END.</param>
+public sealed record TriggerDiverted(SceneId? Source, string TriggerId, SceneId? Target) : GameEvent;
+
 public sealed record StoryEnded : GameEvent;

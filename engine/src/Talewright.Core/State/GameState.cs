@@ -193,7 +193,7 @@ public sealed class GameState : IGameStateView
             case StoryEnded:
                 IsEnded = true;
                 break;
-            case ChoiceMade or SkillCheckResolved:
+            case ChoiceMade or SkillCheckResolved or TriggerDiverted:
                 // Pure history; queried through the event log.
                 break;
             default:

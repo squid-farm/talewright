@@ -20,7 +20,9 @@
                 @foreach (var step in Run.Steps)
                 {
                     var text = step.TakenItemName is { } takenItemName
-                        ? $"{takenItemName} to {step.Scene}"
+                        ? step.TriggerSourceScene is { } source
+                            ? $"Trigger redirect from scene {source}: {takenItemName}"
+                            : $"{takenItemName} to {step.Scene}"
                         : step.Order == 1 ? $"Started at {step.Scene}" : step.Scene;
                     <li>@text</li>
                 }

@@ -99,6 +99,55 @@ public sealed class StoryMapTests
     }
 
     [Fact]
+    public void Public_map_exposes_trigger_outcomes_and_reachability_without_evaluating_conditions()
+    {
+        const string yaml = """
+            game: { id: trigger-map, title: Trigger map, start: start }
+            characters: { player: { first-name: Ada } }
+            triggers:
+              - id: secret-route
+                when: false
+                do:
+                  effect: set flag:routed
+                  divert: trigger-only
+              - id: end-route
+                when: false
+                do:
+                  divert: END
+            """;
+        const string tale = """
+            === start
+            * [Stay] -> start
+            === trigger-only
+            -> downstream
+            === downstream
+            -> trigger-only
+            === orphan
+            -> END
+            """;
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = yaml,
+            ["main.tale"] = tale,
+        }));
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+
+        var map = StoryMap.Build(result.Story!);
+
+        Assert.Equal(["start", "trigger-only", "downstream", "orphan", "END"], map.Nodes.Select(node => node.Id));
+        Assert.Equal([true, true, true, false, true], map.Nodes.Select(node => node.IsReachable));
+        Assert.Equal(2, map.Triggers.Count);
+        var trigger = Assert.Single(map.Triggers, candidate => candidate.Id == "secret-route");
+        Assert.Equal("secret-route", trigger.Id);
+        Assert.NotNull(trigger.Source);
+        Assert.Single(trigger.Effects);
+        Assert.Equal("trigger-only", trigger.Divert!.Scene!.Value.Value);
+        Assert.True(Assert.Single(map.Triggers, candidate => candidate.Id == "end-route").Divert!.IsEnd);
+        Assert.Contains(result.Warnings, warning =>
+            warning.Code == "TW3009" && warning.Message.Contains("'orphan'", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Public_map_connections_include_ordered_diverts_hub_offers_and_endpoints()
     {
         var manifest = TestStories.DefaultManifest();

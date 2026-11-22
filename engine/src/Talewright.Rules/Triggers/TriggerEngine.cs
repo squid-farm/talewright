@@ -1,10 +1,23 @@
 using Talewright.Core.Events;
+using Talewright.Core.Identity;
 using Talewright.Core.State;
 using Talewright.Rules.Diagnostics;
 using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
 
 namespace Talewright.Rules.Triggers;
+
+/// <summary>A trigger's destination. A null scene means END.</summary>
+public sealed record TriggerDestination(SceneId? Scene)
+{
+    public static TriggerDestination End { get; } = new((SceneId?)null);
+}
+
+/// <summary>The destination requested by the last fired trigger that redirects during a settlement.</summary>
+public sealed record TriggerRedirect(string TriggerId, TriggerDestination Destination);
+
+/// <summary>The triggers fired and the final redirect requested during one cascade settlement.</summary>
+public sealed record TriggerRunResult(IReadOnlyList<string> Fired, TriggerRedirect? Redirect);
 
 /// <summary>
 /// A reactive rule: when <see cref="When"/> becomes true, run <see cref="Effects"/>.
@@ -13,6 +26,7 @@ namespace Talewright.Rules.Triggers;
 public sealed record TriggerDefinition(string Id, Expr When, IReadOnlyList<Effect> Effects, bool Once)
 {
     public bool Save { get; init; }
+    public TriggerDestination? Divert { get; init; }
 }
 
 /// <summary>
@@ -95,14 +109,18 @@ public sealed class TriggerEngine
     }
 
     /// <summary>Fires every trigger whose condition has newly become true. Returns the ids fired, in order.</summary>
-    public IReadOnlyList<string> Run(EventLog log)
+    public IReadOnlyList<string> Run(EventLog log) => RunWithResult(log).Fired;
+
+    /// <summary>Fires eligible triggers and returns the last divert requested during the complete cascade.</summary>
+    public TriggerRunResult RunWithResult(EventLog log)
     {
         if (_triggers.Count == 0)
         {
-            return [];
+            return new([], null);
         }
 
         var fired = new List<string>();
+        TriggerRedirect? redirect = null;
         for (var pass = 0; pass <= MaxPasses; pass++)
         {
             var firedThisPass = false;
@@ -137,6 +155,10 @@ public sealed class TriggerEngine
                 log.Append(new TriggerFired(trigger.Id));
                 EffectExecutor.ExecuteAll(trigger.Effects, log, _predicates, _resolveSkillCheck);
                 fired.Add(trigger.Id);
+                if (trigger.Divert is { } destination)
+                {
+                    redirect = new TriggerRedirect(trigger.Id, destination);
+                }
                 firedThisPass = true;
                 Observe(DecisionOutcome.Fired, DecisionReason.RisingEdge);
 
@@ -155,12 +177,12 @@ public sealed class TriggerEngine
                         $"Fired: {firedIds}. Still eligible: {string.Join(", ", pending)}.");
                 }
 
-                return fired;
+                return new(fired, redirect);
             }
 
             if (!firedThisPass)
             {
-                return fired;
+                return new(fired, redirect);
             }
         }
 

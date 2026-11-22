@@ -814,6 +814,31 @@ public class CompilerTests
     }
 
     [Fact]
+    public void Trigger_diverts_validate_targets_and_require_an_action()
+    {
+        const string yaml = """
+            game: { id: trigger-target, title: Trigger target, start: a }
+            characters: { player: { first-name: Ada } }
+            triggers:
+              - id: rescue
+                when: true
+                do:
+                  divert: missing
+            """;
+        var result = Compile("=== a\n-> END", yaml);
+        var diagnostic = Assert.Single(result.Errors, error => error.Code == CompilerDiagnosticCodes.UnknownScene);
+
+        Assert.Contains("Trigger 'rescue'", diagnostic.Message);
+        Assert.Contains("unknown scene 'missing'", diagnostic.Message);
+        Assert.Equal(new SourceLocation("story.talewright.yaml", 7, 15), diagnostic.Location);
+
+        var missingAction = Compile("=== a\n-> END", yaml.Replace("do:\n      divert: missing", "do: {}", StringComparison.Ordinal));
+        Assert.Contains(missingAction.Errors, error =>
+            error.Code == CompilerDiagnosticCodes.InvalidConfigurationValue
+            && error.Message.Contains("at least an 'effect' or a 'divert'", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Inline_conditionals_cannot_cross_formatting()
     {
         Error("=== a\n*{if true}a*{/if}\n-> END", "TW1005");

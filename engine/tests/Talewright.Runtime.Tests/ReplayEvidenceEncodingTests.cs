@@ -58,6 +58,8 @@ public sealed class ReplayEvidenceEncodingTests
             """["LevelChanged",{"character":{"value":"player"},"oldLevel":1,"newLevel":2}]""" },
         { "trigger", new TriggerFired("outcast"),
             """["TriggerFired",{"triggerId":"outcast"}]""" },
+        { "trigger divert", new TriggerDiverted(new SceneId("cave"), "rescue", new SceneId("safe")),
+            """["TriggerDiverted",{"source":{"value":"cave"},"triggerId":"rescue","target":{"value":"safe"}}]""" },
         { "end", new StoryEnded(),
             """["StoryEnded",{}]""" },
     };

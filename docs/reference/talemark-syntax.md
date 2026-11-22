@@ -189,6 +189,12 @@ triggers:
     once: true
 ```
 
+`do` may stay a scalar effect string or be a mapping with `effect`, `divert`, or both. A redirect
+target is a scene ID or `END`; if both keys are present, effects run before the redirect regardless
+of YAML key order. Triggers are checked sequentially in authored order after each complete effect
+batch, and the last redirect requested during settlement overrides the interrupted scene or choice
+continuation.
+
 List-form flags start as false. Use a mapping to set their starting values:
 `flags: { door-open: false, guide-trusts-you: true }`. A flag declared by an effect
 without a manifest entry also starts as false.
