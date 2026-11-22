@@ -13,7 +13,7 @@ public sealed class ValidationTests : IDisposable
     public ValidationTests()
     {
         Directory.CreateDirectory(_root);
-        var manifest = new ManifestFaker("cli", "CLI", "a") { Version = "1", BaseRuleset = "rpg" };
+        var manifest = new ManifestFaker("cli", "CLI", "a") { Version = "1", Talemark = 1, BaseRuleset = "rpg" };
         manifest.Character("player", "Tester");
         File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), manifest.Build(trailingNewline: true));
         File.WriteAllText(Path.Combine(_root, "main.tale"), string.Join('\n',
@@ -119,6 +119,28 @@ public sealed class ValidationTests : IDisposable
         var result = Run("--format", "json", "--warnings-as-errors");
         Assert.Equal(1, result.Code);
         Assert.Contains("\"severity\":\"warning\"", result.Output);
+    }
+
+    [Theory]
+    [InlineData("validate")]
+    [InlineData("lint")]
+    public void Missing_talemark_version_is_information_and_does_not_fail_warnings_as_errors(string command)
+    {
+        var manifestPath = Path.Combine(_root, "story.talewright.yaml");
+        File.WriteAllText(manifestPath,
+            File.ReadAllText(manifestPath).Replace("  talemark: 1\n", "", StringComparison.Ordinal));
+
+        using var output = new StringWriter();
+        using var error = new StringWriter();
+        var code = CommandLine.Run([command, _root, "--format", "json", "--warnings-as-errors"], output, error);
+        using var json = JsonDocument.Parse(output.ToString());
+        var notice = Assert.Single(json.RootElement.GetProperty("diagnostics").EnumerateArray());
+
+        Assert.Equal(0, code);
+        Assert.True(json.RootElement.GetProperty("success").GetBoolean());
+        Assert.Equal("TW4008", notice.GetProperty("code").GetString());
+        Assert.Equal("information", notice.GetProperty("severity").GetString());
+        Assert.Contains("talemark: 1", notice.GetProperty("message").GetString());
     }
 
     [Theory]

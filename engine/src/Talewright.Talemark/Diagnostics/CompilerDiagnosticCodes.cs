@@ -56,4 +56,5 @@ public static class CompilerDiagnosticCodes
     public const string UnknownConfigurationReference = "TW4005";
     public const string UnknownConfigurationKey = "TW4006";
     public const string DuplicateConfigurationDeclaration = "TW4007";
+    public const string MissingTalemarkVersion = "TW4008";
 }

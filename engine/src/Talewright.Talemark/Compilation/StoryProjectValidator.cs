@@ -26,7 +26,12 @@ public static class StoryProjectValidator
             var location = diagnostic.Location;
             var file = string.IsNullOrEmpty(location.File) ? Path.Combine(directory, StorySource.ManifestFileName)
                 : Path.Combine(directory, location.File);
-            var severity = diagnostic.Severity == DiagnosticSeverity.Error ? "error" : "warning";
+            var severity = diagnostic.Severity switch
+            {
+                DiagnosticSeverity.Error => "error",
+                DiagnosticSeverity.Warning => "warning",
+                _ => "information",
+            };
             output.WriteLine($"{file}({Math.Max(1, location.Line)},{Math.Max(1, location.Column)}): {severity} {diagnostic.Code}: {diagnostic.Message}");
         }
 

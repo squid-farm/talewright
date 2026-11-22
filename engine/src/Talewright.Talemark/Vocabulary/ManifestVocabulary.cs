@@ -18,6 +18,7 @@ internal static class ManifestVocabulary
     internal const string Id = "id";
     internal const string Title = SceneVocabulary.Title;
     internal const string Version = "version";
+    internal const string Talemark = "talemark";
     internal const string Start = "start";
     internal const string Randomness = "randomness";
     internal const string Seed = "seed";
@@ -107,7 +108,7 @@ internal static class ManifestVocabulary
     internal static readonly ImmutableArray<string> PropertyKeys =
     [
         Game, Characters, Factions, Items, Flags, Vars, Triggers,
-        Id, Title, Version, Start, Randomness, Seed, Undo, Autosave, CharacterSheet, Ruleset, Creation,
+        Id, Title, Version, Talemark, Start, Randomness, Seed, Undo, Autosave, CharacterSheet, Ruleset, Creation,
         When, Do, Once, Save, Base, Disable, Stats, Shown, Name, Category, Min, Max, Default, GoverningAttribute,
         FirstName, LastName, Pronouns, Inventory, NameAgreement, Subject, Object, PossessivePronoun, Reflexive,
         Agreement, Determiner, Independent, Uncountable, Modifiers, Standing, Presets, Label,

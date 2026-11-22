@@ -38,6 +38,7 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
         }
         var game = gameNode is null ? new YamlMappingNode() : _yaml.Mapping(gameNode, ManifestVocabulary.Game) ?? new YamlMappingNode();
         _yaml.CheckKeys(game, ManifestVocabulary.Id, ManifestVocabulary.Title, ManifestVocabulary.Version,
+            ManifestVocabulary.Talemark,
             ManifestVocabulary.Start, ManifestVocabulary.Randomness, ManifestVocabulary.Seed,
             ManifestVocabulary.Undo, ManifestVocabulary.Autosave, ManifestVocabulary.CharacterSheet,
             ManifestVocabulary.Ruleset, ManifestVocabulary.Creation);
@@ -63,6 +64,35 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
             Start = _yaml.RequiredIdentifier(game, ManifestVocabulary.Start) ?? string.Empty,
             StartLocation = Get(game, ManifestVocabulary.Start) is { } startNode ? _yaml.At(startNode) : _yaml.At(game),
         };
+
+        if (Get(game, ManifestVocabulary.Talemark) is not { } talemark)
+        {
+            _yaml.Diagnostics.Information(
+                CompilerDiagnosticCodes.MissingTalemarkVersion,
+                "game.talemark is not set. Add 'talemark: 1' to preserve the current integer arithmetic. " +
+                "See the language-version migration guide: https://github.com/squid-farm/talewright/blob/main/docs/guide/talemark/language-versions.md",
+                _yaml.At(game));
+        }
+        else if (talemark is not YamlScalarNode scalar ||
+                 scalar.Style is YamlDotNet.Core.ScalarStyle.DoubleQuoted or YamlDotNet.Core.ScalarStyle.SingleQuoted ||
+                 !int.TryParse(Scalar(talemark), NumberStyles.None, CultureInfo.InvariantCulture, out var talemarkVersion))
+        {
+            _yaml.Diagnostics.Error(
+                CompilerDiagnosticCodes.InvalidConfigurationValue,
+                "game.talemark must be the integer 1; quoted or other values are invalid.",
+                _yaml.At(talemark));
+        }
+        else if (talemarkVersion != 1)
+        {
+            _yaml.Diagnostics.Error(
+                CompilerDiagnosticCodes.InvalidConfigurationValue,
+                $"Talemark version {talemarkVersion} is not supported by this release. Use 1 or omit game.talemark to use version 1.",
+                _yaml.At(talemark));
+        }
+        else
+        {
+            manifest.TalemarkVersion = 1;
+        }
 
         if (Get(game, ManifestVocabulary.Randomness) is { } randomness)
         {

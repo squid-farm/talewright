@@ -11,20 +11,26 @@ not the casing of their C# implementation.
 ## Compatibility freeze
 
 Talewright's compatibility promise starts with **1.0.0-preview.1**, which has not shipped yet. Until
-then the story format can still change. From that release on, these rules apply:
+then the story format can still change.
+
+From that release on, compatibility guarantees apply within a major Talewright version:
 
 - Don't make backward-incompatible changes to Talemark syntax or meaning, the manifest schema, the
   save format, replay evidence, choice identities or gameplay behaviour.
-- Additive changes are fine if you show they don't change existing stories or saves: no character
-  or word that existing prose may already use becomes reserved, existing stories compile the same
-  way, and the [golden save tests](engine/tests/Talewright.Runtime.Tests/SaveSamples/golden/README.md)
+- Additive changes are fine if they do not change existing stories or saves: no character or word
+  that existing prose may already use becomes reserved, existing stories compile the same way, and
+  the [golden save tests](engine/tests/Talewright.Runtime.Tests/SaveSamples/golden/README.md)
   pass unchanged.
-- A breaking change is allowed only for a severe defect, such as a security or data-loss bug. It
-  needs a project-lead decision, advance notice, a version bump and migration notes, and the old
-  form must produce an error that names its replacement.
+- A breaking change within the major version is allowed only for a severe defect, such as a security
+  or data-loss bug. It needs a project-lead decision, advance notice, a version bump and migration
+  guidance, and the detectable old form must fail with an actionable message that names its replacement.
+- A deliberate major-version break requires the same project-lead decision and advance notice,
+  plus migration guidance and a release-gated version bump.
 
-Author Debugger scenario files, tooling, and the C# extension and NuGet APIs are not frozen before
-1.0. Whatever the release, a failed load must keep the active session and the original stored bytes.
+These guarantees cover the author-facing story format, saves and replay evidence. Author Debugger
+scenario files, tooling, C# extension APIs and NuGet APIs remain outside this format guarantee,
+although failed loads must preserve the active session and original stored bytes. Existing save bytes
+must remain loadable; failed loads must not replace active state or the stored bytes.
 
 ## Set up
 

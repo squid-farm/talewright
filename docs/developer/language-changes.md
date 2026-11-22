@@ -34,6 +34,11 @@ meanings and the difference between implemented and decided syntax.
   change needs a severe defect, an explicit project-lead decision, advance notice, an error that names
   the replacement, a version bump and migration notes. See the
   [compatibility freeze](../../CONTRIBUTING.md#compatibility-freeze).
+- [ ] State the major-version boundary. Compatibility guarantees hold within a major Talewright
+  version. A deliberate major-version break is allowed only with a project-lead decision, advance
+  notice and migration guidance. The severe-defect exception within a major version retains the
+  decision, notice, version-bump and migration requirements. Detectable incompatible inputs must fail
+  clearly; failed loads must preserve the active session and original save bytes.
 - [ ] Show that existing stories and saves are unchanged: the shipped samples compile with the same
   diagnostics and the golden save tests pass without updating their fixtures.
 - [ ] Check identifier collisions, hyphen/subtraction ambiguity and interactions with nested

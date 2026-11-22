@@ -59,4 +59,6 @@ public sealed record CompilationResult(StoryDefinition? Story, IReadOnlyList<Dia
     public IEnumerable<Diagnostic> Errors => Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Error);
 
     public IEnumerable<Diagnostic> Warnings => Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Warning);
+
+    public IEnumerable<Diagnostic> Information => Diagnostics.Where(d => d.Severity == DiagnosticSeverity.Information);
 }

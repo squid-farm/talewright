@@ -49,6 +49,7 @@ public sealed class ManifestFaker
     public string Start { get; }
     public ulong? Seed { get; }
     public string? Version { get; init; }
+    public int? Talemark { get; init; }
     public string? BaseRuleset { get; init; }
     public string? Randomness { get; init; }
     public bool? Undo { get; init; }
@@ -281,6 +282,10 @@ public sealed class ManifestFaker
         if (Version is not null)
         {
             Add(game, "version", Version);
+        }
+        if (Talemark is not null)
+        {
+            Add(game, "talemark", Talemark.Value);
         }
         Add(game, "start", Start);
         if (Randomness is not null)
