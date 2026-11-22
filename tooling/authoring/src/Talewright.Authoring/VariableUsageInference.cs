@@ -32,7 +32,7 @@ internal static class VariableUsageInference
     private static VariableUsageType Infer(StoryAnalysis analysis, ExpressionContext context, int offset)
     {
         var text = context.Text;
-        var tokens = Lexer.Tokenize(text);
+        var tokens = Lexer.Tokenize(text, analysis.TalemarkVersion);
         var diagnostics = new DiagnosticBag();
         SourceLocation Locate(int at) => new(context.Range.Start.File, 1, at + 1);
         switch (context.Kind)
