@@ -27,7 +27,7 @@ builder.Services.AddSingleton<IDiagnosticReportExporter>(new LocalDiagnosticRepo
 builder.Services.AddScoped<PlayerDiagnostics>();
 builder.Services.AddScoped<PlayerPreferencesStore>();
 builder.RootComponents.Add<Desktop.App>("app");
-var app = builder.Build();
+var app = builder.Build(services => services.GetRequiredService<PhotinoWindow>().LogVerbosity = 0);
 window = app.MainWindow;
 app.MainWindow.SetTitle("CSharp Story");
 app.Run();

@@ -10,6 +10,9 @@ dotnet run --project tooling/cli/src/Talewright.Cli -- debug samples/LostRelic
 For native prerequisites and platform coverage, see the [CLI reference](../../../../docs/reference/cli.md#debug).
 For the author workflow, see [Testing your story](../../../../docs/guide/testing-your-story.md#3-jump-to-any-scene-with-the-author-debugger).
 
+The debugger and play-only host disable Photino's verbose window and web-message logs;
+unhandled exceptions still appear on stderr and in a dialog.
+
 How it's built:
 
 - **Normal play.** The same native host has a separate play-only mode for `talewright run`. It uses

@@ -69,11 +69,10 @@ internal static class Program
                 builder.Services.AddSingleton(mapExportDialog);
                 builder.RootComponents.Add<Workbench>("app");
             }
-            var app = builder.Build();
+            var app = builder.Build(services => services.GetRequiredService<PhotinoWindow>().LogVerbosity = 0);
             window = app.MainWindow;
             if (player is not null)
             {
-                app.MainWindow.LogVerbosity = 0;
                 player.SetTitle = title => app.MainWindow.SetTitle(title);
                 app.MainWindow.SetTitle("Talewright").SetSize(1200, 850).SetUseOsDefaultSize(false).Center();
             }
