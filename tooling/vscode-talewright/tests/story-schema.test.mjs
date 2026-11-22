@@ -439,3 +439,18 @@ test('schema rejects missing required fields, wrong types, and invalid closed en
     characters: { player: { 'first-name': 'Ada' } },
   }, 'creation value constraints');
 });
+
+test('schema and YAML parser accept Talemark 1.0 as integer version 1', () => {
+  const manifest = parsedYaml(`
+game:
+  id: talemark-decimal
+  title: Talemark decimal
+  start: beginning
+  talemark: 1.0
+characters:
+  player:
+    first-name: Ada
+`, 'Talemark decimal manifest');
+
+  assertValid(validateManifest, manifest, 'Talemark decimal manifest');
+});

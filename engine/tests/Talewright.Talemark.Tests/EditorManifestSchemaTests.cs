@@ -68,12 +68,32 @@ public class EditorManifestSchemaTests
         Assert.Contains("language-versions.md", notice.Message);
     }
 
+    [Fact]
+    public void Talemark_accepts_decimal_integer_form_used_by_yaml_schema()
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = """
+                game:
+                  id: language
+                  title: Language
+                  talemark: 1.0
+                  start: beginning
+                characters: { player: { first-name: Ada } }
+                """,
+            ["main.tale"] = "=== beginning\nHello.\n-> END\n",
+        }));
+
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        Assert.Empty(result.Diagnostics);
+        Assert.Equal(1, result.Story!.TalemarkVersion);
+    }
+
     [Theory]
     [InlineData("0")]
     [InlineData("2")]
     [InlineData("3")]
     [InlineData("\"1\"")]
-    [InlineData("1.0")]
     [InlineData("one")]
     public void Talemark_rejects_malformed_unsupported_and_future_values(string value)
     {

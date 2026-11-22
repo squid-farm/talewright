@@ -75,14 +75,14 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
         }
         else if (talemark is not YamlScalarNode scalar ||
                  scalar.Style is YamlDotNet.Core.ScalarStyle.DoubleQuoted or YamlDotNet.Core.ScalarStyle.SingleQuoted ||
-                 !int.TryParse(Scalar(talemark), NumberStyles.None, CultureInfo.InvariantCulture, out var talemarkVersion))
+                 !decimal.TryParse(Scalar(talemark), NumberStyles.AllowDecimalPoint, CultureInfo.InvariantCulture, out var talemarkVersion))
         {
             _yaml.Diagnostics.Error(
                 CompilerDiagnosticCodes.InvalidConfigurationValue,
                 "game.talemark must be the integer 1; quoted or other values are invalid.",
                 _yaml.At(talemark));
         }
-        else if (talemarkVersion != 1)
+        else if (talemarkVersion != 1m)
         {
             _yaml.Diagnostics.Error(
                 CompilerDiagnosticCodes.InvalidConfigurationValue,

@@ -78,6 +78,17 @@ public sealed class PlayerDiagnosticsTests
     }
 
     [Fact]
+    public void Informational_compiler_diagnostics_are_not_reported_as_warnings_or_errors()
+    {
+        var diagnostics = new PlayerDiagnostics();
+        diagnostics.RecordCompiler(new Diagnostic(DiagnosticSeverity.Information, "TW4008",
+            "game.talemark is not set.", SourceLocation.None));
+
+        Assert.Contains("Recent warnings and errors: 0", diagnostics.CreateReport());
+        Assert.DoesNotContain("TW4008", diagnostics.CreateReport());
+    }
+
+    [Fact]
     public void Exception_details_compiler_messages_paths_and_unsafe_ids_never_enter_the_report()
     {
         const string secret = "PRIVATE_CONTENT_5f2d";

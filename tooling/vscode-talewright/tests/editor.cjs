@@ -513,6 +513,13 @@ async function testYamlSchema() {
     await replaceDocument(document, valid);
     diagnostics = await waitForDiagnostics(document, items => items.length === 0);
 
+    const talemarkDecimal = valid.replace('  start: beginning\n',
+      '  start: beginning\n  talemark: 1.0\n');
+    await replaceDocument(document, talemarkDecimal);
+    diagnostics = await waitForDiagnostics(document, items => items.length === 0);
+    await replaceDocument(document, valid);
+    await waitForDiagnostics(document, items => items.length === 0);
+
     const completionPosition = document.positionAt(document.getText().indexOf('    \n') + 4);
     const completions = await vscode.commands.executeCommand(
       'vscode.executeCompletionItemProvider',
