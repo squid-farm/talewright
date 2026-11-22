@@ -4,7 +4,7 @@
 
 <dialog class="tw-saves" aria-label="Saves" tabindex="-1" @ref="_dialog" data-busy="@(Busy ? "true" : "false")">
     <h2>Saves</h2>
-    <button type="button" class="tw-link" disabled="@Busy" @onclick="OnClose">Close saves</button>
+    <button type="button" class="tw-link tw-saves-close" disabled="@Busy" @onclick="OnClose">Close saves</button>
     @if (Message is not null)
     {
         <p class="@(Error ? "tw-error" : "tw-save-status")" role="@(Error ? "alert" : "status")">@Message</p>
@@ -129,9 +129,6 @@
     private bool _initialized;
 
     private Task ChangeSlot(ChangeEventArgs args) => SlotChanged.InvokeAsync(args.Value?.ToString() ?? "");
-
-    [JSInvokable]
-    public Task DismissAsync() => OnClose.InvokeAsync();
 
     [JSInvokable]
     public Task FocusAfterLoadAsync() => OnFocusAfterLoad.InvokeAsync();
