@@ -60,8 +60,9 @@ hidden until you choose **Reveal image**. If the story's image files changed sin
 revealed picture may look different or fail to load. Revealed pictures appear within the reading
 width, framed to match the theme, without a separate scroll box.
 
-In the story, click or tap an illustration to inspect it at full resolution. Press **Escape**, choose
-**Close image**, or click the backdrop to return to the passage.
+In the story, click or tap an illustration to inspect it at full resolution against a dimmed view
+of the passage. Press **Escape**, choose **Close image**, or click the backdrop to return to the
+passage.
 
 Use **Return to play**, or press **History** again, to go back to where you were. You can't choose,
 save, load or restart while History is open.

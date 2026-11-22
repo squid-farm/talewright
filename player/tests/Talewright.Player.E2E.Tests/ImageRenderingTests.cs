@@ -504,7 +504,6 @@ public sealed class ImageRenderingTests : PlayerTest
         await Expect(trigger).ToBeVisibleAsync();
         await Expect(trigger).ToHaveCSSAsync("cursor", "zoom-in");
         var dialog = Page.Locator("dialog.tw-image-lightbox");
-        string? lightBackground = null;
         foreach (var theme in new[] { "light", "dark" })
         {
             await Page.EvaluateAsync("theme => document.documentElement.dataset.twTheme = theme", theme);
@@ -526,10 +525,16 @@ public sealed class ImageRenderingTests : PlayerTest
                 await expanded.ElementHandleAsync());
             Assert.Equal(await illustration.EvaluateAsync<int>("image => image.naturalWidth"),
                 await expanded.EvaluateAsync<int>("image => image.naturalWidth"));
-            var background = await dialog.EvaluateAsync<string>("element => getComputedStyle(element).backgroundColor");
-            Assert.NotEqual("rgba(0, 0, 0, 0)", background);
-            if (theme == "light") lightBackground = background;
-            else Assert.NotEqual(lightBackground, background);
+            Assert.Equal("rgba(0, 0, 0, 0)",
+                await dialog.EvaluateAsync<string>("element => getComputedStyle(element).backgroundColor"));
+            var backdropOpacity = await dialog.EvaluateAsync<double>("""
+                element => {
+                    const color = getComputedStyle(element, "::backdrop").backgroundColor;
+                    const alpha = color.match(/^rgba\([^,]+,[^,]+,[^,]+,\s*([\d.]+)\)$/);
+                    return alpha ? Number(alpha[1]) : -1;
+                }
+                """);
+            Assert.InRange(backdropOpacity, 0.01, 0.5);
 
             if (theme == "light")
             {
@@ -539,7 +544,9 @@ public sealed class ImageRenderingTests : PlayerTest
             }
             else
             {
-                await dialog.EvaluateAsync("element => element.click()");
+                await expanded.ClickAsync();
+                await Expect(dialog).ToBeVisibleAsync();
+                await Page.Mouse.ClickAsync(5, 5);
                 await Expect(dialog).ToBeHiddenAsync();
                 await Expect(trigger).ToBeFocusedAsync();
             }
