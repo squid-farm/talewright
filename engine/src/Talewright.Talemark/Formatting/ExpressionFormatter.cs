@@ -91,9 +91,11 @@ public static class ExpressionFormatter
         Visited visited => $"{Player} {ExpressionVocabulary.Visited} {Name(visited.Scene.Value)}",
         SceneVisitCountRef visits => Reference(
             visits.IsSceneAlias
-                ? ExpressionVocabulary.Scene
-                : visits.Scene is { } scene
-                    ? Name(scene.Value)
+                ? visits.Scene is { } aliasScene
+                    ? Name(aliasScene.Value)
+                    : ExpressionVocabulary.Scene
+                : visits.Scene is { } namedScene
+                    ? Name(namedScene.Value)
                     : ExpressionVocabulary.Scene,
             Player,
             Visits),
