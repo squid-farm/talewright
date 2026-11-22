@@ -22,6 +22,12 @@
           "default": "0.0.0",
           "description": "Author-defined story version. Defaults to 0.0.0."
         },
+        "talemark": {
+          "type": "integer",
+          "enum": [1],
+          "default": 1,
+          "description": "Talemark language version. Omit it during v0 to preserve version 1 behavior with an informational migration notice; pin it to 1 for the current integer arithmetic."
+        },
         "start": {
           "$ref": "#/definitions/identifier",
           "description": "ID of the scene where play begins. The compiler checks that this scene exists."

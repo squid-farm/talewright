@@ -34,6 +34,7 @@ public sealed class HistoryNavigationPerformanceTests : PlayerTest
             game:
               id: history-navigation
               title: History navigation
+              talemark: 1
               start: loop
               seed: 42
             characters:

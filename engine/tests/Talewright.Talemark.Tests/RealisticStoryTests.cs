@@ -3,6 +3,7 @@ using System.Text;
 using Talewright.Core.Identity;
 using Talewright.Runtime;
 using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Model;
 using Talewright.Testing;
 
@@ -86,12 +87,16 @@ public sealed class RealisticStoryTests
         Assert.InRange(result.Story!.Scenes.Count, minScenes, maxScenes);
         Assert.Equal(generated.SceneCount, result.Story.Scenes.Count);
         Assert.Equal(chapters / Profile.CutSceneEveryChapters, generated.CutSceneCount);
-        Assert.All(result.Diagnostics, diagnostic =>
+        var notice = Assert.Single(result.Information);
+        Assert.Equal("TW4008", notice.Code);
+        Assert.Equal(DiagnosticSeverity.Information, notice.Severity);
+        Assert.Empty(result.Errors);
+        Assert.All(result.Warnings, diagnostic =>
         {
             Assert.Equal("TW3009", diagnostic.Code);
             Assert.Contains(".cut'", diagnostic.Message);
         });
-        Assert.Equal(generated.CutSceneCount, result.Diagnostics.Count);
+        Assert.Equal(generated.CutSceneCount, result.Warnings.Count());
     }
 
     [Fact]

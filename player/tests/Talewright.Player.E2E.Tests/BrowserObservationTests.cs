@@ -6,6 +6,41 @@ namespace Talewright.Player.E2E.Tests;
 public sealed class BrowserObservationTests(WebHostFixture host, ITestOutputHelper output) : PlayerTest(host, output)
 {
     [Fact]
+    public async Task Reload_waits_for_the_library_after_document_load()
+    {
+        await Page.AddInitScriptAsync("""
+            window.libraryStartup = new Promise(resolve => { window.releaseLibraryStartup = resolve; });
+            """);
+        await Page.RouteAsync(BaseUrl, async route =>
+        {
+            var response = await route.FetchAsync();
+            var html = await response.TextAsync();
+            Assert.Contains("<script src=\"_framework/blazor.webassembly", html);
+            html = html.Replace("<script src=\"_framework/blazor.webassembly",
+                "<script autostart=\"false\" src=\"_framework/blazor.webassembly");
+            html = html.Replace("</body>", """
+                <script>window.addEventListener('load', () => window.libraryStartup.then(() => Blazor.start()));</script>
+                </body>
+                """);
+            await route.FulfillAsync(new() { Response = response, Body = html });
+        });
+
+        var reload = ReloadAsync();
+        try
+        {
+            await Page.WaitForFunctionAsync("() => document.readyState === 'complete' && window.releaseLibraryStartup");
+            Assert.NotSame(reload, await Task.WhenAny(reload, Task.Delay(500)));
+        }
+        finally
+        {
+            await Page.EvaluateAsync("() => window.releaseLibraryStartup()");
+            await reload;
+        }
+
+        Assert.True(await Page.GetByLabel("Story archive").IsVisibleAsync());
+    }
+
+    [Fact]
     public async Task Functional_tests_use_reduced_motion_without_changing_player_preferences()
     {
         Assert.True(await Page.EvaluateAsync<bool>("() => matchMedia('(prefers-reduced-motion: reduce)').matches"));

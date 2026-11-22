@@ -214,7 +214,8 @@ public sealed class TalemarkVocabularyGuardTests
                 }
                 if (element.TryGetProperty("enum", out var enumeration))
                     foreach (var value in enumeration.EnumerateArray())
-                        schemaKeywords.Add(value.GetString()!);
+                        if (value.ValueKind == JsonValueKind.String)
+                            schemaKeywords.Add(value.GetString()!);
                 foreach (var property in element.EnumerateObject())
                     VisitSchema(property.Value);
             }

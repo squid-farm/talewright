@@ -29,11 +29,18 @@ meanings and the difference between implemented and decided syntax.
   For a callable, complete the [callable construct contract](../reference/talemark-operators.md#callable-construct-contract)
   and follow its shape guideline, or justify the exception.
 - [ ] Define errors and source ranges for malformed, incomplete and obsolete spellings.
-  From 1.0.0-preview.1, syntax changes must be additive. An additive change reserves no character
-  or word that existing prose may already use, and existing stories compile the same way. A breaking
-  change needs a severe defect, an explicit project-lead decision, advance notice, an error that names
-  the replacement, a version bump and migration notes. See the
+  From 1.0.0-preview.1, syntax changes within a major version must be additive. An additive change
+  reserves no character or word that existing prose may already use, and existing stories compile
+  the same way. A breaking change within a major version is allowed only for a severe defect and
+  requires a project-lead decision, advance notice, an explicit version bump, an error that names
+  the replacement and migration guidance. See the
   [compatibility freeze](../../CONTRIBUTING.md#compatibility-freeze).
+- [ ] State the major-version boundary. Compatibility guarantees hold within a major Talewright
+  version. A deliberate major-version break does not require a severe defect, but must be part of a
+  deliberate major release with a project-lead decision, advance notice and migration guidance. The
+  severe-defect exception within a major version retains its decision, notice, explicit version-bump
+  and migration requirements. Detectable incompatible inputs must fail with an actionable message;
+  failed loads must preserve the active session and original save bytes.
 - [ ] Show that existing stories and saves are unchanged: the shipped samples compile with the same
   diagnostics and the golden save tests pass without updating their fixtures.
 - [ ] Check identifier collisions, hyphen/subtraction ambiguity and interactions with nested
@@ -64,10 +71,11 @@ meanings and the difference between implemented and decided syntax.
 10. **Talemark is not Markdown.** Markdown-derived forms survive only if authors use them.
     Text renders as it sits in the file.
 11. **Use the [glossary's](../reference/glossary.md) terms** in diagnostics, docs and hover text.
-12. **Existing stories keep working** (from 1.0.0-preview.1). New syntax is additive and leaves existing stories and saves
-    unchanged. A breaking change is reserved for severe defects; its old form produces an error that
-    shows the replacement, with migration notes. Any change that silently alters rendering is called
-    out in the release notes.
+12. **Existing stories keep working within a major version** (from 1.0.0-preview.1). New syntax is
+    additive and leaves existing stories and saves unchanged. A breaking change within a major
+    version is reserved for severe defects; its old form produces an error that shows the replacement,
+    with migration notes. A deliberate major-version break follows the separate release safeguards
+    above. Any change that silently alters rendering is called out in the release notes.
 13. **Sugar and defaults are different contracts.** See [Sugar and defaults](#sugar-and-defaults).
 
 Proposals that conflict with a principle must name it and say why it should be broken.

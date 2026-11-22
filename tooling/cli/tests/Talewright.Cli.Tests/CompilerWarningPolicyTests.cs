@@ -11,7 +11,7 @@ public sealed class CompilerWarningPolicyTests : IDisposable
     {
         Directory.CreateDirectory(_root);
         File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), """
-            game: {id: cli, title: CLI, start: start}
+            game: {id: cli, title: CLI, start: start, talemark: 1}
             characters:
               player: {first-name: Ada}
             flags: [ready]

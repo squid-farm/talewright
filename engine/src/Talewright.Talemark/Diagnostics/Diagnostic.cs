@@ -4,6 +4,7 @@ public enum DiagnosticSeverity
 {
     Warning,
     Error,
+    Information,
 }
 
 /// <summary>A position in a story source file. Lines and columns are 1-based.</summary>
@@ -44,4 +45,7 @@ public sealed class DiagnosticBag
 
     public void Warning(string code, string message, SourceLocation location) =>
         _items.Add(new Diagnostic(DiagnosticSeverity.Warning, code, message, location));
+
+    public void Information(string code, string message, SourceLocation location) =>
+        _items.Add(new Diagnostic(DiagnosticSeverity.Information, code, message, location));
 }

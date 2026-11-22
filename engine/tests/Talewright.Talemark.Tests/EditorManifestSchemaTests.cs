@@ -13,6 +13,122 @@ namespace Talewright.Talemark.Tests;
 
 public class EditorManifestSchemaTests
 {
+    [Fact]
+    public void Editor_schema_accepts_only_talemark_version_one()
+    {
+        var root = new DirectoryInfo(AppContext.BaseDirectory);
+        while (root is not null && !File.Exists(Path.Combine(root.FullName, "Talewright.slnx"))) root = root.Parent;
+        Assert.NotNull(root);
+        using var document = JsonDocument.Parse(File.ReadAllText(
+            Path.Combine(root.FullName, "tooling", "vscode-talewright", "schemas", "story.schema.json")));
+        var talemark = document.RootElement.GetProperty("properties").GetProperty("game")
+            .GetProperty("properties").GetProperty("talemark");
+        Assert.Equal("integer", talemark.GetProperty("type").GetString());
+        Assert.Equal([1], talemark.GetProperty("enum").EnumerateArray().Select(value => value.GetInt32()).ToArray());
+        Assert.Equal(1, talemark.GetProperty("default").GetInt32());
+    }
+
+    [Fact]
+    public void Talemark_version_one_and_omitted_version_preserve_v0_behavior()
+    {
+        const string tale = "=== beginning\nHello.\n-> END\n";
+        var omitted = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = """
+                game:
+                  id: language
+                  title: Language
+                  start: beginning
+                characters: { player: { first-name: Ada } }
+                """,
+            ["main.tale"] = tale,
+        }));
+        var pinned = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = """
+                game:
+                  id: language
+                  title: Language
+                  talemark: 1
+                  start: beginning
+                characters: { player: { first-name: Ada } }
+                """,
+            ["main.tale"] = tale,
+        }));
+
+        Assert.True(pinned.Success, string.Join("\n", pinned.Diagnostics));
+        Assert.Empty(pinned.Diagnostics);
+        Assert.Equal(1, pinned.Story!.TalemarkVersion);
+        Assert.True(omitted.Success, string.Join("\n", omitted.Diagnostics));
+        Assert.Equal(1, omitted.Story!.TalemarkVersion);
+        var notice = Assert.Single(omitted.Diagnostics);
+        Assert.Equal(DiagnosticSeverity.Information, notice.Severity);
+        Assert.Equal("TW4008", notice.Code);
+        Assert.Contains("talemark: 1", notice.Message);
+        Assert.Contains("language-versions.md", notice.Message);
+    }
+
+    [Theory]
+    [InlineData("1.0")]
+    [InlineData("1e0")]
+    [InlineData("+1")]
+    [InlineData("0x01")]
+    [InlineData("0o01")]
+    public void Talemark_rejects_non_integer_spellings(string value)
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = $$"""
+                game:
+                  id: language
+                  title: Language
+                  talemark: {{value}}
+                  start: beginning
+                characters: { player: { first-name: Ada } }
+                """,
+            ["main.tale"] = "=== beginning\nHello.\n-> END\n",
+        }));
+
+        Assert.False(result.Success);
+        Assert.Null(result.Story);
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal("TW4003", diagnostic.Code);
+        Assert.Contains("game.talemark", diagnostic.Message);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("2")]
+    [InlineData("3")]
+    [InlineData("\"1\"")]
+    [InlineData("'1'")]
+    [InlineData("null")]
+    [InlineData("[1]")]
+    [InlineData("one")]
+    public void Talemark_rejects_malformed_unsupported_and_future_values(string value)
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = $$"""
+                game:
+                  id: language
+                  title: Language
+                  talemark: {{value}}
+                  start: beginning
+                characters: { player: { first-name: Ada } }
+                """,
+            ["main.tale"] = "=== beginning\nHello.\n-> END\n",
+        }));
+
+        Assert.False(result.Success);
+        Assert.Null(result.Story);
+        var diagnostic = Assert.Single(result.Diagnostics);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal("TW4003", diagnostic.Code);
+        Assert.Contains("game.talemark", diagnostic.Message);
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -134,11 +250,16 @@ public class EditorManifestSchemaTests
         {
             var file = fixture.GetProperty("file").GetString()!;
             files.Add(file);
+            var manifestText = File.ReadAllText(Path.Combine(directory, file));
             var expectedCodes = fixture.GetProperty("compilerCodes").EnumerateArray()
                 .Select(code => code.GetString()!).Order().ToArray();
+            if (!Regex.IsMatch(manifestText, @"(?m)^\s+talemark\s*:"))
+            {
+                expectedCodes = expectedCodes.Append("TW4008").Order().ToArray();
+            }
             var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
             {
-                ["story.talewright.yaml"] = File.ReadAllText(Path.Combine(directory, file)),
+                ["story.talewright.yaml"] = manifestText,
                 ["main.tale"] = "=== beginning\nHello.\n-> END\n",
             }));
             Assert.Equal(expectedCodes, result.Diagnostics.Select(diagnostic => diagnostic.Code).Order().ToArray());

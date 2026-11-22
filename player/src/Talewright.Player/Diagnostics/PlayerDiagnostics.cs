@@ -73,6 +73,11 @@ public sealed class PlayerDiagnostics
 
     public void RecordCompiler(Diagnostic diagnostic, bool includeContext = true)
     {
+        if (diagnostic.Severity == DiagnosticSeverity.Information)
+        {
+            return;
+        }
+
         var code = diagnostic.Code;
         var safeCode = code.Length == 6 && code.StartsWith("TW", StringComparison.Ordinal) &&
             code.AsSpan(2).IndexOfAnyExceptInRange('0', '9') < 0 ? code : null;

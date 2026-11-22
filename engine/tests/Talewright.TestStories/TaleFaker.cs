@@ -75,12 +75,13 @@ public sealed record TaleCast(string Player, IReadOnlyList<TaleCharacter> Compan
         .. Items.Select(item => SubstitutionFaker.Item(new TaleItemRef(item.Id))),
     ];
 
-    public string Manifest(string id, string start, int seed)
+    public string Manifest(string id, string start, int seed, int? talemark = 1)
     {
         var manifest = new ManifestFaker(id, id, start, seed)
         {
             Version = "1.0.0",
             BaseRuleset = "rpg",
+            Talemark = talemark,
         };
         manifest.Flag(Scouted.Id);
         manifest.Flag(Alarm.Id);

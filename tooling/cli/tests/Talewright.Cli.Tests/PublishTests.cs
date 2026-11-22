@@ -28,7 +28,7 @@ public sealed class PublishTests : IDisposable
     public PublishTests()
     {
         Directory.CreateDirectory(Path.Combine(Story, "chapters"));
-        var manifest = new ManifestFaker("publish", "Publish", "a");
+        var manifest = new ManifestFaker("publish", "Publish", "a") { Talemark = 1 };
         manifest.Character("player", "Tester");
         File.WriteAllText(Path.Combine(Story, "story.talewright.yaml"), manifest.Build(trailingNewline: true));
         File.WriteAllText(Path.Combine(Story, "chapters", "main.tale"), string.Join('\n',
@@ -158,6 +158,18 @@ public sealed class PublishTests : IDisposable
         Assert.Throws<InvalidDataException>(() => cache.GetTemplate(badVersion, "web", null));
         File.Delete(Path.Combine(badAssets, $"talewright-publish-template-web-{badVersion}.zip.sha256"));
         Assert.Throws<FileNotFoundException>(() => cache.GetTemplate(badVersion, "web", null));
+    }
+
+    [Fact]
+    public void Missing_talemark_version_is_information_and_does_not_fail_publication()
+    {
+        var manifestPath = Path.Combine(Story, "story.talewright.yaml");
+        File.WriteAllText(manifestPath,
+            File.ReadAllText(manifestPath).Replace("  talemark: 1\n", "", StringComparison.Ordinal));
+
+        var result = Run("-a", "--target", "web");
+
+        Assert.True(result.Code == 0, result.Error + result.Output);
     }
 
     [Fact]

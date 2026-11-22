@@ -10,7 +10,7 @@ before the next step. Separate `~` lines are separate batches.
 `story.talewright.yaml`:
 
 ```yaml
-game: { id: guild-job, title: A Guild Job, start: job }
+game: { id: guild-job, title: A Guild Job, start: job, talemark: 1 }
 characters:
   player: { first-name: Ada }
 items:

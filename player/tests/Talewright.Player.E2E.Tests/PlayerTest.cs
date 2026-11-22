@@ -88,11 +88,15 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
         await Page.GotoAsync(host.BaseUrl);
         if (StartsInLibrary)
         {
-            await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Talewright", Exact = true }))
-                .ToBeVisibleAsync(new() { Timeout = 30_000 });
-            await Expect(Page.GetByLabel("Story archive"))
-                .ToBeVisibleAsync(new() { Timeout = 30_000 });
+            await WaitForLibraryAsync();
         }
+    }
+
+    private async Task WaitForLibraryAsync()
+    {
+        await Expect(Page.GetByRole(AriaRole.Heading, new() { Name = "Talewright", Exact = true }))
+            .ToBeVisibleAsync(new() { Timeout = 30_000 });
+        await Expect(Page.GetByLabel("Story archive")).ToBeVisibleAsync(new() { Timeout = 30_000 });
     }
 
     protected async Task Upload(StoryFixture fixture, string prefix = "", bool resumeAutosave = false)
@@ -235,6 +239,10 @@ public abstract class PlayerTest(WebHostFixture host, ITestOutputHelper output) 
         finally
         {
             _reloading = false;
+        }
+        if (StartsInLibrary)
+        {
+            await WaitForLibraryAsync();
         }
     }
 

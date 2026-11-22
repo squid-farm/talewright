@@ -213,6 +213,7 @@ public static class StoryCompiler
             Id = manifest.Id,
             Title = manifest.Title,
             Version = manifest.Version,
+            TalemarkVersion = manifest.TalemarkVersion,
             ContentFingerprint = Fingerprint(source, options.CompatibilityId),
             ReplayCompatibilityId = string.IsNullOrWhiteSpace(options.CompatibilityId)
                 ? null : $"{ReplayVersion}\n{options.CompatibilityId}",
