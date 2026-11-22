@@ -43,9 +43,14 @@ file, or either file it would create. Other files, such as a README or `.git`, a
 After creation it prints the file paths and next steps:
 
 ```text
-talewright run "/path/to/my-story"
-Open "/path/to/my-story" in VS Code.
+In a terminal opened in the story folder, run:
+  talewright run .
+Open the story folder in VS Code.
 ```
+
+The run command uses the current directory instead of quoting the folder path. POSIX shells,
+PowerShell and Command Prompt use different path-quoting rules, so open a terminal in the story
+folder before running it.
 
 ## Options shared by all commands
 
