@@ -1,6 +1,8 @@
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
+using System.Buffers;
 using System.IO.Compression;
+using MessagePack;
 
 namespace Talewright.Talemark.Tests;
 
@@ -11,6 +13,206 @@ public sealed class StorySourceTests : IDisposable
     private static readonly StorySource.ArchiveLimits FormerArchiveLimits = new(1_000, 5L * 1024 * 1024, 50L * 1024 * 1024);
 
     public StorySourceTests() => Directory.CreateDirectory(_root);
+
+    [Fact]
+    public void Desktop_story_pack_round_trips_text_and_image_catalogue()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = "id: round-trip\ntitle: Round Trip",
+            ["chapters/main.tale"] = "=== start\nHello.",
+            ["characters/guide.talewright.yaml"] = "name: Guide",
+        }, ["images/camp.png", "images/maps/camp.PNG"]);
+
+        using var buffer = new MemoryStream();
+        DesktopStoryPack.Write(buffer, source);
+        buffer.Position = 0;
+        var loaded = DesktopStoryPack.Read(buffer);
+
+        Assert.Equal(source.Files, loaded.Files);
+        Assert.True(source.ImagePaths.SetEquals(loaded.ImagePaths));
+    }
+
+    [Fact]
+    public void Desktop_story_pack_round_trips_unicode_across_chunk_boundaries()
+    {
+        var text = new string('a', 81917) + "😀" + new string('b', 81919);
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = "",
+            ["main.tale"] = text,
+            ["boundary.tale"] = new string('x', 16383) + "😀",
+        });
+        using var buffer = new MemoryStream();
+        DesktopStoryPack.Write(buffer, source);
+        buffer.Position = 0;
+        Assert.Equal(source.Files, DesktopStoryPack.Read(buffer).Files);
+    }
+
+    [Fact]
+    public void Desktop_story_pack_payload_is_valid_messagepack()
+    {
+        using var buffer = new MemoryStream();
+        DesktopStoryPack.Write(buffer, new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = "hello 😀",
+        }));
+        buffer.Position = 16;
+        using var gzip = new GZipStream(buffer, CompressionMode.Decompress);
+        using var payload = new MemoryStream();
+        gzip.CopyTo(payload);
+        var reader = new MessagePackReader(new ReadOnlySequence<byte>(payload.ToArray()));
+        Assert.Equal(3, reader.ReadArrayHeader());
+        Assert.Equal(3, reader.ReadInt32());
+        Assert.Equal(1, reader.ReadArrayHeader());
+        Assert.Equal(2, reader.ReadArrayHeader());
+        Assert.Equal(1, reader.ReadArrayHeader());
+        Assert.Equal(StorySource.ManifestFileName, reader.ReadString());
+        Assert.Equal(1, reader.ReadArrayHeader());
+        Assert.Equal("hello 😀", reader.ReadString());
+        Assert.Equal(0, reader.ReadArrayHeader());
+        Assert.True(reader.End);
+    }
+
+    [Fact]
+    public void Desktop_story_pack_ignores_unused_unsafe_or_unsupported_images()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = "id: image-filter",
+        }, [
+            "images/camp.png",
+            "images/unused#draft.png",
+            "images/unused.txt",
+            "private-notes.txt",
+        ]);
+
+        using var buffer = new MemoryStream();
+        DesktopStoryPack.Write(buffer, source);
+        buffer.Position = 0;
+        var loaded = DesktopStoryPack.Read(buffer);
+
+        Assert.Equal(["images/camp.png"], loaded.ImagePaths);
+    }
+
+    [Fact]
+    public void Desktop_story_pack_rejects_truncated_malformed_and_missing_manifest_packs()
+    {
+        using var buffer = new MemoryStream();
+        DesktopStoryPack.Write(buffer, new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = "id: damaged",
+        }));
+        var bytes = buffer.ToArray();
+
+        Assert.Throws<InvalidDataException>(() => DesktopStoryPack.Read(new MemoryStream(bytes[..(bytes.Length / 2)])));
+
+        Array.Fill<byte>(bytes, 0, 0, 8);
+        Assert.Throws<InvalidDataException>(() => DesktopStoryPack.Read(new MemoryStream(bytes)));
+
+        using var missingManifest = new MemoryStream();
+        DesktopStoryPack.Write(missingManifest, new StorySource(new Dictionary<string, string>
+        {
+            ["main.tale"] = "Hello.",
+        }));
+        missingManifest.Position = 0;
+        Assert.Throws<InvalidDataException>(() => DesktopStoryPack.Read(missingManifest));
+    }
+
+    [Fact]
+    public void Desktop_story_pack_preserves_hash_characters_in_text_paths()
+    {
+        using var buffer = new MemoryStream();
+        DesktopStoryPack.Write(buffer, new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = "id: hash",
+            ["chapters/main#1.tale"] = "=== start\nHello.",
+        }));
+
+        buffer.Position = 0;
+        var loaded = DesktopStoryPack.Read(buffer);
+        Assert.Equal("=== start\nHello.", loaded.Files["chapters/main#1.tale"]);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(8)]
+    public void Desktop_story_pack_rejects_a_missing_gzip_footer(int removedBytes)
+    {
+        using var buffer = new MemoryStream();
+        DesktopStoryPack.Write(buffer, new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = "id: damaged",
+            ["main.tale"] = "Hello.",
+        }));
+        var bytes = buffer.ToArray();
+
+        Assert.Throws<InvalidDataException>(() =>
+            DesktopStoryPack.Read(new MemoryStream(bytes[..^removedBytes])));
+    }
+
+    [Fact]
+    public void Desktop_story_pack_rejects_a_corrupted_gzip_payload()
+    {
+        using var buffer = new MemoryStream();
+        DesktopStoryPack.Write(buffer, new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = "id: damaged",
+            ["main.tale"] = "Hello.",
+        }));
+        var bytes = buffer.ToArray();
+        bytes[26] ^= 0xff;
+
+        Assert.Throws<InvalidDataException>(() => DesktopStoryPack.Read(new MemoryStream(bytes)));
+    }
+
+    [Fact]
+    public void Desktop_story_pack_rejects_an_out_of_range_payload_length()
+    {
+        using var buffer = new MemoryStream();
+        DesktopStoryPack.Write(buffer, new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = "id: damaged",
+        }));
+        var bytes = buffer.ToArray();
+        Array.Fill(bytes, byte.MaxValue, 8, 8);
+
+        Assert.Throws<InvalidDataException>(() => DesktopStoryPack.Read(new MemoryStream(bytes)));
+    }
+
+    [Fact]
+    public void Desktop_story_pack_rejects_a_declared_string_length_without_allocating_it()
+    {
+        // [version, [[path chunks, text chunks]], images], with a forged str32 chunk.
+        var bytes = PackPayload([0x93, 0x03, 0x91, 0x92, 0x91, 0xdb, 0xff, 0xff, 0xff, 0xff]);
+        Assert.Throws<InvalidDataException>(() => DesktopStoryPack.Read(new MemoryStream(bytes)));
+    }
+
+    [Theory]
+    [InlineData(new byte[] { 0x93, 0x04, 0x90, 0x90 })]
+    [InlineData(new byte[] { 0x93, 0x03, 0x91, 0x92, 0x91, 0xa1, 0xff })]
+    [InlineData(new byte[] { 0x93, 0x03, 0x91, 0x92, 0x91 })]
+    [InlineData(new byte[] { 0x93, 0x03, 0x91, 0x92, 0x91, 0xc0 })]
+    [InlineData(new byte[] { 0x93, 0x03, 0x91, 0x92, 0x91, 0xc1 })]
+    [InlineData(new byte[] { 0x93, 0x03, 0xdd, 0xff, 0xff, 0xff, 0xff })]
+    [InlineData(new byte[] { 0x93, 0x03, 0x90, 0x90, 0x01 })]
+    public void Desktop_story_pack_rejects_invalid_messagepack_payloads(byte[] payload)
+    {
+        var bytes = PackPayload(payload);
+        Assert.Throws<InvalidDataException>(() => DesktopStoryPack.Read(new MemoryStream(bytes)));
+    }
+
+    private static byte[] PackPayload(byte[] payload)
+    {
+        using var buffer = new MemoryStream();
+        buffer.Write("TWRPACK1"u8);
+        Span<byte> length = stackalloc byte[8];
+        BitConverter.TryWriteBytes(length, (ulong)payload.Length);
+        buffer.Write(length);
+        using (var gzip = new GZipStream(buffer, CompressionLevel.SmallestSize, leaveOpen: true))
+            gzip.Write(payload);
+        return buffer.ToArray();
+    }
 
     [Fact]
     public void Archive_text_accounting_includes_actual_fragment_encoding_and_bom_bytes()

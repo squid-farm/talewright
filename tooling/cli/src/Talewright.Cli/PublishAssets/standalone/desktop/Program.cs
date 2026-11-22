@@ -6,6 +6,7 @@ using Talewright.Player.Library;
 using Talewright.Player.Preferences;
 using Talewright.Player.Saves;
 using Talewright.Runtime.Saves;
+using Talewright.Talemark.Compilation;
 
 namespace Talewright.Host.Desktop;
 
@@ -14,13 +15,13 @@ internal static class Program
     [STAThread]
     private static void Main(string[] args)
     {
-        var story = Path.Combine(AppContext.BaseDirectory, "story");
-        if (!Directory.Exists(story))
-            story = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "story"));
-        if (!Directory.Exists(story))
-            story = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "story"));
-        if (!Directory.Exists(story))
-            story = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "story"));
+        var story = Path.Combine(AppContext.BaseDirectory, "story" + DesktopStoryPack.FileExtension);
+        if (!File.Exists(story))
+            story = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "story" + DesktopStoryPack.FileExtension));
+        if (!File.Exists(story))
+            story = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "story" + DesktopStoryPack.FileExtension));
+        if (!File.Exists(story))
+            story = Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "story" + DesktopStoryPack.FileExtension));
         var builder = PhotinoBlazorAppBuilder.CreateDefault(args);
         builder.Services.AddSingleton<IStoryLibrary>(new FileSystemStoryLibrary([story]));
         var options = new DesktopOptions(story);

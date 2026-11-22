@@ -313,8 +313,10 @@ templates, binaries, UI assets and the engine license, so no source checkout is 
 host uses precompiled Player binaries and copies their JS modules as static assets.
 
 All export formats preserve supported image files so the exported story passes the
-same compiler lookup as the source. Standalone hosts keep story text and images in
-an external `story/` directory; universal desktop bundles share one copy across runtimes.
+same compiler lookup as the source. Web hosts keep an external `story/` directory.
+Desktop hosts pack manifest and story text into one versioned, compressed `story.storypack`;
+images stay external under `story/images/`. Universal desktop bundles share that one pack
+and image directory across runtimes.
 Web hosts fetch individual images when needed. Deploy the complete extracted web
 archive, including its `story/` directory.
 

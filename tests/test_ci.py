@@ -502,7 +502,7 @@ class DesktopArchiveTests(unittest.TestCase):
         files = {name: "" for name in ["start.sh", "start.command", "start.cmd",
                                        "Story Name.sh", "Story Name.command", "Story Name.cmd",
                                        "ENGINE-LICENSE.txt", "DEPLOYMENT.txt",
-                                       "story/story.talewright.yaml"]}
+                                       "story.storypack"]}
         for os_name, native, runtime in [("linux", "Photino.Native.so", "libcoreclr.so"),
                                         ("win", "Photino.Native.dll", "coreclr.dll"),
                                         ("osx", "Photino.Native.dylib", "libcoreclr.dylib")]:
