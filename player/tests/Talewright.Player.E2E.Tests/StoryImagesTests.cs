@@ -185,4 +185,30 @@ public sealed class StoryImagesTests
         await Assert.ThrowsAsync<InvalidDataException>(() =>
             new FileSystemStoryLibrary([damaged]).OpenAsync(damaged));
     }
+
+    [Fact]
+    public async Task Folder_named_like_a_story_pack_uses_the_folder_as_the_image_root()
+    {
+        using var files = new ImageStoryFiles();
+        var folder = Path.Combine(files.Root, "folder" + DesktopStoryPack.FileExtension);
+        Directory.CreateDirectory(folder);
+        foreach (var path in StorySource.FromDirectory(files.Root).Files)
+        {
+            var destination = Path.Combine(folder, path.Key.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            await File.WriteAllTextAsync(destination, path.Value);
+        }
+        foreach (var imagePath in StorySource.FromDirectory(files.Root).ImagePaths)
+        {
+            var destination = Path.Combine(folder, imagePath.Replace('/', Path.DirectorySeparatorChar));
+            Directory.CreateDirectory(Path.GetDirectoryName(destination)!);
+            File.Copy(Path.Combine(files.Root, imagePath.Replace('/', Path.DirectorySeparatorChar)), destination, overwrite: true);
+        }
+
+        using var loaded = await new FileSystemStoryLibrary([folder]).OpenAsync(folder);
+        var compile = StoryCompiler.Compile(loaded.Source);
+        Assert.True(compile.Success, string.Join("\n", compile.Diagnostics));
+        await using var image = await loaded.Images!.OpenAsync("images/photo.jpeg");
+        Assert.True(image.CanRead);
+    }
 }

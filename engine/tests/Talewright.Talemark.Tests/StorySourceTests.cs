@@ -56,6 +56,91 @@ public sealed class StorySourceTests : IDisposable
     }
 
     [Fact]
+    public void Desktop_story_pack_preserves_hash_characters_in_text_paths()
+    {
+        using var buffer = new MemoryStream();
+        DesktopStoryPack.Write(buffer, new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = "id: hash",
+            ["chapters/main#1.tale"] = "=== start\nHello.",
+        }));
+
+        buffer.Position = 0;
+        var loaded = DesktopStoryPack.Read(buffer);
+        Assert.Equal("=== start\nHello.", loaded.Files["chapters/main#1.tale"]);
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(8)]
+    public void Desktop_story_pack_rejects_a_missing_gzip_footer(int removedBytes)
+    {
+        using var buffer = new MemoryStream();
+        DesktopStoryPack.Write(buffer, new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = "id: damaged",
+            ["main.tale"] = "Hello.",
+        }));
+        var bytes = buffer.ToArray();
+
+        Assert.Throws<InvalidDataException>(() =>
+            DesktopStoryPack.Read(new MemoryStream(bytes[..^removedBytes])));
+    }
+
+    [Fact]
+    public void Desktop_story_pack_rejects_a_corrupted_gzip_payload()
+    {
+        using var buffer = new MemoryStream();
+        DesktopStoryPack.Write(buffer, new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = "id: damaged",
+            ["main.tale"] = "Hello.",
+        }));
+        var bytes = buffer.ToArray();
+        bytes[26] ^= 0xff;
+
+        Assert.Throws<InvalidDataException>(() => DesktopStoryPack.Read(new MemoryStream(bytes)));
+    }
+
+    [Fact]
+    public void Desktop_story_pack_rejects_an_out_of_range_payload_length()
+    {
+        using var buffer = new MemoryStream();
+        DesktopStoryPack.Write(buffer, new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = "id: damaged",
+        }));
+        var bytes = buffer.ToArray();
+        Array.Fill(bytes, byte.MaxValue, 8, 8);
+
+        Assert.Throws<InvalidDataException>(() => DesktopStoryPack.Read(new MemoryStream(bytes)));
+    }
+
+    [Fact]
+    public void Desktop_story_pack_rejects_a_declared_string_length_without_allocating_it()
+    {
+        using var payload = new MemoryStream();
+        using (var writer = new BinaryWriter(payload, System.Text.Encoding.UTF8, leaveOpen: true))
+        {
+            writer.Write(1);
+            writer.Write(1);
+            writer.Write(int.MaxValue);
+        }
+
+        using var buffer = new MemoryStream();
+        buffer.Write("TWRPACK1"u8);
+        Span<byte> length = stackalloc byte[8];
+        BitConverter.TryWriteBytes(length, (ulong)payload.Length);
+        buffer.Write(length);
+        payload.Position = 0;
+        using (var gzip = new GZipStream(buffer, CompressionLevel.SmallestSize, leaveOpen: true))
+            payload.CopyTo(gzip);
+
+        buffer.Position = 0;
+        Assert.Throws<InvalidDataException>(() => DesktopStoryPack.Read(buffer));
+    }
+
+    [Fact]
     public void Archive_text_accounting_includes_actual_fragment_encoding_and_bom_bytes()
     {
         using var buffer = new MemoryStream();

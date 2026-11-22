@@ -1221,6 +1221,20 @@ public sealed class PublishTests : IDisposable
     }
 
     [Fact]
+    public void Desktop_publication_accepts_hash_characters_in_story_text_filenames()
+    {
+        var original = Path.Combine(Story, "chapters", "main.tale");
+        var hashNamed = Path.Combine(Story, "chapters", "main#1.tale");
+        File.Move(original, hashNamed);
+
+        var result = Run("-a", "--target", "desktop");
+
+        Assert.True(result.Code == 0, result.Error);
+        using var zip = ZipFile.OpenRead(Zip);
+        Assert.Contains(zip.Entries, entry => entry.FullName.EndsWith("story.storypack", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Split_configuration_and_images_survive_story_archive_and_generated_host_staging()
     {
         AddImages();

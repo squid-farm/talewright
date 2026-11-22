@@ -139,15 +139,18 @@ public sealed class FileSystemStoryLibrary(IEnumerable<string> paths) : IStoryLi
 
     public async Task<LoadedStory> OpenAsync(string id)
     {
+        if (Directory.Exists(id))
+        {
+            var folderSource = await LoadAsync(id);
+            return new(folderSource, StoryImages.FromDirectory(folderSource, id));
+        }
         if (Path.GetExtension(id).Equals(DesktopStoryPack.FileExtension, StringComparison.OrdinalIgnoreCase))
         {
             var source = await LoadAsync(id);
             var storyDirectory = Path.Combine(Path.GetDirectoryName(Path.GetFullPath(id))!, "story");
             return new(source, StoryImages.FromDirectory(source, storyDirectory));
         }
-        if (!Directory.Exists(id)) return ArchiveStoryImages.Open(File.OpenRead(id));
-        var folderSource = await LoadAsync(id);
-        return new(folderSource, StoryImages.FromDirectory(folderSource, id));
+        return ArchiveStoryImages.Open(File.OpenRead(id));
     }
 }
 
