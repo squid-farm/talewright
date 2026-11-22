@@ -1,6 +1,8 @@
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
+using System.Buffers;
 using System.IO.Compression;
+using MessagePack;
 
 namespace Talewright.Talemark.Tests;
 
@@ -29,6 +31,47 @@ public sealed class StorySourceTests : IDisposable
 
         Assert.Equal(source.Files, loaded.Files);
         Assert.True(source.ImagePaths.SetEquals(loaded.ImagePaths));
+    }
+
+    [Fact]
+    public void Desktop_story_pack_round_trips_unicode_across_chunk_boundaries()
+    {
+        var text = new string('a', 81917) + "😀" + new string('b', 81919);
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = "",
+            ["main.tale"] = text,
+            ["boundary.tale"] = new string('x', 16383) + "😀",
+        });
+        using var buffer = new MemoryStream();
+        DesktopStoryPack.Write(buffer, source);
+        buffer.Position = 0;
+        Assert.Equal(source.Files, DesktopStoryPack.Read(buffer).Files);
+    }
+
+    [Fact]
+    public void Desktop_story_pack_payload_is_valid_messagepack()
+    {
+        using var buffer = new MemoryStream();
+        DesktopStoryPack.Write(buffer, new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = "hello 😀",
+        }));
+        buffer.Position = 16;
+        using var gzip = new GZipStream(buffer, CompressionMode.Decompress);
+        using var payload = new MemoryStream();
+        gzip.CopyTo(payload);
+        var reader = new MessagePackReader(new ReadOnlySequence<byte>(payload.ToArray()));
+        Assert.Equal(3, reader.ReadArrayHeader());
+        Assert.Equal(3, reader.ReadInt32());
+        Assert.Equal(1, reader.ReadArrayHeader());
+        Assert.Equal(2, reader.ReadArrayHeader());
+        Assert.Equal(1, reader.ReadArrayHeader());
+        Assert.Equal(StorySource.ManifestFileName, reader.ReadString());
+        Assert.Equal(1, reader.ReadArrayHeader());
+        Assert.Equal("hello 😀", reader.ReadString());
+        Assert.Equal(0, reader.ReadArrayHeader());
+        Assert.True(reader.End);
     }
 
     [Fact]
@@ -140,25 +183,35 @@ public sealed class StorySourceTests : IDisposable
     [Fact]
     public void Desktop_story_pack_rejects_a_declared_string_length_without_allocating_it()
     {
-        using var payload = new MemoryStream();
-        using (var writer = new BinaryWriter(payload, System.Text.Encoding.UTF8, leaveOpen: true))
-        {
-            writer.Write(2);
-            writer.Write(1);
-            writer.Write(long.MaxValue);
-        }
+        // [version, [[path chunks, text chunks]], images], with a forged str32 chunk.
+        var bytes = PackPayload([0x93, 0x03, 0x91, 0x92, 0x91, 0xdb, 0xff, 0xff, 0xff, 0xff]);
+        Assert.Throws<InvalidDataException>(() => DesktopStoryPack.Read(new MemoryStream(bytes)));
+    }
 
+    [Theory]
+    [InlineData(new byte[] { 0x93, 0x04, 0x90, 0x90 })]
+    [InlineData(new byte[] { 0x93, 0x03, 0x91, 0x92, 0x91, 0xa1, 0xff })]
+    [InlineData(new byte[] { 0x93, 0x03, 0x91, 0x92, 0x91 })]
+    [InlineData(new byte[] { 0x93, 0x03, 0x91, 0x92, 0x91, 0xc0 })]
+    [InlineData(new byte[] { 0x93, 0x03, 0x91, 0x92, 0x91, 0xc1 })]
+    [InlineData(new byte[] { 0x93, 0x03, 0xdd, 0xff, 0xff, 0xff, 0xff })]
+    [InlineData(new byte[] { 0x93, 0x03, 0x90, 0x90, 0x01 })]
+    public void Desktop_story_pack_rejects_invalid_messagepack_payloads(byte[] payload)
+    {
+        var bytes = PackPayload(payload);
+        Assert.Throws<InvalidDataException>(() => DesktopStoryPack.Read(new MemoryStream(bytes)));
+    }
+
+    private static byte[] PackPayload(byte[] payload)
+    {
         using var buffer = new MemoryStream();
         buffer.Write("TWRPACK1"u8);
         Span<byte> length = stackalloc byte[8];
         BitConverter.TryWriteBytes(length, (ulong)payload.Length);
         buffer.Write(length);
-        payload.Position = 0;
         using (var gzip = new GZipStream(buffer, CompressionLevel.SmallestSize, leaveOpen: true))
-            payload.CopyTo(gzip);
-
-        buffer.Position = 0;
-        Assert.Throws<InvalidDataException>(() => DesktopStoryPack.Read(buffer));
+            gzip.Write(payload);
+        return buffer.ToArray();
     }
 
     [Fact]

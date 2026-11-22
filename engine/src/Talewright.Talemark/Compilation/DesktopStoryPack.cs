@@ -1,6 +1,8 @@
 using System.IO.Compression;
+using System.Buffers;
 using System.Buffers.Binary;
 using System.Text;
+using MessagePack;
 
 namespace Talewright.Talemark.Compilation;
 
@@ -9,7 +11,9 @@ public static class DesktopStoryPack
 {
     public const string FileExtension = ".storypack";
     private static readonly byte[] Magic = "TWRPACK1"u8.ToArray();
-    private const int PayloadVersion = 2;
+    private const int PayloadVersion = 3;
+    private const int ChunkChars = 16384;
+    private static readonly UTF8Encoding StrictUtf8 = new(false, true);
 
     public static void Write(Stream output, StorySource source)
     {
@@ -20,22 +24,23 @@ public static class DesktopStoryPack
         try
         {
             using (var payload = File.Create(payloadPath, 4096, FileOptions.SequentialScan))
-            using (var writer = new BinaryWriter(payload, Encoding.UTF8, leaveOpen: true))
             {
-                writer.Write(PayloadVersion);
-                writer.Write(source.Files.Count);
+                WriteArrayHeader(payload, 3);
+                MessagePackSerializer.Serialize(payload, PayloadVersion);
+                WriteArrayHeader(payload, source.Files.Count);
                 foreach (var (path, text) in source.Files.OrderBy(entry => entry.Key, StringComparer.Ordinal))
                 {
-                    WriteString(writer, ValidateTextPath(path));
-                    WriteString(writer, text);
+                    WriteArrayHeader(payload, 2);
+                    WriteString(payload, ValidateTextPath(path));
+                    WriteString(payload, text);
                 }
                 var imagePaths = StoryImageResolver.CompletionPaths(source)
                     .Select(path => "images/" + path)
                     .ToArray();
-                writer.Write(imagePaths.Length);
+                WriteArrayHeader(payload, imagePaths.Length);
                 foreach (var path in imagePaths)
                 {
-                    WriteString(writer, ValidateImagePath(path));
+                    WriteString(payload, ValidateImagePath(path));
                 }
             }
 
@@ -85,17 +90,19 @@ public static class DesktopStoryPack
                 4096, FileOptions.SequentialScan);
             using var gzip = new GZipStream(compressedInput, CompressionMode.Decompress, leaveOpen: true);
             using var counting = new CountingReadStream(gzip);
-            using var reader = new BinaryReader(counting, Encoding.UTF8, leaveOpen: true);
-            var version = reader.ReadInt32();
+            using var reader = new MessagePackStreamReader(counting, leaveOpen: true);
+            if (ReadArrayHeader(reader) != 3)
+                throw new InvalidDataException("The story pack has an invalid payload shape.");
+            var version = ReadInteger(reader);
             if (version != PayloadVersion)
                 throw new InvalidDataException($"Unsupported story pack version '{version}'.");
 
-            var fileCount = reader.ReadInt32();
-            if (fileCount < 0)
-                throw new InvalidDataException("The story pack has an invalid file count.");
+            var fileCount = ReadArrayHeader(reader);
             var files = new Dictionary<string, string>(StringComparer.Ordinal);
             for (var index = 0; index < fileCount; index++)
             {
+                if (ReadArrayHeader(reader) != 2)
+                    throw new InvalidDataException("The story pack has an invalid file entry.");
                 var path = ReadString(reader);
                 ValidateTextPath(path);
                 var text = ReadString(reader);
@@ -103,9 +110,7 @@ public static class DesktopStoryPack
                     throw new InvalidDataException($"The story pack contains duplicate file '{path}'.");
             }
 
-            var imageCount = reader.ReadInt32();
-            if (imageCount < 0)
-                throw new InvalidDataException("The story pack has an invalid image count.");
+            var imageCount = ReadArrayHeader(reader);
             var images = new HashSet<string>(StringComparer.Ordinal);
             for (var index = 0; index < imageCount; index++)
             {
@@ -115,16 +120,21 @@ public static class DesktopStoryPack
                     throw new InvalidDataException($"The story pack contains duplicate image path '{path}'.");
             }
 
+            if (!reader.RemainingBytes.IsEmpty || counting.ReadByte() != -1)
+                throw new InvalidDataException("The story pack has trailing payload data.");
             if (counting.BytesRead != payloadLength)
                 throw new InvalidDataException("The story pack payload length is invalid.");
-            if (gzip.ReadByte() != -1)
-                throw new InvalidDataException("The story pack has trailing payload data.");
             if (counting.Crc32 != footer.Crc32 || (uint)(counting.BytesRead & 0xffffffff) != footer.PayloadSize)
                 throw new InvalidDataException("The story pack has an invalid GZip footer.");
             if (!files.ContainsKey(StorySource.ManifestFileName))
                 throw new InvalidDataException("The story pack has no root manifest.");
 
             return new StorySource(files, images);
+        }
+        catch (Exception ex) when (ex is MessagePackSerializationException or EndOfStreamException
+            or DecoderFallbackException or OverflowException)
+        {
+            throw new InvalidDataException("The story pack contains damaged MessagePack data.", ex);
         }
         finally
         {
@@ -133,68 +143,63 @@ public static class DesktopStoryPack
         }
     }
 
-    private static void WriteString(BinaryWriter writer, string value)
+    private static void WriteArrayHeader(Stream output, int count)
     {
-        var prefixPosition = writer.BaseStream.Position;
-        writer.Write((long)0);
-
-        var encoded = new byte[81920];
-        var encoder = Encoding.UTF8.GetEncoder();
-        var charOffset = 0;
-        var byteLength = (long)0;
-        while (charOffset < value.Length)
-        {
-            var charCount = Math.Min(encoded.Length, value.Length - charOffset);
-            var flush = charOffset + charCount == value.Length;
-            encoder.Convert(value.AsSpan(charOffset, charCount), encoded, flush,
-                out var charsUsed, out var bytesUsed, out _);
-            if (charsUsed == 0)
-                throw new InvalidOperationException("The UTF-8 encoder made no progress.");
-            writer.Write(encoded, 0, bytesUsed);
-            byteLength = checked(byteLength + bytesUsed);
-            charOffset += charsUsed;
-        }
-
-        var endPosition = writer.BaseStream.Position;
-        writer.BaseStream.Position = prefixPosition;
-        Span<byte> length = stackalloc byte[8];
-        BinaryPrimitives.WriteInt64LittleEndian(length, byteLength);
-        writer.BaseStream.Write(length);
-        writer.BaseStream.Position = endPosition;
+        var buffer = new ArrayBufferWriter<byte>();
+        var writer = new MessagePackWriter(buffer);
+        writer.WriteArrayHeader(count);
+        writer.Flush();
+        output.Write(buffer.WrittenSpan);
     }
 
-    private static string ReadString(BinaryReader reader)
+    private static int ChunkLength(string value, int offset)
     {
-        var length = reader.ReadInt64();
-        if (length < 0)
-            throw new InvalidDataException("The story pack contains an invalid string length.");
-        var output = new System.Text.StringBuilder();
-        var bytes = new byte[81920];
-        var chars = new char[81920];
-        var decoder = new UTF8Encoding(false, true).GetDecoder();
-        var remaining = length;
-        try
+        var length = Math.Min(ChunkChars, value.Length - offset);
+        if (offset + length < value.Length && char.IsHighSurrogate(value[offset + length - 1])
+            && char.IsLowSurrogate(value[offset + length]))
+            length--;
+        return length;
+    }
+
+    private static void WriteString(Stream output, string value)
+    {
+        var chunks = 0;
+        for (var offset = 0; offset < value.Length; chunks++)
+            offset += ChunkLength(value, offset);
+        WriteArrayHeader(output, chunks);
+        for (var offset = 0; offset < value.Length;)
         {
-            while (remaining > 0)
-            {
-                var count = (int)Math.Min(bytes.Length, remaining);
-                var read = reader.Read(bytes, 0, count);
-                if (read == 0)
-                    throw new InvalidDataException("The story pack is truncated.");
-                decoder.Convert(bytes.AsSpan(0, read), chars, flush: false,
-                    out _, out var charsUsed, out _);
-                output.Append(chars, 0, charsUsed);
-                remaining -= read;
-            }
-            decoder.Convert(ReadOnlySpan<byte>.Empty, chars, flush: true,
-                out _, out var flushedCharsUsed, out _);
-            output.Append(chars, 0, flushedCharsUsed);
-            return output.ToString();
+            var length = ChunkLength(value, offset);
+            MessagePackSerializer.Serialize(output, value.Substring(offset, length));
+            offset += length;
         }
-        catch (DecoderFallbackException ex)
+    }
+
+    private static int ReadArrayHeader(MessagePackStreamReader reader) =>
+        reader.ReadArrayHeaderAsync(CancellationToken.None).GetAwaiter().GetResult();
+
+    private static ReadOnlySequence<byte> ReadItem(MessagePackStreamReader reader) =>
+        reader.ReadAsync(CancellationToken.None).GetAwaiter().GetResult()
+        ?? throw new InvalidDataException("The story pack is truncated.");
+
+    private static int ReadInteger(MessagePackStreamReader reader)
+    {
+        var item = new MessagePackReader(ReadItem(reader));
+        return item.ReadInt32();
+    }
+
+    private static string ReadString(MessagePackStreamReader reader)
+    {
+        var count = ReadArrayHeader(reader);
+        var output = new StringBuilder();
+        for (var index = 0; index < count; index++)
         {
-            throw new InvalidDataException("The story pack contains invalid text.", ex);
+            var item = new MessagePackReader(ReadItem(reader));
+            var bytes = item.ReadStringSequence()
+                ?? throw new InvalidDataException("The story pack contains invalid text.");
+            output.Append(StrictUtf8.GetString(bytes.ToArray()));
         }
+        return output.ToString();
     }
 
     private static string ValidateTextPath(string path)

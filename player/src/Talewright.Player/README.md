@@ -96,7 +96,10 @@ and save contents. See [collecting diagnostics](../../../docs/guide/troubleshoot
 Generated hosts reuse the publisher's validated staging and shared image presentation. They
 do not embed story text or images in program files. Desktop uses `FileSystemStoryLibrary` over
 `story.storypack`, with images from the adjacent `story/` directory (one directory shared above
-the universal runtime folders). The standalone web overlay registers `PublishedStoryLibrary` with a page-base-relative
+the universal runtime folders). The pack contains a versioned, GZip-compressed MessagePack payload.
+Text is represented as arrays of UTF-8 string chunks so individual files and the aggregate payload
+are not limited to one MessagePack string or in-memory buffer.
+The standalone web overlay registers `PublishedStoryLibrary` with a page-base-relative
 `story/` HTTP client. Its `index.json` lists staged paths and individual SHA-256 versions,
 so static hosts need no directory listing. Discovery is refreshed per page load; text is
 loaded before compilation, while image HTTP streams open only when an occurrence acquires
