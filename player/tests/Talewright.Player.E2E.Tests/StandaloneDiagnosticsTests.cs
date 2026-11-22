@@ -5,6 +5,7 @@ using System.Text.Json;
 using System.Text.RegularExpressions;
 using Microsoft.Playwright;
 using Xunit.Abstractions;
+using Talewright.Talemark.Compilation;
 using static Microsoft.Playwright.Assertions;
 
 namespace Talewright.Player.E2E.Tests;
@@ -94,8 +95,20 @@ public sealed class StandaloneDiagnosticsTests(WebHostFixture host, ITestOutputH
             var copiedExecutable = Path.Combine(copy, "Talewright.Host.Desktop");
             if (OperatingSystem.IsLinux())
                 File.SetUnixFileMode(copiedExecutable, File.GetUnixFileMode(sourceExecutable));
-            Directory.CreateDirectory(Path.Combine(copy, "story"));
-            await File.WriteAllTextAsync(Path.Combine(copy, "story", "story.talewright.yaml"), "PRIVATE_INVALID: [");
+            var invalidSource = new StorySource(new Dictionary<string, string>
+            {
+                [StorySource.ManifestFileName] = "PRIVATE_INVALID: [",
+            });
+            var storyPacks = Directory.EnumerateFiles(copy, "story.storypack", SearchOption.AllDirectories).ToArray();
+            if (storyPacks.Length == 0)
+            {
+                storyPacks = [Path.Combine(copy, "story.storypack")];
+            }
+            foreach (var storyPack in storyPacks)
+            {
+                using var output = File.Create(storyPack);
+                DesktopStoryPack.Write(output, invalidSource);
+            }
 
             var artifacts = Path.Combine(Environment.GetEnvironmentVariable("TALEWRIGHT_TEST_RESULTS") ?? Path.GetTempPath(),
                 "broken-published", Guid.NewGuid().ToString("N"));
