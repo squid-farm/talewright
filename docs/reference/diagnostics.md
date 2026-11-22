@@ -124,6 +124,7 @@ story ends there.
 | TW4005 | Unknown stat or item in `story.talewright.yaml`, or an unknown/disabled `governing-attribute` target. | Fix the spelling, enable the stat's registered ruleset, or declare it under `game.ruleset.stats` / `items`. If `ruleset.disable` names a stat missing from the base, select the ruleset that provides it or remove that entry. Governing attributes must resolve to enabled attributes after `disable` and all stat declarations. |
 | TW4006 | Unknown or non-scalar configuration key. | Correct or remove the key; the message lists the expected keys. |
 | TW4007 | A declaration identity is repeated, two triggers have the same id, or more than one configuration file declares `triggers:`. | Remove or rename the duplicate; keep one authored trigger list. Cross-file conflicts name both sources. |
+| TW4008 | `game.talemark` is omitted (informational). | Add `talemark: 1` to preserve current integer arithmetic. The notice does not block validation or publishing. |
 
 ## Lint rule codes
 

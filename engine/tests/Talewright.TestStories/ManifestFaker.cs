@@ -49,7 +49,7 @@ public sealed class ManifestFaker
     public string Start { get; }
     public ulong? Seed { get; }
     public string? Version { get; init; }
-    public int? Talemark { get; init; }
+    public int? Talemark { get; init; } = 1;
     public string? BaseRuleset { get; init; }
     public string? Randomness { get; init; }
     public bool? Undo { get; init; }
