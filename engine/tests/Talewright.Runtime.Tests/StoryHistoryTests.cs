@@ -134,6 +134,66 @@ public class StoryHistoryTests
     }
 
     [Fact]
+    public void Resource_check_rounds_stat_and_difficulty_without_mutating_resource()
+    {
+        var story = Compile("""
+            game: { id: resource-check, title: Resource, talemark: 2, start: a, ruleset: rpg, randomness: off }
+            characters: { player: { first-name: Tester, stats: { hp: 14.75 } } }
+            """, """
+            === a
+            {if skill-check hp dc 24.5}Success.{/if}
+            * [Continue] -> a
+            """);
+        var history = new StoryHistory(story, 42);
+        var check = Assert.Single(history.Events.OfType<SkillCheckResolved>());
+        Assert.Equal(15, check.Modifier);
+        Assert.Equal(25, check.Difficulty);
+        Assert.True(check.Success);
+        Assert.Equal(ExactNumber.Parse("14.75"), history.State.GetExactBaseStat(EntityId.Player, new("hp")));
+    }
+
+    [Fact]
+    public void Save_rejects_fractional_resource_checkpoint_without_losing_state()
+    {
+        var story = Compile("""
+            game: { id: resource-save, title: Resource, talemark: 2, start: a, ruleset: rpg }
+            characters: { player: { first-name: Tester, stats: { hp: 14.75 } } }
+            """, "=== a\n* [Continue] -> a");
+        var history = new StoryHistory(story, 42);
+        var exception = Assert.Throws<InvalidOperationException>(() => history.Save());
+        Assert.Contains("stats", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.Equal(ExactNumber.Parse("14.75"), history.State.GetExactBaseStat(EntityId.Player, new("hp")));
+    }
+
+    [Fact]
+    public void Replay_reconstructs_fractional_resource_when_checkpoint_is_whole()
+    {
+        var story = Compile("""
+            game: { id: resource-replay, title: Resource, talemark: 2, start: a, ruleset: rpg }
+            characters: { player: { first-name: Tester, stats: { hp: 20 } } }
+            """, "=== a\n~ player:hp -= 5.25\n* [Continue] -> a");
+        var history = new StoryHistory(story, 42);
+        var restored = StoryHistory.Restore(story, history.Save());
+        Assert.Equal(ExactNumber.Parse("14.75"), restored.State.GetExactBaseStat(EntityId.Player, new("hp")));
+    }
+
+    [Fact]
+    public void Whole_checkpoint_overrides_fractional_start_with_the_same_integer_projection()
+    {
+        const string yaml = """
+            game: { id: resource-continuation, title: Resource, talemark: 2, start: a, ruleset: rpg }
+            characters: { player: { first-name: Tester, stats: { hp: 15 } } }
+            """;
+        const string tale = "=== a\n* [Continue] -> b\n=== b\n* [Again] -> a";
+        var history = new StoryHistory(Compile(yaml, tale), 42);
+        history.Choose("c0");
+        var changed = Compile(yaml.Replace("hp: 15", "hp: 14.75", StringComparison.Ordinal), tale);
+        var restored = StoryHistory.Restore(changed, history.Save());
+        Assert.NotNull(restored.Continuation);
+        Assert.Equal(ExactNumber.FromInteger(15), restored.State.GetExactBaseStat(EntityId.Player, new("hp")));
+    }
+
+    [Fact]
     public void Save_rejects_fractional_inventory_in_integer_checkpoints()
     {
         var story = Compile("""

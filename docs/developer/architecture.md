@@ -250,9 +250,8 @@ Folders:
   `VarId`). They are readonly record structs wrapping a string, so you can't pass a stat where a faction is
   expected. `EntityId.Player` is the well-known player id.
 - **`Rulesets/`**: the "what kind of game is this" layer.
-  - `StatDefinition(Id, Name, Category, Min, Max, Default, GoverningAttribute)`. A stat is just an integer with
-    bounds and a display name. `StatCategory` (Attribute, Skill, Resource, Progression, Custom) is only used for
-    grouping (the character sheet uses it).
+  - `StatDefinition(Id, Name, Category, Min, Max, Default, GoverningAttribute)` describes a bounded stat with a
+    display name. `StatCategory` groups the character sheet and identifies exact resources in Talemark 2.
   - `ReputationTier(Id, Name, Minimum)`: named bands of faction standing (hostile … allied).
   - `ISkillCheckRule`, `ILevelingRule`, `IStatModifier`: the pluggable behaviours. See §6.
   - `Ruleset` is immutable; `RulesetBuilder` builds it with `AddStat` / `RemoveStat` / `ReplaceStat` /

@@ -211,7 +211,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
                 standing.ToString(CultureInfo.InvariantCulture),
             SetupNumberKind.Stat when setup.Stats.SingleOrDefault(value =>
                 value.Character.Value == field.Character && value.Stat.Value == field.Id) is { } stat =>
-                stat.Value.ToString(CultureInfo.InvariantCulture),
+                stat.Number.ToCanonicalString(),
             SetupNumberKind.Inventory when setup.Inventory.SingleOrDefault(value =>
                 value.Character.Value == field.Character && value.Item.Value == field.Id) is { } item =>
                 item.Value.ToCanonicalString(),
@@ -524,7 +524,10 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
             foreach (var stat in story.World.Ruleset.Stats)
             {
                 numbers.Add(new(SetupNumberKind.Stat, stat.Id.Value, $"{character.Id}:{stat.Id}",
-                    character.Stats.GetValueOrDefault(stat.Id, stat.Default), character.Id.Value));
+                    (character.ExactStats is not null && character.ExactStats.TryGetValue(stat.Id, out var exactStat)
+                        ? exactStat : character.Stats.TryGetValue(stat.Id, out var initial)
+                            ? initial : story.TalemarkVersion == 2 ? stat.ExactDefault ?? stat.Default : stat.Default)
+                        .ToCanonicalString(), character.Id.Value));
             }
             foreach (var item in story.World.Items.Values)
             {
@@ -666,12 +669,17 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
             foreach (var (stat, value) in character.Stats)
                 stats[new StatId(stat)] = value;
             foreach (var (stat, value) in stats.OrderBy(pair => pair.Key.Value, StringComparer.Ordinal))
-                Apply(StateChanges.SetStat(state, EntityId.Player, stat, value));
+            {
+                var exact = !character.Stats.ContainsKey(stat.Value)
+                    && story.Creation.Presets.FirstOrDefault(p => p.Id == character.Preset)?.ExactStats is { } exactStats
+                    && exactStats.TryGetValue(stat, out var presetValue) ? presetValue : value;
+                Apply(StateChanges.SetStat(state, EntityId.Player, stat, exact));
+            }
         }
 
         var setup = BuildSetup(Numbers, Flags, Texts, story).Validate(story);
         foreach (var value in setup.Stats)
-            Apply(StateChanges.SetStat(state, value.Character, value.Stat, value.Value));
+            Apply(StateChanges.SetStat(state, value.Character, value.Stat, value.Number));
         foreach (var value in setup.Inventory)
         {
             var current = state.GetExactItemCount(value.Character, value.Item);
@@ -719,7 +727,14 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
                     standings.Add(new(field.Id), ParseWhole(field));
                     break;
                 case SetupNumberKind.Stat:
-                    stats.Add(new(new(field.Character!), new(field.Id), ParseWhole(field)));
+                    if (talemarkVersion == 2 && story.World.Ruleset.IsFractionalResource(new(field.Id)))
+                    {
+                        if (!ExactNumber.TryParse(field.Value, out var statValue))
+                            throw new ArgumentException($"{field.Label} requires a decimal number.");
+                        stats.Add(new(new(field.Character!), new(field.Id), statValue));
+                    }
+                    else
+                        stats.Add(new(new(field.Character!), new(field.Id), ParseWhole(field)));
                     break;
                 case SetupNumberKind.Inventory:
                     if (talemarkVersion == 2 && story.World.Items[new(field.Id)].Divisible)
@@ -785,7 +800,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
         {
             SetupNumberKind.Variable => state.GetExactVariable(new(field.Id)).ToCanonicalString(),
             SetupNumberKind.Standing => state.GetStanding(new(field.Id)).ToString(CultureInfo.InvariantCulture),
-            SetupNumberKind.Stat => state.GetBaseStat(new(field.Character!), new(field.Id)).ToString(CultureInfo.InvariantCulture),
+            SetupNumberKind.Stat => state.GetExactBaseStat(new(field.Character!), new(field.Id)).ToCanonicalString(),
             SetupNumberKind.Inventory => state.GetExactItemCount(new(field.Character!), new(field.Id)).ToCanonicalString(),
             _ => throw new InvalidOperationException($"Unsupported edit field {field.Kind}."),
         }, field.Character)).ToArray();

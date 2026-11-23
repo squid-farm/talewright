@@ -7,7 +7,14 @@ using Talewright.Talemark.Model;
 
 namespace Talewright.Runtime;
 
-public sealed record AuthorStatValue(EntityId Character, StatId Stat, int Value);
+public sealed record AuthorStatValue(EntityId Character, StatId Stat, int Value)
+{
+    public AuthorStatValue(EntityId character, StatId stat, ExactNumber value)
+        : this(character, stat, value.ToInt32RoundedAwayFromZero()) => ExactValue = value;
+
+    public ExactNumber? ExactValue { get; init; }
+    public ExactNumber Number => ExactValue ?? Value;
+}
 public sealed record AuthorItemValue(EntityId Character, ItemId Item, int Quantity)
 {
     public AuthorItemValue(EntityId character, ItemId item, ExactNumber quantity)
@@ -94,6 +101,10 @@ public sealed record AuthorSetup
             {
                 throw new ArgumentException($"Duplicate setup stat '{value.Character}:{value.Stat}'.");
             }
+            if (value.ExactValue is { } exact && (world.TalemarkVersion == 1 ||
+                !world.Ruleset.IsFractionalResource(value.Stat))
+                && exact.Denominator != System.Numerics.BigInteger.One)
+                throw new ArgumentException($"Setup stat '{value.Stat}' requires a whole value.");
         }
         var items = new HashSet<(EntityId, ItemId)>();
         foreach (var value in Inventory)
@@ -129,7 +140,7 @@ public sealed record AuthorSetup
     {
         foreach (var value in Stats)
         {
-            log.AppendRange(StateChanges.SetStat(log.State, value.Character, value.Stat, value.Value));
+            log.AppendRange(StateChanges.SetStat(log.State, value.Character, value.Stat, value.Number));
         }
         foreach (var value in Inventory)
         {
@@ -184,7 +195,7 @@ public sealed record AuthorSetup
         }
         foreach (var value in Stats)
         {
-            yield return new($"stat:{value.Character}:{value.Stat}", state.GetBaseStat(value.Character, value.Stat).ToString(CultureInfo.InvariantCulture));
+            yield return new($"stat:{value.Character}:{value.Stat}", state.GetExactBaseStat(value.Character, value.Stat).ToCanonicalString());
         }
         foreach (var value in Inventory)
         {

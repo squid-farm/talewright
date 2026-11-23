@@ -207,6 +207,14 @@ built-in d20-style stats and levelling. A `ruleset` mapping without `base`
 declares only its own `stats` on top of `none`. An unknown ruleset name is an
 error (TW4004) that lists the available rulesets.
 
+In Talemark 2, `resource` stats retain exact fractional values, including their bounds,
+starting values and held-item modifiers. For example, `~ player:hp -= 7 * (1 - .25)`
+reduces 20 HP to 14.75. Other stat changes round each incoming amount to the nearest
+whole number, with halves away from zero; the ruleset's level stat stays whole even if
+declared as a resource. A resource used in a check is rounded only
+for that check. Character creation's selectable stat lists remain whole numbers.
+Talemark 1 retains its integer behavior.
+
 Manifest booleans use `true` or `false`; quoted `'true'` and `"false"` are also
 accepted. Values such as `yes`, `no`, `1`, or `sometimes` produce TW4003.
 This applies to `game.undo`, `game.autosave`, `game.character-sheet`,

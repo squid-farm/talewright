@@ -34,6 +34,16 @@ public interface IGameStateView
     /// <summary>Effective value: base + held item modifiers + ruleset modifiers, clamped to the stat's bounds.</summary>
     int GetStat(EntityId character, StatId stat);
 
+    /// <summary>Exact stored value. Version-2 state views must implement this member.</summary>
+    ExactNumber GetExactBaseStat(EntityId character, StatId stat) => World.TalemarkVersion == 1
+        ? GetBaseStat(character, stat)
+        : throw new NotSupportedException("This state view does not expose exact stats.");
+
+    /// <summary>Exact effective value. Version-2 state views must implement this member.</summary>
+    ExactNumber GetExactStat(EntityId character, StatId stat) => World.TalemarkVersion == 1
+        ? GetStat(character, stat)
+        : throw new NotSupportedException("This state view does not expose exact stats.");
+
     /// <summary>Returns the legacy int32 projection of an item quantity.</summary>
     int GetItemCount(EntityId character, ItemId item);
 

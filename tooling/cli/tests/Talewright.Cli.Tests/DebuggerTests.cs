@@ -1,4 +1,5 @@
 using Talewright.Debugger;
+using Talewright.Core;
 using Talewright.Core.Identity;
 using Talewright.Core.Events;
 using Talewright.Core.State;
@@ -80,6 +81,39 @@ public sealed class DebuggerTests : IDisposable
             Assert.Equal(expected.Total, actual.Total);
             Assert.Equal(expectedSuccess, actual.Success);
         }
+    }
+
+    [Fact]
+    public void Resource_defaults_setup_and_edits_remain_exact()
+    {
+        File.WriteAllText(Path.Combine(_root, "story.talewright.yaml"), """
+            game:
+              id: resource-debug
+              title: Resource debug
+              talemark: 2
+              start: start
+              ruleset:
+                stats:
+                  - { id: mana, category: resource, max: 30, default: 10.25 }
+            characters: { player: { first-name: Ada } }
+            """);
+        File.WriteAllText(Path.Combine(_root, "main.tale"), "=== start\n* [Stay] -> start");
+        using var model = new WorkbenchModel(_root);
+        model.Reload();
+        var field = Assert.Single(model.Numbers, value => value.Label == "player:mana");
+        Assert.Equal("41/4", field.Value);
+        field.Enabled = true;
+        field.Value = "14.75";
+        model.Start();
+        Assert.Null(model.Error);
+        Assert.Equal(ExactNumber.Parse("14.75"), model.Session!.State.GetExactBaseStat(EntityId.Player, new("mana")));
+        var edit = Assert.Single(model.EditNumbers, value => value.Label == "player:mana");
+        edit.Enabled = true;
+        edit.Value = "1/3";
+        model.ApplyEdits();
+        Assert.Null(model.Error);
+        Assert.Equal(ExactNumber.FromFraction(1, 3), model.Session.State.GetExactBaseStat(EntityId.Player, new("mana")));
+        Assert.Equal("1/3", Assert.Single(model.Inspection!.Characters.Single().Stats).ExactBaseValue);
     }
 
     [Fact]

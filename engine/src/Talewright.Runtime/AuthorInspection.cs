@@ -10,7 +10,13 @@ using System.Text.Json.Serialization;
 
 namespace Talewright.Runtime;
 
-public sealed record AuthorStatInspection(StatId Id, string Name, int BaseValue, int EffectiveValue);
+public sealed record AuthorStatInspection(StatId Id, string Name, int BaseValue, int EffectiveValue)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ExactBaseValue { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ExactEffectiveValue { get; init; }
+}
 public sealed record AuthorEventInspection(int Offset, GameEvent Event);
 public sealed record AuthorItemInspection(ItemId Id, string Name, int Quantity)
 {
@@ -51,7 +57,11 @@ public sealed class AuthorInspection
             var identity = state.GetCharacterDefinition(id);
             var stats = story.World.Ruleset.Stats.Where(stat => story.IsStatVisible(stat.Id, state))
                 .Select(stat => new AuthorStatInspection(stat.Id, stat.Name,
-                state.GetBaseStat(id, stat.Id), state.GetStat(id, stat.Id))).ToArray();
+                state.GetBaseStat(id, stat.Id), state.GetStat(id, stat.Id))
+                {
+                    ExactBaseValue = story.TalemarkVersion == 2 ? state.GetExactBaseStat(id, stat.Id).ToCanonicalString() : null,
+                    ExactEffectiveValue = story.TalemarkVersion == 2 ? state.GetExactStat(id, stat.Id).ToCanonicalString() : null,
+                }).ToArray();
             var inventory = state.GetExactInventory(id).Select(item => new AuthorItemInspection(item.Key,
                 story.World.Items[item.Key].Name, item.Value.ToInt32RoundedAwayFromZero())
             {

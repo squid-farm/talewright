@@ -49,6 +49,35 @@ public class GameStateTests
     }
 
     [Fact]
+    public void Exact_resource_state_and_extension_modifiers_survive_replay()
+    {
+        var ruleset = GenericRuleset.Create().ToBuilder().AddModifier(new FractionalModifier()).Build();
+        var world = new WorldDefinition(ruleset,
+            [new CharacterDefinition(EntityId.Player, "Mara", "", Pronouns.She,
+                new Dictionary<StatId, int>(), new Dictionary<ItemId, int>())
+            {
+                ExactStats = new Dictionary<StatId, ExactNumber> { [GenericRuleset.HitPoints] = ExactNumber.Parse("20.5") },
+            }],
+            [], [], [], new Dictionary<VarId, int>(), talemarkVersion: 2);
+        var log = new EventLog(world, 1);
+        log.AppendRange(StateChanges.AdjustStat(log.State, EntityId.Player, GenericRuleset.HitPoints,
+            ExactNumber.FromFraction(-1, 3)));
+        var expected = ExactNumber.Parse("20.5") - ExactNumber.FromFraction(1, 3);
+        Assert.Equal(expected, log.State.GetExactBaseStat(EntityId.Player, GenericRuleset.HitPoints));
+        Assert.Equal(expected + ExactNumber.FromFraction(1, 4), log.State.GetExactStat(EntityId.Player, GenericRuleset.HitPoints));
+        Assert.IsType<ExactStatChanged>(Assert.Single(log.Events));
+        var replay = EventLog.Replay(world, 1, log.Events);
+        Assert.Equal(expected, replay.State.GetExactBaseStat(EntityId.Player, GenericRuleset.HitPoints));
+    }
+
+    private sealed class FractionalModifier : IStatModifier
+    {
+        public int GetModifier(IGameStateView state, EntityId character, StatId stat) => 0;
+        public ExactNumber GetExactModifier(IGameStateView state, EntityId character, StatId stat) =>
+            stat == GenericRuleset.HitPoints ? ExactNumber.FromFraction(1, 4) : ExactNumber.Zero;
+    }
+
+    [Fact]
     public void Held_items_modify_effective_but_not_base_stats()
     {
         var log = new EventLog(CreateWorld(), 1);

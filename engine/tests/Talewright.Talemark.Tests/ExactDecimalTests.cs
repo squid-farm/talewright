@@ -4,6 +4,8 @@ using Talewright.Core.Events;
 using Talewright.Core.State;
 using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
+using Talewright.Core.Rulesets;
+using Talewright.Rulesets.Generic;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
 
@@ -109,6 +111,123 @@ public class ExactDecimalTests
         var state = new EventLog(result.Story!.World, 1).State;
         Assert.True(ExpressionEvaluator.IsTrue(result.Story.Scenes[0].Requires!,
             EvaluationContext.For(state)));
+    }
+
+    [Fact]
+    public void Resources_preserve_damage_and_whole_stats_round_each_incoming_change()
+    {
+        var result = CompileInventory(2, """
+            characters: { player: { first-name: Tester, stats: { hp: 20, str: 10 } } }
+            """, """
+            === a
+            ~ player:hp -= 7 * (1 - .25)
+            ~ player:str += .49; player:str += .49
+            ~ player:str += .5; player:str += -.5
+            -> END
+            """);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var log = new EventLog(result.Story!.World, 1);
+        foreach (var batch in result.Story.Scenes[0].Steps.OfType<EffectStep>())
+            EffectExecutor.ExecuteAll(batch.Effects, log, result.Story.Predicates);
+        Assert.Equal(ExactNumber.Parse("14.75"), log.State.GetExactBaseStat(EntityId.Player, new("hp")));
+        Assert.Equal(10, log.State.GetBaseStat(EntityId.Player, new("str")));
+        var resourceCheck = new D20SkillCheckRule().CalculateTotal(log.State, new SkillCheckRequest(EntityId.Player, new("hp"), null));
+        Assert.Equal(15, resourceCheck.Modifier);
+        Assert.Equal(ExactNumber.Parse("14.75"), log.State.GetExactBaseStat(EntityId.Player, new("hp")));
+    }
+
+    [Fact]
+    public void Whole_stat_rounds_negative_and_positive_amounts_independently()
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = """
+                game:
+                  id: whole-boundaries
+                  title: Whole boundaries
+                  talemark: 2
+                  start: a
+                  ruleset:
+                    stats: [{ id: score, category: custom, min: -20, max: 20 }]
+                characters: { player: { first-name: Tester } }
+                """,
+            ["main.tale"] = """
+                === a
+                ~ player:score = -.5
+                ~ player:score += -.49; player:score += -.49
+                ~ player:score -= .5
+                -> END
+                """,
+        }));
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var log = new EventLog(result.Story!.World, 1);
+        foreach (var batch in result.Story.Scenes[0].Steps.OfType<EffectStep>())
+            EffectExecutor.ExecuteAll(batch.Effects, log, result.Story.Predicates);
+        Assert.Equal(-2, log.State.GetBaseStat(EntityId.Player, new("score")));
+        Assert.Equal(2, log.Events.OfType<StatChanged>().Count());
+    }
+
+    [Fact]
+    public void Level_stat_remains_whole_even_when_declared_as_a_resource()
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = """
+                game:
+                  id: whole-level
+                  title: Whole level
+                  talemark: 2
+                  start: a
+                  ruleset:
+                    base: rpg
+                    stats: [{ id: level, category: resource, min: 1, max: 20 }]
+                characters: { player: { first-name: Tester, stats: { level: 2.4 } } }
+                """,
+            ["main.tale"] = "=== a\n~ player:level += .49; player:level += .5\n-> END",
+        }));
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var log = new EventLog(result.Story!.World, 1);
+        foreach (var batch in result.Story.Scenes[0].Steps.OfType<EffectStep>())
+            EffectExecutor.ExecuteAll(batch.Effects, log, result.Story.Predicates);
+        Assert.Equal(3, log.State.GetBaseStat(EntityId.Player, new("level")));
+        Assert.Equal(ExactNumber.FromInteger(3), log.State.GetExactBaseStat(EntityId.Player, new("level")));
+    }
+
+    [Fact]
+    public void Resource_initial_bounds_and_held_modifiers_are_exact_and_clamped()
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = """
+                game:
+                  id: resources
+                  title: Resources
+                  talemark: 2
+                  start: a
+                  ruleset:
+                    stats:
+                      - { id: mana, category: resource, min: 0.25, max: 20.75, default: 10.5 }
+                items: { charm: { modifiers: { mana: .25 } } }
+                characters: { player: { first-name: Tester, stats: { mana: 20.25 }, inventory: [charm] }, guide: { first-name: Guide } }
+                """,
+            ["main.tale"] = """
+                === a
+                @requires player:mana == 20.5
+                ~ player:mana += 1 / 3; player:mana += 1 / 3
+                -> END
+                """,
+        }));
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var story = result.Story!;
+        var log = new EventLog(story.World, 1);
+        Assert.Equal(ExactNumber.Parse("10.5"), log.State.GetExactBaseStat(new("guide"), new("mana")));
+        Assert.True(ExpressionEvaluator.IsTrue(story.Scenes[0].Requires!, EvaluationContext.For(log.State)));
+        foreach (var batch in story.Scenes[0].Steps.OfType<EffectStep>())
+            EffectExecutor.ExecuteAll(batch.Effects, log, story.Predicates);
+        Assert.Equal(ExactNumber.Parse("20.75"), log.State.GetExactBaseStat(EntityId.Player, new("mana")));
+        Assert.Equal(ExactNumber.Parse("20.75"), log.State.GetExactStat(EntityId.Player, new("mana")));
+        log.AppendRange(StateChanges.AdjustStat(log.State, EntityId.Player, new("mana"), -100));
+        Assert.Equal(ExactNumber.Parse(".25"), log.State.GetExactBaseStat(EntityId.Player, new("mana")));
     }
 
     [Fact]

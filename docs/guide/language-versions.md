@@ -32,8 +32,8 @@ loaded by a future player may follow that future player's documented omission de
 Version `2` adds exact decimal arithmetic and numeric variables. For example, `1 / 4` and `.25`
 represent the same exact value, and numeric variables may start with decimal values or exponent
 notation. Version 2 is
-still under development: resource behavior, exact save preservation, and player
+still under development: exact save preservation and player
 presentation are not complete. The current player rejects saves when a version-2 numeric variable
-or checkpoint inventory quantity is fractional or outside the int32 range. Do not select version 2 for an author-facing story until
+or checkpoint resource or inventory quantity is fractional or outside the int32 range. Do not select version 2 for an author-facing story until
 those parts ship together. The compiler and debugger support below exists for implementation and
 testing only.

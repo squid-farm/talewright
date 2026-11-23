@@ -11,6 +11,7 @@ internal static class StatDisclosureVisibility
     internal static StatId? StatFor(GameEvent gameEvent, Ruleset ruleset) => gameEvent switch
     {
         StatChanged changed => changed.Stat,
+        ExactStatChanged changed => changed.Stat,
         SkillCheckResolved check => check.Skill,
         LevelChanged when ruleset.LevelingRule is { } leveling => leveling.LevelStat,
         _ => null,

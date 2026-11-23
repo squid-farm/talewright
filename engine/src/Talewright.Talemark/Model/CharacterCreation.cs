@@ -1,10 +1,14 @@
 using System.Collections.ObjectModel;
+using Talewright.Core;
 using Talewright.Core.Identity;
 using Talewright.Core.World;
 
 namespace Talewright.Talemark.Model;
 
-public sealed record CharacterPreset(string Id, string Label, IReadOnlyDictionary<StatId, int> Stats);
+public sealed record CharacterPreset(string Id, string Label, IReadOnlyDictionary<StatId, int> Stats)
+{
+    public IReadOnlyDictionary<StatId, ExactNumber>? ExactStats { get; init; }
+}
 
 /// <summary>Bounded author-defined choices; no point-buy or implicit class/race system.</summary>
 public sealed class CharacterCreation

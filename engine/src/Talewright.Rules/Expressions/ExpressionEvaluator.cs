@@ -157,7 +157,9 @@ public static class ExpressionEvaluator
             BoolLiteral e => Value.Of(e.Value),
             TextLiteral e => Value.Of(e.Value),
             TierLiteral e => Value.Of(e.Tier),
-            StatRef e => Value.Of(state.GetStat(e.Character, e.Stat)),
+            StatRef e => state.World.TalemarkVersion == 1
+                ? Value.Of(state.GetStat(e.Character, e.Stat))
+                : Value.Of(state.GetExactStat(e.Character, e.Stat)),
             StandingRef e => Value.Of(state.GetStanding(e.Faction)),
             StandingTierRef e => state.Ruleset.TierFor(state.GetStanding(e.Faction)) is { } tier
                 ? Value.Of(tier)

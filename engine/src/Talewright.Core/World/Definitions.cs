@@ -22,6 +22,8 @@ public sealed record CharacterDefinition(
     GrammaticalNumber NameAgreement = GrammaticalNumber.Singular)
 {
     public string FullName => string.IsNullOrEmpty(LastName) ? FirstName : $"{FirstName} {LastName}";
+    /// <summary>Exact starting values override matching entries in <see cref="Stats"/>.</summary>
+    public IReadOnlyDictionary<StatId, ExactNumber>? ExactStats { get; init; }
     /// <summary>Exact starting quantities override matching entries in <see cref="Inventory"/>.</summary>
     public IReadOnlyDictionary<ItemId, ExactNumber>? ExactInventory { get; init; }
 }
@@ -35,7 +37,11 @@ public sealed record ItemDefinition(
     IReadOnlyDictionary<StatId, int> Modifiers,
     GrammaticalNumber NameAgreement = GrammaticalNumber.Singular,
     bool Uncountable = false,
-    bool Divisible = false);
+    bool Divisible = false)
+{
+    /// <summary>Exact modifiers override matching entries in <see cref="Modifiers"/>.</summary>
+    public IReadOnlyDictionary<StatId, ExactNumber>? ExactModifiers { get; init; }
+}
 
 /// <summary>A faction the player can stand well or badly with.</summary>
 public sealed record FactionDefinition(FactionId Id, string Name, int InitialStanding);

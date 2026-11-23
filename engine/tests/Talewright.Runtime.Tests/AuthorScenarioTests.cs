@@ -267,6 +267,29 @@ public sealed class AuthorScenarioTests
     }
 
     [Fact]
+    public void Scenario_roundtrip_preserves_fractional_resource_setup_and_edit()
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = """
+                game: { id: exact-resource-scenario, title: Resource, talemark: 2, start: start, ruleset: rpg }
+                characters: { player: { first-name: Tester } }
+                """,
+            ["main.tale"] = "=== start\n* [Finish] -> END\n",
+        }));
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var source = AuthorSession.Create(result.Story!, new("start"), seed: 42, setup: new()
+        {
+            Stats = [new(EntityId.Player, new("hp"), ExactNumber.Parse("14.75"))],
+        });
+        source.Edit(new() { Stats = [new(EntityId.Player, new("hp"), ExactNumber.FromFraction(1, 3))] });
+        var bytes = AuthorScenario.Export(source, Extensions);
+        var restored = AuthorScenario.Import(result.Story!, bytes, Extensions).Session;
+        Assert.Equal(ExactNumber.FromFraction(1, 3), restored.State.GetExactBaseStat(EntityId.Player, new("hp")));
+        Assert.Equal(bytes, AuthorScenario.Export(restored, Extensions));
+    }
+
+    [Fact]
     public void Continued_sessions_cannot_be_exported_as_portable_scenarios()
     {
         var source = Start();

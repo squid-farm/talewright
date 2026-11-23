@@ -177,6 +177,16 @@ internal sealed class ContinuationCheckpoint
             throw new InvalidOperationException(
                 "Saving is unavailable while inventory contains quantities that the current save format cannot preserve.");
         }
+        if (world.TalemarkVersion == 2 && world.Characters.Keys.Any(id =>
+            world.Ruleset.Stats.Any(stat =>
+            {
+                var value = state.GetExactBaseStat(id, stat.Id);
+                return value.Denominator != BigInteger.One || value.Numerator < int.MinValue || value.Numerator > int.MaxValue;
+            })))
+        {
+            throw new InvalidOperationException(
+                "Saving is unavailable while stats contain values that the current save format cannot preserve.");
+        }
 
         var payload = new CheckpointPayload
         {
@@ -277,15 +287,16 @@ internal sealed class ContinuationCheckpoint
                     continue;
                 }
 
-                var value = statDefinition.Clamp(stat.Value);
+                var value = world.TalemarkVersion == 2 && world.Ruleset.IsFractionalResource(statId)
+                    ? statDefinition.ClampExact(stat.Value) : statDefinition.Clamp(stat.Value);
                 if (value != stat.Value)
                 {
-                    notes.Add($"{id}'s {stat.Id} {stat.Value} is outside its declared range and was clamped to {value}.");
+                    notes.Add($"{id}'s {stat.Id} {stat.Value} is outside its declared range and was clamped to {value.ToDecimalString()}.");
                 }
-                var before = initial.GetBaseStat(id, statId);
+                var before = initial.GetExactBaseStat(id, statId);
                 if (value != before)
                 {
-                    events.Add(new StatChanged(id, statId, before, value));
+                    events.AddRange(StateChanges.SetStat(initial, id, statId, value));
                 }
             }
 
