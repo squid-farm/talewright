@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Talewright.Core;
 using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
 using Talewright.Talemark.Vocabulary;
@@ -14,7 +15,7 @@ internal abstract record ExpressionNode(ExpressionSpan Span);
 
 internal sealed record ErrorExpressionNode(ExpressionSpan Span) : ExpressionNode(Span);
 
-internal sealed record NumberExpressionNode(int Value, ExpressionSpan Span) : ExpressionNode(Span);
+internal sealed record NumberExpressionNode(ExactNumber Value, ExpressionSpan Span) : ExpressionNode(Span);
 
 internal sealed record TextExpressionNode(string Value, ExpressionSpan Span) : ExpressionNode(Span);
 

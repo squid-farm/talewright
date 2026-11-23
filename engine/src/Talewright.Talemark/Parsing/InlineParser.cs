@@ -147,7 +147,7 @@ internal static class InlineParser
         CancellationToken cancellationToken,
         List<TalemarkClassification>? classifications = null,
         Func<EntityId, StatId, SkillCheckIdentity>? createSkillCheckIdentity = null,
-        SceneId? sceneOwner = null)
+        SceneId? sceneOwner = null, int talemarkVersion = 1)
     {
         private int _remaining = CancellationInterval;
 
@@ -161,6 +161,7 @@ internal static class InlineParser
         public Func<EntityId, StatId, SkillCheckIdentity>? CreateSkillCheckIdentity { get; } =
             createSkillCheckIdentity;
         public SceneId? SceneOwner { get; } = sceneOwner;
+        public int TalemarkVersion { get; } = symbols?.World.TalemarkVersion ?? talemarkVersion;
         public int WorkUnits { get; set; }
 
         public void Check()
@@ -217,11 +218,12 @@ internal static class InlineParser
     }
 
     internal static IReadOnlyList<TalemarkClassification> Classify(SourceText source,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, int talemarkVersion = 1)
     {
         cancellationToken.ThrowIfCancellationRequested();
         var context = new Context(source, null, new DiagnosticBag(), allowImages: true,
-            allowFormattedOutput: true, cancellationToken: cancellationToken, classifications: []);
+            allowFormattedOutput: true, cancellationToken: cancellationToken, classifications: [],
+            talemarkVersion: talemarkVersion);
         var text = source.Text;
         var scan = DelimiterScanner.Scan(text, DelimiterScanMode.ReaderText, cancellationToken: cancellationToken);
         context.WorkUnits += scan.WorkUnits;
@@ -464,13 +466,13 @@ internal static class InlineParser
             var expression = text[expressionStart..innerEnd];
             TalemarkClassifier.ClassifyExpressionSyntax(expression,
                 offset => context.Source.Locate(expressionStart + offset), context.Classifications!,
-                context.CancellationToken);
+                context.CancellationToken, context.TalemarkVersion);
             return;
         }
 
         var source = text[innerStart..innerEnd];
         TalemarkClassifier.ClassifyExpressionSyntax(source, offset => context.Source.Locate(innerStart + offset),
-            context.Classifications!, context.CancellationToken);
+            context.Classifications!, context.CancellationToken, context.TalemarkVersion);
     }
 
     private static void SetSyntaxPieceKinds(Token token, string text, int open, int close)

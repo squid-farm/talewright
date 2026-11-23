@@ -76,15 +76,15 @@ public static class StoryCompiler
 
         var scenes = new Dictionary<SceneId, SourceLocation>();
         var flags = manifest.World.Flags.ToHashSet();
-        var variables = manifest.World.Variables.ToDictionary();
+        var variables = manifest.World.ExactVariables.ToDictionary();
         var textVariables = manifest.World.TextVariables.ToDictionary();
         var declarations = new List<VariableDeclaration>();
-        var discoveredNumbers = new Dictionary<VarId, int>();
+        var discoveredNumbers = new Dictionary<VarId, Talewright.Core.ExactNumber>();
         void DiscoverEffects(string text, SourceLocation location)
         {
             cancellationToken.ThrowIfCancellationRequested();
             ExpressionParser.CollectDeclarations(text, flags, discoveredNumbers,
-                typedDeclaration: declarations.Add, location: location);
+                typedDeclaration: declarations.Add, location: location, talemarkVersion: manifest.TalemarkVersion);
         }
         var syntaxes = new List<(string Path, TaleFileSyntax Syntax)>(taleFiles.Count);
         foreach (var (path, text) in taleFiles)
@@ -126,7 +126,7 @@ public static class StoryCompiler
             declarations, variables, textVariables, options, diagnostics);
         var world = new WorldDefinition(manifest.World.Ruleset, manifest.World.Characters.Values,
             manifest.World.Items.Values, manifest.World.Factions.Values, flags, variables, textVariables,
-            manifest.World.InitialFlags);
+            manifest.World.InitialFlags, manifest.TalemarkVersion);
         analysis?.World(world, unresolved);
         var symbols = new StorySymbols
         {

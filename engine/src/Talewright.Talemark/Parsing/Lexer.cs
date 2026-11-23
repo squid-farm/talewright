@@ -61,11 +61,12 @@ internal readonly record struct Token(TokenKind Kind, string Source, int Offset,
         : Text.ToString());
 }
 
-internal sealed class TokenBuffer(string source, List<Token> tokens)
+internal sealed class TokenBuffer(string source, List<Token> tokens, int talemarkVersion)
 {
     private readonly List<Token> _tokens = tokens;
 
     internal string Source { get; } = source;
+    internal int TalemarkVersion { get; } = talemarkVersion;
     internal int Count => _tokens.Count;
     internal Token this[int index] => _tokens[index];
     internal TokenWindow Slice(int start, int length) => new(this, start, length);
@@ -100,8 +101,11 @@ internal readonly struct TokenWindow(TokenBuffer buffer, int start, int length)
 /// </summary>
 internal static class Lexer
 {
-    public static TokenBuffer Tokenize(string text)
+    public static TokenBuffer Tokenize(string text, int talemarkVersion = 1)
     {
+        if (talemarkVersion is not (1 or 2))
+            throw new ArgumentOutOfRangeException(nameof(talemarkVersion), talemarkVersion, "Unsupported Talemark version.");
+
         var tokens = new List<Token>();
         var i = 0;
         while (i < text.Length)
@@ -127,11 +131,21 @@ internal static class Lexer
                 continue;
             }
 
-            if (char.IsDigit(c))
+            if (char.IsDigit(c) || talemarkVersion == 2 && c == '.' &&
+                i + 1 < text.Length && char.IsDigit(text[i + 1]))
             {
+                if (c == '.') i++;
                 while (i < text.Length && char.IsDigit(text[i]))
                 {
                     i++;
+                }
+
+                if (talemarkVersion == 2 && i + 1 < text.Length && text[i] == '.' &&
+                    char.IsDigit(text[i + 1]))
+                {
+                    i++;
+                    while (i < text.Length && char.IsDigit(text[i]))
+                        i++;
                 }
 
                 tokens.Add(new Token(TokenKind.Number, text, start, i - start));
@@ -178,6 +192,6 @@ internal static class Lexer
         }
 
         tokens.Add(new Token(TokenKind.End, text, text.Length, 0));
-        return new TokenBuffer(text, tokens);
+        return new TokenBuffer(text, tokens, talemarkVersion);
     }
 }

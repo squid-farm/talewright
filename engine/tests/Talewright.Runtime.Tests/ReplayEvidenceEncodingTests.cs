@@ -38,6 +38,8 @@ public sealed class ReplayEvidenceEncodingTests
             """["FlagChanged",{"flag":{"value":"door-open"},"value":true}]""" },
         { "variable", new VariableChanged(new VarId("gold"), 10, 8),
             """["VariableChanged",{"variable":{"value":"gold"},"oldValue":10,"newValue":8}]""" },
+        { "exact variable", new ExactVariableChanged(new VarId("amount"), "1/4", "1/2"),
+            """["ExactVariableChanged",{"variable":{"value":"amount"},"oldValue":"1/4","newValue":"1/2"}]""" },
         { "text variable", new TextVariableChanged(new VarId("nickname"), "", "Joel \"big\" <&>"),
             """["TextVariableChanged",{"variable":{"value":"nickname"},"oldValue":"","newValue":"Joel \u0022big\u0022 \u003C\u0026\u003E"}]""" },
         { "scene", new SceneEntered(new SceneId("cave")),

@@ -24,9 +24,9 @@
         },
         "talemark": {
           "type": "integer",
-          "enum": [1],
+          "enum": [1, 2],
           "default": 1,
-          "description": "Talemark language version. Omit it during v0 to preserve version 1 behavior with an informational migration notice; pin it to 1 for the current integer arithmetic."
+          "description": "Talemark language version. Version 1 uses integer arithmetic; version 2 uses exact decimal arithmetic. Version 2 is still under development and is not yet a complete authoring or player feature."
         },
         "start": {
           "$ref": "#/definitions/identifier",
@@ -145,11 +145,11 @@
       },
       "additionalProperties": {
         "oneOf": [
-          { "$ref": "#/definitions/integer" },
+          { "type": "number" },
           { "type": "string" }
         ]
       },
-      "description": "Optional integer or text variables keyed by story-specific IDs. Quote text initial values, including empty text and numeric-looking text. Initial values establish fixed types."
+      "description": "Optional numeric or text variables keyed by story-specific IDs. Version 1 accepts integers; version 2 accepts exact decimal numbers. Quote text initial values, including empty text and numeric-looking text. Initial values establish fixed types."
     },
     "triggers": {
       "type": "array",
@@ -159,6 +159,33 @@
       "description": "Optional story-wide condition/effect triggers."
     }
   },
+  "allOf": [
+    {
+      "if": {
+        "required": ["game"],
+        "properties": {
+          "game": {
+            "not": {
+              "required": ["talemark"],
+              "properties": { "talemark": { "const": 2 } }
+            }
+          }
+        }
+      },
+      "then": {
+        "properties": {
+          "vars": {
+            "additionalProperties": {
+              "oneOf": [
+                { "$ref": "#/definitions/integer" },
+                { "type": "string" }
+              ]
+            }
+          }
+        }
+      }
+    }
+  ],
   "additionalProperties": false,
   "definitions": {
     "nonEmptyString": {

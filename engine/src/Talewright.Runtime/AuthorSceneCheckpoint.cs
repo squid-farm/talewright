@@ -1,4 +1,5 @@
 using Talewright.Core.Events;
+using Talewright.Core;
 using Talewright.Core.Identity;
 using Talewright.Core.Rulesets;
 using Talewright.Core.State;
@@ -72,6 +73,8 @@ public sealed class AuthorSceneCheckpoint
         {
             Flags = _setup.Flags.Where(value => world.Flags.Contains(value.Key)).ToDictionary(),
             Variables = _setup.Variables.Where(value => world.Variables.ContainsKey(value.Key)).ToDictionary(),
+            ExactVariables = _setup.ExactVariables.Where(value => world.ExactVariables.ContainsKey(value.Key))
+                .ToDictionary(),
             TextVariables = _setup.TextVariables.Where(value => world.TextVariables.ContainsKey(value.Key)).ToDictionary(),
             Standings = _setup.Standings.Where(value => world.Factions.ContainsKey(value.Key)).ToDictionary(),
             Stats = _setup.Stats.Where(value => world.Characters.ContainsKey(value.Character)
@@ -82,6 +85,7 @@ public sealed class AuthorSceneCheckpoint
         {
             FlagChanged changed => world.Flags.Contains(changed.Flag),
             VariableChanged changed => world.Variables.ContainsKey(changed.Variable),
+            ExactVariableChanged changed => world.ExactVariables.ContainsKey(changed.Variable),
             TextVariableChanged changed => world.TextVariables.ContainsKey(changed.Variable),
             StandingChanged changed => world.Factions.ContainsKey(changed.Faction),
             StatChanged changed => world.Characters.ContainsKey(changed.Character)
@@ -194,6 +198,7 @@ internal sealed class AuthorStateView(GameState state) : IGameStateView
     public int GetStanding(FactionId faction) => state.GetStanding(faction);
     public bool GetFlag(FlagId flag) => state.GetFlag(flag);
     public int GetVariable(VarId variable) => state.GetVariable(variable);
+    public ExactNumber GetExactVariable(VarId variable) => state.GetExactVariable(variable);
     public string GetTextVariable(VarId variable) => state.GetTextVariable(variable);
     public int VisitCount(SceneId scene) => state.VisitCount(scene);
     public bool HasFiredTrigger(string triggerId) => state.HasFiredTrigger(triggerId);

@@ -272,8 +272,8 @@ Pronoun forms are properties, not manipulators; for example,
 `#one-many("singular", "plural")` requires exactly two quoted strings, singular
 first and plural second. A number-valued expression selects the first string only
 when its evaluated value is exactly `1`; every other value selects the second.
-This includes inventory counts, stats, number variables and arithmetic. Current
-Talemark numbers are integers. Pronoun references select from the effective
+This includes inventory counts, stats, number variables and arithmetic. Version 1
+uses integers; version 2 compares exact decimal values. Pronoun references select from the effective
 pronoun set's `agreement` at render time; singular they uses plural agreement.
 On an item-name reference, `{item:pants#one-many("is", "are")}` selects from
 item `name-agreement` instead. Character names, text variables and other

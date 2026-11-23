@@ -1,4 +1,5 @@
 using System.Globalization;
+using Talewright.Core;
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Core.Randomness;
@@ -15,15 +16,30 @@ namespace Talewright.Debugger;
 
 public enum SetupNumberKind { Variable, Stat, Inventory, Standing }
 
-public sealed class SetupNumber(SetupNumberKind kind, string id, string label, int value, string? character = null)
+public sealed class SetupNumber
 {
-    public SetupNumberKind Kind { get; } = kind;
-    public string Id { get; } = id;
-    public string? Character { get; } = character;
-    public string Label { get; } = label;
+    public SetupNumber(SetupNumberKind kind, string id, string label, int value, string? character = null)
+        : this(kind, id, label, value.ToString(CultureInfo.InvariantCulture), character)
+    {
+    }
+
+    public SetupNumber(SetupNumberKind kind, string id, string label, string value, string? character = null)
+    {
+        Kind = kind;
+        Id = id;
+        Label = label;
+        Character = character;
+        Initial = value;
+        Value = value;
+    }
+
+    public SetupNumberKind Kind { get; }
+    public string Id { get; }
+    public string? Character { get; }
+    public string Label { get; }
     public bool Enabled { get; set; }
-    public string Initial { get; } = value.ToString(CultureInfo.InvariantCulture);
-    public string Value { get; set; } = value.ToString(CultureInfo.InvariantCulture);
+    public string Initial { get; }
+    public string Value { get; set; }
 
     /// <summary>Sets the value and enables the field only while it differs from its initial value.</summary>
     public void Edit(string value)
@@ -185,21 +201,30 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
     {
         var inspection = candidate.Inspect();
         var setup = candidate.Setup;
-        int? Requested(SetupNumber field) => field.Kind switch
+        string? Requested(SetupNumber field) => field.Kind switch
         {
-            SetupNumberKind.Variable => setup.Variables.TryGetValue(new(field.Id), out var value) ? value : null,
-            SetupNumberKind.Standing => setup.Standings.TryGetValue(new(field.Id), out var value) ? value : null,
-            SetupNumberKind.Stat => setup.Stats.SingleOrDefault(value => value.Character.Value == field.Character && value.Stat.Value == field.Id)?.Value,
-            SetupNumberKind.Inventory => setup.Inventory.SingleOrDefault(value => value.Character.Value == field.Character && value.Item.Value == field.Id)?.Quantity,
+            SetupNumberKind.Variable when setup.ExactVariables.TryGetValue(new(field.Id), out var exact) =>
+                exact.ToCanonicalString(),
+            SetupNumberKind.Variable when setup.Variables.TryGetValue(new(field.Id), out var value) =>
+                value.ToString(CultureInfo.InvariantCulture),
+            SetupNumberKind.Standing when setup.Standings.TryGetValue(new(field.Id), out var standing) =>
+                standing.ToString(CultureInfo.InvariantCulture),
+            SetupNumberKind.Stat when setup.Stats.SingleOrDefault(value =>
+                value.Character.Value == field.Character && value.Stat.Value == field.Id) is { } stat =>
+                stat.Value.ToString(CultureInfo.InvariantCulture),
+            SetupNumberKind.Inventory when setup.Inventory.SingleOrDefault(value =>
+                value.Character.Value == field.Character && value.Item.Value == field.Id) is { } item =>
+                item.Quantity.ToString(CultureInfo.InvariantCulture),
+            SetupNumberKind.Variable or SetupNumberKind.Standing or SetupNumberKind.Stat or SetupNumberKind.Inventory => null,
             _ => throw new InvalidOperationException($"Unsupported setup field {field.Kind}."),
         };
         var numbers = Numbers.Select(field =>
         {
             var requested = Requested(field);
-            return new SetupNumber(field.Kind, field.Id, field.Label, 0, field.Character)
+            return new SetupNumber(field.Kind, field.Id, field.Label, "0", field.Character)
             {
-                Enabled = requested.HasValue,
-                Value = requested?.ToString(CultureInfo.InvariantCulture) ?? field.Value,
+                Enabled = requested is not null,
+                Value = requested ?? field.Value,
             };
         }).ToArray();
         var flags = Flags.Select(flag => new SetupFlag(flag.Id)
@@ -395,7 +420,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
                 });
             }
             var (numbers, flags, texts, missing) = SynchronizeSetup(story);
-            BuildSetup(numbers, flags, texts).Validate(story);
+            BuildSetup(numbers, flags, texts, story.TalemarkVersion).Validate(story);
             var seed = Story is null ? story.Seed?.ToString(CultureInfo.InvariantCulture) ?? "" : Seed;
             var resolvedSeed = DeterministicDice.ResolveSeed(ParseSeed(seed), story.Seed, _randomSeed);
             var selection = RevalidateCharacter(story, resolvedSeed);
@@ -485,9 +510,10 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
         IReadOnlyList<SetupText> Texts, string[] Missing) SynchronizeSetup(StoryDefinition story)
     {
         var numbers = new List<SetupNumber>();
-        foreach (var variable in story.World.Variables)
+        foreach (var variable in story.World.ExactVariables)
         {
-            numbers.Add(new(SetupNumberKind.Variable, variable.Key.Value, $"var:{variable.Key}", variable.Value));
+            numbers.Add(new(SetupNumberKind.Variable, variable.Key.Value, $"var:{variable.Key}",
+                variable.Value.ToCanonicalString()));
         }
         foreach (var faction in story.World.Factions.Values)
         {
@@ -588,7 +614,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
         {
             var story = Story ?? throw new InvalidOperationException("Load a valid story first.");
             var candidate = AuthorSession.Create(story, new SceneId(Target), captureDecisions: true,
-                BuildSetup(Numbers, Flags, Texts),
+                BuildSetup(Numbers, Flags, Texts, story.TalemarkVersion),
                 story.Creation is null ? ParseSeed(Seed) : ValidatedCreationSeed(), Character);
             var inspection = candidate.Inspect();
             Session = candidate;
@@ -642,7 +668,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
                 Apply(StateChanges.SetStat(state, EntityId.Player, stat, value));
         }
 
-        var setup = BuildSetup(Numbers, Flags, Texts).Validate(story);
+        var setup = BuildSetup(Numbers, Flags, Texts, story.TalemarkVersion).Validate(story);
         foreach (var value in setup.Stats)
             Apply(StateChanges.SetStat(state, value.Character, value.Stat, value.Value));
         foreach (var value in setup.Inventory)
@@ -658,6 +684,8 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
             Apply(StateChanges.SetFlag(state, id, value));
         foreach (var (id, value) in setup.Variables)
             Apply(StateChanges.SetVariable(state, id, value));
+        foreach (var (id, value) in setup.ExactVariables)
+            Apply(StateChanges.SetVariable(state, id, value));
         foreach (var (id, value) in setup.TextVariables)
             Apply(StateChanges.SetTextVariable(state, id, value));
 
@@ -665,24 +693,35 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
     }
 
     private static AuthorSetup BuildSetup(IEnumerable<SetupNumber> numbers, IEnumerable<SetupFlag> flags,
-        IEnumerable<SetupText> texts)
+        IEnumerable<SetupText> texts, int talemarkVersion)
     {
         var variables = new Dictionary<VarId, int>();
+        var exactVariables = new Dictionary<VarId, ExactNumber>();
         var standings = new Dictionary<FactionId, int>();
         var stats = new List<AuthorStatValue>();
         var inventory = new List<AuthorItemValue>();
         foreach (var field in numbers.Where(field => field.Enabled))
         {
-            if (!int.TryParse(field.Value, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var value))
-            {
-                throw new ArgumentException($"{field.Label} requires a 32-bit integer.");
-            }
             switch (field.Kind)
             {
-                case SetupNumberKind.Variable: variables.Add(new(field.Id), value); break;
-                case SetupNumberKind.Standing: standings.Add(new(field.Id), value); break;
-                case SetupNumberKind.Stat: stats.Add(new(new(field.Character!), new(field.Id), value)); break;
-                case SetupNumberKind.Inventory: inventory.Add(new(new(field.Character!), new(field.Id), value)); break;
+                case SetupNumberKind.Variable:
+                    if (talemarkVersion == 2 && ExactNumber.TryParse(field.Value, out var exact))
+                        exactVariables.Add(new(field.Id), exact);
+                    else if (talemarkVersion == 1 && int.TryParse(field.Value, NumberStyles.AllowLeadingSign,
+                                 CultureInfo.InvariantCulture, out var variable))
+                        variables.Add(new(field.Id), variable);
+                    else
+                        throw new ArgumentException($"{field.Label} requires a {(talemarkVersion == 1 ? "32-bit integer" : "decimal number")}.");
+                    break;
+                case SetupNumberKind.Standing:
+                    standings.Add(new(field.Id), ParseWhole(field));
+                    break;
+                case SetupNumberKind.Stat:
+                    stats.Add(new(new(field.Character!), new(field.Id), ParseWhole(field)));
+                    break;
+                case SetupNumberKind.Inventory:
+                    inventory.Add(new(new(field.Character!), new(field.Id), ParseWhole(field)));
+                    break;
                 default: throw new InvalidOperationException($"Unsupported setup field {field.Kind}.");
             }
         }
@@ -690,11 +729,17 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
         {
             Flags = flags.Where(field => field.Enabled).ToDictionary(field => field.Id, field => field.Value),
             Variables = variables,
+            ExactVariables = exactVariables,
             TextVariables = texts.Where(field => field.Enabled).ToDictionary(field => field.Id, field => field.Value),
             Standings = standings,
             Stats = stats,
             Inventory = inventory,
         };
+
+        static int ParseWhole(SetupNumber field) =>
+            int.TryParse(field.Value, NumberStyles.AllowLeadingSign, CultureInfo.InvariantCulture, out var value)
+                ? value
+                : throw new ArgumentException($"{field.Label} requires a 32-bit integer.");
     }
 
     public void Choose(string key) => RunCommand(session => session.Choose(key));
@@ -703,7 +748,8 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
 
     public void RevertEdits() => RefreshEdits();
 
-    public void ApplyEdits() => RunCommand(session => session.Edit(BuildSetup(EditNumbers, EditFlags, EditTexts)));
+    public void ApplyEdits() => RunCommand(session => session.Edit(BuildSetup(EditNumbers, EditFlags, EditTexts,
+        session.Story.TalemarkVersion)));
     public void JumpPreservingState() => RunCommand(session => session.Jump(new SceneId(Target)));
     public void Back() => RunCommand(session => session.Back());
     public void Forward() => RunCommand(session => session.Forward());
@@ -728,10 +774,10 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
         var state = session.State;
         EditNumbers = Numbers.Select(field => new SetupNumber(field.Kind, field.Id, field.Label, field.Kind switch
         {
-            SetupNumberKind.Variable => state.GetVariable(new(field.Id)),
-            SetupNumberKind.Standing => state.GetStanding(new(field.Id)),
-            SetupNumberKind.Stat => state.GetBaseStat(new(field.Character!), new(field.Id)),
-            SetupNumberKind.Inventory => state.GetItemCount(new(field.Character!), new(field.Id)),
+            SetupNumberKind.Variable => state.GetExactVariable(new(field.Id)).ToCanonicalString(),
+            SetupNumberKind.Standing => state.GetStanding(new(field.Id)).ToString(CultureInfo.InvariantCulture),
+            SetupNumberKind.Stat => state.GetBaseStat(new(field.Character!), new(field.Id)).ToString(CultureInfo.InvariantCulture),
+            SetupNumberKind.Inventory => state.GetItemCount(new(field.Character!), new(field.Id)).ToString(CultureInfo.InvariantCulture),
             _ => throw new InvalidOperationException($"Unsupported edit field {field.Kind}."),
         }, field.Character)).ToArray();
         EditFlags = Flags.Select(flag => new SetupFlag(flag.Id, state.GetFlag(flag.Id))).ToArray();

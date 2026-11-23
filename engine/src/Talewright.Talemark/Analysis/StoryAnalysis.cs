@@ -1,4 +1,5 @@
 using System.Collections.Frozen;
+using Talewright.Core;
 using Talewright.Core.Identity;
 using Talewright.Core.Rulesets;
 using Talewright.Core.World;
@@ -71,6 +72,7 @@ public sealed class StoryAnalysis
     private StoryAnalysis(StoryAnalysis original, Diagnostic additional)
     {
         Source = original.Source;
+        TalemarkVersion = original.TalemarkVersion;
         Symbols = original.Symbols;
         Expressions = original.Expressions;
         _sites = original._sites;
@@ -102,6 +104,7 @@ public sealed class StoryAnalysis
         IReadOnlyList<string>? additionalTagNames, StoryDefinition? story)
     {
         Source = source;
+        TalemarkVersion = collector.TalemarkVersion;
         _currentFile = currentFileAnalysis ? currentFile : null;
         var currentSymbols = collector.Symbols.Distinct().ToArray();
         _currentFileSymbols = currentFileAnalysis ? Array.AsReadOnly(currentSymbols) : [];
@@ -136,7 +139,8 @@ public sealed class StoryAnalysis
         Tokens = Array.AsReadOnly(collector.Tokens.ToArray());
         var classificationSources = collector.ClassificationSources.ToArray();
         _classifications = new(() => Array.AsReadOnly(classificationSources
-            .SelectMany(input => TalemarkClassifier.Classify(input.File, input.Syntax, CancellationToken.None))
+            .SelectMany(input => TalemarkClassifier.Classify(input.File, input.Syntax, CancellationToken.None,
+                TalemarkVersion))
             .ToArray()));
         World = collector.AuthoredWorld;
         Story = currentFileAnalysis ? null : story;
@@ -162,6 +166,7 @@ public sealed class StoryAnalysis
     private readonly StatDiagnosticGuidance? _statDiagnosticGuidance;
 
     public StorySource Source { get; }
+    public int TalemarkVersion { get; }
     public IReadOnlyList<AuthoringSymbol> Symbols { get; }
     public IReadOnlyList<ExpressionContext> Expressions { get; }
     public IReadOnlyList<Diagnostic> Diagnostics { get; }
@@ -269,18 +274,20 @@ public static class StoryAnalyzer
         var previousSymbols = snapshot?.Symbols ?? [];
         var context = snapshot?.SymbolContext;
         var previousWorld = context?.World ?? EmptyWorld();
+        collector.TalemarkVersion = snapshot?.TalemarkVersion ?? previousWorld.TalemarkVersion;
         if (context is null) collector.Registrations();
 
         if (StorySource.IsConfigurationFile(file))
         {
             var flags = context?.Flags.ToHashSet() ?? [];
-            var numbers = previousWorld.Variables.ToDictionary();
+            var numbers = previousWorld.ExactVariables.ToDictionary();
             var textVariables = previousWorld.TextVariables.ToDictionary();
             var unresolved = context?.UnresolvedVariables.ToHashSet() ?? [];
             RemovePreviousFileSymbols(file, previousSymbols, snapshot, flags, numbers, textVariables, unresolved, null);
             var baseWorld = new WorldDefinition(previousWorld.Ruleset, previousWorld.Characters.Values,
                 previousWorld.Items.Values, previousWorld.Factions.Values, flags, numbers, textVariables,
-                previousWorld.InitialFlags.Where(pair => flags.Contains(pair.Key)).ToDictionary());
+                previousWorld.InitialFlags.Where(pair => flags.Contains(pair.Key)).ToDictionary(),
+                previousWorld.TalemarkVersion);
             collector.World(baseWorld, unresolved);
             var root = new StoryYamlContext(file, diagnostics).Parse(file, source.Files[file]);
             if (root is not null) collector.Manifest(root, file);
@@ -291,7 +298,7 @@ public static class StoryAnalyzer
                 throw new ArgumentNullException(nameof(syntax), "Current-file syntax is required for a TaleMark document.");
 
             var declarations = new List<VariableDeclaration>();
-            var discoveredNumbers = new Dictionary<VarId, int>();
+            var discoveredNumbers = new Dictionary<VarId, ExactNumber>();
             var localFlags = new HashSet<FlagId>();
             var localVariables = new HashSet<VarId>();
             var currentScenes = new HashSet<SceneId>();
@@ -302,7 +309,8 @@ public static class StoryAnalyzer
                         if (flag) localFlags.Add(new FlagId(name));
                         else localVariables.Add(new VarId(name));
                     },
-                    typedDeclaration: declarations.Add, location: location);
+                    typedDeclaration: declarations.Add, location: location,
+                    talemarkVersion: collector.TalemarkVersion);
 
             TaleDeclarations.Collect(file, syntax, (id, location) =>
             {
@@ -337,7 +345,7 @@ public static class StoryAnalyzer
             else
             {
                 var mutableFlags = context?.Flags.ToHashSet() ?? [];
-                var numbers = previousWorld.Variables.ToDictionary();
+                var numbers = previousWorld.ExactVariables.ToDictionary();
                 var textVariables = previousWorld.TextVariables.ToDictionary();
                 var mutableUnresolved = context?.UnresolvedVariables.ToHashSet() ?? [];
                 var mutableScenes = context?.Scenes.ToHashSet() ?? [];
@@ -347,13 +355,15 @@ public static class StoryAnalyzer
                 mutableScenes.UnionWith(currentScenes);
                 var baseWorld = new WorldDefinition(previousWorld.Ruleset, previousWorld.Characters.Values,
                     previousWorld.Items.Values, previousWorld.Factions.Values, mutableFlags, numbers, textVariables,
-                    previousWorld.InitialFlags.Where(pair => mutableFlags.Contains(pair.Key)).ToDictionary());
+                    previousWorld.InitialFlags.Where(pair => mutableFlags.Contains(pair.Key)).ToDictionary(),
+                    previousWorld.TalemarkVersion);
                 var localUnresolved = VariableDiscovery.Resolve(baseWorld, mutableFlags, mutableScenes,
                     declarations, numbers, textVariables, options, diagnostics);
                 mutableUnresolved.UnionWith(localUnresolved);
                 world = new WorldDefinition(previousWorld.Ruleset, previousWorld.Characters.Values,
                     previousWorld.Items.Values, previousWorld.Factions.Values, mutableFlags, numbers, textVariables,
-                    previousWorld.InitialFlags.Where(pair => mutableFlags.Contains(pair.Key)).ToDictionary());
+                    previousWorld.InitialFlags.Where(pair => mutableFlags.Contains(pair.Key)).ToDictionary(),
+                    previousWorld.TalemarkVersion);
                 collector.World(world, mutableUnresolved);
                 flags = mutableFlags;
                 variables = numbers.Keys.Concat(textVariables.Keys).Concat(mutableUnresolved).ToHashSet();
@@ -390,7 +400,7 @@ public static class StoryAnalyzer
     }
 
     private static void RemovePreviousFileSymbols(string file, IReadOnlyList<AuthoringSymbol> previousSymbols,
-        StoryAnalysis? snapshot, HashSet<FlagId> flags, Dictionary<VarId, int> numbers,
+        StoryAnalysis? snapshot, HashSet<FlagId> flags, Dictionary<VarId, ExactNumber> numbers,
         Dictionary<VarId, string> textVariables, HashSet<VarId> unresolved, HashSet<SceneId>? scenes)
     {
         foreach (var symbol in previousSymbols.Where(symbol => symbol.Declaration?.Start.File == file))
@@ -441,6 +451,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal List<AuthoredScene> Scenes { get; } = [];
     internal List<Diagnostic> RecoveryImageDiagnostics { get; } = [];
     internal StorySymbols? SymbolContext { get; set; }
+    internal int TalemarkVersion { get; set; } = 1;
 
     private void AddSite(CompletionSite site) => CompletionSites.Add(CompletionSiteSource.Of(site));
 
@@ -861,7 +872,7 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
         }
         var key = (location, completionText);
         if (_reusableExpressions is null || !_reusableExpressions.TryGetValue(key, out var tokens))
-            tokens = Lexer.Tokenize(completionText);
+            tokens = Lexer.Tokenize(completionText, TalemarkVersion);
         if (cacheForReuse) (_reusableExpressions ??= []).TryAdd(key, tokens);
         var sites = new ExpressionSiteSource(tokens, text.Length, kind, range, location, scalar, locate);
         var map = new ExpressionSourceMap(sites);
@@ -1062,7 +1073,8 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
             (ManifestVocabulary.Characters, AuthoringSymbolKind.Character, ManifestVocabulary.SymbolCharacter),
             (ManifestVocabulary.Items, AuthoringSymbolKind.Item, ManifestVocabulary.SymbolItem),
             (ManifestVocabulary.Factions, AuthoringSymbolKind.Faction, ManifestVocabulary.SymbolFaction),
-            (ManifestVocabulary.Vars, AuthoringSymbolKind.Variable, ManifestVocabulary.SymbolInteger),
+            (ManifestVocabulary.Vars, AuthoringSymbolKind.Variable,
+                TalemarkVersion == 1 ? ManifestVocabulary.SymbolInteger : ManifestVocabulary.SymbolNumber),
         })
         {
             if (Get(root, name) is YamlMappingNode map)
@@ -1082,7 +1094,11 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
     internal void World(WorldDefinition world, IReadOnlySet<VarId>? unresolved = null)
     {
         AuthoredWorld = world;
-        foreach (var id in world.Variables.Keys) _variableTypes[id.Value] = ManifestVocabulary.SymbolInteger;
+        TalemarkVersion = world.TalemarkVersion;
+        var numberType = world.TalemarkVersion == 1
+            ? ManifestVocabulary.SymbolInteger
+            : ManifestVocabulary.SymbolNumber;
+        foreach (var id in world.Variables.Keys) _variableTypes[id.Value] = numberType;
         foreach (var id in world.TextVariables.Keys) _variableTypes[id.Value] = ManifestVocabulary.SymbolText;
         foreach (var id in unresolved ?? new HashSet<VarId>())
             _variableTypes[id.Value] = ManifestVocabulary.SymbolUnresolved;

@@ -321,6 +321,23 @@ public sealed class StoryPreviewTests
     }
 
     [Fact]
+    public void Current_file_analysis_inherits_the_snapshot_talemark_version()
+    {
+        var manifest = Manifest.Replace("  start: start", "  start: start\n  talemark: 2");
+        var tale = "=== start\n@requires .25 == 0.25\n-> END";
+        var source = Source(tale, manifest);
+        var snapshot = StoryAnalyzer.Analyze(source);
+        var workspace = new StoryWorkspace(source);
+
+        var analysis = workspace.AnalyzeCurrentFile("main.tale", tale, snapshot, CancellationToken.None);
+
+        Assert.Equal(2, snapshot.TalemarkVersion);
+        Assert.Equal(2, analysis.TalemarkVersion);
+        Assert.DoesNotContain(analysis.Diagnostics,
+            diagnostic => diagnostic.Code == "TW1001" && diagnostic.Message.Contains("Unexpected ."));
+    }
+
+    [Fact]
     public void Metadata_predicate_visibility_does_not_execute_project_code_during_analysis_or_hover()
     {
         var manifest = Manifest.Replace("  ruleset: rpg",

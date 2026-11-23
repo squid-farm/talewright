@@ -32,7 +32,7 @@ internal static class VariableUsageInference
     private static VariableUsageType Infer(StoryAnalysis analysis, ExpressionContext context, int offset)
     {
         var text = context.Text;
-        var tokens = Lexer.Tokenize(text);
+        var tokens = Lexer.Tokenize(text, analysis.TalemarkVersion);
         var diagnostics = new DiagnosticBag();
         SourceLocation Locate(int at) => new(context.Range.Start.File, 1, at + 1);
         switch (context.Kind)
@@ -133,7 +133,7 @@ internal static class VariableUsageInference
     private static VariableUsageType DeclaredType(StoryAnalysis analysis, string name) =>
         analysis.Symbols.FirstOrDefault(symbol => symbol.Kind == AuthoringSymbolKind.Variable && symbol.Name == name)?.Type switch
         {
-            ManifestVocabulary.SymbolInteger => VariableUsageType.Number,
+            ManifestVocabulary.SymbolInteger or ManifestVocabulary.SymbolNumber => VariableUsageType.Number,
             ManifestVocabulary.SymbolText => VariableUsageType.Text,
             _ => VariableUsageType.Unknown
         };

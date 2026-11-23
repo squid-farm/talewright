@@ -719,7 +719,8 @@ internal sealed partial class TaleBinder
                     var expression = clause.Kind == TaleClauseKind.UnclosedRequires
                         ? value[..parsed.ExpressionLength]
                         : value;
-                    var tokens = _symbols.Analysis?.Expression(context, expression, location) ?? Lexer.Tokenize(expression);
+                    var tokens = _symbols.Analysis?.Expression(context, expression, location)
+                        ?? Lexer.Tokenize(expression, _symbols.World.TalemarkVersion);
                     ExpressionParser.ReportStringErrors(tokens, offset => At(clause.ValueStart + offset), _diagnostics);
                     break;
                 case TaleClauseKind.InvalidCondition when _symbols.Analysis is not null:

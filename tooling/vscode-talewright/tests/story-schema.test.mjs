@@ -61,12 +61,17 @@ test('schema validates every shipped story configuration', async () => {
   }
 });
 
-test('schema validates numeric values after YAML normalization', () => {
-  for (const value of ['1', '0', '2', '"1"', 'one']) {
+test('schema validates Talemark versions and version-specific numeric variables', () => {
+  for (const value of ['1', '2']) {
     const name = `Talemark version ${value}`;
     const manifest = parsedYaml(`game:\n  id: language-version\n  title: Language version\n  start: beginning\n  talemark: ${value}\n`, name);
-    if (value === '1') assertValid(validateManifest, manifest, name);
-    else assertInvalid(validateManifest, manifest, name);
+    assertValid(validateManifest, manifest, name);
+  }
+
+  for (const value of ['0', '3', '"1"', 'one']) {
+    const name = `unsupported Talemark version ${value}`;
+    const manifest = parsedYaml(`game:\n  id: language-version\n  title: Language version\n  start: beginning\n  talemark: ${value}\n`, name);
+    assertInvalid(validateManifest, manifest, name);
   }
 
   // Schema validation cannot distinguish normalized numbers from their original spellings.
@@ -76,6 +81,15 @@ test('schema validates numeric values after YAML normalization', () => {
     assert.equal(manifest.game.talemark, 1, `${name} should normalize to the integer 1`);
     assertValid(validateManifest, manifest, name);
   }
+
+  const v2 = parsedYaml(`game:\n  id: decimal-vars\n  title: Decimal vars\n  start: beginning\n  talemark: 2\nvars:\n  short: .25\n  leading-zero: 0.25\n`, 'version 2 decimal variables');
+  assertValid(validateManifest, v2, 'version 2 decimal variables');
+
+  const v2Exponent = parsedYaml(`game:\n  id: exponent-vars\n  title: Exponent vars\n  start: beginning\n  talemark: 2\nvars:\n  hundred: 1e2\n`, 'version 2 exponent variable');
+  assertValid(validateManifest, v2Exponent, 'version 2 exponent variable');
+
+  const v1 = parsedYaml(`game:\n  id: integer-vars\n  title: Integer vars\n  start: beginning\n  talemark: 1\nvars:\n  amount: .25\n`, 'version 1 decimal variable');
+  assertInvalid(validateManifest, v1, 'version 1 decimal variable');
 });
 
 test('player declarations may be in the root or a supporting configuration file', () => {

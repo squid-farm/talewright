@@ -1,4 +1,5 @@
 using System.Globalization;
+using Talewright.Core;
 using Talewright.Core.Identity;
 using Talewright.Core.Rulesets;
 using Talewright.Core.World;
@@ -387,9 +388,10 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
         return flags;
     }
 
-    internal (Dictionary<VarId, int> Numbers, Dictionary<VarId, string> Text) ReadVars(YamlNode? node)
+    internal (Dictionary<VarId, ExactNumber> Numbers, Dictionary<VarId, string> Text) ReadVars(
+        YamlNode? node, int talemarkVersion)
     {
-        var numericVars = new Dictionary<VarId, int>();
+        var numericVars = new Dictionary<VarId, ExactNumber>();
         var textVars = new Dictionary<VarId, string>();
         if (node is null || _yaml.Mapping(node, ManifestVocabulary.Vars) is not { } map)
         {
@@ -404,16 +406,33 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
                 textVars.Add(new VarId(id), text.Value ?? "");
             }
             else if (value is YamlScalarNode { Value: { } raw } &&
-                int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var number))
+                TryParseVariableNumber(raw, talemarkVersion, out var number))
             {
                 numericVars.Add(new VarId(id), number);
             }
             else
             {
-                _yaml.Error(value, CompilerDiagnosticCodes.InvalidConfigurationValue, $"Variable '{id}' needs a whole number or quoted text value.", 0);
+                _yaml.Error(value, CompilerDiagnosticCodes.InvalidConfigurationValue,
+                    $"Variable '{id}' needs {(talemarkVersion == 1 ? "a whole number" : "a decimal number")} or quoted text value.", 0);
             }
         }
 
         return (numericVars, textVars);
+    }
+
+    private static bool TryParseVariableNumber(string raw, int talemarkVersion, out ExactNumber number)
+    {
+        if (talemarkVersion == 1 &&
+            int.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out var integer))
+        {
+            number = ExactNumber.FromInteger(integer);
+            return true;
+        }
+
+        if (talemarkVersion == 2 && !raw.Contains('/') && ExactNumber.TryParse(raw, out number))
+            return true;
+
+        number = ExactNumber.Zero;
+        return false;
     }
 }

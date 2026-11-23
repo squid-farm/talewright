@@ -1,6 +1,7 @@
 using Talewright.Core.Identity;
 using Talewright.Core.Randomness;
 using Talewright.Core.World;
+using Talewright.Core;
 
 namespace Talewright.Core.Events;
 
@@ -30,6 +31,8 @@ public sealed record StandingChanged(FactionId Faction, int OldValue, int NewVal
 public sealed record FlagChanged(FlagId Flag, bool Value) : GameEvent;
 
 public sealed record VariableChanged(VarId Variable, int OldValue, int NewValue) : GameEvent;
+
+public sealed record ExactVariableChanged(VarId Variable, string OldValue, string NewValue) : GameEvent;
 
 public sealed record TextVariableChanged(VarId Variable, string OldValue, string NewValue) : GameEvent;
 

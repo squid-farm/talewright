@@ -1,4 +1,5 @@
 using Talewright.Core.Events;
+using Talewright.Core;
 using Talewright.Core.Identity;
 using Talewright.Core.State;
 using Talewright.Core.World;
@@ -31,6 +32,7 @@ public sealed class AuthorInspection
         _stepSources = story.Scenes.SelectMany(scene => SceneSteps.Walk(scene.Steps)
             .Select(step => (Key: (scene.Id, step.Id), step.Source))).ToDictionary(step => step.Key, step => step.Source);
         Seed = state.Seed;
+        TalemarkVersion = story.TalemarkVersion;
         RollCount = state.RollCount;
         CurrentScene = state.CurrentScene;
         IsEnded = state.IsEnded;
@@ -59,6 +61,9 @@ public sealed class AuthorInspection
             .Select(id => new KeyValuePair<FlagId, bool>(id, state.GetFlag(id))).ToArray());
         Variables = Array.AsReadOnly(story.World.Variables.Keys.OrderBy(id => id.Value, StringComparer.Ordinal)
             .Select(id => new KeyValuePair<VarId, int>(id, state.GetVariable(id))).ToArray());
+        ExactVariables = Array.AsReadOnly(story.World.ExactVariables.Keys
+            .OrderBy(id => id.Value, StringComparer.Ordinal)
+            .Select(id => new KeyValuePair<VarId, ExactNumber>(id, state.GetExactVariable(id))).ToArray());
         TextVariables = Array.AsReadOnly(story.World.TextVariables.Keys.OrderBy(id => id.Value, StringComparer.Ordinal)
             .Select(id => new KeyValuePair<VarId, string>(id, state.GetTextVariable(id))).ToArray());
         Scenes = Array.AsReadOnly(story.Scenes.Select(scene =>
@@ -68,6 +73,7 @@ public sealed class AuthorInspection
     }
 
     public ulong Seed { get; }
+    public int TalemarkVersion { get; }
     public int RollCount { get; }
     public SceneId? CurrentScene { get; }
     public bool IsEnded { get; }
@@ -80,6 +86,7 @@ public sealed class AuthorInspection
     public IReadOnlyList<AuthorFactionInspection> Factions { get; }
     public IReadOnlyList<KeyValuePair<FlagId, bool>> Flags { get; }
     public IReadOnlyList<KeyValuePair<VarId, int>> Variables { get; }
+    public IReadOnlyList<KeyValuePair<VarId, ExactNumber>> ExactVariables { get; }
     public IReadOnlyList<KeyValuePair<VarId, string>> TextVariables { get; }
     public IReadOnlyList<AuthorSceneInspection> Scenes { get; }
     public IReadOnlyList<AuthorTriggerInspection> Triggers { get; }

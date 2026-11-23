@@ -1,4 +1,5 @@
 using MessagePack;
+using System.Numerics;
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Core.State;
@@ -157,6 +158,18 @@ internal sealed class ContinuationCheckpoint
         PlayerEntryBoundary boundary, CheckpointPayload? retained)
     {
         var world = story.World;
+        if (world.TalemarkVersion == 2 && world.ExactVariables.Keys.Any(id =>
+        {
+            var value = state.GetExactVariable(id);
+            return value.Denominator != BigInteger.One
+                || value.Numerator < int.MinValue
+                || value.Numerator > int.MaxValue;
+        }))
+        {
+            throw new InvalidOperationException(
+                "Saving is unavailable while Talemark version 2 numeric variables contain values that the current save format cannot preserve.");
+        }
+
         var payload = new CheckpointPayload
         {
             Target = boundary.Target.Scene?.Value,

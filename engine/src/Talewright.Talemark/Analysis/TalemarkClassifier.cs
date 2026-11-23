@@ -9,25 +9,25 @@ public static class TalemarkClassifier
 {
     /// <summary>Parses and classifies one <c>.tale</c> file without resolving any story symbols.</summary>
     public static IReadOnlyList<TalemarkClassification> Classify(string file, string text,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default, int talemarkVersion = 1)
     {
         ArgumentNullException.ThrowIfNull(file);
         ArgumentNullException.ThrowIfNull(text);
         cancellationToken.ThrowIfCancellationRequested();
-        return Classify(file, TaleSyntaxParser.Parse(text, cancellationToken), cancellationToken);
+        return Classify(file, TaleSyntaxParser.Parse(text, cancellationToken), cancellationToken, talemarkVersion);
     }
 
     internal static IReadOnlyList<TalemarkClassification> Classify(string file, TaleFileSyntax syntax,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken, int talemarkVersion = 1)
     {
-        var classifier = new Classifier(file, syntax, cancellationToken);
+        var classifier = new Classifier(file, syntax, cancellationToken, talemarkVersion);
         return classifier.Run();
     }
 
     internal static void ClassifyExpressionSyntax(string text, Func<int, SourceLocation> locate,
-        ICollection<TalemarkClassification> output, CancellationToken cancellationToken)
+        ICollection<TalemarkClassification> output, CancellationToken cancellationToken, int talemarkVersion = 1)
     {
-        var tokens = Lexer.Tokenize(text);
+        var tokens = Lexer.Tokenize(text, talemarkVersion);
         var previousWasHash = false;
         var work = 0;
         for (var index = 0; index < tokens.Count; index++)
@@ -124,7 +124,8 @@ public static class TalemarkClassifier
         tokens[index - 5].Kind == TokenKind.Colon &&
         tokens[index - 6].Kind == TokenKind.Identifier;
 
-    private sealed class Classifier(string file, TaleFileSyntax syntax, CancellationToken cancellationToken)
+    private sealed class Classifier(string file, TaleFileSyntax syntax, CancellationToken cancellationToken,
+        int talemarkVersion)
     {
         private readonly List<TalemarkClassification> _classifications = [];
         private int _work;
@@ -539,11 +540,11 @@ public static class TalemarkClassifier
 
         private void ClassifyExpression(ReadOnlySpan<char> text, SourceLocation location) =>
             ClassifyExpressionSyntax(text.ToString(), offset => location.Offset(offset), _classifications,
-                cancellationToken);
+                cancellationToken, talemarkVersion);
 
         private void AddInline(SourceText source)
         {
-            foreach (var classification in InlineParser.Classify(source, cancellationToken))
+            foreach (var classification in InlineParser.Classify(source, cancellationToken, talemarkVersion))
             {
                 CheckCancellation();
                 _classifications.Add(classification);

@@ -672,7 +672,7 @@ counts, stats, number variables and arithmetic:
 {var:coins - 1#one-many("coin remains", "coins remain")}.
 ```
 
-Current Talemark numbers are integers. On a pronoun reference, selection reads
+Version 1 numbers are integers; version 2 compares exact decimal values. On a pronoun reference, selection reads
 the character's effective pronouns at render time, including the player's
 character-creation choice. Built-in `she`, `he` and `it` select the first string;
 `they` selects the second, including singular they. Custom sets use their required
@@ -843,7 +843,7 @@ The Markdown `![alt](path)` form is not supported and reports TW1015.
 ```
 or / and / not            boolean logic
 == != < <= > >=           comparison
-+ - * /                   integer arithmetic
++ - * /                   arithmetic (version 1: integers; version 2: exact numbers)
 player has rope           inventory check (any character id)
 player:inventory:rope:count
                           quantity of rope held by a character; 0 if not held
@@ -857,6 +857,24 @@ hostile … allied          reputation tier names (compare with faction:<id>:tie
 ```
 
 Types are checked at compile time (number, bool, text, tier).
+Version 1 uses integer literals and arithmetic. Version 2 additionally accepts
+decimal literals such as `.25` and `0.25`; numeric variables may use decimal
+initial values, including exponent notation such as `1e2`, and remain exact through
+arithmetic and comparisons. For example:
+
+```yaml
+game:
+  talemark: 2
+vars:
+  amount: 0.25
+```
+
+```tale
+{if var:amount == 1 / 4}The values are equal.{/if}
+```
+
+Version 2 is still under development; see the [language-version guide](../guide/language-versions.md)
+before using it in a story.
 Only player visits are tracked. Scene visit counts are numeric, including for hubs; `scene` refers
 to the scene that owns the expression, even when that expression is evaluated in a hub offer.
 `<scene-id>:player:visits` refers to a named scene. Manifest triggers and character-sheet rules have
@@ -919,7 +937,8 @@ That order does not depend on filesystem enumeration or the reader's choices.
 Later incompatible assignments are errors, not type changes.
 
 Types can flow through forward references and assignment chains. Arithmetic and
-compound assignments require integers. When a chain has no resolvable type (for
+compound assignments require numbers; version 1 keeps integer arithmetic, while
+version 2 supports exact decimals. When a chain has no resolvable type (for
 example, two variables only assigned from each other), the compiler reports
 TW2007: add an explicit manifest initial value to establish the type.
 

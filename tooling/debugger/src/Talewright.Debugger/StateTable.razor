@@ -19,7 +19,10 @@
     <summary>Flags, variables, factions, visits and triggers</summary>
     <ul>
         @foreach (var flag in Inspection.Flags.Where(v => Match($"flag:{v.Key}"))) { <li>flag:@flag.Key = @flag.Value</li> }
-        @foreach (var variable in Inspection.Variables.Where(v => Match($"var:{v.Key}"))) { <li>var:@variable.Key (integer) = @variable.Value</li> }
+        @foreach (var variable in Inspection.ExactVariables.Where(v => Match($"var:{v.Key}")))
+        {
+            <li>var:@variable.Key (@(Inspection.TalemarkVersion == 1 ? "integer" : "number")) = @variable.Value</li>
+        }
         @foreach (var variable in Inspection.TextVariables.Where(v => Match($"var:{v.Key}")))
         {
             <li>var:@variable.Key (text) = <code>@System.Text.Json.JsonSerializer.Serialize(variable.Value)</code></li>

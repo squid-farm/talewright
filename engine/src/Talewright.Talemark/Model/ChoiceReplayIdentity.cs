@@ -332,7 +332,10 @@ internal static class ChoiceReplayIdentity
         {
             case NumberLiteral value:
                 writer.WriteStringValue("number");
-                writer.WriteNumberValue(value.Value);
+                if (value.Value.Denominator.IsOne)
+                    writer.WriteRawValue(value.Value.Numerator.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                else
+                    writer.WriteStringValue(value.Value.ToCanonicalString());
                 break;
             case BoolLiteral value:
                 writer.WriteStringValue("bool");

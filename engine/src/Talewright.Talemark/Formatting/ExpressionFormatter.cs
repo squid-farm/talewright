@@ -1,4 +1,5 @@
 using System.Globalization;
+using Talewright.Core;
 using System.Text;
 using Talewright.Core.Identity;
 using Talewright.Rules.Expressions;
@@ -72,7 +73,7 @@ public static class ExpressionFormatter
 
     private static string Atom(Expr expression) => expression switch
     {
-        NumberLiteral number => number.Value.ToString(CultureInfo.InvariantCulture),
+        NumberLiteral number => number.Value.ToCanonicalString(),
         BoolLiteral boolean => boolean.Value ? True : False,
         TextLiteral literal => Quote(literal.Value),
         TierLiteral tier => TierName(tier.Tier.Id),
@@ -175,7 +176,8 @@ public static class ExpressionFormatter
             or BinaryOp.Greater or BinaryOp.GreaterOrEqual } => 4,
         BinaryExpr { Op: BinaryOp.Add or BinaryOp.Subtract } => 5,
         BinaryExpr { Op: BinaryOp.Multiply or BinaryOp.Divide } => 6,
-        UnaryExpr { Op: UnaryOp.Negate } or NumberLiteral { Value: < 0 } => 7,
+        UnaryExpr { Op: UnaryOp.Negate } => 7,
+        NumberLiteral number when number.Value < ExactNumber.Zero => 7,
         UnaryExpr => throw Invalid("Unknown unary operator."),
         BinaryExpr => throw Invalid("Unknown binary operator."),
         _ => 8,
