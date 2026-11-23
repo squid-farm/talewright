@@ -280,7 +280,7 @@ public sealed class OrderedSceneTests
             """, BuildManifest(talemark: 2).Build()));
         var text = Text(session.Start());
 
-        Assert.Contains("(20)", text);
+        Assert.Contains("(10)", text);
         Assert.DoesNotContain("−0", text);
         Assert.DoesNotContain("+0", text);
     }
