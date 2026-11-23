@@ -47,6 +47,30 @@ public sealed class DecisionListTests : BunitContext
     }
 
     [Fact]
+    public void Reports_rendered_divisions_with_their_source_and_expression_warning()
+    {
+        var files = ComponentStory.Files();
+        files["main.tale"] = """
+            === hall
+            A value: {1 / 0}.
+            * [Continue {1 / 0}] -> END
+            """;
+        using var model = ComponentStory.Load(files);
+        model.Start();
+
+        var list = Show(model.Inspection!);
+
+        Assert.Equal(
+        [
+            "RenderedExpression hall step:2:1: Evaluated (DivisionByZero)",
+            "RenderedExpression hall step:3:1: Evaluated (DivisionByZero)",
+        ], Summaries(list).Where(summary => summary.StartsWith("RenderedExpression ", StringComparison.Ordinal)));
+        Assert.Equal(2, list.FindAll("[role='alert']").Count);
+        Assert.StartsWith("Source: main.tale:2:", Paragraphs(Decision(list, "RenderedExpression hall step:2:1"))[0]);
+        Assert.StartsWith("Source: main.tale:3:", Paragraphs(Decision(list, "RenderedExpression hall step:3:1"))[0]);
+    }
+
+    [Fact]
     public void Lists_the_events_each_decision_produced()
     {
         using var model = ComponentStory.Start();

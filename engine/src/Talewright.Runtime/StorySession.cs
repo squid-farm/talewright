@@ -543,7 +543,8 @@ public sealed class StorySession : IStorySession
         var target = new DivertTarget(storylet.Id);
         var label = HubLabelSource(storylet);
         return new ChoiceCandidate(key, storylet.Requires, label,
-            ChoiceAvailability.ShownLabelSource(storylet.Shown, label, _executor.Render),
+            ChoiceAvailability.ShownLabelSource(storylet.Shown,
+                label, text => _executor.Render(text, storylet.Id.Value)),
             notes =>
             {
                 _log.Append(new ChoiceMade(scene.Id, key));
@@ -554,7 +555,7 @@ public sealed class StorySession : IStorySession
 
     private Func<IReadOnlyList<RenderedInline>> HubLabelSource(SceneDefinition storylet) =>
         storylet.ChoiceLabel is { } choiceLabel
-            ? () => _executor.Render(choiceLabel)
+            ? () => _executor.Render(choiceLabel, storylet.Id.Value)
             : () => [new RenderedText(storylet.Title ?? storylet.Id.Value, TextStyle.None)];
 
     private List<VisibleChoice> ContinueTo(

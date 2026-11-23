@@ -13,6 +13,7 @@ public enum DecisionKind
     Check,
     CheckOutcome,
     Trigger,
+    RenderedExpression,
 }
 
 public enum DecisionOutcome
@@ -27,6 +28,7 @@ public enum DecisionOutcome
     Primed,
     Fired,
     Suppressed,
+    Evaluated,
 }
 
 public enum DecisionReason
@@ -51,10 +53,12 @@ public enum DecisionReason
     AlreadyFired,
     RisingEdge,
     CascadeLimit,
+    DivisionByZero,
 }
 
 /// <summary>
-/// An actual execution decision. Event offsets refer to the observing run, not a later state.
+/// An actual execution decision or rendered-expression diagnostic. Event offsets refer to the observing run,
+/// not a later state.
 /// Null offsets mean the caller did not supply an event-log position.
 /// Effects/results occupy [EventStart, EventEnd); a condition-only decision has an empty range.
 /// </summary>

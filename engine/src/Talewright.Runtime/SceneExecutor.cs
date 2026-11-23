@@ -108,7 +108,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                         break;
                     }
                     var renderMark = log.Events.Count;
-                    var rendered = renderer.Render([prose.Block], Context).Blocks;
+                    var rendered = renderer.Render([prose.Block], TemplateContext(step.Id)).Blocks;
                     AppendSkillCheckNotes(step.Id, renderMark, blocks);
                     if (!refresh && rememberEntry) _prose[step.Id] = rendered;
                     blocks.AddRange(rendered);
@@ -262,10 +262,12 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
     }
 
     public ChoiceView View(ChoiceDefinition choice) =>
-        ChoiceAvailability.CreateView(choice.Key, LabelSource(choice), _replayIdentities.For(choice));
+        ChoiceAvailability.CreateView(choice.Key, LabelSource(choice,
+            _replayChoices.FirstOrDefault(step => step.Choice.Key == choice.Key)?.Id ?? choice.Key),
+            _replayIdentities.For(choice));
 
-    public IReadOnlyList<RenderedInline> Render(IReadOnlyList<TemplateInline> text) =>
-        renderer.RenderInlines(text, Context);
+    public IReadOnlyList<RenderedInline> Render(IReadOnlyList<TemplateInline> text, string subject) =>
+        renderer.RenderInlines(text, TemplateContext(subject));
 
     private ChoiceCandidate CreateCandidate(SceneDefinition scene, ChoiceStep step)
     {
@@ -274,26 +276,26 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
             return cached;
         }
 
-        var label = LabelSource(step.Choice);
+        var label = LabelSource(step.Choice, step.Id);
         var candidate = new ChoiceCandidate(step.Choice.Key, step.Choice.Requires, label,
-            ChoiceAvailability.ShownLabelSource(step.Choice.Shown, label, Render),
+            ChoiceAvailability.ShownLabelSource(step.Choice.Shown, label, text => Render(text, step.Id)),
             notes => makeChoice(scene, step, notes),
             _replayIdentities.For(step.Choice), new ChoiceStepExecution(scene, step));
         _choiceCandidates.Add(step, candidate);
         return candidate;
     }
 
-    private Func<IReadOnlyList<RenderedInline>> LabelSource(ChoiceDefinition choice)
+    private Func<IReadOnlyList<RenderedInline>> LabelSource(ChoiceDefinition choice, string subject)
     {
         if (choice.Label is { } label)
         {
-            return () => renderer.RenderInlines(label, Context);
+            return () => renderer.RenderInlines(label, TemplateContext(subject));
         }
 
         if (choice.Check is null && choice.Divert?.Scene is { } target &&
             story.GetScene(target).ChoiceLabel is { } choiceLabel)
         {
-            return () => renderer.RenderInlines(choiceLabel, Context);
+            return () => renderer.RenderInlines(choiceLabel, TemplateContext(subject));
         }
 
         return static () => ChoiceView.ContinueLabel;
@@ -309,6 +311,47 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
 
     private bool Test(Expr? expression, out ExpressionTrace? trace) =>
         RuleObservation.Test(expression, Context, observer is not null, out trace);
+
+    private EvaluationContext TemplateContext(string subject)
+    {
+        var context = Context;
+        if (observer is null)
+            return context;
+
+        return context with
+        {
+            Trace = trace =>
+            {
+                if (ContainsExecutedDivisionByZero(trace))
+                {
+                    observer(new(DecisionKind.RenderedExpression, subject, log.State.CurrentScene,
+                        DecisionOutcome.Evaluated, DecisionReason.DivisionByZero,
+                        trace, log.Events.Count, log.Events.Count));
+                }
+            },
+        };
+    }
+
+    private static bool ContainsExecutedDivisionByZero(ExpressionTrace trace)
+    {
+        var pending = new Stack<ExpressionTrace>();
+        pending.Push(trace);
+        while (pending.TryPop(out var current))
+        {
+            if (current.Expression is BinaryExpr { Op: BinaryOp.Divide } &&
+                current.Children.Count >= 2 &&
+                current.Children[1].Result is { Type: ExprType.Number } divisor &&
+                divisor.ExactNumber == Talewright.Core.ExactNumber.Zero)
+            {
+                return true;
+            }
+
+            foreach (var child in current.Children)
+                pending.Push(child);
+        }
+
+        return false;
+    }
 
     internal Value ResolveExpressionCheck(SkillCheckExpr expression)
     {

@@ -102,6 +102,31 @@ public sealed class AuthorInspectionTests
     }
 
     [Fact]
+    public void Rendered_division_by_zero_is_observed_with_step_source_without_reporting_skipped_divisions()
+    {
+        var story = Compile("""
+            === start
+            Value: {1 / 0}
+            {if 1 == 0 and 1 / 0 == 0}Skipped{/if}
+            * [Continue {1 / 0}] -> END
+            """);
+
+        var inspection = Start(story).Inspect();
+        var decisions = inspection.FindDecisions(kind: DecisionKind.RenderedExpression).ToArray();
+
+        Assert.Equal(["step:2:1", "step:4:1"], decisions.Select(decision => decision.Subject));
+        Assert.All(decisions, decision =>
+        {
+            Assert.Equal(DecisionOutcome.Evaluated, decision.Outcome);
+            Assert.Equal(DecisionReason.DivisionByZero, decision.Reason);
+            Assert.NotNull(decision.Expression?.Result);
+            Assert.Equal(0, decision.Expression!.Result!.Value.Number);
+            Assert.NotNull(inspection.SourceFor(decision));
+        });
+        Assert.Equal([2, 4], decisions.Select(decision => inspection.SourceFor(decision)!.Start.Line));
+    }
+
+    [Fact]
     public void Inspection_includes_all_characters_false_flags_zero_variables_and_unvisited_scenes()
     {
         var manifest = CreateManifest();
