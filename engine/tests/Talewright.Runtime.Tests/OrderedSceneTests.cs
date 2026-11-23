@@ -274,7 +274,7 @@ public sealed class OrderedSceneTests
     {
         var session = new StorySession(Compile("""
             === start
-            ~ player:hp -= .004
+            ~ player:hp -= 0.004
             Current.
             -> END
             """));
