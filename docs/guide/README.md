@@ -3,6 +3,8 @@
 Everything you need to write in **Talemark**, then test and share your story with Talewright.
 Talemark is the story-authoring language in your `.tale` files. No programming required.
 
+**Coming in v0.8.0:** [Talemark 2 and the planned default change](talemark-2.md).
+
 1. **[Getting started](getting-started.md):** set up your story folder and editor, find the Command Palette, and get the CLI.
    **[Get the story-checking tools](cli-installation.md):** optional downloads, explained step by step.
 2. **[Your first story](first-story.md):** build a small, complete story step by step.

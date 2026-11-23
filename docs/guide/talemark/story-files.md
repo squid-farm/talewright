@@ -11,7 +11,8 @@ Do not put Talemark scene headers inside YAML.
   `ruleset: rpg` under `game:` opts into built-in RPG stats and levelling; without it, no stats
   exist unless declared under `game.ruleset.stats`.
 - `flags: [name]` starts a boolean flag false. A mapping can set initial values.
-  `vars: { count: 0, weather: "clear" }` declares integer and text variables, not booleans.
+  `vars: { count: 0, weather: "clear" }` declares number and text variables, not booleans.
+  Number variables can keep fractions in Talemark 2, available starting with v0.8.0.
 - Put additional declarations in subfolders in files ending exactly `.talewright.yaml`.
   Only the root manifest can contain `game:`; never put another `story.talewright.yaml` in a
   subfolder. Names are story-wide, not scoped by file or folder. Duplicate declarations are errors.

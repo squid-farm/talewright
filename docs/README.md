@@ -8,6 +8,8 @@ characters and rules go in `story.talewright.yaml`.
 New here? Play a story in the [web player](https://play.trytalewright.com/), then follow
 **[Your first story](guide/first-story.md)**.
 
+**Coming in v0.8.0:** [Talemark 2 and the planned default change](guide/talemark-2.md).
+
 | Guide | |
 |---|---|
 | [Getting started](guide/getting-started.md) | Play in the browser and set up your writing tools |
@@ -15,6 +17,7 @@ New here? Play a story in the [web player](https://play.trytalewright.com/), the
 | [Author cheat sheet](guide/cheat-sheet.md) | Talemark at a glance, plus VS Code shortcuts |
 | [Using an assistant with Talemark](guide/talemark-agent-brief.md) | Optional, focused guidance for AI in your existing workflow |
 | [Writing stories](guide/writing-stories.md) | Characters, stats, items, factions, checks, hubs and conditions |
+| [Talemark language versions](guide/language-versions.md) | Choose a version and update an existing story |
 | [Playing and saving](guide/playing-and-saving.md) | The player screen, saves, Back and Forward |
 | [Testing your story](guide/testing-your-story.md) | Checking for mistakes and using the Author Debugger |
 | [Sharing your story](guide/sharing-your-story.md) | Story files, web games and desktop games |
