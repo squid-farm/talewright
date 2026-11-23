@@ -20,6 +20,8 @@ public sealed class StoryHoverTests
         flags: [ready]
         vars: {coins: 1}
         """;
+    private static readonly string VersionTwoManifest =
+        Manifest.Replace("  start: first", "  talemark: 2\n  start: first", StringComparison.Ordinal);
 
     [Theory]
     [InlineData("-> se|cond", "Scene", "second")]
@@ -68,6 +70,21 @@ public sealed class StoryHoverTests
         Assert.Contains(expected, hover.PlainText);
         var line = analysis.Source.Files["main.tale"].Split('\n')[1];
         Assert.Equal(token, line[(hover.Range.Start.Column - 1)..(hover.Range.End.Column - 1)]);
+    }
+
+    [Theory]
+    [InlineData("{0.6#rou|nd}", "round", "nearest whole number")]
+    [InlineData("{0.6#rou|nd-up}", "round-up", "mathematical ceiling")]
+    [InlineData("{0.6#rou|nd-down}", "round-down", "mathematical floor")]
+    public void Numeric_modifier_hover_explains_exact_rounding(string line, string token, string description)
+    {
+        var (analysis, position) = Analyze("=== first\n" + line, VersionTwoManifest);
+        var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, position));
+        var sourceLine = analysis.Source.Files["main.tale"].Split('\n')[1];
+
+        Assert.Contains(description, hover.PlainText);
+        Assert.Contains("Talemark 2", hover.PlainText);
+        Assert.Equal(token, sourceLine[(hover.Range.Start.Column - 1)..(hover.Range.End.Column - 1)]);
     }
 
     [Theory]

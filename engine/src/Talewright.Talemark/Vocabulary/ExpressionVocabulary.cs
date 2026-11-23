@@ -34,6 +34,9 @@ internal static class ExpressionVocabulary
     internal const string Has = "has";
     internal const string Image = "image";
     internal const string Decorative = "decorative";
+    internal const string Round = "round";
+    internal const string RoundUp = "round-up";
+    internal const string RoundDown = "round-down";
 
     internal const string Faction = "faction";
     internal const string Item = "item";
@@ -144,6 +147,16 @@ internal static class ExpressionVocabulary
         (UnaryOp.Negate, Minus.ToString()),
     ];
 
+    private static readonly ImmutableArray<(UnaryOp Value, string Spelling)> NumericModifiers =
+    [
+        (UnaryOp.Round, Round),
+        (UnaryOp.RoundUp, RoundUp),
+        (UnaryOp.RoundDown, RoundDown),
+    ];
+
+    internal static readonly ImmutableArray<string> NumericModifierSpellings =
+        [.. NumericModifiers.Select(modifier => ModifierMarker + modifier.Spelling)];
+
     private static readonly ImmutableArray<(AssignOp Value, string Spelling)> AssignmentOperators =
     [
         (AssignOp.Set, Assign.ToString()),
@@ -183,11 +196,21 @@ internal static class ExpressionVocabulary
 
     internal static bool TryGetSpelling(BinaryOp op, out string spelling) => TryGet(BinaryOperators, op, out spelling);
 
-    internal static bool TryGetSpelling(UnaryOp op, out string spelling) => TryGet(UnaryOperators, op, out spelling);
+    internal static bool TryGetSpelling(UnaryOp op, out string spelling) =>
+        TryGet(UnaryOperators, op, out spelling) || TryGet(NumericModifiers, op, out spelling);
 
     internal static string Spelling(BinaryOp op) => Required(BinaryOperators, op);
 
-    internal static string Spelling(UnaryOp op) => Required(UnaryOperators, op);
+    internal static string Spelling(UnaryOp op) =>
+        TryGetSpelling(op, out var spelling)
+            ? spelling
+            : throw new ArgumentOutOfRangeException(nameof(op), op, $"{nameof(UnaryOp)} has no Talemark spelling.");
+
+    internal static bool TryGetNumericModifier(ReadOnlySpan<char> text, out UnaryOp op) =>
+        TryGet(NumericModifiers, text, out op);
+
+    internal static string NumericModifierSpelling(UnaryOp op) =>
+        ModifierMarker + Required(NumericModifiers, op);
 
     internal static string Spelling(AssignOp op) => Required(AssignmentOperators, op);
 

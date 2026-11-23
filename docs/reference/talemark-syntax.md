@@ -601,7 +601,7 @@ Text wraps to fit the player, with tabs at four-space stops.
 
 ## 3. Substitutions
 
-`{reference#manipulator#manipulator…}`
+`{value#modifier#modifier…}`
 
 | Reference                                                                                   | Value                                     |
 | ------------------------------------------------------------------------------------------- | ----------------------------------------- |
@@ -627,7 +627,7 @@ For these terms, see the [glossary](glossary.md).
 
 Any character id can replace `player`.
 
-| Manipulator         | Effect                                                                                       |
+| Text manipulator    | Effect                                                                                       |
 | ------------------- | -------------------------------------------------------------------------------------------- |
 | `#possessive`       | Grammatically correct English possessive (Chicago style): `Mara's`, `Burns's`, `the guards'` |
 | `#capitalize`       | First letter upper case                                                                      |
@@ -636,6 +636,25 @@ Any character id can replace `player`.
 | `#the`              | Prefix with `the`                                                                            |
 | `#this` / `#that`   | Prefix with `this`/`that`, or `these`/`those` for plural agreement                               |
 | `#bold` / `#italic` | Apply bold or italic formatting to the value                                                  |
+
+**Numeric modifiers (Talemark 2).** Apply `#round`, `#round-up` or `#round-down` to an exact
+numeric expression. Each returns a whole-number-valued **number**, so the result remains usable
+in arithmetic, comparisons, conditions, assignments and substitutions:
+
+```tale
+~ var:loss = (player:hp * 0.1)#round-up
+@requires ((var:loss)#round-down) >= 1
+{(var:loss)#round#one-many("point", "points")}
+```
+
+`#round` chooses the nearest integer, with midpoint ties away from zero (`2.5` becomes `3`,
+`-2.5` becomes `-3`). `#round-up` is the mathematical ceiling (`-0.1` becomes `0`), and
+`#round-down` is the mathematical floor (`-0.1` becomes `-1`). They use the exact value, not its
+displayed decimal, have no int32 result limit, and chain from left to right. Parenthesize a
+compound expression before applying a modifier. These operations only return a value: displaying
+or evaluating one does not change the source variable; an explicit assignment stores the result.
+They are available only in Talemark 2. Talemark 1 keeps its existing integer expression behavior
+and reports an error if one of these modifiers is used.
 
 `#bold` and `#italic` produce formatted text without changing its characters. They may follow
 text manipulators, and may be chained with each other; text manipulators cannot follow them. Use

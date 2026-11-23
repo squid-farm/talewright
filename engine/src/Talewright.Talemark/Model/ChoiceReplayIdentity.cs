@@ -474,6 +474,9 @@ internal static class ChoiceReplayIdentity
     {
         UnaryOp.Not => "Not",
         UnaryOp.Negate => "Negate",
+        UnaryOp.Round => "Round",
+        UnaryOp.RoundUp => "RoundUp",
+        UnaryOp.RoundDown => "RoundDown",
         _ => throw Unsupported(op),
     };
 

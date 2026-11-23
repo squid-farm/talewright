@@ -51,6 +51,15 @@ public static class ExpressionFormatter
             switch (current)
             {
                 case UnaryExpr unary:
+                    if (unary.Op is UnaryOp.Round or UnaryOp.RoundUp or UnaryOp.RoundDown)
+                    {
+                        if (unary.Operand.Type != ExprType.Number)
+                            throw Invalid($"Numeric modifier '{ExpressionVocabulary.NumericModifierSpelling(unary.Op)}' requires a number operand.");
+                        pending.Push(FormatAction.ForText(ExpressionVocabulary.NumericModifierSpelling(unary.Op)));
+                        pending.Push(FormatAction.ForExpression(unary.Operand, precedence, false));
+                        break;
+                    }
+
                     pending.Push(FormatAction.ForExpression(unary.Operand, precedence, false));
                     pending.Push(FormatAction.ForText(UnaryPrefix(unary)));
                     break;
@@ -176,11 +185,12 @@ public static class ExpressionFormatter
             or BinaryOp.Greater or BinaryOp.GreaterOrEqual } => 4,
         BinaryExpr { Op: BinaryOp.Add or BinaryOp.Subtract } => 5,
         BinaryExpr { Op: BinaryOp.Multiply or BinaryOp.Divide } => 6,
-        UnaryExpr { Op: UnaryOp.Negate } => 7,
-        NumberLiteral number when number.Value < ExactNumber.Zero => 7,
+        UnaryExpr { Op: UnaryOp.Round or UnaryOp.RoundUp or UnaryOp.RoundDown } => 7,
+        UnaryExpr { Op: UnaryOp.Negate } => 8,
+        NumberLiteral number when number.Value < ExactNumber.Zero => 8,
         UnaryExpr => throw Invalid("Unknown unary operator."),
         BinaryExpr => throw Invalid("Unknown binary operator."),
-        _ => 8,
+        _ => 9,
     };
 
     private static string Quote(string value)

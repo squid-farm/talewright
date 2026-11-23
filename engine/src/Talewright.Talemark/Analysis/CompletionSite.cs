@@ -27,6 +27,11 @@ internal static class ExpressionCompletion
         AuthoringSyntaxVocabulary.KeywordDetails(SubjectForm, ObjectForm, PossessivePronoun, ReflexiveForm,
             OneManyTextModifier.ModifierName);
 
+    private static readonly string[] NumericModifierKeywords =
+        [ExpressionVocabulary.Round, ExpressionVocabulary.RoundUp, ExpressionVocabulary.RoundDown];
+    private static readonly IReadOnlyDictionary<string, string> NumericModifierDetails =
+        AuthoringSyntaxVocabulary.KeywordDetails(NumericModifierKeywords);
+
     private static readonly IReadOnlyDictionary<string, string> PossessivePropertyDetails =
         AuthoringSyntaxVocabulary.KeywordDetails(Determiner, Independent);
 
@@ -36,7 +41,7 @@ internal static class ExpressionCompletion
     private static readonly string[] NumericInventoryItemKeywords = [Count];
 
     internal static IEnumerable<CompletionSite> Sites(TokenBuffer tokens, ExpressionContextKind kind, Func<int, int, SourceRange> map,
-        IReadOnlyList<AuthoringSymbol> symbols)
+        IReadOnlyList<AuthoringSymbol> symbols, int talemarkVersion)
     {
         var text = tokens.Source;
         var offsets = new HashSet<int> { text.Length };
@@ -76,10 +81,23 @@ internal static class ExpressionCompletion
                 if (kind == ExpressionContextKind.Substitution)
                 {
                     kinds = [AuthoringSymbolKind.Modifier];
+                    if (talemarkVersion == 2)
+                    {
+                        keywords = NumericModifierKeywords;
+                        details = NumericModifierDetails;
+                    }
                     if (IsAgreementReference(tokens, symbols))
                     {
-                        keywords = [OneManyTextModifier.ModifierName];
+                        keywords = [.. keywords, OneManyTextModifier.ModifierName];
                         details = PronounFormDetails;
+                    }
+                }
+                else if (kind is ExpressionContextKind.Condition or ExpressionContextKind.Number or ExpressionContextKind.Effects)
+                {
+                    if (talemarkVersion == 2)
+                    {
+                        keywords = NumericModifierKeywords;
+                        details = NumericModifierDetails;
                     }
                 }
             }

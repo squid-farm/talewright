@@ -167,6 +167,20 @@ public sealed class StoryQuickFixesTests
     }
 
     [Fact]
+    public void Missing_variable_inside_a_numeric_modifier_is_inferred_as_a_number()
+    {
+        const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\n  talemark: 2\ncharacters:\n  player: {first-name: Ada}\n";
+        const string story = "=== start\n@requires var:gold#round > 3\n-> END\n";
+        var analysis = AnalyzeManifest(manifest, story);
+        var diagnostic = Assert.Single(analysis.Diagnostics, item => item.Code == "TW2004");
+
+        var fix = Assert.Single(StoryQuickFixes.ForMissingVariable(analysis, diagnostic).Fixes);
+
+        Assert.Equal("Declare variable 'gold' as a number", fix.Title);
+        Assert.Equal("\nvars:\n  gold: 0\n", fix.NewText);
+    }
+
+    [Fact]
     public void Missing_variable_quick_fix_tokenizes_using_the_story_talemark_version()
     {
         const string manifest = "game:\n  id: quick-fix\n  title: Quick Fix\n  start: start\n  talemark: 2\ncharacters:\n  player: {first-name: Ada}\n";

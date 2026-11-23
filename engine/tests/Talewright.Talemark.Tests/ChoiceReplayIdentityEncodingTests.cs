@@ -73,6 +73,9 @@ public sealed class ChoiceReplayIdentityEncodingTests
             new NumberLiteral(14), IsHidden: true),
             """["skill-check-expr","player","athletics","start",0,true,["number",14]]""" },
         { "unary", new UnaryExpr(UnaryOp.Negate, new VarRef(Gold)), """["unary","Negate",["variable-ref","gold"]]""" },
+        { "round", new UnaryExpr(UnaryOp.Round, new VarRef(Gold)), """["unary","Round",["variable-ref","gold"]]""" },
+        { "round up", new UnaryExpr(UnaryOp.RoundUp, new VarRef(Gold)), """["unary","RoundUp",["variable-ref","gold"]]""" },
+        { "round down", new UnaryExpr(UnaryOp.RoundDown, new VarRef(Gold)), """["unary","RoundDown",["variable-ref","gold"]]""" },
         { "binary", new BinaryExpr(BinaryOp.GreaterOrEqual, new StatRef(Player, Hp), new NumberLiteral(3)),
             """["binary","GreaterOrEqual",["stat-ref","player","hp"],["number",3]]""" },
     };
@@ -119,7 +122,8 @@ public sealed class ChoiceReplayIdentityEncodingTests
         Assert.Equal(["First", "Last", "Full"], Enum.GetValues<NamePart>().Select(ChoiceReplayIdentity.Token));
         Assert.Equal(["Subject", "Object", "Possessive", "PossessivePronoun", "Reflexive"],
             Enum.GetValues<PronounForm>().Select(ChoiceReplayIdentity.Token));
-        Assert.Equal(["Not", "Negate"], Enum.GetValues<UnaryOp>().Select(ChoiceReplayIdentity.Token));
+        Assert.Equal(["Not", "Negate", "Round", "RoundUp", "RoundDown"],
+            Enum.GetValues<UnaryOp>().Select(ChoiceReplayIdentity.Token));
         Assert.Equal(
             ["Add", "Subtract", "Multiply", "Divide", "Equal", "NotEqual", "Less", "LessOrEqual", "Greater",
                 "GreaterOrEqual", "And", "Or"],

@@ -26,6 +26,8 @@ public sealed class StoryCompletionTests
         flags: [ready, door-open]
         vars: {coins: 0}
         """;
+    private static readonly string VersionTwoManifest =
+        Manifest.Replace("  start: first", "  talemark: 2\n  start: first", StringComparison.Ordinal);
 
     [Theory]
     [InlineData("-> sec|", "second")]
@@ -480,6 +482,27 @@ public sealed class StoryCompletionTests
         var (hoverAnalysis, hoverPosition) = Analyze("=== first\n" + partial);
         var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(hoverAnalysis, hoverPosition));
         Assert.Contains(expected, hover.PlainText);
+    }
+
+    [Theory]
+    [InlineData("@requires 0.6#rou|")]
+    [InlineData("{0.6#rou|}")]
+    public void Numeric_modifier_completion_is_offered_in_version_two_expression_slots(string line)
+    {
+        var (analysis, position) = Analyze("=== first\n" + line, VersionTwoManifest);
+        var completions = StoryCompletion.Complete(analysis, position);
+
+        Assert.Equal(["round", "round-down", "round-up"], completions.Select(item => item.Label));
+        Assert.All(completions, item => Assert.Contains("Talemark 2", item.Detail));
+    }
+
+    [Fact]
+    public void Numeric_modifier_completion_is_not_offered_to_talemark_one_stories()
+    {
+        var (analysis, position) = Analyze("=== first\n@requires 1#rou|");
+
+        Assert.DoesNotContain(StoryCompletion.Complete(analysis, position),
+            item => item.Label is "round" or "round-up" or "round-down");
     }
 
     [Theory]

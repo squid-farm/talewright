@@ -58,6 +58,7 @@ test('fallback scopes multi-paragraph speech blocks', () => {
 
 test('fallback highlights templates, quoted strings, and escaped braces', () => {
   hasScope('{player:first-name}', 'first-name', 'meta.template.tale');
+  hasScope('{(var:amount)#round-up}', 'round-up', 'meta.template.tale');
   hasScope('{image("camp", "A camp")}', 'camp', 'string.quoted.double.tale');
   hasScope('"quoted text"', 'quoted text', 'string.quoted.double.tale');
   hasScope(String.raw`{image("a \" quote", "alt")}`, String.raw`\"`, 'constant.character.escape.tale');
