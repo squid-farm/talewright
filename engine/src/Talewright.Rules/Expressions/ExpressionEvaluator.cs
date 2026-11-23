@@ -23,7 +23,7 @@ public readonly record struct Value(ExprType Type, int Number, bool Bool, string
     /// <summary>Display form used by the template renderer.</summary>
     public override string ToString() => Type switch
     {
-        ExprType.Number => ExactNumber.ToDecimalString(),
+        ExprType.Number => ExactNumber.ToDisplayString(),
         ExprType.Bool => Bool ? "true" : "false",
         ExprType.Text => Text ?? string.Empty,
         ExprType.Tier => Tier?.Name ?? string.Empty,

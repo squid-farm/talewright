@@ -1,4 +1,5 @@
 using Bunit;
+using Talewright.Core;
 using Talewright.Debugger;
 using Talewright.Rules.Expressions;
 
@@ -26,6 +27,30 @@ public sealed class ExpressionViewRerenderTests : BunitContext
 
         Assert.Empty(view.FindAll("li > code"));
         Assert.NotEmpty(view.FindAll("li > em"));
+    }
+
+    [Fact]
+    public void Executed_division_by_zero_is_reported_without_marking_short_circuit_branches()
+    {
+        var expression = new BinaryExpr(BinaryOp.Divide, new NumberLiteral(1), new NumberLiteral(0));
+        var trace = new ExpressionTrace(expression, Value.Of(ExactNumber.Zero),
+        [
+            new(new NumberLiteral(1), Value.Of(1), []),
+            new(new NumberLiteral(0), Value.Of(0), []),
+        ]);
+
+        var view = Render<ExpressionView>(parameters => parameters.Add(component => component.Trace, trace));
+
+        Assert.Contains("division by zero executed", view.Find("[role='alert']").TextContent);
+
+        var shortCircuited = new ExpressionTrace(expression, Value.Of(ExactNumber.Zero),
+        [
+            new(new NumberLiteral(1), Value.Of(1), []),
+            ExpressionTrace.NotEvaluated(new NumberLiteral(0)),
+        ]);
+        view.Render(parameters => parameters.Add(component => component.Trace, shortCircuited));
+
+        Assert.Empty(view.FindAll("[role='alert']"));
     }
 
     private sealed record UnsupportedExpr : Expr

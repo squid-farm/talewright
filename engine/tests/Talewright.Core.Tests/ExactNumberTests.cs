@@ -42,6 +42,24 @@ public class ExactNumberTests
         Assert.Equal("1/3", ExactNumber.Parse("1/3").ToDecimalString());
     }
 
+    [Theory]
+    [InlineData("1.234", "1.23")]
+    [InlineData("1.235", "1.24")]
+    [InlineData("-1.235", "-1.24")]
+    [InlineData("1/2", "0.5")]
+    [InlineData("1/3", "0.33")]
+    [InlineData("2/3", "0.67")]
+    [InlineData("-1/3", "-0.33")]
+    [InlineData("0.004", "0")]
+    [InlineData("-0.004", "0")]
+    [InlineData("0.995", "1")]
+    [InlineData("1.004", "1")]
+    [InlineData("2.500", "2.5")]
+    public void Reader_display_rounds_at_most_two_places_away_from_zero(string text, string expected)
+    {
+        Assert.Equal(expected, ExactNumber.Parse(text).ToDisplayString());
+    }
+
     [Fact]
     public void Exponent_notation_is_an_exact_manifest_number()
     {

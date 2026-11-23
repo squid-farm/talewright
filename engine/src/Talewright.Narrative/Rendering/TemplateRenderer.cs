@@ -153,6 +153,7 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
         var modifierContext = new ModifierContext(grammar, isPlural, item?.Uncountable ?? false)
         {
             NumberValue = evaluated.Type == ExprType.Number ? evaluated.Number : null,
+            ExactNumberValue = evaluated.Type == ExprType.Number ? evaluated.ExactNumber : null,
         };
         foreach (var modifier in substitution.Modifiers)
         {

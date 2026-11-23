@@ -89,6 +89,7 @@ public static class StoryPreview
         var modifierContext = new ModifierContext(EnglishGrammar.Instance, plural, item?.Uncountable ?? false)
         {
             NumberValue = evaluated.Type == ExprType.Number ? evaluated.Number : null,
+            ExactNumberValue = evaluated.Type == ExprType.Number ? evaluated.ExactNumber : null,
         };
         foreach (var modifier in template.Modifiers)
         {

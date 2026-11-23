@@ -35,6 +35,12 @@ notation. Saves preserve exact numeric variables, resources and divisible invent
 still under development, including player presentation; do not select it for an author-facing story
 until its features ship together.
 
+Readers see exact values rounded to at most two decimal places. Halves round away from zero,
+trailing zeros are omitted, and stored state is never rounded for display. For example, `1 / 3`
+is displayed as `0.33`, and `0.995` is displayed as `1`, but gameplay comparisons still use the
+exact values. `#one-many` uses the displayed rounded value, so each of those examples is treated
+as one only when its displayed value is exactly `1`.
+
 When a story changes arithmetic versions, a supported checkpoint can carry its state forward and
 starts a new Back boundary. Older replay-only saves need a validated replay against their original
 story; the player does not automatically find that story. Keep the original story and save, and test

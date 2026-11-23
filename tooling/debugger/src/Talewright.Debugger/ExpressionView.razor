@@ -6,6 +6,10 @@
     {
         <span> (opaque C# predicate; internals unavailable)</span>
     }
+    @if (IsExecutedDivisionByZero())
+    {
+        <span class="division-by-zero" role="alert"> (division by zero executed; result is 0)</span>
+    }
     @if (Trace.Children.Count > 0)
     {
         @if (Depth < MaximumDisplayDepth)
@@ -31,6 +35,17 @@
     [Parameter] public int Depth { get; set; }
     private string? _talemark;
     private string? _unavailable;
+
+    private bool IsExecutedDivisionByZero()
+    {
+        if (Trace.Expression is not BinaryExpr { Op: BinaryOp.Divide } ||
+            Trace.Children.Count < 2 ||
+            Trace.Children[1].Result is not { } divisor ||
+            divisor.Type != ExprType.Number)
+            return false;
+
+        return divisor.ExactNumber == Talewright.Core.ExactNumber.Zero;
+    }
 
     protected override void OnParametersSet()
     {
