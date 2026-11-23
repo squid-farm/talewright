@@ -81,6 +81,36 @@ public sealed class ContinuationSaveTests
     }
 
     [Fact]
+    public void Arithmetic_version_continuation_keeps_trigger_edges_and_keyed_checks()
+    {
+        var original = PlayToSquare(Compile(new()));
+        var updated = Compile(new() { TalemarkVersion = 2 });
+        var restored = Restore(updated, original.Save());
+        Assert.NotNull(restored.Continuation);
+        AssertEquivalentState();
+        Assert.Equal(Plain(original.Transcript), Plain(restored.Transcript));
+        foreach (var label in new[] { "Back to market", "Haggle", "Back to market", "Haggle" })
+        {
+            original.Choose(KeyOf(original.Current, label));
+            restored.Choose(KeyOf(restored.Current, label));
+            AssertEquivalentState();
+        }
+        Assert.Single(restored.Events, gameEvent => gameEvent is TriggerFired { TriggerId: "later" });
+        Assert.Equal(original.Events.OfType<DiceRolled>().Last(), restored.Events.OfType<DiceRolled>().Last());
+
+        void AssertEquivalentState()
+        {
+            Assert.Equal(original.Current.Scene, restored.Current.Scene);
+            Assert.Equal(original.State.GetVariable(Gold), restored.State.GetVariable(Gold));
+            Assert.Equal(original.State.GetVariable(Bonus), restored.State.GetVariable(Bonus));
+            Assert.Equal(original.State.GetFlag(new FlagId("later")), restored.State.GetFlag(new FlagId("later")));
+            Assert.Equal(original.State.GetBaseStat(EntityId.Player, Hp), restored.State.GetBaseStat(EntityId.Player, Hp));
+            Assert.Equal(original.State.VisitCount(new SceneId("market")), restored.State.VisitCount(new SceneId("market")));
+            Assert.Equal(original.Current.Document.ToPlainText(), restored.Current.Document.ToPlainText());
+        }
+    }
+
+    [Fact]
     public void Updated_current_scene_is_reentered_once_with_its_new_text_choices_and_entry_effects()
     {
         var original = PlayToSquare(Compile(new()));
@@ -528,6 +558,24 @@ public sealed class ContinuationSaveTests
     }
 
     [Fact]
+    public void Format_five_ignores_unknown_trailing_fields_on_numeric_pairs()
+    {
+        var original = PlayToSquare(Compile(new()));
+        var saved = SaveFormat.Read(original.Save());
+        var variable = saved.Continuation!.Payload.Current!.Variables.Single(value => value.Id == "gold");
+        var oldValue = variable.Value;
+        variable.ExactValue = "1/3";
+        var bytes = SaveFormat.Write(saved);
+        bytes[4] = 5;
+
+        var decoded = SaveFormat.Read(bytes);
+        var decodedVariable = decoded.Continuation!.Payload.Current!.Variables.Single(value => value.Id == "gold");
+        Assert.Equal(oldValue, decodedVariable.Value);
+        Assert.Null(decodedVariable.ExactValue);
+        Assert.Equal(Snapshot(original), Snapshot(StoryHistory.Restore(original.Story, bytes)));
+    }
+
+    [Fact]
     public void Continuation_truncations_and_single_bit_flips_are_rejected_or_preserve_play()
     {
         var original = PlayToSquare(Compile(new()));
@@ -561,7 +609,7 @@ public sealed class ContinuationSaveTests
         var bytes = history.Save();
         var body = SaveFormat.EncodeBody(SaveFormat.Read(bytes));
         var reader = new MessagePackReader(new ReadOnlySequence<byte>(body));
-        Assert.Equal(11, reader.ReadArrayHeader());
+        Assert.Equal(12, reader.ReadArrayHeader());
         for (var i = 0; i < 10; i++) reader.Skip();
         Assert.Equal(4, reader.ReadArrayHeader());
         Assert.Equal(13, reader.ReadArrayHeader());
@@ -597,6 +645,7 @@ public sealed class ContinuationSaveTests
         }
         Assert.True(reader.TryReadNil());
         Assert.Equal(0, reader.ReadInt32());
+        Assert.Equal(1, reader.ReadInt32());
         Assert.True(reader.End);
     }
 
@@ -657,8 +706,13 @@ public sealed class ContinuationSaveTests
         typeof(T).Assembly.GetTypes().Where(type => !type.IsAbstract && typeof(T).IsAssignableFrom(type))
             .OrderBy(type => type.Name);
 
-    private static void AssertMalformed(byte[] bytes) =>
+    private static void AssertMalformed(byte[] bytes)
+    {
         Assert.Equal(SaveFormat.MalformedMessage, Assert.Throws<InvalidDataException>(() => SaveFormat.Read(bytes)).Message);
+        var legacy = bytes.ToArray();
+        legacy[4] = 5;
+        Assert.Equal(SaveFormat.MalformedMessage, Assert.Throws<InvalidDataException>(() => SaveFormat.Read(legacy)).Message);
+    }
 
     private delegate void WriteContinuation(ref MessagePackWriter writer);
 
@@ -666,16 +720,18 @@ public sealed class ContinuationSaveTests
     {
         var body = SaveFormat.EncodeBody(SaveFormat.Read(bytes));
         var reader = new MessagePackReader(new ReadOnlySequence<byte>(body));
-        Assert.Equal(11, reader.ReadArrayHeader());
+        Assert.Equal(12, reader.ReadArrayHeader());
         var output = new ArrayBufferWriter<byte>();
         var writer = new MessagePackWriter(output);
-        writer.WriteArrayHeader(11);
+        writer.WriteArrayHeader(12);
         for (var i = 0; i < 10; i++)
         {
             var field = reader.ReadRaw();
             writer.WriteRaw(field);
         }
         write(ref writer);
+        reader.Skip();
+        writer.WriteRaw(reader.ReadRaw());
         writer.Flush();
         return SaveFormat.Pack(output.WrittenSpan);
     }
@@ -686,10 +742,14 @@ public sealed class ContinuationSaveTests
         var ids = new List<string>(count);
         for (var i = 0; i < count; i++)
         {
-            Assert.Equal(2, reader.ReadArrayHeader());
+            Assert.Equal(textValues ? 2 : 3, reader.ReadArrayHeader());
             ids.Add(reader.ReadString()!);
             if (textValues) Assert.NotNull(reader.ReadString());
-            else reader.ReadInt32();
+            else
+            {
+                reader.ReadInt32();
+                if (!reader.TryReadNil()) Assert.NotNull(reader.ReadString());
+            }
         }
         Assert.Equal(ids.Order(StringComparer.Ordinal), ids);
     }
@@ -783,6 +843,7 @@ public sealed class ContinuationSaveTests
     private sealed record Options
     {
         public string Version { get; init; } = "1";
+        public int TalemarkVersion { get; init; } = 1;
         public bool HpLoss { get; init; }
         public bool ConditionalProse { get; init; }
         public bool Legacy { get; init; } = true;
@@ -806,6 +867,7 @@ public sealed class ContinuationSaveTests
         var manifest = new ManifestFaker("resilient", "Resilient", "start")
         {
             Version = options.Version,
+            Talemark = options.TalemarkVersion,
             BaseRuleset = "rpg",
         };
         var inventory = new Dictionary<string, int>();

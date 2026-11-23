@@ -185,10 +185,46 @@
           "characters": {
             "additionalProperties": {
               "properties": {
+                "stats": { "$ref": "#/definitions/integerMap" },
                 "inventory": {
                   "if": { "type": "object" },
                   "then": {
                     "additionalProperties": { "$ref": "#/definitions/inventoryQuantity" }
+                  }
+                }
+              }
+            }
+          },
+          "items": {
+            "additionalProperties": {
+              "if": { "type": "object" },
+              "then": { "properties": { "modifiers": { "$ref": "#/definitions/integerMap" } } }
+            }
+          },
+          "game": {
+            "properties": {
+              "creation": {
+                "properties": {
+                  "presets": {
+                    "additionalProperties": {
+                      "properties": { "stats": { "$ref": "#/definitions/integerMap" } }
+                    }
+                  }
+                }
+              },
+              "ruleset": {
+                "if": { "type": "object" },
+                "then": {
+                  "properties": {
+                    "stats": {
+                      "items": {
+                        "properties": {
+                          "min": { "$ref": "#/definitions/integer" },
+                          "max": { "$ref": "#/definitions/integer" },
+                          "default": { "$ref": "#/definitions/integer" }
+                        }
+                      }
+                    }
                   }
                 }
               }
@@ -247,8 +283,10 @@
       }
     },
     "statMap": {
-      "$ref": "#/definitions/integerMap",
-      "description": "Stats keyed by ruleset stat IDs. The compiler checks each ID against the selected ruleset."
+      "type": "object",
+      "propertyNames": { "$ref": "#/definitions/identifier" },
+      "additionalProperties": { "type": "number" },
+      "description": "Stats keyed by ruleset stat IDs. Talemark 2 resources retain fractions; the compiler validates the selected language version and stat."
     },
     "ruleset": {
       "type": "object",
@@ -352,17 +390,17 @@
           "description": "Stat category."
         },
         "min": {
-          "$ref": "#/definitions/integer",
+          "type": "number",
           "default": 0,
           "description": "Inclusive minimum. Defaults to 0."
         },
         "max": {
-          "$ref": "#/definitions/integer",
+          "type": "number",
           "default": 2147483647,
           "description": "Inclusive maximum. Defaults to the largest supported 32-bit integer."
         },
         "default": {
-          "$ref": "#/definitions/integer",
+          "type": "number",
           "description": "Initial stat value. Defaults to min, or 0 when min is omitted."
         },
         "governing-attribute": {

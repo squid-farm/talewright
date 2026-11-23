@@ -1,4 +1,5 @@
 using Talewright.Core.Identity;
+using Talewright.Core;
 using Talewright.Core.Rulesets;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
@@ -11,7 +12,7 @@ namespace Talewright.Talemark.Parsing;
 
 /// <summary>Reads ruleset configuration before world declarations resolve their stats.</summary>
 internal sealed class StoryYamlRulesetReader(StoryYamlContext yaml, CompilerOptions options,
-    StatDiagnosticGuidance statGuidance, AnalysisCollector? analysis)
+    StatDiagnosticGuidance statGuidance, AnalysisCollector? analysis, int talemarkVersion)
 {
     private readonly StoryYamlContext _yaml = yaml;
     private readonly CompilerOptions _options = options;
@@ -88,18 +89,32 @@ internal sealed class StoryYamlRulesetReader(StoryYamlContext yaml, CompilerOpti
                         $"{ManifestVocabulary.StatCategoryProgression} or {ManifestVocabulary.StatCategoryCustom}.", 0);
                 }
 
-                var min = _yaml.Int(Get(stat, ManifestVocabulary.Min)) ?? 0;
-                var max = _yaml.Int(Get(stat, ManifestVocabulary.Max)) ?? int.MaxValue;
-                if (min > max)
+                ExactNumber ReadNumber(string key, ExactNumber fallback) => talemarkVersion == 1
+                    ? _yaml.Int(Get(stat, key)) ?? fallback
+                    : _yaml.Number(Get(stat, key)) ?? fallback;
+                var resource = talemarkVersion == 2 && parsedCategory == StatCategory.Resource
+                    && baseRuleset.LevelingRule?.LevelStat != new StatId(id);
+                var minValue = ReadNumber(ManifestVocabulary.Min, 0);
+                var maxValue = ReadNumber(ManifestVocabulary.Max, int.MaxValue);
+                var min = minValue.ToInt32RoundedAwayFromZero();
+                var max = maxValue.ToInt32RoundedAwayFromZero();
+                if (resource ? minValue > maxValue : min > max)
                 {
-                    _yaml.Error(Get(stat, ManifestVocabulary.Min) ?? stat, CompilerDiagnosticCodes.InvalidConfigurationValue, $"Stat '{id}' minimum ({min}) must not be greater than its maximum ({max}).", 0);
+                    _yaml.Error(Get(stat, ManifestVocabulary.Min) ?? stat, CompilerDiagnosticCodes.InvalidConfigurationValue,
+                        $"Stat '{id}' minimum ({(resource ? minValue.ToDecimalString() : min.ToString())}) must not be greater than its maximum ({(resource ? maxValue.ToDecimalString() : max.ToString())}).", 0);
                     continue;
                 }
+                var defaultValue = ReadNumber(ManifestVocabulary.Default, minValue);
 
                 var attributeNode = Get(stat, ManifestVocabulary.GoverningAttribute);
                 var attribute = attributeNode is null ? null : _yaml.Identifier(attributeNode, IdentifierLabels.GoverningAttribute);
                 var definition = new StatDefinition(new StatId(id), Scalar(Get(stat, ManifestVocabulary.Name)) ?? id, parsedCategory,
-                    min, max, _yaml.Int(Get(stat, ManifestVocabulary.Default)) ?? min, attribute is null ? null : new StatId(attribute));
+                    min, max, defaultValue.ToInt32RoundedAwayFromZero(), attribute is null ? null : new StatId(attribute))
+                {
+                    ExactMin = resource ? minValue : null,
+                    ExactMax = resource ? maxValue : null,
+                    ExactDefault = resource ? defaultValue : null,
+                };
                 governingAttributes.Remove(definition.Id);
                 if (attributeNode is not null)
                 {

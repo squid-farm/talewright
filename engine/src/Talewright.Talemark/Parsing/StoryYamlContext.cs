@@ -1,4 +1,5 @@
 using System.Globalization;
+using Talewright.Core;
 using Talewright.Core.Identity;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Vocabulary;
@@ -103,6 +104,16 @@ internal sealed class StoryYamlContext(string file, DiagnosticBag diagnostics)
         }
 
         Diagnostics.Error(CompilerDiagnosticCodes.InvalidConfigurationValue, $"Expected a whole number but found '{Scalar(node) ?? node.NodeType.ToString()}'.", At(node));
+        return null;
+    }
+
+    internal ExactNumber? Number(YamlNode? node)
+    {
+        if (node is null) return null;
+        if (node is YamlScalarNode { Style: not (ScalarStyle.DoubleQuoted or ScalarStyle.SingleQuoted), Value: { } raw }
+            && !raw.Contains('/') && ExactNumber.TryParse(raw, out var value))
+            return value;
+        Diagnostics.Error(CompilerDiagnosticCodes.InvalidConfigurationValue, $"Expected a decimal number but found '{Scalar(node) ?? node.NodeType.ToString()}'.", At(node));
         return null;
     }
 

@@ -124,6 +124,24 @@ test('inventory is not a valid item ID', () => {
   assertInvalid(validateManifest, { items: { inventory: 'Inventory' } }, 'reserved inventory item ID', 'not');
 });
 
+test('resource declarations and stat values respect the Talemark version', () => {
+  for (const [label, add] of [
+    ['bounds', m => { m.game.ruleset = { stats: [{ id: 'mana', category: 'resource', min: 0.25 }] }; }],
+    ['initial', m => { m.characters.player.stats = { mana: 12.5 }; }],
+    ['modifiers', m => { m.items = { charm: { modifiers: { mana: 0.25 } } }; }],
+    ['preset', m => { m.game.creation = { presets: { mage: { stats: { mana: 12.5 } } } }; }],
+  ]) {
+    const manifest = {
+      game: { id: 'resource', title: 'Resource', start: 'beginning' },
+      characters: { player: { 'first-name': 'Ada' } },
+    };
+    add(manifest);
+    assertInvalid(validateManifest, manifest, `version 1 fractional ${label}`);
+    manifest.game.talemark = 2;
+    assertValid(validateManifest, manifest, `version 2 fractional ${label}`);
+  }
+});
+
 test('item grammar has explicit enum/boolean values and independent defaults', () => {
   const item = compileSubschema(schema.definitions.itemValue);
   for (const value of ['sword', {}, { name: 'armor', uncountable: true, divisible: true },

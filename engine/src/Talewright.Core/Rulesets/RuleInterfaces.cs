@@ -50,4 +50,8 @@ public interface ILevelingRule
 public interface IStatModifier
 {
     int GetModifier(IGameStateView state, EntityId character, StatId stat);
+
+    /// <summary>Returns the exact modifier for version-2 resource stats.</summary>
+    ExactNumber GetExactModifier(IGameStateView state, EntityId character, StatId stat) =>
+        GetModifier(state, character, stat);
 }

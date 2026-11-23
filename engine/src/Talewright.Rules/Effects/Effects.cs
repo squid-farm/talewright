@@ -58,6 +58,11 @@ public static class EffectExecutor
 
         IEnumerable<GameEvent> events = effect switch
         {
+            ChangeStat e when integerArithmetic => StateChanges.SetStat(state, e.Character, e.Stat,
+                Apply(state.GetBaseStat(e.Character, e.Stat), e.Op, EvalWhole(e.Amount))),
+            ChangeStat e when state.Ruleset.IsFractionalResource(e.Stat) =>
+                StateChanges.SetStat(state, e.Character, e.Stat,
+                    Apply(state, state.GetExactBaseStat(e.Character, e.Stat), e.Op, Eval(e.Amount))),
             ChangeStat e => StateChanges.SetStat(state, e.Character, e.Stat,
                 Apply(state.GetBaseStat(e.Character, e.Stat), e.Op, EvalWhole(e.Amount))),
             ChangeStanding e => StateChanges.SetStanding(state, e.Faction,

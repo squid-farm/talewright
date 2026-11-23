@@ -62,7 +62,7 @@ public class SaveFormatTests
         var body = SaveFormat.EncodeBody(sample);
         var reader = new MessagePackReader(new ReadOnlySequence<byte>(body));
 
-        Assert.Equal(11, reader.ReadArrayHeader());
+        Assert.Equal(12, reader.ReadArrayHeader());
         Assert.Equal(sample.StoryId, reader.ReadString());
         Assert.Equal(sample.StoryVersion, reader.ReadString());
         Assert.Equal(sample.ContentFingerprint, reader.ReadString());
@@ -104,6 +104,7 @@ public class SaveFormatTests
             Assert.Equal(identity, reader.ReadBytes()!.Value.ToArray());
         }
         Assert.True(reader.TryReadNil());
+        Assert.Equal(sample.TalemarkVersion, reader.ReadInt32());
         Assert.True(reader.End);
     }
 
@@ -118,9 +119,9 @@ public class SaveFormatTests
         var oldBody = Decompress(frozen);
         var currentBody = SaveFormat.EncodeBody(Sample);
         Assert.Equal(0x98, oldBody[0]);
-        Assert.Equal(0x9b, currentBody[0]);
-        Assert.Equal(oldBody[1..], currentBody[1..^3]);
-        Assert.Equal([0xc0, 0xc0, 0xc0], currentBody[^3..]);
+        Assert.Equal(0x9c, currentBody[0]);
+        Assert.Equal(oldBody[1..], currentBody[1..^4]);
+        Assert.Equal([0xc0, 0xc0, 0xc0, 0x01], currentBody[^4..]);
     }
 
     [Fact]
@@ -145,7 +146,7 @@ public class SaveFormatTests
 
         var futureField = MessagePackBody((ref MessagePackWriter writer) =>
         {
-            writer.WriteArrayHeader(12);
+            writer.WriteArrayHeader(13);
             writer.Write("story");
             writer.Write("1");
             writer.Write("fingerprint");
@@ -157,6 +158,7 @@ public class SaveFormatTests
             writer.WriteNil();
             writer.WriteNil();
             writer.WriteNil();
+            writer.Write(1);
             writer.Write("future");
         });
         Assert.Equal("story", SaveFormat.DecodeBody(futureField, out _).StoryId);
@@ -181,6 +183,25 @@ public class SaveFormatTests
                 SaveFormat.Read(SaveFormat.Write(Sample with { ReplayEvidence = invalid })));
             Assert.Equal(SaveFormat.HistoryMessage, error.Message);
         }
+
+    }
+
+    [Fact]
+    public void Current_format_requires_a_supported_arithmetic_version()
+    {
+        var oldBody = MessagePackBody((ref MessagePackWriter writer) =>
+        {
+            writer.WriteArrayHeader(7);
+            writer.Write("story");
+            writer.Write("1");
+            writer.Write("fingerprint");
+            writer.Write(7UL);
+            writer.Write(0);
+            writer.WriteNil();
+            writer.WriteArrayHeader(0);
+        });
+        Assert.Throws<InvalidDataException>(() => SaveFormat.Read(SaveFormat.Pack(oldBody)));
+        Assert.Throws<InvalidDataException>(() => SaveFormat.Read(SaveFormat.Write(Sample with { TalemarkVersion = 3 })));
     }
 
     [Fact]

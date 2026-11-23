@@ -45,10 +45,10 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
         var talemarkVersion = ReadTalemarkVersion(game);
         if (_analysis is not null) _analysis.TalemarkVersion = talemarkVersion;
 
-        var ruleset = new StoryYamlRulesetReader(_yaml, _options, _statGuidance, _analysis)
+        var ruleset = new StoryYamlRulesetReader(_yaml, _options, _statGuidance, _analysis, talemarkVersion)
             .Read(Get(game, ManifestVocabulary.Ruleset));
         var world = new StoryYamlWorldReader(_yaml, _statGuidance);
-        var items = world.ReadItems(Get(root, ManifestVocabulary.Items), ruleset);
+        var items = world.ReadItems(Get(root, ManifestVocabulary.Items), ruleset, talemarkVersion);
         var factions = world.ReadFactions(Get(root, ManifestVocabulary.Factions));
         var characters = world.ReadCharacters(Get(root, ManifestVocabulary.Characters), root, ruleset, items, talemarkVersion);
         var flags = world.ReadFlags(Get(root, ManifestVocabulary.Flags));
@@ -101,7 +101,7 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
         }
 
         ReadTriggers(Get(root, ManifestVocabulary.Triggers), manifest.Triggers);
-        manifest.Creation = world.ReadCreation(Get(game, ManifestVocabulary.Creation), ruleset);
+        manifest.Creation = world.ReadCreation(Get(game, ManifestVocabulary.Creation), ruleset, talemarkVersion);
         return manifest;
     }
 

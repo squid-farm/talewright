@@ -361,7 +361,8 @@ public sealed class TalemarkVocabularyGuardTests
                 MemberAccessExpressionSyntax access => access.Name.Identifier.ValueText,
                 _ => string.Empty,
             };
-            if (method is not ("Get" or "RequiredScalar" or "RequiredIdentifier" or "TryGetValue" or "Form"))
+            if (method is not ("Get" or "RequiredScalar" or "RequiredIdentifier" or "TryGetValue" or "Form"
+                    or "CheckKeys" or "ReadNumber"))
                 continue;
             if (invocation.ArgumentList.Arguments.Any(argument => argument.Span.Contains(member.Span)))
                 return true;

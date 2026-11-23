@@ -90,6 +90,8 @@ public sealed class AuthorSceneCheckpoint
             StandingChanged changed => world.Factions.ContainsKey(changed.Faction),
             StatChanged changed => world.Characters.ContainsKey(changed.Character)
                 && world.Ruleset.StatsById.ContainsKey(changed.Stat),
+            ExactStatChanged changed => world.Characters.ContainsKey(changed.Character)
+                && world.Ruleset.StatsById.ContainsKey(changed.Stat),
             ItemsGranted changed => world.Items.ContainsKey(changed.Item),
             ItemsRemoved changed => world.Items.ContainsKey(changed.Item),
             ExactItemsGranted changed => world.Items.ContainsKey(changed.Item),
@@ -195,6 +197,8 @@ internal sealed class AuthorStateView(GameState state) : IGameStateView
     public CharacterDefinition GetCharacterDefinition(EntityId id) => state.GetCharacterDefinition(id);
     public int GetBaseStat(EntityId character, StatId stat) => state.GetBaseStat(character, stat);
     public int GetStat(EntityId character, StatId stat) => state.GetStat(character, stat);
+    public ExactNumber GetExactBaseStat(EntityId character, StatId stat) => state.GetExactBaseStat(character, stat);
+    public ExactNumber GetExactStat(EntityId character, StatId stat) => state.GetExactStat(character, stat);
     public int GetItemCount(EntityId character, ItemId item) => state.GetItemCount(character, item);
     public ExactNumber GetExactItemCount(EntityId character, ItemId item) => state.GetExactItemCount(character, item);
     public IEnumerable<KeyValuePair<ItemId, int>> GetInventory(EntityId character) => state.GetInventory(character);

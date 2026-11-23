@@ -19,6 +19,8 @@ public sealed record CharacterIdentityChanged(EntityId Character, string FirstNa
 /// <summary>A character's base stat was set to a new (already clamped) value.</summary>
 public sealed record StatChanged(EntityId Character, StatId Stat, int OldValue, int NewValue) : GameEvent;
 
+public sealed record ExactStatChanged(EntityId Character, StatId Stat, string OldValue, string NewValue) : GameEvent;
+
 /// <summary>Items were added to a character's inventory.</summary>
 public sealed record ItemsGranted(EntityId Character, ItemId Item, int Quantity) : GameEvent;
 

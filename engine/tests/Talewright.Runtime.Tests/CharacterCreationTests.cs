@@ -1,4 +1,5 @@
 using Talewright.Core.Events;
+using Talewright.Core;
 using Talewright.Core.Identity;
 using Talewright.Core.State;
 using Talewright.Runtime.Saves;
@@ -73,6 +74,32 @@ public sealed class CharacterCreationTests
         }
         Assert.Equal(saved.State.GetCharacterDefinition(EntityId.Player), replay.GetCharacterDefinition(EntityId.Player));
         Assert.Equal("Default", story.World.Characters[EntityId.Player].FirstName);
+    }
+
+    [Fact]
+    public void Resource_preset_preserves_fractional_starting_value()
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = """
+                game:
+                  id: resource-preset
+                  title: Resource preset
+                  talemark: 2
+                  start: a
+                  ruleset: rpg
+                  creation:
+                    presets:
+                      mage: { label: Mage, stats: { hp: 14.75 } }
+                characters: { player: { first-name: Tester } }
+                """,
+            ["main.tale"] = "=== a\n* [Next] -> END",
+        }));
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var story = result.Story!;
+        var selection = story.Creation!.Default(story.World.Characters[EntityId.Player]);
+        var history = new StoryHistory(story, 42, selection);
+        Assert.Equal(ExactNumber.Parse("14.75"), history.State.GetExactBaseStat(EntityId.Player, new("hp")));
     }
 
     [Fact]

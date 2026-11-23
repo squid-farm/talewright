@@ -45,6 +45,8 @@ public static class EventNarrator
                 SkillCheckResolved { IsHidden: false } c when statVisible => new RenderedNote(NoteKind.Check, DescribeCheck(c, state)),
                 StatChanged s when s.Stat != levelStat && statVisible => new RenderedNote(NoteKind.Change,
                     $"{Who(s.Character, state)}{StatName(s.Stat, state)} {Signed(s.NewValue - s.OldValue)} ({s.NewValue})"),
+                ExactStatChanged s when s.Stat != levelStat && statVisible => new RenderedNote(NoteKind.Change,
+                    $"{Who(s.Character, state)}{StatName(s.Stat, state)} {Signed(ExactNumber.Parse(s.NewValue) - ExactNumber.Parse(s.OldValue))} ({ExactNumber.Parse(s.NewValue).ToDecimalString()})"),
                 ItemsGranted g => new RenderedNote(NoteKind.Change, $"{Who(g.Character, state)}Gained: {Items(g.Item, g.Quantity, state)}"),
                 ItemsRemoved r => new RenderedNote(NoteKind.Change, $"{Who(r.Character, state)}Lost: {Items(r.Item, r.Quantity, state)}"),
                 ExactItemsGranted g => new RenderedNote(NoteKind.Change, $"{Who(g.Character, state)}Gained: {Items(g.Item, ExactNumber.Parse(g.Quantity), state)}"),
@@ -96,4 +98,7 @@ public static class EventNarrator
     }
 
     private static string Signed(int value) => value < 0 ? $"−{-value}" : $"+{value}";
+
+    private static string Signed(ExactNumber value) => value < 0
+        ? $"−{(-value).ToDecimalString()}" : $"+{value.ToDecimalString()}";
 }

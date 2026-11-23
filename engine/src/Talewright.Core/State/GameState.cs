@@ -45,7 +45,15 @@ public sealed class GameState : IGameStateView
             var cs = new CharacterState();
             foreach (var stat in world.Ruleset.Stats)
             {
-                cs.Stats[stat.Id] = stat.Clamp(character.Stats.TryGetValue(stat.Id, out var v) ? v : stat.Default);
+                var resource = world.TalemarkVersion == 2 && world.Ruleset.IsFractionalResource(stat.Id);
+                if (resource)
+                {
+                    var initial = character.ExactStats is not null && character.ExactStats.TryGetValue(stat.Id, out var exactValue)
+                        ? exactValue : character.Stats.TryGetValue(stat.Id, out var startingValue) ? startingValue : stat.ExactDefault ?? stat.Default;
+                    cs.ExactStats[stat.Id] = stat.ClampExact(initial);
+                }
+                else
+                    cs.Stats[stat.Id] = stat.Clamp(character.Stats.TryGetValue(stat.Id, out var value) ? value : stat.Default);
             }
 
             foreach (var (item, qty) in character.Inventory)
@@ -98,6 +106,8 @@ public sealed class GameState : IGameStateView
             var copy = new CharacterState { Definition = character.Definition };
             foreach (var (stat, value) in character.Stats)
                 copy.Stats.Add(stat, value);
+            foreach (var (stat, value) in character.ExactStats)
+                copy.ExactStats.Add(stat, value);
             foreach (var (item, quantity) in character.Inventory)
                 copy.Inventory.Add(item, quantity);
             fork._characters.Add(id, copy);
@@ -128,9 +138,14 @@ public sealed class GameState : IGameStateView
                 break;
             case StatChanged e:
                 Character(e.Character).Stats[e.Stat] = e.NewValue;
+                Character(e.Character).ExactStats.Remove(e.Stat);
+                break;
+            case ExactStatChanged e:
+                Character(e.Character).ExactStats[e.Stat] = ExactNumber.Parse(e.NewValue);
                 break;
             case LevelChanged e when World.Ruleset.LevelingRule is { } leveling:
                 Character(e.Character).Stats[leveling.LevelStat] = e.NewLevel;
+                Character(e.Character).ExactStats.Remove(leveling.LevelStat);
                 break;
             case LevelChanged:
                 break;
@@ -229,11 +244,21 @@ public sealed class GameState : IGameStateView
         Character(id).Definition ?? (World.Characters.TryGetValue(id, out var def)
             ? def : throw new KeyNotFoundException($"Unknown character '{id}'."));
 
-    public int GetBaseStat(EntityId character, StatId stat) =>
-        Character(character).Stats.TryGetValue(stat, out var value) ? value : 0;
+    public int GetBaseStat(EntityId character, StatId stat)
+    {
+        var state = Character(character);
+        return World.TalemarkVersion == 2 && state.ExactStats.TryGetValue(stat, out var exact)
+            ? exact.ToInt32RoundedAwayFromZero() : state.Stats.GetValueOrDefault(stat);
+    }
+
+    public ExactNumber GetExactBaseStat(EntityId character, StatId stat) =>
+        Character(character).ExactStats.TryGetValue(stat, out var exact)
+            ? exact : Character(character).Stats.GetValueOrDefault(stat);
 
     public int GetStat(EntityId character, StatId stat)
     {
+        if (World.TalemarkVersion == 2)
+            return GetExactStat(character, stat).ToInt32RoundedAwayFromZero();
         var value = GetBaseStat(character, stat);
         foreach (var (item, qty) in Character(character).Inventory)
         {
@@ -249,6 +274,29 @@ public sealed class GameState : IGameStateView
         }
 
         return World.Ruleset.StatsById.TryGetValue(stat, out var definition) ? definition.Clamp(value) : value;
+    }
+
+    public ExactNumber GetExactStat(EntityId character, StatId stat)
+    {
+        if (World.TalemarkVersion == 1)
+            return GetStat(character, stat);
+        var value = GetExactBaseStat(character, stat);
+        Ruleset.StatsById.TryGetValue(stat, out var definition);
+        var resource = Ruleset.IsFractionalResource(stat);
+        foreach (var (item, qty) in Character(character).Inventory)
+        {
+            if (qty <= 0 || !World.Items.TryGetValue(item, out var def)) continue;
+            var bonus = def.ExactModifiers is not null && def.ExactModifiers.TryGetValue(stat, out var exactBonus)
+                ? exactBonus : def.Modifiers.TryGetValue(stat, out var integerBonus) ? integerBonus : ExactNumber.Zero;
+            value += resource ? bonus : bonus.ToInt32RoundedAwayFromZero();
+        }
+        foreach (var modifier in Ruleset.Modifiers)
+        {
+            var bonus = modifier.GetExactModifier(this, character, stat);
+            value += resource ? bonus : bonus.ToInt32RoundedAwayFromZero();
+        }
+        return definition is null ? value : resource ? definition.ClampExact(value)
+            : definition.Clamp(value.ToInt32RoundedAwayFromZero());
     }
 
     public int GetItemCount(EntityId character, ItemId item) =>
@@ -289,6 +337,7 @@ public sealed class GameState : IGameStateView
     {
         public CharacterDefinition? Definition { get; set; }
         public Dictionary<StatId, int> Stats { get; } = [];
+        public Dictionary<StatId, ExactNumber> ExactStats { get; } = [];
         public Dictionary<ItemId, ExactNumber> Inventory { get; } = [];
     }
 }

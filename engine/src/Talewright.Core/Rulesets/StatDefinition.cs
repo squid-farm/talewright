@@ -15,7 +15,7 @@ public enum StatCategory
 }
 
 /// <summary>
-/// Declares one stat. Values are integers clamped to <see cref="Min"/>..<see cref="Max"/>.
+/// Declares one stat. Resource values can be fractional in Talemark 2.
 /// </summary>
 /// <param name="Id">Author-facing id, e.g. <c>dex</c>.</param>
 /// <param name="Name">Display name, e.g. <c>Dexterity</c>.</param>
@@ -34,6 +34,19 @@ public sealed record StatDefinition(
     StatId? GoverningAttribute = null)
 {
     public int Clamp(int value) => Math.Clamp(value, Min, Max);
+
+    public ExactNumber? ExactMin { get; init; }
+    public ExactNumber? ExactMax { get; init; }
+    public ExactNumber? ExactDefault { get; init; }
+
+    public ExactNumber ClampExact(ExactNumber value)
+    {
+        var min = ExactMin ?? Min;
+        var max = ExactMax ?? Max;
+        if (min > max)
+            throw new ArgumentException("Stat minimum must not exceed its maximum.");
+        return value < min ? min : value > max ? max : value;
+    }
 }
 
 /// <summary>

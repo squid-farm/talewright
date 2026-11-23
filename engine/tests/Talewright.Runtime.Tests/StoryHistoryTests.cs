@@ -1,4 +1,5 @@
 using System.Text;
+using System.Security.Cryptography;
 using Talewright.Core;
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
@@ -122,19 +123,78 @@ public class StoryHistoryTests
     }
 
     [Fact]
-    public void Save_rejects_talemark_2_values_that_integer_checkpoints_cannot_preserve()
+    public void Save_preserves_fractional_numeric_variables()
     {
         var yaml = BuildManifest(declareVariables: true, talemarkVersion: 2).Build()
             .Replace("visits: 0", "visits: 0.25", StringComparison.Ordinal);
         var history = new StoryHistory(Compile(yaml), 42);
 
-        var exception = Assert.Throws<InvalidOperationException>(() => history.Save());
-
-        Assert.Contains("cannot preserve", exception.Message, StringComparison.Ordinal);
+        var restored = StoryHistory.RestoreFromCheckpoint(history.Story, history.Save());
+        Assert.Equal(history.State.GetExactVariable(new VarId("visits")),
+            restored.State.GetExactVariable(new VarId("visits")));
     }
 
     [Fact]
-    public void Save_rejects_fractional_inventory_in_integer_checkpoints()
+    public void Resource_check_rounds_stat_and_difficulty_without_mutating_resource()
+    {
+        var story = Compile("""
+            game: { id: resource-check, title: Resource, talemark: 2, start: a, ruleset: rpg, randomness: off }
+            characters: { player: { first-name: Tester, stats: { hp: 14.75 } } }
+            """, """
+            === a
+            {if skill-check hp dc 24.5}Success.{/if}
+            * [Continue] -> a
+            """);
+        var history = new StoryHistory(story, 42);
+        var check = Assert.Single(history.Events.OfType<SkillCheckResolved>());
+        Assert.Equal(15, check.Modifier);
+        Assert.Equal(25, check.Difficulty);
+        Assert.True(check.Success);
+        Assert.Equal(ExactNumber.Parse("14.75"), history.State.GetExactBaseStat(EntityId.Player, new("hp")));
+    }
+
+    [Fact]
+    public void Save_preserves_fractional_resource_checkpoint()
+    {
+        var story = Compile("""
+            game: { id: resource-save, title: Resource, talemark: 2, start: a, ruleset: rpg }
+            characters: { player: { first-name: Tester, stats: { hp: 14.75 } } }
+            """, "=== a\n* [Continue] -> a");
+        var history = new StoryHistory(story, 42);
+        var restored = StoryHistory.RestoreFromCheckpoint(story, history.Save());
+        Assert.Equal(ExactNumber.Parse("14.75"), restored.State.GetExactBaseStat(EntityId.Player, new("hp")));
+    }
+
+    [Fact]
+    public void Replay_reconstructs_fractional_resource_when_checkpoint_is_whole()
+    {
+        var story = Compile("""
+            game: { id: resource-replay, title: Resource, talemark: 2, start: a, ruleset: rpg }
+            characters: { player: { first-name: Tester, stats: { hp: 20 } } }
+            """, "=== a\n~ player:hp -= 5.25\n* [Continue] -> a");
+        var history = new StoryHistory(story, 42);
+        var restored = StoryHistory.Restore(story, history.Save());
+        Assert.Equal(ExactNumber.Parse("14.75"), restored.State.GetExactBaseStat(EntityId.Player, new("hp")));
+    }
+
+    [Fact]
+    public void Whole_checkpoint_overrides_fractional_start_with_the_same_integer_projection()
+    {
+        const string yaml = """
+            game: { id: resource-continuation, title: Resource, talemark: 2, start: a, ruleset: rpg }
+            characters: { player: { first-name: Tester, stats: { hp: 15 } } }
+            """;
+        const string tale = "=== a\n* [Continue] -> b\n=== b\n* [Again] -> a";
+        var history = new StoryHistory(Compile(yaml, tale), 42);
+        history.Choose("c0");
+        var changed = Compile(yaml.Replace("hp: 15", "hp: 14.75", StringComparison.Ordinal), tale);
+        var restored = StoryHistory.Restore(changed, history.Save());
+        Assert.NotNull(restored.Continuation);
+        Assert.Equal(ExactNumber.FromInteger(15), restored.State.GetExactBaseStat(EntityId.Player, new("hp")));
+    }
+
+    [Fact]
+    public void Save_preserves_fractional_inventory_in_checkpoints()
     {
         var story = Compile("""
             game: { id: inventory-save, title: Inventory, talemark: 2, start: a }
@@ -145,9 +205,219 @@ public class StoryHistoryTests
             * [Continue] -> a
             """);
         var history = new StoryHistory(story, 42);
-        var exception = Assert.Throws<InvalidOperationException>(() => history.Save());
-        Assert.Contains("inventory", exception.Message, StringComparison.OrdinalIgnoreCase);
+        var restored = StoryHistory.RestoreFromCheckpoint(story, history.Save());
+        Assert.Equal(ExactNumber.Parse(".25"), restored.State.GetExactItemCount(EntityId.Player, new("coin")));
     }
+
+    [Fact]
+    public void Fractional_checkpoint_round_trips_exact_state_and_continues_arithmetic()
+    {
+        var story = Compile("""
+            game: { id: exact-save, title: Exact, talemark: 2, start: a, ruleset: rpg }
+            vars: { amount: 0 }
+            items: { coin: { divisible: true } }
+            characters: { player: { first-name: Tester, stats: { hp: 20 } } }
+            """, """
+            === a
+            ~ var:amount = 1 / 3; player:hp -= 1 / 3; give player coin 1 / 3
+            * [Next] -> b
+            === b
+            * [Multiply] { var:amount = var:amount * 3 } -> c
+            === c
+            * [Again] -> c
+            """);
+        var history = new StoryHistory(story, 42);
+        history.Choose("c0");
+        var bytes = history.Save();
+        var fixture = File.ReadAllBytes(Path.Combine(AppContext.BaseDirectory, "..", "..", "..",
+            "SaveSamples", "fractional-v6.twsave"));
+        Assert.Equal("63381742AB1C316DE431D18777A65787286C8D5983EABB9A7CB50AAFED3EFF9B",
+            Convert.ToHexString(SHA256.HashData(fixture)));
+        Assert.Equal(ExactNumber.FromFraction(1, 3),
+            StoryHistory.Restore(story, bytes).State.GetExactVariable(new("amount")));
+        Assert.Equal(ExactNumber.FromFraction(1, 3),
+            StoryHistory.Restore(story, fixture).State.GetExactVariable(new("amount")));
+        var restored = StoryHistory.RestoreFromCheckpoint(story, fixture);
+        Assert.Equal(ExactNumber.FromFraction(1, 3), restored.State.GetExactVariable(new("amount")));
+        Assert.Equal(ExactNumber.FromFraction(59, 3), restored.State.GetExactBaseStat(EntityId.Player, new("hp")));
+        Assert.Equal(ExactNumber.FromFraction(1, 3), restored.State.GetExactItemCount(EntityId.Player, new("coin")));
+        restored.Choose("c0");
+        Assert.Equal(ExactNumber.One, restored.State.GetExactVariable(new("amount")));
+        var reloaded = StoryHistory.Restore(story, restored.Save());
+        Assert.Equal(ExactNumber.One, reloaded.State.GetExactVariable(new("amount")));
+        Assert.Equal(ExactNumber.FromFraction(1, 3), reloaded.State.GetExactItemCount(EntityId.Player, new("coin")));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Numeric_version_change_continues_from_checkpoint_even_with_unchanged_fingerprint(bool sameFingerprint)
+    {
+        const string yaml = """
+            game: { id: arithmetic-save, title: Arithmetic, talemark: 1, start: a }
+            vars: { amount: 0 }
+            characters: { player: { first-name: Tester } }
+            """;
+        const string tale = """
+            === a
+            ~ var:amount = 1 / 3
+            * [Next] -> b
+            === b
+            ~ var:amount += 1
+            * [Next] -> c
+            === c
+            * [Again] -> c
+            """;
+        // Simulate the future omission-default change: identical source fingerprints but different compiled semantics.
+        var oldYaml = sameFingerprint ? yaml.Replace("talemark: 1, ", "", StringComparison.Ordinal) : yaml;
+        var oldStory = Compile(oldYaml, tale);
+        var newStory = Compile(yaml.Replace("talemark: 1", "talemark: 2", StringComparison.Ordinal), tale);
+        if (sameFingerprint)
+            newStory = WithFingerprint(newStory, oldStory.ContentFingerprint);
+        var history = new StoryHistory(oldStory, 42);
+        history.Choose("c0");
+        history.Choose("c0");
+        history.Back();
+        var bytes = history.Save();
+        var copy = bytes.ToArray();
+
+        var restored = StoryHistory.Restore(newStory, bytes);
+        Assert.NotNull(restored.Continuation);
+        Assert.True(restored.Continuation.RedoDiscarded);
+        Assert.False(restored.CanBack);
+        Assert.False(restored.CanForward);
+        Assert.Equal(ExactNumber.One, restored.State.GetExactVariable(new("amount")));
+        Assert.Equal(history.Transcript.Count, restored.Transcript.Count);
+        Assert.Equal(copy, bytes);
+        var reloaded = StoryHistory.Restore(newStory, restored.Save());
+        Assert.Equal(ExactNumber.One, reloaded.State.GetExactVariable(new("amount")));
+        Assert.Equal(restored.Transcript.Count, reloaded.Transcript.Count);
+    }
+
+    [Theory]
+    [InlineData("1/0")]
+    [InlineData("2/6")]
+    [InlineData("1e99999")]
+    [InlineData("-0")]
+    public void Corrupt_exact_checkpoint_is_rejected_without_changing_active_play(string value)
+    {
+        var story = Compile("""
+            game: { id: exact-corrupt, title: Exact, talemark: 2, start: a }
+            vars: { amount: 0 }
+            characters: { player: { first-name: Tester } }
+            """, "=== a\n~ var:amount = 1 / 3\n* [Next] -> b\n=== b\n* [Again] -> b");
+        var history = new StoryHistory(story, 42);
+        history.Choose("c0");
+        var save = SaveFormat.Read(history.Save());
+        save.Continuation!.Payload.Current!.Variables.Single().ExactValue = value;
+        var bytes = SaveFormat.Write(save);
+        var copy = bytes.ToArray();
+
+        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(story, bytes));
+        Assert.Equal(copy, bytes);
+        Assert.Equal(ExactNumber.FromFraction(1, 3), history.State.GetExactVariable(new("amount")));
+        Assert.Equal(new SceneId("b"), history.Current.Scene);
+    }
+
+    [Fact]
+    public void Fractional_checkpoint_cannot_be_rounded_into_version_one()
+    {
+        const string yaml = """
+            game: { id: exact-downgrade, title: Exact, talemark: 2, start: a }
+            vars: { amount: 0 }
+            characters: { player: { first-name: Tester } }
+            """;
+        const string tale = "=== a\n~ var:amount = 1 / 3\n* [Next] -> b\n=== b\n* [Again] -> b";
+        var story = Compile(yaml, tale);
+        var history = new StoryHistory(story, 42);
+        history.Choose("c0");
+        var bytes = history.Save();
+        var copy = bytes.ToArray();
+        var older = Compile(yaml.Replace("talemark: 2", "talemark: 1", StringComparison.Ordinal), tale);
+
+        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(older, bytes));
+        Assert.Equal(copy, bytes);
+        Assert.Equal(ExactNumber.FromFraction(1, 3), history.State.GetExactVariable(new("amount")));
+    }
+
+    [Fact]
+    public void Checkpoint_preserves_values_beyond_int32()
+    {
+        var story = Compile("""
+            game: { id: exact-large, title: Exact, talemark: 2, start: a }
+            vars: { amount: 0 }
+            items: { coin: { divisible: true } }
+            characters: { player: { first-name: Tester } }
+            """, """
+            === a
+            ~ var:amount = 100000000000000000000 / 3; give player coin 100000000000000000000 / 3
+            * [Next] -> b
+            === b
+            * [Again] -> b
+            """);
+        var history = new StoryHistory(story, 42);
+        history.Choose("c0");
+        var restored = StoryHistory.RestoreFromCheckpoint(story, history.Save());
+        var expected = ExactNumber.Parse("100000000000000000000/3");
+        Assert.Equal(expected, restored.State.GetExactVariable(new("amount")));
+        Assert.Equal(expected, restored.State.GetExactItemCount(EntityId.Player, new("coin")));
+    }
+
+    [Theory]
+    [InlineData(4)]
+    [InlineData(5)]
+    [InlineData(6)]
+    public void Replay_only_migration_requires_matching_original_source_and_evidence(byte format)
+    {
+        const string yaml = "game: { id: old-replay, title: Replay, talemark: 1, start: a }\nvars: { amount: 0 }\ncharacters: { player: { first-name: Tester } }";
+        const string tale = "=== a\n~ var:amount = 1 / 3\n* [Next] -> b\n=== b\n* [Again] -> b";
+        var original = Compile(yaml, tale);
+        var updated = Compile(yaml.Replace("talemark: 1", "talemark: 2", StringComparison.Ordinal), tale);
+        var history = new StoryHistory(original, 42);
+        history.Choose("c0");
+        var replay = SaveFormat.Read(history.Save()) with { Continuation = null };
+        var bytes = SaveFormat.Write(replay);
+        bytes[4] = format;
+        var copy = bytes.ToArray();
+
+        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(updated, bytes));
+        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(updated, bytes, updated));
+        var changedOriginal = Compile(yaml, tale.Replace("=== a\n", "=== a\nChanged source.\n", StringComparison.Ordinal));
+        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(updated, bytes, changedOriginal));
+        var evidence = replay.ReplayEvidence!.ToArray();
+        evidence[^1] ^= 1;
+        var damaged = SaveFormat.Write(replay with { ReplayEvidence = evidence });
+        damaged[4] = format;
+        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(updated, damaged, original));
+        var identities = replay.ReplayChoiceIdentities!.Select(identity => identity.ToArray()).ToArray();
+        identities[0][0] ^= 1;
+        var wrongChoice = SaveFormat.Write(replay with { ReplayChoiceIdentities = identities });
+        wrongChoice[4] = format;
+        Assert.Throws<InvalidDataException>(() => StoryHistory.Restore(updated, wrongChoice, original));
+        var restored = StoryHistory.Restore(updated, bytes, original);
+        Assert.NotNull(restored.Continuation);
+        Assert.Equal(ExactNumber.Zero, restored.State.GetExactVariable(new("amount")));
+        Assert.Equal(history.Transcript.Count, restored.Transcript.Count);
+        Assert.Equal(copy, bytes);
+        Assert.Equal(ExactNumber.Zero, StoryHistory.Restore(updated, restored.Save()).State.GetExactVariable(new("amount")));
+    }
+
+    private static StoryDefinition WithFingerprint(StoryDefinition story, string? fingerprint) => new()
+    {
+        Id = story.Id,
+        Title = story.Title,
+        Version = story.Version,
+        TalemarkVersion = story.TalemarkVersion,
+        ContentFingerprint = fingerprint,
+        ReplayCompatibilityId = story.ReplayCompatibilityId,
+        Start = story.Start,
+        Randomness = story.Randomness,
+        Seed = story.Seed,
+        World = story.World,
+        Scenes = story.Scenes,
+        Triggers = story.Triggers,
+        Predicates = story.Predicates,
+    };
 
     [Fact]
     public void Replay_reconstructs_fractional_inventory_when_the_checkpoint_is_whole()

@@ -1,5 +1,4 @@
 using MessagePack;
-using System.Numerics;
 using Talewright.Core;
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
@@ -96,12 +95,12 @@ internal sealed class ContinuationCheckpoint
                 }
                 pronouns.ToPronouns();
             }
-            ValidatePairs(character.Stats);
-            ValidatePairs(character.Items, value => value > 0);
+            ValidatePairs(character.Stats, exact: true);
+            ValidatePairs(character.Items, value => value > 0, exact: true);
         }
         ValidatePairs(checkpoint.Standings);
         ValidatePairs(checkpoint.Flags, value => value is 0 or 1);
-        ValidatePairs(checkpoint.Variables);
+        ValidatePairs(checkpoint.Variables, exact: true);
         ValidatePairs(checkpoint.Visits, value => value > 0);
         // Every preceding frame can contribute at most one scene entry to the pre-entry checkpoint.
         if (checkpoint.Visits.Sum(visit => (long)visit.Value) > precedingFrames)
@@ -123,18 +122,27 @@ internal sealed class ContinuationCheckpoint
         TranscriptCodec.ValidateBlocks(checkpoint.Pending);
     }
 
-    private static void ValidatePairs(IEnumerable<NamedValuePayload> values, Func<int, bool>? valid = null)
+    private static void ValidatePairs(IEnumerable<NamedValuePayload> values, Func<int, bool>? valid = null,
+        bool exact = false)
     {
         var ids = new HashSet<string>(StringComparer.Ordinal);
         foreach (var value in values)
         {
             if (value is null || string.IsNullOrEmpty(value.Id) || !ids.Add(value.Id)
-                || (valid is not null && !valid(value.Value)))
+                || (value.ExactValue is not null && (!exact || value.Value != 0
+                    || !IsCanonical(value.ExactValue)))
+                || (valid is not null && (value.ExactValue is null
+                    ? !valid(value.Value)
+                    : value.Number <= ExactNumber.Zero)))
             {
                 throw new InvalidDataException(SaveFormat.MalformedMessage);
             }
         }
     }
+
+    private static bool IsCanonical(string value) =>
+        value.Length > 0 && value.All(c => char.IsAsciiDigit(c) || c is '-' or '/')
+        && ExactNumber.TryParse(value, out var number) && number.ToCanonicalString() == value;
 
     private static void ValidateIds(IEnumerable<string> values)
     {
@@ -159,25 +167,6 @@ internal sealed class ContinuationCheckpoint
         PlayerEntryBoundary boundary, CheckpointPayload? retained)
     {
         var world = story.World;
-        if (world.TalemarkVersion == 2 && world.ExactVariables.Keys.Any(id =>
-        {
-            var value = state.GetExactVariable(id);
-            return value.Denominator != BigInteger.One
-                || value.Numerator < int.MinValue
-                || value.Numerator > int.MaxValue;
-        }))
-        {
-            throw new InvalidOperationException(
-                "Saving is unavailable while Talemark version 2 numeric variables contain values that the current save format cannot preserve.");
-        }
-        if (world.TalemarkVersion == 2 && world.Characters.Keys.Any(id =>
-            state.GetExactInventory(id).Any(item => item.Value.Denominator != BigInteger.One ||
-                item.Value.Numerator > int.MaxValue)))
-        {
-            throw new InvalidOperationException(
-                "Saving is unavailable while inventory contains quantities that the current save format cannot preserve.");
-        }
-
         var payload = new CheckpointPayload
         {
             Target = boundary.Target.Scene?.Value,
@@ -197,9 +186,13 @@ internal sealed class ContinuationCheckpoint
                 LastName = definition.LastName,
                 Pronouns = PronounsPayload.From(definition.Pronouns),
                 Stats = world.Ruleset.Stats.OrderBy(stat => stat.Id.Value, StringComparer.Ordinal)
-                    .Select(stat => new NamedValuePayload(stat.Id.Value, state.GetBaseStat(id, stat.Id))).ToList(),
-                Items = state.GetInventory(id).OrderBy(item => item.Key.Value, StringComparer.Ordinal)
-                    .Select(item => new NamedValuePayload(item.Key.Value, item.Value)).ToList(),
+                    .Select(stat => world.TalemarkVersion == 2
+                        ? new NamedValuePayload(stat.Id.Value, state.GetExactBaseStat(id, stat.Id))
+                        : new NamedValuePayload(stat.Id.Value, state.GetBaseStat(id, stat.Id))).ToList(),
+                Items = state.GetExactInventory(id).OrderBy(item => item.Key.Value, StringComparer.Ordinal)
+                    .Select(item => world.TalemarkVersion == 2
+                        ? new NamedValuePayload(item.Key.Value, item.Value)
+                        : new NamedValuePayload(item.Key.Value, item.Value.ToInt32RoundedAwayFromZero())).ToList(),
             });
         }
         payload.Standings = world.Factions.Keys.OrderBy(id => id.Value, StringComparer.Ordinal)
@@ -207,7 +200,9 @@ internal sealed class ContinuationCheckpoint
         payload.Flags = world.Flags.OrderBy(id => id.Value, StringComparer.Ordinal)
             .Select(id => new NamedValuePayload(id.Value, state.GetFlag(id) ? 1 : 0)).ToList();
         payload.Variables = world.Variables.Keys.OrderBy(id => id.Value, StringComparer.Ordinal)
-            .Select(id => new NamedValuePayload(id.Value, state.GetVariable(id))).ToList();
+            .Select(id => world.TalemarkVersion == 2
+                ? new NamedValuePayload(id.Value, state.GetExactVariable(id))
+                : new NamedValuePayload(id.Value, state.GetVariable(id))).ToList();
         payload.TextVariables = world.TextVariables.Keys.OrderBy(id => id.Value, StringComparer.Ordinal)
             .Select(id => new NamedTextPayload { Id = id.Value, Value = state.GetTextVariable(id) }).ToList();
         payload.Visits = story.Scenes.Select(scene => new NamedValuePayload(scene.Id.Value, state.VisitCount(scene.Id)))
@@ -273,33 +268,40 @@ internal sealed class ContinuationCheckpoint
                 if (!world.Ruleset.StatsById.TryGetValue(statId, out var statDefinition))
                 {
                     (orphan ??= CharacterStatePayload.Empty(savedCharacter.Id)).Stats.Add(stat);
-                    notes.Add($"Stat '{stat.Id}' is no longer declared; {id}'s saved value {stat.Value} is kept but not used.");
+                    notes.Add($"Stat '{stat.Id}' is no longer declared; {id}'s saved value {stat.Number.ToCanonicalString()} is kept but not used.");
                     continue;
                 }
 
-                var value = statDefinition.Clamp(stat.Value);
-                if (value != stat.Value)
+                var savedValue = stat.Number;
+                if ((world.TalemarkVersion == 1 || !world.Ruleset.IsFractionalResource(statId))
+                    && !FitsInt32(savedValue))
+                    throw Structural($"the stat '{stat.Id}' cannot hold its saved fractional value");
+                var value = world.TalemarkVersion == 2 && world.Ruleset.IsFractionalResource(statId)
+                    ? statDefinition.ClampExact(savedValue) : statDefinition.Clamp(savedValue.ToInt32RoundedAwayFromZero());
+                if (value != savedValue)
                 {
-                    notes.Add($"{id}'s {stat.Id} {stat.Value} is outside its declared range and was clamped to {value}.");
+                    notes.Add($"{id}'s {stat.Id} {savedValue.ToCanonicalString()} is outside its declared range and was clamped to {value.ToDecimalString()}.");
                 }
-                var before = initial.GetBaseStat(id, statId);
+                var before = initial.GetExactBaseStat(id, statId);
                 if (value != before)
                 {
-                    events.Add(new StatChanged(id, statId, before, value));
+                    events.AddRange(StateChanges.SetStat(initial, id, statId, value));
                 }
             }
 
-            var savedItems = savedCharacter.Items.ToDictionary(item => item.Id, item => item.Value, StringComparer.Ordinal);
+            var savedItems = savedCharacter.Items.ToDictionary(item => item.Id, item => item.Number, StringComparer.Ordinal);
             foreach (var item in savedCharacter.Items.Where(item => !world.Items.ContainsKey(new ItemId(item.Id))))
             {
                 (orphan ??= CharacterStatePayload.Empty(savedCharacter.Id)).Items.Add(item);
-                notes.Add($"Item '{item.Id}' is no longer declared; {id}'s {item.Value} saved are kept but not used.");
+                notes.Add($"Item '{item.Id}' is no longer declared; {id}'s {item.Number.ToCanonicalString()} saved are kept but not used.");
             }
             foreach (var item in world.Items.Keys.OrderBy(item => item.Value, StringComparer.Ordinal))
             {
                 var before = initial.GetExactItemCount(id, item);
                 var after = knownItems.Contains(item.Value)
-                    ? ExactNumber.FromInteger(savedItems.GetValueOrDefault(item.Value)) : before;
+                    ? savedItems.GetValueOrDefault(item.Value) : before;
+                if ((world.TalemarkVersion == 1 || !world.Items[item].Divisible) && !FitsInt32(after))
+                    throw Structural($"the item '{item}' cannot hold its saved fractional quantity");
                 if (after == before) continue;
                 if (world.TalemarkVersion == 2 && world.Items[item].Divisible)
                 {
@@ -351,11 +353,15 @@ internal sealed class ContinuationCheckpoint
             if (!world.Variables.ContainsKey(id))
             {
                 retained.Variables.Add(variable);
-                notes.Add($"Variable '{variable.Id}' is no longer declared; its saved value {variable.Value} is kept but not used.");
+                notes.Add($"Variable '{variable.Id}' is no longer declared; its saved value {variable.Number.ToCanonicalString()} is kept but not used.");
             }
-            else if (initial.GetVariable(id) != variable.Value)
+            else if (world.TalemarkVersion == 1 && !FitsInt32(variable.Number))
             {
-                events.Add(new VariableChanged(id, initial.GetVariable(id), variable.Value));
+                throw Structural($"the variable '{variable.Id}' cannot hold its saved fractional value");
+            }
+            else
+            {
+                events.AddRange(StateChanges.SetVariable(initial, id, variable.Number));
             }
         }
 
@@ -441,6 +447,9 @@ internal sealed class ContinuationCheckpoint
         return new ContinuationCheckpoint(normalized, events.AsReadOnly(), edges, target, pending, retained,
             eventLog, statVisibilityBeforeEvents.AsReadOnly());
     }
+
+    private static bool FitsInt32(ExactNumber value) =>
+        value.Denominator.IsOne && value.Numerator >= int.MinValue && value.Numerator <= int.MaxValue;
 
     private static void Merge(CheckpointPayload payload, CheckpointPayload retained)
     {
@@ -804,8 +813,17 @@ internal sealed partial class NamedValuePayload
         Value = value;
     }
 
+    public NamedValuePayload(string id, ExactNumber value)
+    {
+        Id = id;
+        ExactValue = value.ToCanonicalString();
+    }
+
     [Key(0)] public string Id { get; set; } = "";
     [Key(1)] public int Value { get; set; }
+    [Key(2)] public string? ExactValue { get; set; }
+
+    [IgnoreMember] public ExactNumber Number => ExactValue is null ? ExactNumber.FromInteger(Value) : ExactNumber.Parse(ExactValue);
 }
 
 [MessagePackObject(AllowPrivate = true)]

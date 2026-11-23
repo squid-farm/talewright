@@ -9,7 +9,7 @@
         <table><caption>Base and effective stats</caption><thead><tr><th>Stat</th><th>Base</th><th>Effective</th></tr></thead>
             <tbody>@foreach (var stat in character.Stats)
             {
-                <tr><th>@stat.Id @stat.Name</th><td>@stat.BaseValue</td><td>@stat.EffectiveValue</td></tr>
+                <tr><th>@stat.Id @stat.Name</th><td>@(stat.ExactBaseValue ?? stat.BaseValue.ToString())</td><td>@(stat.ExactEffectiveValue ?? stat.EffectiveValue.ToString())</td></tr>
             }</tbody>
         </table>
         <ul>@foreach (var item in character.Inventory) { <li>@item.Id @item.Name: @(item.ExactQuantity ?? item.Quantity.ToString())</li> }</ul>
