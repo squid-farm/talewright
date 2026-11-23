@@ -105,7 +105,7 @@ singular they. This selector also works on item names using their declared gramm
 not on character names or arbitrary text.
 For quantity-dependent wording, apply it to the count expression:
 `{player:inventory:arrow:count} {player:inventory:arrow:count#one-many("arrow remains", "arrows remain")}.`
-The first wording is selected only when the number is exactly 1.
+The first wording is selected when the number displayed to the player is 1.
 Scene titles are plain text and can't use substitutions, so use neutral titles such as "Ask your
 guide about the temple"; put `{guide:first-name}` in prose and choice labels instead.
 For recurring item names, use `{item:relic}` rather than repeating the display name in every
@@ -206,7 +206,7 @@ See the [item-name grammar table](../reference/talemark-syntax.md#item-name-gram
 In Talemark 2, declare an item `divisible: true` to hold fractional amounts, for example
 `credits: {name: credits, divisible: true}`. Divisibility is independent of name grammar.
 Other items stay whole: each incoming amount is rounded to the nearest whole number, with
-halves away from zero. Version 2 is still under development; see
+halves away from zero. Talemark 2 is available starting with v0.8.0; see
 [language versions](language-versions.md).
 
 Use `{player:inventory:credits:count}` in prose, arithmetic and conditions to read the

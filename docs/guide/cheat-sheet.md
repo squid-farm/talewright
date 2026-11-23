@@ -88,7 +88,7 @@ choices, choice-only conditions, comments or blank lines.
 | `{scene:player:visits}` / `{camp:player:visits}` | Player visits to the owning / named scene. |
 | `{player:inventory:arrow:count}` | Number of arrows held by the player. |
 | `{item:key#the#capitalize}` | Chain text manipulators: **The brass key**. |
-| `{player:inventory:arrow:count#one-many("arrow", "arrows")}` | Select wording from a number (first string only for exactly 1). |
+| `{player:inventory:arrow:count#one-many("arrow", "arrows")}` | Select wording from a number (first string when the displayed value is 1). |
 | `{player:pronoun#one-many("is", "are")}` | Select wording from pronoun agreement. |
 | `{player:first-name#bold}` | Format a substitution. |
 
