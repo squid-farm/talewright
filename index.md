@@ -4,6 +4,7 @@ Each row links to a run's workflow summary; machine-readable measurements are in
 
 | Date (UTC) | Commit | Benchmarks | Player observations | Publications | Jobs | Run |
 |---|---|---:|---:|---:|---|---|
+| 2026-11-23 | `f6a2b09cc912` | 98 | 19 | 0 | failure/failure/success | [45210614076](https://github.com/squid-farm/talewright/actions/runs/45210614076) · [report](reports/45210614076-1.md) · [JSON](runs/45210614076-1.json) |
 | 2026-11-16 | `ae9771e8c8c1` | 70 | 19 | 0 | failure/failure/success | [43877292758](https://github.com/squid-farm/talewright/actions/runs/43877292758) · [report](reports/43877292758-1.md) · [JSON](runs/43877292758-1.json) |
 | 2026-11-09 | `3078d238694a` | 70 | 19 | 0 | failure/success/success | [42629164200](https://github.com/squid-farm/talewright/actions/runs/42629164200) · [report](reports/42629164200-1.md) · [JSON](runs/42629164200-1.json) |
 | 2026-11-02 | `572cb538fdd7` | 162 | 19 | 3 | success/success/success | [41457687403](https://github.com/squid-farm/talewright/actions/runs/41457687403) · [report](reports/41457687403-1.md) · [JSON](runs/41457687403-1.json) |
