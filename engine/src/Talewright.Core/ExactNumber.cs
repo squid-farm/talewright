@@ -290,6 +290,17 @@ public readonly struct ExactNumber : IEquatable<ExactNumber>, IComparable<ExactN
         return $"{(negative ? "-" : string.Empty)}{whole.ToString(CultureInfo.InvariantCulture)}.{digits}";
     }
 
+    /// <summary>Formats a reader-facing change with a sign, omitting it when rounding displays zero.</summary>
+    public string ToSignedDisplayString()
+    {
+        var displayed = ToDisplayString();
+        if (displayed == "0")
+            return displayed;
+        if (displayed[0] == '-')
+            return $"−{displayed[1..]}";
+        return $"+{displayed}";
+    }
+
     public override string ToString() => ToCanonicalString();
 
     public string ToString(IFormatProvider? formatProvider) => ToCanonicalString();

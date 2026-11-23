@@ -60,6 +60,16 @@ public class ExactNumberTests
         Assert.Equal(expected, ExactNumber.Parse(text).ToDisplayString());
     }
 
+    [Theory]
+    [InlineData("0.004", "0")]
+    [InlineData("-0.004", "0")]
+    [InlineData("0.25", "+0.25")]
+    [InlineData("-0.25", "−0.25")]
+    public void Signed_reader_display_uses_displayed_magnitude(string text, string expected)
+    {
+        Assert.Equal(expected, ExactNumber.Parse(text).ToSignedDisplayString());
+    }
+
     [Fact]
     public void Exponent_notation_is_an_exact_manifest_number()
     {

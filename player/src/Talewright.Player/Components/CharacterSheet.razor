@@ -23,12 +23,13 @@
             {
                 var value = State.GetExactStat(CharacterId, stat.Id);
                 var baseValue = State.GetExactBaseStat(CharacterId, stat.Id);
+                var modifier = value - baseValue;
                 <dt>@stat.Name</dt>
                 <dd>
                     @value.ToDisplayString()
                     @if (value != baseValue)
                     {
-                        <span class="tw-modified" title="Base @baseValue.ToDisplayString(), modified by items or rules">(@Signed(value - baseValue))</span>
+                        <span class="tw-modified" title="Base @baseValue.ToDisplayString(), modified by items or rules">(@modifier.ToSignedDisplayString())</span>
                     }
                 </dd>
             }
@@ -101,16 +102,6 @@
     private CharacterDefinition Character => State.GetCharacterDefinition(CharacterId);
 
     private string ItemName(ItemId id) => State.World.Items.TryGetValue(id, out var item) ? item.Name : id.Value;
-
-    private static string Signed(ExactNumber value)
-    {
-        var displayed = value.ToDisplayString();
-        if (displayed == "0")
-            return displayed;
-        if (displayed[0] == '-')
-            return $"−{displayed[1..]}";
-        return $"+{displayed}";
-    }
 
     private static string CategoryName(StatCategory category) => category switch
     {
