@@ -328,13 +328,7 @@ internal static class ExpressionCompletion
             BinaryExpressionNode binary => binary.Operator switch
             {
                 BinaryOp.Add or BinaryOp.Subtract or BinaryOp.Multiply or BinaryOp.Divide =>
-                    InferNumeric(tokens, binary.Left, symbols) == true &&
-                    InferNumeric(tokens, binary.Right, symbols) == true
-                        ? true
-                        : InferNumeric(tokens, binary.Left, symbols) == false ||
-                          InferNumeric(tokens, binary.Right, symbols) == false
-                            ? false
-                            : null,
+                    InferNumeric(tokens, binary.Left, symbols) & InferNumeric(tokens, binary.Right, symbols),
                 BinaryOp.Equal or BinaryOp.NotEqual or BinaryOp.Less or BinaryOp.LessOrEqual or
                     BinaryOp.Greater or BinaryOp.GreaterOrEqual or BinaryOp.And or BinaryOp.Or => false,
                 _ => null,

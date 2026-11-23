@@ -490,6 +490,7 @@ public sealed class StoryCompletionTests
     [InlineData("@requires var:coins#rou|")]
     [InlineData("{var:coins#rou|}")]
     [InlineData("{faction:guild:standing#rou|}")]
+    [InlineData("{(var:coins + 1 * 2)#rou|}")]
     public void Numeric_modifier_completion_is_offered_in_version_two_expression_slots(string line)
     {
         var (analysis, position) = Analyze("=== first\n" + line, VersionTwoManifest);
@@ -506,9 +507,22 @@ public sealed class StoryCompletionTests
     [InlineData("@requires \"text\"#rou|")]
     [InlineData("@requires flag:ready#rou|")]
     [InlineData("{faction:guild:tier#rou|}")]
+    [InlineData("{(var:coins + var:missing)#rou|}")]
+    [InlineData("{(var:missing + var:coins)#rou|}")]
+    [InlineData("{(var:coins + \"text\")#rou|}")]
     public void Numeric_modifier_completion_is_not_offered_for_nonnumeric_values(string line)
     {
         var (analysis, position) = Analyze("=== first\n" + line, VersionTwoManifest);
+
+        Assert.DoesNotContain(StoryCompletion.Complete(analysis, position),
+            item => item.Label is "round" or "round-up" or "round-down");
+    }
+
+    [Fact]
+    public void Numeric_modifier_completion_handles_long_arithmetic_with_unknown_operand()
+    {
+        var expression = "var:missing" + string.Concat(Enumerable.Repeat(" + 1", 40));
+        var (analysis, position) = Analyze("=== first\n{(" + expression + ")#rou|}", VersionTwoManifest);
 
         Assert.DoesNotContain(StoryCompletion.Complete(analysis, position),
             item => item.Label is "round" or "round-up" or "round-down");
