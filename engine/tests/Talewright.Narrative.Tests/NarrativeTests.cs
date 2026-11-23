@@ -106,6 +106,19 @@ public class NarrativeTests
         Assert.Equal(expected, modifier.Apply(text, context));
     }
 
+    [Theory]
+    [InlineData("0.995", "1")]
+    [InlineData("-0.995", "-1")]
+    [InlineData("1/3", "0.33")]
+    public void Numeric_substitutions_use_reader_display_without_rounding_the_value(string value, string expected)
+    {
+        var exact = Talewright.Core.ExactNumber.Parse(value);
+        var rendered = RenderInline(new SubstitutionTemplate(new NumberLiteral(exact), []));
+
+        Assert.Equal(expected, rendered);
+        Assert.Equal(value, Value.Of(exact).ToString());
+    }
+
     [Fact]
     public void Inline_conditionals_collapse_extra_whitespace()
     {

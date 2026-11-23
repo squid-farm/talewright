@@ -58,6 +58,8 @@ public sealed class StoryPreviewTests
     [InlineData("false", "false")]
     [InlineData("friendly", "Friendly")]
     [InlineData("hostile", "Hostile")]
+    [InlineData("0.995", "1")]
+    [InlineData("-0.995", "-1")]
     [InlineData("true#upper", "TRUE")]
     [InlineData("friendly#lower", "friendly")]
     public void Constant_literals_preview_exact_rendered_values_and_hover(string expression, string expected)

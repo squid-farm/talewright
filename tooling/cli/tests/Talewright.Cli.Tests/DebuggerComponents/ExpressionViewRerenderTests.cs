@@ -53,6 +53,23 @@ public sealed class ExpressionViewRerenderTests : BunitContext
         Assert.Empty(view.FindAll("[role='alert']"));
     }
 
+    [Fact]
+    public void Exact_numeric_operands_remain_visible_when_their_reader_display_would_round()
+    {
+        var left = new NumberLiteral(ExactNumber.Parse("0.995"));
+        var right = new NumberLiteral(1);
+        var comparison = new BinaryExpr(BinaryOp.Equal, left, right);
+        var trace = new ExpressionTrace(comparison, Value.Of(false),
+        [
+            new(left, Value.Of(left.Value), []),
+            new(right, Value.Of(right.Value), []),
+        ]);
+
+        var view = Render<ExpressionView>(parameters => parameters.Add(component => component.Trace, trace));
+
+        Assert.Equal(["false", "0.995", "1"], view.FindAll("strong").Select(element => element.TextContent));
+    }
+
     private sealed record UnsupportedExpr : Expr
     {
         public override ExprType Type => ExprType.Bool;

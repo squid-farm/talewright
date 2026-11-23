@@ -77,7 +77,9 @@ public static class StoryPreview
             return new(substitution.Range, null, [], "Custom or metadata-only manipulators are not executed while editing.");
 
         var evaluated = ExpressionEvaluator.Evaluate(template.Value, context);
-        var value = evaluated.ToString();
+        var value = evaluated.Type == ExprType.Number
+            ? evaluated.ExactNumber.ToDisplayString()
+            : evaluated.ToString();
         var steps = new List<PreviewStep> { new("Input", value) };
         var item = template.Value is ItemNameRef itemName ? context.State.World.Items[itemName.Item] : null;
         var plural = item is not null

@@ -20,10 +20,10 @@ public readonly record struct Value(ExprType Type, int Number, bool Bool, string
     public static Value Of(string text) => new(ExprType.Text, 0, false, text, null);
     public static Value Of(ReputationTier tier) => new(ExprType.Tier, 0, false, null, tier);
 
-    /// <summary>Display form used by the template renderer.</summary>
+    /// <summary>Exact invariant form used when inspecting evaluated expressions.</summary>
     public override string ToString() => Type switch
     {
-        ExprType.Number => ExactNumber.ToDisplayString(),
+        ExprType.Number => ExactNumber.ToDecimalString(),
         ExprType.Bool => Bool ? "true" : "false",
         ExprType.Text => Text ?? string.Empty,
         ExprType.Tier => Tier?.Name ?? string.Empty,
