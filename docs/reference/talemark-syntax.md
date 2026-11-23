@@ -215,6 +215,13 @@ declared as a resource. A resource used in a check is rounded only
 for that check. Character creation's selectable stat lists remain whole numbers.
 Talemark 1 retains its integer behavior.
 
+Repeated multiplication of a resource keeps exact fractions. For example, a recurring
+`~ player:hp *= .99` removes 1% of the current HP each turn, and can grow increasingly
+precise fractions and retain their history in state and event data. Fixed damage is
+simpler and predictable, limited-duration damage can remain active only while a
+condition lasts, and staged damage applies whole damage bands. These alternatives have
+different gameplay consequences and are not mathematically interchangeable.
+
 Manifest booleans use `true` or `false`; quoted `'true'` and `"false"` are also
 accepted. Values such as `yes`, `no`, `1`, or `sometimes` produce TW4003.
 This applies to `game.undo`, `game.autosave`, `game.character-sheet`,
@@ -671,8 +678,11 @@ These are ordinary text expressions, usable in comparisons and text assignments:
 {guide:pronoun#one-many("was", "were")#capitalize} it worth the journey?
 ```
 
-On a number-valued expression, the first string is selected only when the value
-is exactly `1`; every other value selects the second. This works with inventory
+On a number-valued expression, the first string is selected when the reader-displayed
+value is exactly `1`; every other displayed value selects the second. Display rounding
+does not change exact state or exact comparisons. For example, a value of `0.995`
+displays as `1` and selects the first string even though it is not exactly equal to `1`,
+while `1 / 3` displays as `0.33` and selects the second. This works with inventory
 counts, stats, number variables and arithmetic:
 
 ```tale

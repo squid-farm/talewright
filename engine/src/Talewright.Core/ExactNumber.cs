@@ -269,6 +269,38 @@ public readonly struct ExactNumber : IEquatable<ExactNumber>, IComparable<ExactN
         return negative ? $"-{rendered}" : rendered;
     }
 
+    /// <summary>
+    /// Formats a value for readers: at most two decimal places, halves away from zero,
+    /// trailing zeros removed, without changing the stored rational value.
+    /// </summary>
+    public string ToDisplayString()
+    {
+        var quotient = BigInteger.DivRem(Numerator * 100, Denominator, out var remainder);
+        if (!remainder.IsZero && BigInteger.Abs(remainder) * 2 >= Denominator)
+            quotient += Numerator.Sign;
+
+        var negative = quotient.Sign < 0;
+        var hundredths = BigInteger.Abs(quotient);
+        var whole = hundredths / 100;
+        var fraction = hundredths % 100;
+        if (fraction.IsZero)
+            return $"{(negative ? "-" : string.Empty)}{whole.ToString(CultureInfo.InvariantCulture)}";
+
+        var digits = fraction.ToString("D2", CultureInfo.InvariantCulture).TrimEnd('0');
+        return $"{(negative ? "-" : string.Empty)}{whole.ToString(CultureInfo.InvariantCulture)}.{digits}";
+    }
+
+    /// <summary>Formats a reader-facing change with a sign, omitting it when rounding displays zero.</summary>
+    public string ToSignedDisplayString()
+    {
+        var displayed = ToDisplayString();
+        if (displayed == "0")
+            return displayed;
+        if (displayed[0] == '-')
+            return $"−{displayed[1..]}";
+        return $"+{displayed}";
+    }
+
     public override string ToString() => ToCanonicalString();
 
     public string ToString(IFormatProvider? formatProvider) => ToCanonicalString();

@@ -100,6 +100,23 @@ public sealed class PlayerSheetRenderTests
     }
 
     [Fact]
+    public async Task Modifiers_that_round_to_zero_do_not_show_a_sign()
+    {
+        var story = new StoryFixture("zero-rounded-modifier", """
+            game: { id: zero-rounded-modifier, title: Resource, talemark: 2, start: start, ruleset: rpg }
+            items: { charm: { modifiers: { hp: .004 } } }
+            characters: { player: { first-name: Alex, stats: { hp: 20 }, inventory: [charm] } }
+            """, """
+            === start
+            * [Stay] -> start
+            """).Compile();
+        var sheet = System.Net.WebUtility.HtmlDecode(SheetHtml(await RenderPlayerAsync(story)));
+        Assert.Contains("(0)", sheet);
+        Assert.DoesNotContain("+0)", sheet);
+        Assert.DoesNotContain("−0)", sheet);
+    }
+
+    [Fact]
     public async Task Story_with_existing_sheet_sections_keeps_them_visible()
     {
         var html = await RenderPlayerAsync(TestStories.Gates.Compile());

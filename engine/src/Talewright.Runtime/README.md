@@ -290,10 +290,11 @@ are evaluated before ranking/limiting, as in normal selection. Explicit diverts
 still bypass storylet eligibility; observing them does not introduce new gates.
 Block conditions, choice requirements, immediate diverts, check difficulty/results
 and outcome effects, trigger priming/edges/cascade effects are observed at their
-actual engine boundaries. This is not a trace of every prose substitution or
-effect arithmetic operation. Scene decisions use stable step IDs, not collection indexes;
+actual engine boundaries. Prose, menu-label and effect expressions are recorded when they execute division
+by zero, but this is not a trace of every substitution or effect arithmetic
+operation. Scene decisions use stable step IDs, not collection indexes;
 `AuthorInspection.SourceFor` resolves their compiled source spans. Trigger/storylet subjects keep their IDs.
-The debugger displays the location without reevaluating any condition.
+The debugger displays the location and expression trace without reevaluating expressions or conditions.
 
 Recording follows successful author candidate replay: `Choose`, `JumpFresh`
 and checkpoint `Reenter` preserve the recording setting, with no duplicated

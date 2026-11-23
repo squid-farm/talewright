@@ -89,6 +89,36 @@ public class NarrativeTests
             [template with { Modifiers = [renamed, new OneManyTextModifier("is", "are")] }], state)));
     }
 
+    [Theory]
+    [InlineData("0.995", "one")]
+    [InlineData("1.004", "one")]
+    [InlineData("0.994", "many")]
+    [InlineData("1/3", "many")]
+    [InlineData("1", "one")]
+    public void One_many_uses_the_displayed_rounded_value(string text, string expected)
+    {
+        var modifier = new OneManyTextModifier("one", "many");
+        var context = new ModifierContext(EnglishGrammar.Instance, false)
+        {
+            ExactNumberValue = Talewright.Core.ExactNumber.Parse(text),
+        };
+
+        Assert.Equal(expected, modifier.Apply(text, context));
+    }
+
+    [Theory]
+    [InlineData("0.995", "1")]
+    [InlineData("-0.995", "-1")]
+    [InlineData("1/3", "0.33")]
+    public void Numeric_substitutions_use_reader_display_without_rounding_the_value(string value, string expected)
+    {
+        var exact = Talewright.Core.ExactNumber.Parse(value);
+        var rendered = RenderInline(new SubstitutionTemplate(new NumberLiteral(exact), []));
+
+        Assert.Equal(expected, rendered);
+        Assert.Equal(value, Value.Of(exact).ToString());
+    }
+
     [Fact]
     public void Inline_conditionals_collapse_extra_whitespace()
     {

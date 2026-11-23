@@ -23,12 +23,13 @@
             {
                 var value = State.GetExactStat(CharacterId, stat.Id);
                 var baseValue = State.GetExactBaseStat(CharacterId, stat.Id);
+                var modifier = value - baseValue;
                 <dt>@stat.Name</dt>
                 <dd>
-                    @value.ToDecimalString()
+                    @value.ToDisplayString()
                     @if (value != baseValue)
                     {
-                        <span class="tw-modified" title="Base @baseValue.ToDecimalString(), modified by items or rules">(@Signed(value - baseValue))</span>
+                        <span class="tw-modified" title="Base @baseValue.ToDisplayString(), modified by items or rules">(@modifier.ToSignedDisplayString())</span>
                     }
                 </dd>
             }
@@ -48,7 +49,7 @@
             <ul class="tw-inventory">
                 @foreach (var (item, count) in inventory)
                 {
-                    <li>@ItemName(item)@(count != 1 ? $" ×{count.ToDecimalString()}" : string.Empty)</li>
+                    <li>@ItemName(item)@(count != 1 ? $" ×{count.ToDisplayString()}" : string.Empty)</li>
                 }
             </ul>
         }
@@ -101,8 +102,6 @@
     private CharacterDefinition Character => State.GetCharacterDefinition(CharacterId);
 
     private string ItemName(ItemId id) => State.World.Items.TryGetValue(id, out var item) ? item.Name : id.Value;
-
-    private static string Signed(ExactNumber value) => value < 0 ? $"−{(-value).ToDecimalString()}" : $"+{value.ToDecimalString()}";
 
     private static string CategoryName(StatCategory category) => category switch
     {

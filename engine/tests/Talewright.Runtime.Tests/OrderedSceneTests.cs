@@ -12,9 +12,9 @@ public sealed class OrderedSceneTests
 {
     private static readonly string Manifest = BuildManifest().Build();
 
-    private static ManifestFaker BuildManifest(bool includeArrived = false)
+    private static ManifestFaker BuildManifest(bool includeArrived = false, int? talemark = 1)
     {
-        var manifest = new ManifestFaker("order", "Order", "start", 42) { Randomness = "off", BaseRuleset = "rpg" };
+        var manifest = new ManifestFaker("order", "Order", "start", 42) { Talemark = talemark, Randomness = "off", BaseRuleset = "rpg" };
         manifest.Character("player", "Ada");
         manifest.Number("gold", 10);
         manifest.Flag("ready");
@@ -267,6 +267,22 @@ public sealed class OrderedSceneTests
             block => Assert.Contains("Lost:", Assert.IsType<RenderedNote>(block).Text),
             block => Assert.Contains("(7)", Assert.IsType<RenderedNote>(block).Text),
             block => Assert.IsType<RenderedParagraph>(block));
+    }
+
+    [Fact]
+    public void Exact_change_that_rounds_to_zero_omits_the_sign()
+    {
+        var session = new StorySession(Compile("""
+            === start
+            ~ player:hp -= .004
+            Current.
+            -> END
+            """, BuildManifest(talemark: 2).Build()));
+        var text = Text(session.Start());
+
+        Assert.Contains("(10)", text);
+        Assert.DoesNotContain("−0", text);
+        Assert.DoesNotContain("+0", text);
     }
 
     [Fact]

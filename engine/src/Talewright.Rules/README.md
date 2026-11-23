@@ -22,7 +22,8 @@ wrapping. Stat assignments are then clamped to their ruleset bounds. Division by
 
 `Effects.cs`: `ChangeStat`, `ChangeStanding`, `ChangeVariable` (each with `AssignOp` `=`/`+=`/`-=` and an
 `Expr` amount), `SetFlag`, `GiveItem`, `TakeItem`. `EffectExecutor.Execute(All)` evaluates each against the
-*current* state (so later effects see earlier ones) and appends events via `StateChanges`.
+*current* state (so later effects see earlier ones) and appends events via `StateChanges`. An optional
+expression observer receives the actual trace without re-evaluating the amount.
 
 ### `Checks/`
 

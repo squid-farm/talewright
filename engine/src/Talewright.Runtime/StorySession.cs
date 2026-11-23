@@ -393,7 +393,7 @@ public sealed class StorySession : IStorySession
                     break;
                 }
             }
-            selected ??= _executor.View(step.Choice);
+            selected ??= _executor.View(step);
             MakeChoice(scene, step, []);
             return true;
         }
@@ -543,7 +543,9 @@ public sealed class StorySession : IStorySession
         var target = new DivertTarget(storylet.Id);
         var label = HubLabelSource(storylet);
         return new ChoiceCandidate(key, storylet.Requires, label,
-            ChoiceAvailability.ShownLabelSource(storylet.Shown, label, _executor.Render),
+            _observer is null
+                ? ChoiceAvailability.ShownLabelSource(storylet.Shown, label, _executor.Render)
+                : ChoiceAvailability.ShownLabelSource(storylet.Shown, label, _executor.Render, storylet.Id.Value),
             notes =>
             {
                 _log.Append(new ChoiceMade(scene.Id, key));
@@ -552,10 +554,22 @@ public sealed class StorySession : IStorySession
             _replayIdentities.ForDivert(scene.Id, target), new DivertExecution(scene, key, target));
     }
 
-    private Func<IReadOnlyList<RenderedInline>> HubLabelSource(SceneDefinition storylet) =>
-        storylet.ChoiceLabel is { } choiceLabel
-            ? () => _executor.Render(choiceLabel)
-            : () => [new RenderedText(storylet.Title ?? storylet.Id.Value, TextStyle.None)];
+    private Func<IReadOnlyList<RenderedInline>> HubLabelSource(SceneDefinition storylet)
+    {
+        if (storylet.ChoiceLabel is not { } choiceLabel)
+            return () => [new RenderedText(storylet.Title ?? storylet.Id.Value, TextStyle.None)];
+
+        return _observer is null
+            ? HubLabelSource(choiceLabel)
+            : HubLabelSource(choiceLabel, storylet.Id.Value);
+    }
+
+    private Func<IReadOnlyList<RenderedInline>> HubLabelSource(IReadOnlyList<TemplateInline> choiceLabel) =>
+        () => _executor.Render(choiceLabel);
+
+    private Func<IReadOnlyList<RenderedInline>> HubLabelSource(IReadOnlyList<TemplateInline> choiceLabel,
+        string subject) =>
+        () => _executor.Render(choiceLabel, subject);
 
     private List<VisibleChoice> ContinueTo(
         SceneDefinition source, DivertTarget target)
@@ -577,7 +591,7 @@ public sealed class StorySession : IStorySession
         var choice = step.Choice;
         var mark = _log.Events.Count;
         _log.Append(new ChoiceMade(scene.Id, choice.Key));
-        var triggerDivert = _executor.ApplyBatch(choice.Effects);
+        var triggerDivert = _executor.ApplyBatch(choice.Effects, step.Id);
         var target = triggerDivert
             ?? (choice.Check is { } check ? _executor.ResolveCheck(check, step.Id).Target : choice.Divert);
         notes.AddRange(NotesSince(mark));

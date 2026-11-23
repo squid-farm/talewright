@@ -140,7 +140,9 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
     private string Substitute(SubstitutionTemplate substitution, EvaluationContext context)
     {
         var evaluated = ExpressionEvaluator.Evaluate(substitution.Value, context);
-        var text = evaluated.ToString();
+        var text = evaluated.Type == ExprType.Number
+            ? evaluated.ExactNumber.ToDisplayString()
+            : evaluated.ToString();
         if (substitution.Modifiers.Count == 0)
             return text;
 
@@ -153,6 +155,7 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
         var modifierContext = new ModifierContext(grammar, isPlural, item?.Uncountable ?? false)
         {
             NumberValue = evaluated.Type == ExprType.Number ? evaluated.Number : null,
+            ExactNumberValue = evaluated.Type == ExprType.Number ? evaluated.ExactNumber : null,
         };
         foreach (var modifier in substitution.Modifiers)
         {

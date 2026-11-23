@@ -108,7 +108,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                         break;
                     }
                     var renderMark = log.Events.Count;
-                    var rendered = renderer.Render([prose.Block], Context).Blocks;
+                    var rendered = renderer.Render([prose.Block], TemplateContext(step.Id)).Blocks;
                     AppendSkillCheckNotes(step.Id, renderMark, blocks);
                     if (!refresh && rememberEntry) _prose[step.Id] = rendered;
                     blocks.AddRange(rendered);
@@ -118,7 +118,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                     {
                         if (rememberEntry) _entryReplay.Add(new("effect", effect.Effects));
                         var mark = log.Events.Count;
-                        target = ApplyBatch(effect.Effects);
+                        target = ApplyBatch(effect.Effects, step.Id);
                         if (rememberEntry) _effectDiverts[step.Id] = target;
                         Observe(DecisionKind.EntryEffect, step.Id, DecisionOutcome.Applied,
                             DecisionReason.Unconditional, null, mark);
@@ -241,9 +241,33 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
         return target;
     }
 
-    public DivertTarget? ApplyBatch(IReadOnlyList<Effect> effects)
+    public DivertTarget? ApplyBatch(IReadOnlyList<Effect> effects, string subject)
     {
-        EffectExecutor.ExecuteAll(effects, log, story.Predicates, ExpressionCheckResolver);
+        var mark = log.Events.Count;
+        List<ExpressionTrace>? divisionsByZero = null;
+        Action<ExpressionTrace>? observeExpression = null;
+        if (observer is not null)
+        {
+            var capturedTraces = new List<ExpressionTrace>();
+            divisionsByZero = capturedTraces;
+            observeExpression = trace =>
+            {
+                if (RuleObservation.ContainsExecutedDivisionByZero(trace))
+                    capturedTraces.Add(trace);
+            };
+        }
+
+        EffectExecutor.ExecuteAll(effects, log, story.Predicates, ExpressionCheckResolver, observeExpression);
+        if (observer is { } observe && divisionsByZero is { } observedTraces)
+        {
+            foreach (var trace in observedTraces)
+            {
+                observe(new(DecisionKind.EffectExpression, subject, log.State.CurrentScene,
+                    DecisionOutcome.Evaluated, DecisionReason.DivisionByZero,
+                    trace, mark, log.Events.Count));
+            }
+        }
+
         return afterBatch();
     }
 
@@ -255,17 +279,21 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
             ?? throw new InvalidOperationException("A check with no difficulty cannot select a success or failure outcome.");
         var outcome = success ? check.Success : check.Failure;
         var mark = log.Events.Count;
-        var triggerDivert = ApplyBatch(outcome.Effects);
+        var triggerDivert = ApplyBatch(outcome.Effects, stepId);
         Observe(DecisionKind.CheckOutcome, stepId, DecisionOutcome.Applied,
             success ? DecisionReason.CheckSucceeded : DecisionReason.CheckFailed, null, mark);
         return new CheckExecution(triggerDivert ?? outcome.Divert, triggerDivert is not null);
     }
 
-    public ChoiceView View(ChoiceDefinition choice) =>
-        ChoiceAvailability.CreateView(choice.Key, LabelSource(choice), _replayIdentities.For(choice));
+    public ChoiceView View(ChoiceStep step) =>
+        ChoiceAvailability.CreateView(step.Choice.Key, LabelSource(step),
+            _replayIdentities.For(step.Choice));
 
     public IReadOnlyList<RenderedInline> Render(IReadOnlyList<TemplateInline> text) =>
         renderer.RenderInlines(text, Context);
+
+    public IReadOnlyList<RenderedInline> Render(IReadOnlyList<TemplateInline> text, string subject) =>
+        renderer.RenderInlines(text, TemplateContext(subject));
 
     private ChoiceCandidate CreateCandidate(SceneDefinition scene, ChoiceStep step)
     {
@@ -274,14 +302,21 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
             return cached;
         }
 
-        var label = LabelSource(step.Choice);
+        var label = LabelSource(step);
         var candidate = new ChoiceCandidate(step.Choice.Key, step.Choice.Requires, label,
-            ChoiceAvailability.ShownLabelSource(step.Choice.Shown, label, Render),
+            observer is null
+                ? ChoiceAvailability.ShownLabelSource(step.Choice.Shown, label, Render)
+                : ChoiceAvailability.ShownLabelSource(step.Choice.Shown, label, Render, step.Id),
             notes => makeChoice(scene, step, notes),
             _replayIdentities.For(step.Choice), new ChoiceStepExecution(scene, step));
         _choiceCandidates.Add(step, candidate);
         return candidate;
     }
+
+    private Func<IReadOnlyList<RenderedInline>> LabelSource(ChoiceStep step) =>
+        observer is null
+            ? LabelSource(step.Choice)
+            : LabelSource(step.Choice, step.Id);
 
     private Func<IReadOnlyList<RenderedInline>> LabelSource(ChoiceDefinition choice)
     {
@@ -299,6 +334,22 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
         return static () => ChoiceView.ContinueLabel;
     }
 
+    private Func<IReadOnlyList<RenderedInline>> LabelSource(ChoiceDefinition choice, string subject)
+    {
+        if (choice.Label is { } label)
+        {
+            return () => renderer.RenderInlines(label, TemplateContext(subject));
+        }
+
+        if (choice.Check is null && choice.Divert?.Scene is { } target &&
+            story.GetScene(target).ChoiceLabel is { } choiceLabel)
+        {
+            return () => renderer.RenderInlines(choiceLabel, TemplateContext(subject));
+        }
+
+        return static () => ChoiceView.ContinueLabel;
+    }
+
     private static void RequireSettled(bool settled)
     {
         if (!settled)
@@ -309,6 +360,26 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
 
     private bool Test(Expr? expression, out ExpressionTrace? trace) =>
         RuleObservation.Test(expression, Context, observer is not null, out trace);
+
+    private EvaluationContext TemplateContext(string subject)
+    {
+        var context = Context;
+        if (observer is null)
+            return context;
+
+        return context with
+        {
+            Trace = trace =>
+            {
+                if (RuleObservation.ContainsExecutedDivisionByZero(trace))
+                {
+                    observer(new(DecisionKind.RenderedExpression, subject, log.State.CurrentScene,
+                        DecisionOutcome.Evaluated, DecisionReason.DivisionByZero,
+                        trace, log.Events.Count, log.Events.Count));
+                }
+            },
+        };
+    }
 
     internal Value ResolveExpressionCheck(SkillCheckExpr expression)
     {

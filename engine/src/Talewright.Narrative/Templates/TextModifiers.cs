@@ -1,4 +1,5 @@
 using Talewright.Narrative.Grammar;
+using Talewright.Core;
 
 namespace Talewright.Narrative.Templates;
 
@@ -6,6 +7,7 @@ namespace Talewright.Narrative.Templates;
 public sealed record ModifierContext(IGrammar Grammar, bool IsPlural, bool IsUncountable = false)
 {
     public int? NumberValue { get; init; }
+    public ExactNumber? ExactNumberValue { get; init; }
 }
 
 /// <summary>The output kind used when validating a chain of text modifiers.</summary>
@@ -51,7 +53,11 @@ public sealed record OneManyTextModifier(string Singular, string Plural) : IText
 
     public string Apply(string text, ModifierContext context)
     {
-        var isPlural = context.NumberValue is { } number ? number != 1 : context.IsPlural;
+        var isPlural = context.ExactNumberValue is { } exact
+            ? exact.ToDisplayString() != "1"
+            : context.NumberValue is { } number
+                ? number != 1
+                : context.IsPlural;
         return isPlural ? Plural : Singular;
     }
 }

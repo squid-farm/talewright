@@ -1,3 +1,4 @@
+using Talewright.Core;
 using Talewright.Core.Identity;
 using Talewright.Rules.Expressions;
 
@@ -13,6 +14,8 @@ public enum DecisionKind
     Check,
     CheckOutcome,
     Trigger,
+    RenderedExpression,
+    EffectExpression,
 }
 
 public enum DecisionOutcome
@@ -27,6 +30,7 @@ public enum DecisionOutcome
     Primed,
     Fired,
     Suppressed,
+    Evaluated,
 }
 
 public enum DecisionReason
@@ -51,10 +55,12 @@ public enum DecisionReason
     AlreadyFired,
     RisingEdge,
     CascadeLimit,
+    DivisionByZero,
 }
 
 /// <summary>
-/// An actual execution decision. Event offsets refer to the observing run, not a later state.
+/// An actual execution decision or rendered-expression diagnostic. Event offsets refer to the observing run,
+/// not a later state.
 /// Null offsets mean the caller did not supply an event-log position.
 /// Effects/results occupy [EventStart, EventEnd); a condition-only decision has an empty range.
 /// </summary>
@@ -93,6 +99,27 @@ public static class RuleObservation
             return ExpressionEvaluator.Evaluate(expression, context);
         }
         return Capture(expression, context, out trace);
+    }
+
+    public static bool ContainsExecutedDivisionByZero(ExpressionTrace trace)
+    {
+        var pending = new Stack<ExpressionTrace>();
+        pending.Push(trace);
+        while (pending.TryPop(out var current))
+        {
+            if (current.Expression is BinaryExpr { Op: BinaryOp.Divide } &&
+                current.Children.Count >= 2 &&
+                current.Children[1].Result is { Type: ExprType.Number } divisor &&
+                divisor.ExactNumber == ExactNumber.Zero)
+            {
+                return true;
+            }
+
+            foreach (var child in current.Children)
+                pending.Push(child);
+        }
+
+        return false;
     }
 
     private static Value Capture(Expr expression, EvaluationContext context, out ExpressionTrace? trace)
