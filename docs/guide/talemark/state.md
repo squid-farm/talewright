@@ -50,7 +50,7 @@ before the following prose. Re-entering does not pay again.
 |---|---|
 | Set / clear a flag | `set flag:rewarded` / `clear flag:rewarded` |
 | Give / take inventory | `give player coin 3` / `take player coin` |
-| Set / change an integer | `var:jobs = 2` / `var:jobs += 1` / `var:jobs -= 1` |
+| Set / change a number | `var:jobs = 2` / `var:jobs += 1` / `var:jobs -= 1` |
 | Assign text | `var:report = "He said \"Done\"."` |
 | Change a declared stat | `player:hp -= 2` |
 | Change faction standing | `faction:guild:standing += 5` |
@@ -63,7 +63,8 @@ quantity applies an item's modifiers once, regardless of its size.
 Stat assignments are clamped to the ruleset's minimum/maximum; bare faction references are names,
 so mutate `:standing`, not `faction:guild`.
 
-Flags are boolean; variables are integers or text. The initial declaration fixes a variable's type.
+Flags are boolean; variables are numbers or text. Talemark 1 numbers are integers; Talemark 2
+number variables can keep fractions. The initial declaration fixes a variable's type.
 Text allows `=` and case-sensitive `==`/`!=`, not arithmetic, concatenation or implicit conversions.
 Copying a variable copies its current value, not a live reference.
 Effects can introduce flags and variables without YAML declarations, but declare initial values

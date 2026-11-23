@@ -727,8 +727,8 @@ In VS Code, hover a selector to see which wording its default value or agreement
 ![A hover on #one-many("has", "have") showing the input "she", the selected result "has" and a description of the agreement selector](../images/vscode-hover-substitution.png)
 
 The selector accepts **number-valued expressions, pronoun references and
-item-name references**. Number expressions choose the first string only at
-exactly `1`; pronouns use effective agreement and item names use their declared
+item-name references**. Number expressions choose the first string when the displayed value is `1`;
+pronouns use effective agreement and item names use their declared
 `name-agreement`. Character names, text variables and other non-number values
 are unsupported. Unsupported targets, missing arguments and extra arguments
 produce TW2006; an unclosed quote can leave the substitution unclosed (TW1004).
@@ -759,7 +759,7 @@ amounts for ordinary items round to the nearest whole number, halves away from z
 before inventory rules apply. Omitted quantities are one; nonpositive changes have no
 effect, and taking more than is held removes only what is held. A positive fractional
 holding applies its modifiers once. Talemark 1 retains its integer behavior.
-Version 2 is still under development; see
+Talemark 2 is available starting with v0.8.0; see
 [language versions](../guide/language-versions.md).
 
 ### Item-name grammar
@@ -938,8 +938,8 @@ vars:
 {if var:amount == 1 / 4}The values are equal.{/if}
 ```
 
-Version 2 is still under development; see the [language-version guide](../guide/language-versions.md)
-before using it in a story.
+Talemark 2 is available starting with v0.8.0; see the
+[language-version guide](../guide/language-versions.md) before updating an existing story.
 Only player visits are tracked. Scene visit counts are numeric, including for hubs; `scene` refers
 to the scene that owns the expression, even when that expression is evaluated in a hub offer.
 `<scene-id>:player:visits` refers to a named scene. Manifest triggers and character-sheet rules have

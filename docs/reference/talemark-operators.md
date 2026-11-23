@@ -242,7 +242,7 @@ Resource-category stats keep exact values, while other stats and check difficult
 incoming amount the same way. A resource used in a check is rounded for that check only.
 Talemark 1 retains integer behavior.
 
-Variable assignment can introduce integer or text state without YAML declarations.
+Variable assignment can introduce number or text state without YAML declarations.
 Discovery is story-wide; implicit text starts empty until an assignment executes.
 The first declaration fixes the type and assignments copy values, not live links.
 See [declaration ordering and inference](talemark-syntax.md#declaring-variables-in-talemark).
@@ -281,10 +281,10 @@ Passing arguments to any of them is an error.
 Pronoun forms are properties, not manipulators; for example,
 `{player:pronoun:possessive-pronoun:independent}` gives *hers*. The selector
 `#one-many("singular", "plural")` requires exactly two quoted strings, singular
-first and plural second. A number-valued expression selects the first string only
-when its evaluated value is exactly `1`; every other value selects the second.
+first and plural second. A number-valued expression selects the first string when
+its displayed value is `1`; every other displayed value selects the second.
 This includes inventory counts, stats, number variables and arithmetic. Version 1
-uses integers; version 2 compares exact decimal values. Pronoun references select from the effective
+uses integers; version 2 compares exact values but rounds them for display. Pronoun references select from the effective
 pronoun set's `agreement` at render time; singular they uses plural agreement.
 On an item-name reference, `{item:pants#one-many("is", "are")}` selects from
 item `name-agreement` instead. Character names, text variables and other

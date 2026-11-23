@@ -1,9 +1,15 @@
 # Talemark language versions
 
-`game.talemark` pins the arithmetic and language behavior used by a story. It is separate from
-`game.version`, which remains an author-defined story version.
+`game.talemark` chooses how your story handles numbers. It's separate from `game.version`, the
+version number you choose for your own story.
 
-During Talewright v0, pin a story to the existing behavior:
+Starting with Talewright v0.8.0, you can choose Talemark 1 or Talemark 2. During v0, a story without
+a `talemark` setting uses Talemark 1. Starting with the first 1.0 preview, the planned default is
+Talemark 2. That default will stay at 2; it won't silently move to a newer language version later.
+Talemark 1 will remain available throughout Talewright 1.x.
+
+To keep the integer math your story uses today, add `talemark: 1` under `game:` in the root
+`story.talewright.yaml`:
 
 ```yaml
 game:
@@ -13,35 +19,53 @@ game:
   start: beginning
 ```
 
-Version `1` preserves the current integer behavior: int32 saturation, division toward zero and
-division by zero returning `0`.
+To use fractional numbers instead, change that line to `talemark: 2`. Write the version as a plain
+integer, not a quoted string, decimal, exponent or hexadecimal value. An editor's YAML schema may
+accept alternate spellings that it normalizes to the same number; the compiler rejects them.
+Malformed values and versions the player doesn't support are errors.
 
-When `game.talemark` is omitted, Talewright v0 uses version 1 and shows an informational migration
-notice. Pinning `1` is recommended so a future default or player cannot change this story's arithmetic
-accidentally. The key is not a warning: validation and publishing succeed with `--warnings-as-errors`.
-Malformed values and values this release does not support are errors.
-Write the version as a plain integer, not a quoted string, decimal, exponent or hexadecimal value.
-An editor's YAML schema may accept alternate spellings that it normalizes to the same number;
-the compiler rejects them.
+Starting with v0.8.0, an unmarked story shows an informational notice suggesting `talemark: 1`.
+It's not a warning, so validation and publishing still succeed with `--warnings-as-errors`. Pinning
+a version keeps your choice clear when the default changes.
 
-Before adopting another language version, test the complete story and saved progress with that player
-and publishing target. Keep a copy of the original save and use only supported, validated migration
-paths. Older players continue to run stories bundled with their published player; an unmarked story
-loaded by a future player may follow that future player's documented omission default.
+## What changes in Talemark 2?
 
-Version `2` adds exact decimal arithmetic and numeric variables. For example, `1 / 4` and `.25`
-represent the same exact value, and numeric variables may start with decimal values or exponent
-notation. Saves preserve exact numeric variables, resources and divisible inventory. Version 2 is
-still under development, including player presentation; do not select it for an author-facing story
-until its features ship together.
+Talemark 1 uses whole numbers. Division drops the fraction toward zero, and arithmetic is limited
+to the range of a 32-bit signed integer. When a result goes beyond that range, it stops at the
+nearest limit. Talemark 2 keeps exact fractions instead: `1 / 4` and `.25` have the same value.
+In both versions, division by zero returns `0` without interrupting play.
 
-Readers see exact values rounded to at most two decimal places. Halves round away from zero,
-trailing zeros are omitted, and stored state is never rounded for display. For example, `1 / 3`
-is displayed as `0.33`, and `0.995` is displayed as `1`, but gameplay comparisons still use the
-exact values. `#one-many` uses the displayed rounded value, so each of those examples is treated
-as one only when its displayed value is exactly `1`.
+In Talemark 2, number variables and resource stats can keep fractions. Items can too, if you
+declare them with `divisible: true`. Other values, including attributes, skills, faction standing,
+XP, levels, ordinary item counts, visits and check difficulty, stay whole. At those whole-number
+boundaries, incoming fractional amounts round to the nearest whole number, with halves away from
+zero. A fractional resource used in a check is rounded for that check; the stored resource doesn't
+change.
 
-When a story changes arithmetic versions, a supported checkpoint can carry its state forward and
-starts a new Back boundary. Older replay-only saves need a validated replay against their original
-story; the player does not automatically find that story. Keep the original story and save, and test
-your migration. Some updates cannot be migrated.
+Players see numbers rounded to at most two decimal places. Halves round away from zero and trailing
+zeros are omitted, but the stored value stays exact. For example, `1 / 3` displays as `0.33`, and
+`0.995` displays as `1`. Comparisons still use the exact values. `#one-many` uses the displayed
+value, so `0.995` selects the wording for one even though it doesn't compare equal to `1`.
+
+## Moving an existing story
+
+You don't have to switch to Talemark 2 when you update Talewright. If you want your existing story
+to keep its integer behavior, pin `talemark: 1` before opening it with a player that changes the
+default. A published game keeps the player it was bundled with.
+
+When you're ready to try Talemark 2:
+
+1. Keep a copy of the original story and its compatible player. Export copies of your saves before
+   changing anything; [backing up saves](playing-and-saving.md#backing-up-and-moving-saves) shows how.
+2. Set `talemark: 2` in the root manifest. Check divisions and calculations that relied on
+   whole-number results or 32-bit limits. Review conditions and choices that depend on those results.
+3. Check values that must stay whole, and mark an item `divisible: true` only if fractional
+   quantities make sense for it. Test the story with the player and publishing target you plan to use.
+4. Test saved progress too. A supported checkpoint can carry state into the updated story, but it
+   starts a new Back boundary: Back and Forward can't cross it, and undone choices are discarded.
+   Some updates can't continue a save.
+
+Older replay-only saves that need the old arithmetic can't be migrated automatically by the player.
+Keep the original story, save and compatible player so you can still open them. A failed load leaves
+the save and active game untouched. See [updating a story with existing saves](playing-and-saving.md#updating-a-story-with-existing-saves)
+for more about checkpoints and save compatibility.
