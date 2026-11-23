@@ -12,9 +12,9 @@ public sealed class OrderedSceneTests
 {
     private static readonly string Manifest = BuildManifest().Build();
 
-    private static ManifestFaker BuildManifest(bool includeArrived = false)
+    private static ManifestFaker BuildManifest(bool includeArrived = false, int? talemark = 1)
     {
-        var manifest = new ManifestFaker("order", "Order", "start", 42) { Randomness = "off", BaseRuleset = "rpg" };
+        var manifest = new ManifestFaker("order", "Order", "start", 42) { Talemark = talemark, Randomness = "off", BaseRuleset = "rpg" };
         manifest.Character("player", "Ada");
         manifest.Number("gold", 10);
         manifest.Flag("ready");
@@ -274,10 +274,10 @@ public sealed class OrderedSceneTests
     {
         var session = new StorySession(Compile("""
             === start
-            ~ player:hp -= 0.004
+            ~ player:hp -= .004
             Current.
             -> END
-            """));
+            """, BuildManifest(talemark: 2).Build()));
         var text = Text(session.Start());
 
         Assert.Contains("(20)", text);
