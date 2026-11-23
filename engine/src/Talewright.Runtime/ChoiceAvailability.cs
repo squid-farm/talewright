@@ -66,4 +66,22 @@ internal static class ChoiceAvailability
 
         return () => render(text);
     }
+
+    public static Func<IReadOnlyList<RenderedInline>>? ShownLabelSource(ShownDefinition? shown,
+        Func<IReadOnlyList<RenderedInline>> labelSource,
+        Func<IReadOnlyList<TemplateInline>, string, IReadOnlyList<RenderedInline>> render,
+        string subject)
+    {
+        if (shown is null)
+        {
+            return null;
+        }
+
+        if (shown.Text is not { } text)
+        {
+            return labelSource;
+        }
+
+        return () => render(text, subject);
+    }
 }

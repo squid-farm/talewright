@@ -261,10 +261,12 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
         return new CheckExecution(triggerDivert ?? outcome.Divert, triggerDivert is not null);
     }
 
-    public ChoiceView View(ChoiceDefinition choice) =>
-        ChoiceAvailability.CreateView(choice.Key, LabelSource(choice,
-            _replayChoices.FirstOrDefault(step => step.Choice.Key == choice.Key)?.Id ?? choice.Key),
-            _replayIdentities.For(choice));
+    public ChoiceView View(ChoiceStep step) =>
+        ChoiceAvailability.CreateView(step.Choice.Key, LabelSource(step),
+            _replayIdentities.For(step.Choice));
+
+    public IReadOnlyList<RenderedInline> Render(IReadOnlyList<TemplateInline> text) =>
+        renderer.RenderInlines(text, Context);
 
     public IReadOnlyList<RenderedInline> Render(IReadOnlyList<TemplateInline> text, string subject) =>
         renderer.RenderInlines(text, TemplateContext(subject));
@@ -276,13 +278,36 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
             return cached;
         }
 
-        var label = LabelSource(step.Choice, step.Id);
+        var label = LabelSource(step);
         var candidate = new ChoiceCandidate(step.Choice.Key, step.Choice.Requires, label,
-            ChoiceAvailability.ShownLabelSource(step.Choice.Shown, label, text => Render(text, step.Id)),
+            observer is null
+                ? ChoiceAvailability.ShownLabelSource(step.Choice.Shown, label, Render)
+                : ChoiceAvailability.ShownLabelSource(step.Choice.Shown, label, Render, step.Id),
             notes => makeChoice(scene, step, notes),
             _replayIdentities.For(step.Choice), new ChoiceStepExecution(scene, step));
         _choiceCandidates.Add(step, candidate);
         return candidate;
+    }
+
+    private Func<IReadOnlyList<RenderedInline>> LabelSource(ChoiceStep step) =>
+        observer is null
+            ? LabelSource(step.Choice)
+            : LabelSource(step.Choice, step.Id);
+
+    private Func<IReadOnlyList<RenderedInline>> LabelSource(ChoiceDefinition choice)
+    {
+        if (choice.Label is { } label)
+        {
+            return () => renderer.RenderInlines(label, Context);
+        }
+
+        if (choice.Check is null && choice.Divert?.Scene is { } target &&
+            story.GetScene(target).ChoiceLabel is { } choiceLabel)
+        {
+            return () => renderer.RenderInlines(choiceLabel, Context);
+        }
+
+        return static () => ChoiceView.ContinueLabel;
     }
 
     private Func<IReadOnlyList<RenderedInline>> LabelSource(ChoiceDefinition choice, string subject)
