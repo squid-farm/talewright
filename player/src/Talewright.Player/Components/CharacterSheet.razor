@@ -102,7 +102,11 @@
 
     private string ItemName(ItemId id) => State.World.Items.TryGetValue(id, out var item) ? item.Name : id.Value;
 
-    private static string Signed(ExactNumber value) => value < 0 ? $"−{(-value).ToDisplayString()}" : $"+{value.ToDisplayString()}";
+    private static string Signed(ExactNumber value)
+    {
+        var displayed = value.ToDisplayString();
+        return displayed == "0" ? "0" : value < 0 ? $"−{(-value).ToDisplayString()}" : $"+{displayed}";
+    }
 
     private static string CategoryName(StatCategory category) => category switch
     {

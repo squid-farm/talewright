@@ -99,6 +99,9 @@ public static class EventNarrator
 
     private static string Signed(int value) => value < 0 ? $"−{-value}" : $"+{value}";
 
-    private static string Signed(ExactNumber value) => value < 0
-        ? $"−{(-value).ToDisplayString()}" : $"+{value.ToDisplayString()}";
+    private static string Signed(ExactNumber value)
+    {
+        var displayed = value.ToDisplayString();
+        return displayed == "0" ? "0" : value < 0 ? $"−{(-value).ToDisplayString()}" : $"+{displayed}";
+    }
 }

@@ -270,6 +270,22 @@ public sealed class OrderedSceneTests
     }
 
     [Fact]
+    public void Exact_change_that_rounds_to_zero_omits_the_sign()
+    {
+        var session = new StorySession(Compile("""
+            === start
+            ~ player:hp -= .004
+            Current.
+            -> END
+            """));
+        var text = Text(session.Start());
+
+        Assert.Contains("(20)", text);
+        Assert.DoesNotContain("−0", text);
+        Assert.DoesNotContain("+0", text);
+    }
+
+    [Fact]
     public void Executor_collects_choices_at_their_line_even_for_a_model_with_a_later_effect()
     {
         var compiled = Compile("""
