@@ -1,4 +1,5 @@
 using Talewright.Core.Events;
+using Talewright.Core;
 using Talewright.Core.Identity;
 using Talewright.Core.State;
 using Talewright.Narrative.Rendering;
@@ -46,6 +47,8 @@ public static class EventNarrator
                     $"{Who(s.Character, state)}{StatName(s.Stat, state)} {Signed(s.NewValue - s.OldValue)} ({s.NewValue})"),
                 ItemsGranted g => new RenderedNote(NoteKind.Change, $"{Who(g.Character, state)}Gained: {Items(g.Item, g.Quantity, state)}"),
                 ItemsRemoved r => new RenderedNote(NoteKind.Change, $"{Who(r.Character, state)}Lost: {Items(r.Item, r.Quantity, state)}"),
+                ExactItemsGranted g => new RenderedNote(NoteKind.Change, $"{Who(g.Character, state)}Gained: {Items(g.Item, ExactNumber.Parse(g.Quantity), state)}"),
+                ExactItemsRemoved r => new RenderedNote(NoteKind.Change, $"{Who(r.Character, state)}Lost: {Items(r.Item, ExactNumber.Parse(r.Quantity), state)}"),
                 StandingChanged f => new RenderedNote(NoteKind.Change, DescribeStanding(f, state)),
                 LevelChanged l when statVisible => new RenderedNote(NoteKind.Change, $"{Who(l.Character, state)}Level {l.NewLevel}!"),
                 _ => null,
@@ -84,6 +87,12 @@ public static class EventNarrator
     {
         var name = state.World.Items.TryGetValue(item, out var definition) ? definition.Name : item.Value;
         return quantity == 1 ? name : $"{name} ×{quantity}";
+    }
+
+    private static string Items(ItemId item, ExactNumber quantity, IGameStateView state)
+    {
+        var name = state.World.Items.TryGetValue(item, out var definition) ? definition.Name : item.Value;
+        return quantity == 1 ? name : $"{name} ×{quantity.ToDecimalString()}";
     }
 
     private static string Signed(int value) => value < 0 ? $"−{-value}" : $"+{value}";

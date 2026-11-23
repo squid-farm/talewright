@@ -60,6 +60,7 @@ internal static class ManifestVocabulary
     internal const string Determiner = ExpressionVocabulary.Determiner;
     internal const string Independent = ExpressionVocabulary.Independent;
     internal const string Uncountable = "uncountable";
+    internal const string Divisible = "divisible";
     internal const string Modifiers = "modifiers";
     internal const string Standing = ExpressionVocabulary.Standing;
     internal const string Presets = "presets";
@@ -114,7 +115,7 @@ internal static class ManifestVocabulary
         Id, Title, Version, Talemark, Start, Randomness, Seed, Undo, Autosave, CharacterSheet, Ruleset, Creation,
         When, Do, Effect, Divert, Once, Save, Base, Disable, Stats, Shown, Name, Category, Min, Max, Default, GoverningAttribute,
         FirstName, LastName, Pronouns, Inventory, NameAgreement, Subject, Object, PossessivePronoun, Reflexive,
-        Agreement, Determiner, Independent, Uncountable, Modifiers, Standing, Presets, Label,
+        Agreement, Determiner, Independent, Uncountable, Divisible, Modifiers, Standing, Presets, Label,
     ];
 
     internal static readonly ImmutableArray<string> FixedKeywordValues =

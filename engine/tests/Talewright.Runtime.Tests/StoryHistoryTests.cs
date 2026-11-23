@@ -1,4 +1,5 @@
 using System.Text;
+using Talewright.Core;
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Narrative.Rendering;
@@ -130,6 +131,61 @@ public class StoryHistoryTests
         var exception = Assert.Throws<InvalidOperationException>(() => history.Save());
 
         Assert.Contains("cannot preserve", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void Save_rejects_fractional_inventory_in_integer_checkpoints()
+    {
+        var story = Compile("""
+            game: { id: inventory-save, title: Inventory, talemark: 2, start: a }
+            items: { coin: { divisible: true } }
+            characters: { player: { first-name: Tester, inventory: { coin: .25 } } }
+            """, """
+            === a
+            * [Continue] -> a
+            """);
+        var history = new StoryHistory(story, 42);
+        var exception = Assert.Throws<InvalidOperationException>(() => history.Save());
+        Assert.Contains("inventory", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void Replay_reconstructs_fractional_inventory_when_the_checkpoint_is_whole()
+    {
+        var story = Compile("""
+            game: { id: inventory-replay, title: Inventory, talemark: 2, start: a }
+            items: { coin: { divisible: true } }
+            characters: { player: { first-name: Tester, inventory: { coin: 1 } } }
+            """, """
+            === a
+            ~ take player coin .1
+            * [Continue] -> a
+            """);
+        var history = new StoryHistory(story, 42);
+        var restored = StoryHistory.Restore(story, history.Save());
+        Assert.Equal(ExactNumber.Parse(".9"), restored.State.GetExactItemCount(EntityId.Player, new("coin")));
+    }
+
+    [Fact]
+    public void Whole_checkpoint_restores_exactly_when_new_source_has_fractional_starting_inventory()
+    {
+        const string yaml = """
+            game: { id: inventory-continuation, title: Inventory, talemark: 2, start: a }
+            items: { coin: { divisible: true } }
+            characters: { player: { first-name: Tester, inventory: { coin: 1 } } }
+            """;
+        const string tale = """
+            === a
+            * [Continue] -> b
+            === b
+            * [Again] -> a
+            """;
+        var history = new StoryHistory(Compile(yaml, tale), 42);
+        history.Choose("c0");
+        var changed = Compile(yaml.Replace("coin: 1", "coin: .25", StringComparison.Ordinal), tale);
+        var restored = StoryHistory.Restore(changed, history.Save());
+        Assert.NotNull(restored.Continuation);
+        Assert.Equal(ExactNumber.One, restored.State.GetExactItemCount(EntityId.Player, new("coin")));
     }
 
     [Fact]

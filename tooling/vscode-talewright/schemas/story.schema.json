@@ -181,6 +181,18 @@
                 { "type": "string" }
               ]
             }
+          },
+          "characters": {
+            "additionalProperties": {
+              "properties": {
+                "inventory": {
+                  "if": { "type": "object" },
+                  "then": {
+                    "additionalProperties": { "$ref": "#/definitions/inventoryQuantity" }
+                  }
+                }
+              }
+            }
           }
         }
       }
@@ -463,9 +475,10 @@
             "$ref": "#/definitions/identifier"
           },
           "additionalProperties": {
-            "$ref": "#/definitions/inventoryQuantity"
+            "type": "number",
+            "minimum": 0
           },
-          "description": "Item IDs mapped to nonnegative quantities; zero means the item is not held."
+          "description": "Item IDs mapped to nonnegative quantities. Version 2 supports fractional quantities; ordinary items round to whole amounts."
         }
       ]
     },
@@ -498,6 +511,11 @@
           "$ref": "#/definitions/booleanScalar",
           "default": false,
           "description": "Use some with #a, as in some armor. Does not imply plural agreement: this armor is singular. No automatic inflection or count phrasing."
+        },
+        "divisible": {
+          "$ref": "#/definitions/booleanScalar",
+          "default": false,
+          "description": "In Talemark 2, retain exact fractional quantities. Independent of name agreement and uncountable."
         },
         "modifiers": {
           "$ref": "#/definitions/statMap",

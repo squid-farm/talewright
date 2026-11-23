@@ -64,6 +64,24 @@ public sealed class PlayerSheetRenderTests
     }
 
     [Fact]
+    public async Task Fractional_inventory_is_shown_even_below_one()
+    {
+        var story = new StoryFixture("fractional-inventory", """
+            game: { id: fractional-inventory, title: Inventory, talemark: 2, start: start }
+            items: { coin: { name: Credits, divisible: true } }
+            characters: { player: { first-name: Alex, inventory: { coin: .25 } } }
+            """, """
+            === start
+            ~ give player coin .25
+            * [Stay] -> start
+            """).Compile();
+        var sheet = SheetHtml(await RenderPlayerAsync(story));
+        Assert.Contains("Credits", sheet);
+        Assert.Contains("0.5", sheet);
+        Assert.DoesNotContain("Nothing.", sheet);
+    }
+
+    [Fact]
     public async Task Story_with_existing_sheet_sections_keeps_them_visible()
     {
         var html = await RenderPlayerAsync(TestStories.Gates.Compile());

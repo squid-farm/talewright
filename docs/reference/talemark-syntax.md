@@ -211,7 +211,7 @@ Manifest booleans use `true` or `false`; quoted `'true'` and `"false"` are also
 accepted. Values such as `yes`, `no`, `1`, or `sometimes` produce TW4003.
 This applies to `game.undo`, `game.autosave`, `game.character-sheet`,
 `game.character-sheet.stats.shown`, `game.character-sheet.inventory`,
-`game.character-sheet.standing`, `game.creation.name`, item `uncountable`, and
+`game.character-sheet.standing`, `game.creation.name`, item `uncountable` and `divisible`, and
 trigger `once`.
 
 `game.character-sheet` controls what the player's character sheet shows. By
@@ -696,6 +696,34 @@ exactly `1`; pronouns use effective agreement and item names use their declared
 are unsupported. Unsupported targets, missing arguments and extra arguments
 produce TW2006; an unclosed quote can leave the substitution unclosed (TW1004).
 This adds no general multi-argument manipulator support or grammar inference.
+
+### Divisible items
+
+Talemark 2 can retain fractional inventory quantities for items marked `divisible: true`.
+This is independent of `uncountable` and name agreement. Items default to indivisible,
+including shorthand declarations.
+
+```yaml
+items:
+  credits: {name: credits, divisible: true}
+  rope: rope
+characters:
+  player:
+    first-name: Mara
+    inventory: {credits: 100, rope: 2}
+```
+
+```tale
+~ take player credits 99 * (1 - 0.1)
+```
+
+The player has exactly `10.9` credits left. Starting quantities and `give`/`take`
+amounts for ordinary items round to the nearest whole number, halves away from zero,
+before inventory rules apply. Omitted quantities are one; nonpositive changes have no
+effect, and taking more than is held removes only what is held. A positive fractional
+holding applies its modifiers once. Talemark 1 retains its integer behavior.
+Version 2 and fractional checkpoint saves are still under development; see
+[language versions](../guide/language-versions.md).
 
 ### Item-name grammar
 

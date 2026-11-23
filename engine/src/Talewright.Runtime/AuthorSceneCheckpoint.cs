@@ -92,6 +92,8 @@ public sealed class AuthorSceneCheckpoint
                 && world.Ruleset.StatsById.ContainsKey(changed.Stat),
             ItemsGranted changed => world.Items.ContainsKey(changed.Item),
             ItemsRemoved changed => world.Items.ContainsKey(changed.Item),
+            ExactItemsGranted changed => world.Items.ContainsKey(changed.Item),
+            ExactItemsRemoved changed => world.Items.ContainsKey(changed.Item),
             LevelChanged => world.Ruleset.LevelingRule is { } leveling
                 && world.Ruleset.StatsById.ContainsKey(leveling.LevelStat),
             _ => true,
@@ -194,7 +196,9 @@ internal sealed class AuthorStateView(GameState state) : IGameStateView
     public int GetBaseStat(EntityId character, StatId stat) => state.GetBaseStat(character, stat);
     public int GetStat(EntityId character, StatId stat) => state.GetStat(character, stat);
     public int GetItemCount(EntityId character, ItemId item) => state.GetItemCount(character, item);
+    public ExactNumber GetExactItemCount(EntityId character, ItemId item) => state.GetExactItemCount(character, item);
     public IEnumerable<KeyValuePair<ItemId, int>> GetInventory(EntityId character) => state.GetInventory(character);
+    public IEnumerable<KeyValuePair<ItemId, ExactNumber>> GetExactInventory(EntityId character) => state.GetExactInventory(character);
     public int GetStanding(FactionId faction) => state.GetStanding(faction);
     public bool GetFlag(FlagId flag) => state.GetFlag(flag);
     public int GetVariable(VarId variable) => state.GetVariable(variable);

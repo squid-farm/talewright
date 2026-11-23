@@ -50,7 +50,7 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
         var world = new StoryYamlWorldReader(_yaml, _statGuidance);
         var items = world.ReadItems(Get(root, ManifestVocabulary.Items), ruleset);
         var factions = world.ReadFactions(Get(root, ManifestVocabulary.Factions));
-        var characters = world.ReadCharacters(Get(root, ManifestVocabulary.Characters), root, ruleset, items);
+        var characters = world.ReadCharacters(Get(root, ManifestVocabulary.Characters), root, ruleset, items, talemarkVersion);
         var flags = world.ReadFlags(Get(root, ManifestVocabulary.Flags));
         var declaredFlags = flags.Keys.ToArray();
         var (numericVars, textVars) = world.ReadVars(Get(root, ManifestVocabulary.Vars), talemarkVersion);

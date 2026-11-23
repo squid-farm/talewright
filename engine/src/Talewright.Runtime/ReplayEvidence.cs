@@ -270,7 +270,10 @@ internal static class ReplayEvidence
             {
                 writer.WriteStartArray();
                 writer.WriteStringValue(item.Value);
-                writer.WriteNumberValue(state.GetItemCount(id, item));
+                if (state.World.TalemarkVersion == 1)
+                    writer.WriteNumberValue(state.GetItemCount(id, item));
+                else
+                    writer.WriteStringValue(state.GetExactItemCount(id, item).ToCanonicalString());
                 writer.WriteEndArray();
             }
             writer.WriteEndArray();
@@ -283,6 +286,8 @@ internal static class ReplayEvidence
         {
             writer.WriteStartArray();
             writer.WriteStringValue(id.Value);
+            if (state.World.TalemarkVersion == 2)
+                writer.WriteBooleanValue(item.Divisible);
             foreach (var (stat, modifier) in item.Modifiers.OrderBy(entry => entry.Key.Value, StringComparer.Ordinal))
             {
                 writer.WriteStartArray();
@@ -395,6 +400,8 @@ internal static class ReplayEvidence
         StatChanged => "StatChanged",
         ItemsGranted => "ItemsGranted",
         ItemsRemoved => "ItemsRemoved",
+        ExactItemsGranted => "ExactItemsGranted",
+        ExactItemsRemoved => "ExactItemsRemoved",
         StandingChanged => "StandingChanged",
         FlagChanged => "FlagChanged",
         VariableChanged => "VariableChanged",

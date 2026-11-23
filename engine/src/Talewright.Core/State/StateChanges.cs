@@ -33,11 +33,33 @@ public static class StateChanges
 
     public static IEnumerable<GameEvent> TakeItem(IGameStateView state, EntityId character, ItemId item, int quantity)
     {
+        if (state.World.TalemarkVersion == 2 && state.World.Items.TryGetValue(item, out var definition) && definition.Divisible)
+        {
+            foreach (var change in TakeItem(state, character, item, ExactNumber.FromInteger(quantity)))
+                yield return change;
+            yield break;
+        }
         var removed = Math.Min(quantity, state.GetItemCount(character, item));
         if (removed > 0)
         {
             yield return new ItemsRemoved(character, item, removed);
         }
+    }
+
+    public static IEnumerable<GameEvent> GiveItem(IGameStateView state, EntityId character, ItemId item, ExactNumber quantity)
+    {
+        if (state.World.TalemarkVersion == 1 || !state.World.Items[item].Divisible)
+            return GiveItem(character, item, quantity.ToInt32RoundedAwayFromZero());
+        return quantity > 0 ? [new ExactItemsGranted(character, item, quantity.ToCanonicalString())] : [];
+    }
+
+    public static IEnumerable<GameEvent> TakeItem(IGameStateView state, EntityId character, ItemId item, ExactNumber quantity)
+    {
+        if (state.World.TalemarkVersion == 1 || !state.World.Items[item].Divisible)
+            return TakeItem(state, character, item, quantity.ToInt32RoundedAwayFromZero());
+        var held = state.GetExactItemCount(character, item);
+        var removed = quantity < held ? quantity : held;
+        return removed > 0 ? [new ExactItemsRemoved(character, item, removed.ToCanonicalString())] : [];
     }
 
     public static IEnumerable<GameEvent> SetStanding(IGameStateView state, FactionId faction, int value)

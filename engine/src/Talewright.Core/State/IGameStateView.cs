@@ -34,10 +34,21 @@ public interface IGameStateView
     /// <summary>Effective value: base + held item modifiers + ruleset modifiers, clamped to the stat's bounds.</summary>
     int GetStat(EntityId character, StatId stat);
 
+    /// <summary>Returns the legacy int32 projection of an item quantity.</summary>
     int GetItemCount(EntityId character, ItemId item);
 
-    /// <summary>Items with a positive count, in insertion order.</summary>
+    /// <summary>Returns the exact quantity. Version-2 state views must implement this member.</summary>
+    ExactNumber GetExactItemCount(EntityId character, ItemId item) => World.TalemarkVersion == 1
+        ? ExactNumber.FromInteger(GetItemCount(character, item))
+        : throw new NotSupportedException("This state view does not expose exact inventory quantities.");
+
+    /// <summary>Items with a positive projected count, in insertion order.</summary>
     IEnumerable<KeyValuePair<ItemId, int>> GetInventory(EntityId character);
+
+    /// <summary>Items with a positive exact quantity, in insertion order.</summary>
+    IEnumerable<KeyValuePair<ItemId, ExactNumber>> GetExactInventory(EntityId character) => World.TalemarkVersion == 1
+        ? GetInventory(character).Select(item => KeyValuePair.Create(item.Key, ExactNumber.FromInteger(item.Value)))
+        : throw new NotSupportedException("This state view does not expose exact inventory quantities.");
 
     int GetStanding(FactionId faction);
 

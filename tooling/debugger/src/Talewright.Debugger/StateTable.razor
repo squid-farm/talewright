@@ -12,7 +12,7 @@
                 <tr><th>@stat.Id @stat.Name</th><td>@stat.BaseValue</td><td>@stat.EffectiveValue</td></tr>
             }</tbody>
         </table>
-        <ul>@foreach (var item in character.Inventory) { <li>@item.Id @item.Name: @item.Quantity</li> }</ul>
+        <ul>@foreach (var item in character.Inventory) { <li>@item.Id @item.Name: @(item.ExactQuantity ?? item.Quantity.ToString())</li> }</ul>
     </details>
 }
 <details>

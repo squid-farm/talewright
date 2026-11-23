@@ -57,6 +57,9 @@ before the following prose. Re-entering does not pay again.
 
 An omitted item quantity means one. Any declared character can hold items; counts are read-only,
 zero when not held. Do not assign to `player:inventory:coin:count`; use `give`/`take`.
+In Talemark 2, items declared with `divisible: true` keep exact fractional amounts. Other items
+round each incoming amount to the nearest whole number, with halves away from zero. A positive
+quantity applies an item's modifiers once, regardless of its size.
 Stat assignments are clamped to the ruleset's minimum/maximum; bare faction references are names,
 so mutate `:standing`, not `faction:guild`.
 

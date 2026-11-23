@@ -52,6 +52,12 @@ public sealed class GameState : IGameStateView
             {
                 cs.Inventory[item] = qty;
             }
+            if (character.ExactInventory is { } exactInventory)
+                foreach (var (item, qty) in exactInventory)
+                    cs.Inventory[item] = world.TalemarkVersion == 2 &&
+                        world.Items.TryGetValue(item, out var definition) && definition.Divisible
+                            ? qty
+                            : qty.ToInt32RoundedAwayFromZero();
 
             state._characters[character.Id] = cs;
         }
@@ -130,11 +136,15 @@ public sealed class GameState : IGameStateView
                 break;
             case ItemsGranted e:
                 var inv = Character(e.Character).Inventory;
-                inv[e.Item] = inv.GetValueOrDefault(e.Item) + e.Quantity;
+                inv[e.Item] = World.TalemarkVersion == 1
+                    ? unchecked(inv.GetValueOrDefault(e.Item).ToInt32RoundedAwayFromZero() + e.Quantity)
+                    : inv.GetValueOrDefault(e.Item) + e.Quantity;
                 break;
             case ItemsRemoved e:
                 var inventory = Character(e.Character).Inventory;
-                var left = inventory.GetValueOrDefault(e.Item) - e.Quantity;
+                var left = World.TalemarkVersion == 1
+                    ? unchecked(inventory.GetValueOrDefault(e.Item).ToInt32RoundedAwayFromZero() - e.Quantity)
+                    : inventory.GetValueOrDefault(e.Item) - e.Quantity;
                 if (left > 0)
                 {
                     inventory[e.Item] = left;
@@ -144,6 +154,18 @@ public sealed class GameState : IGameStateView
                     inventory.Remove(e.Item);
                 }
 
+                break;
+            case ExactItemsGranted e:
+                var exactInventory = Character(e.Character).Inventory;
+                exactInventory[e.Item] = exactInventory.GetValueOrDefault(e.Item) + ExactNumber.Parse(e.Quantity);
+                break;
+            case ExactItemsRemoved e:
+                var exactItems = Character(e.Character).Inventory;
+                var exactLeft = exactItems.GetValueOrDefault(e.Item) - ExactNumber.Parse(e.Quantity);
+                if (exactLeft > 0)
+                    exactItems[e.Item] = exactLeft;
+                else
+                    exactItems.Remove(e.Item);
                 break;
             case StandingChanged e:
                 _standings[e.Faction] = e.NewValue;
@@ -229,9 +251,17 @@ public sealed class GameState : IGameStateView
         return World.Ruleset.StatsById.TryGetValue(stat, out var definition) ? definition.Clamp(value) : value;
     }
 
-    public int GetItemCount(EntityId character, ItemId item) => Character(character).Inventory.GetValueOrDefault(item);
+    public int GetItemCount(EntityId character, ItemId item) =>
+        GetExactItemCount(character, item).ToInt32RoundedAwayFromZero();
+
+    public ExactNumber GetExactItemCount(EntityId character, ItemId item) =>
+        Character(character).Inventory.GetValueOrDefault(item);
 
     public IEnumerable<KeyValuePair<ItemId, int>> GetInventory(EntityId character) =>
+        GetExactInventory(character).Select(kv => KeyValuePair.Create(kv.Key, kv.Value.ToInt32RoundedAwayFromZero()))
+            .Where(kv => kv.Value > 0);
+
+    public IEnumerable<KeyValuePair<ItemId, ExactNumber>> GetExactInventory(EntityId character) =>
         Character(character).Inventory.Where(kv => kv.Value > 0);
 
     public int GetStanding(FactionId faction) => _standings.GetValueOrDefault(faction);
@@ -259,6 +289,6 @@ public sealed class GameState : IGameStateView
     {
         public CharacterDefinition? Definition { get; set; }
         public Dictionary<StatId, int> Stats { get; } = [];
-        public Dictionary<ItemId, int> Inventory { get; } = [];
+        public Dictionary<ItemId, ExactNumber> Inventory { get; } = [];
     }
 }

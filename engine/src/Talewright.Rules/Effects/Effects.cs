@@ -70,8 +70,10 @@ public static class EffectExecutor
                 StateChanges.SetTextVariable(state, e.Variable, ExpressionEvaluator.Evaluate(e.Value, context).Text
                     ?? throw new InvalidOperationException("A text expression produced no text.")),
             SetFlag e => StateChanges.SetFlag(state, e.Flag, e.Value),
-            GiveItem e => StateChanges.GiveItem(e.Character, e.Item, EvalWhole(e.Quantity)),
-            TakeItem e => StateChanges.TakeItem(state, e.Character, e.Item, EvalWhole(e.Quantity)),
+            GiveItem e when integerArithmetic => StateChanges.GiveItem(e.Character, e.Item, EvalWhole(e.Quantity)),
+            TakeItem e when integerArithmetic => StateChanges.TakeItem(state, e.Character, e.Item, EvalWhole(e.Quantity)),
+            GiveItem e => StateChanges.GiveItem(state, e.Character, e.Item, Eval(e.Quantity)),
+            TakeItem e => StateChanges.TakeItem(state, e.Character, e.Item, Eval(e.Quantity)),
             _ => throw new NotSupportedException($"Unknown effect {effect.GetType().Name}."),
         };
         log.AppendRange(events.ToArray());

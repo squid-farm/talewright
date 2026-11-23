@@ -1,5 +1,6 @@
 using MessagePack;
 using System.Numerics;
+using Talewright.Core;
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Core.State;
@@ -169,6 +170,13 @@ internal sealed class ContinuationCheckpoint
             throw new InvalidOperationException(
                 "Saving is unavailable while Talemark version 2 numeric variables contain values that the current save format cannot preserve.");
         }
+        if (world.TalemarkVersion == 2 && world.Characters.Keys.Any(id =>
+            state.GetExactInventory(id).Any(item => item.Value.Denominator != BigInteger.One ||
+                item.Value.Numerator > int.MaxValue)))
+        {
+            throw new InvalidOperationException(
+                "Saving is unavailable while inventory contains quantities that the current save format cannot preserve.");
+        }
 
         var payload = new CheckpointPayload
         {
@@ -289,10 +297,17 @@ internal sealed class ContinuationCheckpoint
             }
             foreach (var item in world.Items.Keys.OrderBy(item => item.Value, StringComparer.Ordinal))
             {
-                var before = initial.GetItemCount(id, item);
-                var after = knownItems.Contains(item.Value) ? savedItems.GetValueOrDefault(item.Value) : before;
-                if (after > before) events.Add(new ItemsGranted(id, item, after - before));
-                else if (after < before) events.Add(new ItemsRemoved(id, item, before - after));
+                var before = initial.GetExactItemCount(id, item);
+                var after = knownItems.Contains(item.Value)
+                    ? ExactNumber.FromInteger(savedItems.GetValueOrDefault(item.Value)) : before;
+                if (after == before) continue;
+                if (world.TalemarkVersion == 2 && world.Items[item].Divisible)
+                {
+                    if (after > before) events.Add(new ExactItemsGranted(id, item, (after - before).ToCanonicalString()));
+                    else events.Add(new ExactItemsRemoved(id, item, (before - after).ToCanonicalString()));
+                }
+                else if (after > before) events.Add(new ItemsGranted(id, item, (after - before).ToInt32RoundedAwayFromZero()));
+                else events.Add(new ItemsRemoved(id, item, (before - after).ToInt32RoundedAwayFromZero()));
             }
 
             if (orphan is not null) retained.Characters.Add(orphan);

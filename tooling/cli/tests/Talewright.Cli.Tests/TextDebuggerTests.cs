@@ -12,6 +12,37 @@ namespace Talewright.Cli.Tests;
 public class TextDebuggerTests
 {
     [Fact]
+    public void Version_two_debugger_edits_fractional_inventory_exactly()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = """
+                game: { id: inventory-debugger, title: Inventory, talemark: 2, start: a }
+                items: { coin: { divisible: true } }
+                characters: { player: { first-name: Ada, inventory: { coin: .25 } } }
+                """,
+            ["main.tale"] = "=== a\n* [Stay] -> a",
+        });
+        var compilation = StoryCompiler.Compile(source);
+        Assert.True(compilation.Success, string.Join("\n", compilation.Diagnostics));
+        using var model = new WorkbenchModel("unused");
+        Assert.True(model.ApplySource(new SourceCompilation(source, compilation, null), restart: true));
+        var field = Assert.Single(model.Numbers);
+        Assert.Equal("1/4", field.Value);
+        field.Edit("1/3");
+        model.Start();
+        Assert.Null(model.Error);
+        Assert.Equal(Talewright.Core.ExactNumber.FromFraction(1, 3),
+            model.Session!.State.GetExactItemCount(new("player"), new("coin")));
+        var edit = Assert.Single(model.EditNumbers);
+        edit.Edit(".5");
+        model.ApplyEdits();
+        Assert.Null(model.Error);
+        Assert.Equal(Talewright.Core.ExactNumber.FromFraction(1, 2),
+            model.Session.State.GetExactItemCount(new("player"), new("coin")));
+    }
+
+    [Fact]
     public void Version_two_setup_accepts_canonical_exact_fraction_values()
     {
         var source = new StorySource(new Dictionary<string, string>

@@ -36,7 +36,7 @@
 
     @if (ShowsInventory)
     {
-        var inventory = State.GetInventory(CharacterId).Where(i => i.Value > 0).ToList();
+        var inventory = State.GetExactInventory(CharacterId).ToList();
         <h3>Inventory</h3>
         @if (inventory.Count == 0)
         {
@@ -47,7 +47,7 @@
             <ul class="tw-inventory">
                 @foreach (var (item, count) in inventory)
                 {
-                    <li>@ItemName(item)@(count > 1 ? $" ×{count}" : string.Empty)</li>
+                    <li>@ItemName(item)@(count != 1 ? $" ×{count.ToDecimalString()}" : string.Empty)</li>
                 }
             </ul>
         }

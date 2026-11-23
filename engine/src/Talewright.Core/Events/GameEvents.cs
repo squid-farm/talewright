@@ -25,6 +25,10 @@ public sealed record ItemsGranted(EntityId Character, ItemId Item, int Quantity)
 /// <summary>Items were removed from a character's inventory (quantity actually removed).</summary>
 public sealed record ItemsRemoved(EntityId Character, ItemId Item, int Quantity) : GameEvent;
 
+public sealed record ExactItemsGranted(EntityId Character, ItemId Item, string Quantity) : GameEvent;
+
+public sealed record ExactItemsRemoved(EntityId Character, ItemId Item, string Quantity) : GameEvent;
+
 /// <summary>The player's standing with a faction changed.</summary>
 public sealed record StandingChanged(FactionId Faction, int OldValue, int NewValue) : GameEvent;
 
