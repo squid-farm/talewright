@@ -21,12 +21,13 @@ public sealed record SavedGame
     public byte[]? ReplayEvidence { get; init; }
     public IReadOnlyList<byte[]>? ReplayChoiceIdentities { get; init; }
     public SaveContinuation? Continuation { get; init; }
+    public int TalemarkVersion { get; init; } = 1;
 }
 
 /// <summary>Reads and writes save files: a short header followed by a zlib-compressed MessagePack array.</summary>
 public static class SaveFormat
 {
-    public const int Version = 5;
+    public const int Version = 6;
     /// <summary>File extension for saves on disk and exported backups.</summary>
     public const string FileExtension = ".twsave";
     // Damaged or hostile-file guards, not playthrough limits. The decoded bound is within 2x of the largest
@@ -85,7 +86,9 @@ public static class SaveFormat
     internal static SavedGame Read(ReadOnlySpan<byte> data, out bool summaryDamaged)
     {
         var body = Decompress(data);
-        return DecodeBody(data[Magic.Length] == 4 ? StripLegacyFields(body) : body, out summaryDamaged);
+        var version = data[Magic.Length];
+        return DecodeBody(version < 6 ? StripLegacyFields(body, version == 4 ? 10 : 11) : body,
+            out summaryDamaged, requireVersion: version == 6);
     }
 
     internal static int DecodedBodyLength(ReadOnlySpan<byte> data) => Decompress(data).Length;
@@ -96,9 +99,13 @@ public static class SaveFormat
     internal static byte[] EncodeBody(SavePayload payload) =>
         MessagePackSerializer.Serialize(payload, SerializerOptions);
 
-    internal static SavedGame DecodeBody(ReadOnlySpan<byte> body, out bool summaryDamaged)
+    internal static SavedGame DecodeBody(ReadOnlySpan<byte> body, out bool summaryDamaged, bool requireVersion = false)
     {
-        var payload = Deserialize<SavePayload>(body, ValidateShape);
+        var payload = Deserialize<SavePayload>(body, requireVersion ? ValidateCurrentShape : ValidateShape);
+        if (payload.TalemarkVersion is not (1 or 2))
+        {
+            throw new InvalidDataException(MalformedMessage);
+        }
         if (string.IsNullOrEmpty(payload.StoryId))
         {
             throw new InvalidDataException(MalformedMessage);
@@ -167,6 +174,7 @@ public static class SaveFormat
             ReplayEvidence = payload.ReplayEvidence,
             ReplayChoiceIdentities = payload.ReplayChoiceIdentities,
             Continuation = payload.Continuation is null ? null : new SaveContinuation(payload.Continuation),
+            TalemarkVersion = payload.TalemarkVersion,
         };
     }
 
@@ -183,6 +191,7 @@ public static class SaveFormat
             ReplayEvidence = save.ReplayEvidence,
             ReplayChoiceIdentities = save.ReplayChoiceIdentities?.Select(identity => identity.ToArray()).ToList(),
             Continuation = save.Continuation?.Payload,
+            TalemarkVersion = save.TalemarkVersion,
         };
         if (save.Character is { } character)
         {
@@ -352,6 +361,9 @@ public static class SaveFormat
                 case 10:
                     ValidateContinuation(ref reader, hasEvidence || hasIdentities);
                     break;
+                case 11:
+                    reader.ReadInt32();
+                    break;
                 default:
                     reader.Skip();
                     break;
@@ -362,6 +374,16 @@ public static class SaveFormat
         {
             throw new InvalidDataException(MalformedMessage);
         }
+    }
+
+    private static void ValidateCurrentShape(ref MessagePackReader reader)
+    {
+        var copy = reader;
+        if (copy.ReadArrayHeader() < 12)
+        {
+            throw new InvalidDataException(MalformedMessage);
+        }
+        ValidateShape(ref reader);
     }
 
     private static void ValidateContinuation(ref MessagePackReader reader, bool hasEvidence)
@@ -480,7 +502,7 @@ public static class SaveFormat
         }
     }
 
-    private static byte[] StripLegacyFields(ReadOnlySpan<byte> body)
+    private static byte[] StripLegacyFields(ReadOnlySpan<byte> body, int retainedFields)
     {
         var bytes = body.ToArray();
         try
@@ -491,20 +513,94 @@ public static class SaveFormat
             {
                 throw new InvalidDataException(MalformedMessage);
             }
-            if (fields <= 10)
+            if (fields <= retainedFields && retainedFields == 10)
             {
                 return bytes;
             }
 
             var output = new ArrayBufferWriter<byte>();
             var writer = new MessagePackWriter(output);
-            writer.WriteArrayHeader(10);
+            writer.WriteArrayHeader(Math.Min(fields, retainedFields));
             for (var field = 0; field < fields; field++)
             {
-                var raw = reader.ReadRaw();
-                if (field < 10)
+                if (field == 10 && retainedFields == 11)
                 {
-                    writer.WriteRaw(raw);
+                    StripLegacyContinuation(ref reader, ref writer);
+                }
+                else
+                {
+                    var raw = reader.ReadRaw();
+                    if (field < retainedFields) writer.WriteRaw(raw);
+                }
+            }
+
+            static void StripLegacyContinuation(ref MessagePackReader reader, ref MessagePackWriter writer)
+            {
+                var tree = reader;
+                ValidateContinuationTree(ref tree, 0);
+                if (reader.TryReadNil())
+                {
+                    writer.WriteNil();
+                    return;
+                }
+                var fields = reader.ReadArrayHeader();
+                if (fields > MaxArrayFields) throw new InvalidDataException(MalformedMessage);
+                writer.WriteArrayHeader(fields);
+                for (var field = 0; field < fields; field++)
+                {
+                    if (field is 0 or 2) StripLegacyCheckpoint(ref reader, ref writer);
+                    else writer.WriteRaw(reader.ReadRaw());
+                }
+            }
+
+            static void StripLegacyCheckpoint(ref MessagePackReader reader, ref MessagePackWriter writer)
+            {
+                if (reader.TryReadNil())
+                {
+                    writer.WriteNil();
+                    return;
+                }
+                var fields = reader.ReadArrayHeader();
+                if (fields > MaxArrayFields) throw new InvalidDataException(MalformedMessage);
+                writer.WriteArrayHeader(fields);
+                for (var field = 0; field < fields; field++)
+                {
+                    if (field == 2)
+                    {
+                        var characters = reader.ReadArrayHeader();
+                        writer.WriteArrayHeader(characters);
+                        for (var i = 0; i < characters; i++) StripLegacyCharacter(ref reader, ref writer);
+                    }
+                    else if (field is 3 or 4 or 5 or 7) StripLegacyPairs(ref reader, ref writer);
+                    else writer.WriteRaw(reader.ReadRaw());
+                }
+            }
+
+            static void StripLegacyCharacter(ref MessagePackReader reader, ref MessagePackWriter writer)
+            {
+                var fields = reader.ReadArrayHeader();
+                if (fields > MaxArrayFields) throw new InvalidDataException(MalformedMessage);
+                writer.WriteArrayHeader(fields);
+                for (var field = 0; field < fields; field++)
+                {
+                    if (field is 4 or 5) StripLegacyPairs(ref reader, ref writer);
+                    else writer.WriteRaw(reader.ReadRaw());
+                }
+            }
+
+            static void StripLegacyPairs(ref MessagePackReader reader, ref MessagePackWriter writer)
+            {
+                var count = reader.ReadArrayHeader();
+                writer.WriteArrayHeader(count);
+                for (var i = 0; i < count; i++)
+                {
+                    var fields = reader.ReadArrayHeader();
+                    writer.WriteArrayHeader(Math.Min(fields, 2));
+                    for (var field = 0; field < fields; field++)
+                    {
+                        var raw = reader.ReadRaw();
+                        if (field < 2) writer.WriteRaw(raw);
+                    }
                 }
             }
             writer.Flush();
@@ -658,7 +754,7 @@ public static class SaveFormat
             throw new InvalidDataException(text.Length > 0 && text[0] == (byte)'{' ? UnsupportedMessage : MalformedMessage);
         }
 
-        if (data.Length <= Magic.Length || data[Magic.Length] is not (4 or Version))
+        if (data.Length <= Magic.Length || data[Magic.Length] is not (4 or 5 or Version))
         {
             throw new InvalidDataException(data.Length == Magic.Length ? MalformedMessage : UnsupportedMessage);
         }

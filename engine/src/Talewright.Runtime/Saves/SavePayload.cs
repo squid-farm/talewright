@@ -37,6 +37,9 @@ internal sealed partial class SavePayload
 
     [Key(10)]
     public ContinuationPayload? Continuation { get; set; }
+
+    [Key(11)]
+    public int TalemarkVersion { get; set; } = 1;
 }
 
 [MessagePackObject(AllowPrivate = true)]

@@ -37,6 +37,39 @@ public sealed partial class StoryHistory
     public static StoryHistory Restore(StoryDefinition story, ReadOnlySpan<byte> data)
         => Restore(story, data, replayTransitionObserved: null);
 
+    /// <summary>
+    /// Restores a replay-only save across arithmetic versions using its original compiled story.
+    /// The original source fingerprint, choice identities and replay evidence must all match.
+    /// </summary>
+    public static StoryHistory Restore(StoryDefinition story, ReadOnlySpan<byte> data, StoryDefinition originalStory)
+    {
+        ArgumentNullException.ThrowIfNull(originalStory);
+        var save = SaveFormat.Read(data);
+        RequireSameStory(story, save);
+        if (save.Continuation is not null || save.TalemarkVersion == story.TalemarkVersion)
+            return Restore(story, data);
+
+        try
+        {
+            return RestoreByReplay(story, save);
+        }
+        catch (InvalidDataException)
+        {
+            // Validate and reconstruct the original replay before crossing a new boundary.
+        }
+
+        if (save.TalemarkVersion != 1 || save.ReplayEvidence is null || save.ReplayChoiceIdentities is null
+            || originalStory.TalemarkVersion != save.TalemarkVersion
+            || originalStory.Id != save.StoryId || originalStory.Version != save.StoryVersion
+            || !IsFingerprint(save.ContentFingerprint)
+            || originalStory.ContentFingerprint != save.ContentFingerprint)
+            throw Incompatible(story, save);
+
+        var original = RestoreByReplay(originalStory, save);
+        var continuation = original.CaptureContinuation().Payload;
+        return ResumeFromCheckpoint(story, continuation, save);
+    }
+
     internal static StoryHistory Restore(StoryDefinition story, ReadOnlySpan<byte> data,
         Action<ReplayTransitionKind>? replayTransitionObserved)
     {
@@ -47,7 +80,8 @@ public sealed partial class StoryHistory
             return RestoreByReplay(story, save, replayTransitionObserved);
         }
 
-        var changed = save.StoryVersion != story.Version || save.ContentFingerprint != story.ContentFingerprint;
+        var changed = save.StoryVersion != story.Version || save.ContentFingerprint != story.ContentFingerprint
+            || save.TalemarkVersion != story.TalemarkVersion;
         if (!changed)
         {
             return continuation.Base is null

@@ -120,10 +120,11 @@ public class GoldenSaveTests
 
         // Compare the unchanged v4 envelope with the v4 projection of the same replay inputs.
         var legacyBody = SaveFormat.EncodeBody(currentSave with { Continuation = null });
-        Assert.Equal(0x9b, legacyBody[0]);
-        Assert.Equal(0xc0, legacyBody[^1]);
+        Assert.Equal(0x9c, legacyBody[0]);
+        Assert.Equal(0x01, legacyBody[^1]);
+        Assert.Equal(0xc0, legacyBody[^2]);
         legacyBody[0] = 0x9a;
-        var legacyData = SaveFormat.Pack(legacyBody.AsSpan(0, legacyBody.Length - 1));
+        var legacyData = SaveFormat.Pack(legacyBody.AsSpan(0, legacyBody.Length - 2));
         legacyData[4] = 4;
         Assert.Equal(bytes, TriggerSaveCodec.Encode(expected with { Data = legacyData }));
 

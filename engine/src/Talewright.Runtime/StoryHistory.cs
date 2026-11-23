@@ -293,6 +293,7 @@ public sealed partial class StoryHistory
             ReplayEvidence = _evidence is null ? null : ReplayEvidence.Encode(_evidence[^1], Cursor),
             ReplayChoiceIdentities = _replayChoiceIdentities?.Select(identity => identity.ToArray()).ToArray(),
             Continuation = progressKeyOnly ? ProgressContinuation() : CaptureContinuation(),
+            TalemarkVersion = Story.TalemarkVersion,
         };
     }
 
@@ -363,6 +364,11 @@ public sealed partial class StoryHistory
         }
 
         var changed = save.StoryVersion != story.Version || save.ContentFingerprint != story.ContentFingerprint;
+        var semanticsChanged = save.TalemarkVersion != story.TalemarkVersion;
+        if (semanticsChanged && (save.ReplayEvidence is null || save.ReplayChoiceIdentities is null))
+        {
+            throw Incompatible(story, save);
+        }
         if (changed && (save.ReplayEvidence is null || save.ReplayChoiceIdentities is null
             || save.ReplayChoiceIdentities.Count != save.Choices.Count || !CanRecordEvidence(story)
             || !IsFingerprint(save.ContentFingerprint) || !IsFingerprint(story.ContentFingerprint)
