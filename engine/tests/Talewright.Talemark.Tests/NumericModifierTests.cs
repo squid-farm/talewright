@@ -148,6 +148,34 @@ public sealed class NumericModifierTests
         Assert.Equal(new SourceLocation("main.tale", 2, endColumn), diagnostic.EndLocation);
     }
 
+    [Fact]
+    public void Numeric_modifier_chains_accept_256_modifiers()
+    {
+        var modifiers = string.Concat(Enumerable.Repeat("#round", 256));
+        var result = Compile(2, "vars: { amount: 0 }",
+            $"=== a\n@requires 1{modifiers} == 1\n-> END");
+
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        Assert.DoesNotContain(result.Diagnostics, diagnostic =>
+            diagnostic.Code == "TW1016");
+    }
+
+    [Fact]
+    public void Numeric_modifier_chains_report_257_modifiers_at_the_crossing()
+    {
+        var modifiers = string.Concat(Enumerable.Repeat("#round", 257));
+        var result = Compile(2, "vars: { amount: 0 }",
+            $"=== a\n@requires 1{modifiers} == 1\n-> END");
+
+        var diagnostic = Assert.Single(result.Diagnostics, item =>
+            item.Code == "TW1016");
+        Assert.Equal("Expression is nested more than 256 levels deep.",
+            diagnostic.Message);
+        Assert.Equal(new SourceLocation("main.tale", 2,
+            12 + (256 * "#round".Length)),
+            diagnostic.Location);
+    }
+
     [Theory]
     [InlineData(2, "=== a\n@requires \"text\"#round == \"text\"\n-> END", "requires a number-valued expression")]
     [InlineData(2, "=== a\n@requires 1#round(2) == 1\n-> END", "takes no arguments")]

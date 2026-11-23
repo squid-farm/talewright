@@ -487,6 +487,8 @@ public sealed class StoryCompletionTests
     [Theory]
     [InlineData("@requires 0.6#rou|")]
     [InlineData("{0.6#rou|}")]
+    [InlineData("@requires var:coins#rou|")]
+    [InlineData("{var:coins#rou|}")]
     public void Numeric_modifier_completion_is_offered_in_version_two_expression_slots(string line)
     {
         var (analysis, position) = Analyze("=== first\n" + line, VersionTwoManifest);
@@ -494,6 +496,20 @@ public sealed class StoryCompletionTests
 
         Assert.Equal(["round", "round-down", "round-up"], completions.Select(item => item.Label));
         Assert.All(completions, item => Assert.Contains("Talemark 2", item.Detail));
+    }
+
+    [Theory]
+    [InlineData("{player:first-name#rou|}")]
+    [InlineData("{\"text\"#rou|}")]
+    [InlineData("{true#rou|}")]
+    [InlineData("@requires \"text\"#rou|")]
+    [InlineData("@requires flag:ready#rou|")]
+    public void Numeric_modifier_completion_is_not_offered_for_nonnumeric_values(string line)
+    {
+        var (analysis, position) = Analyze("=== first\n" + line, VersionTwoManifest);
+
+        Assert.DoesNotContain(StoryCompletion.Complete(analysis, position),
+            item => item.Label is "round" or "round-up" or "round-down");
     }
 
     [Fact]

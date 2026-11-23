@@ -638,9 +638,16 @@ internal sealed class ExpressionSyntaxParser
 
     private ExpressionNode ParseNumberModifiers(ExpressionNode value)
     {
+        var modifierDepth = 0;
         while (Peek.Kind == TokenKind.Hash)
         {
             var marker = Next();
+            if (modifierDepth + _nestingDepth == MaximumNestingDepth)
+            {
+                Fail(CompilerDiagnosticCodes.NestingLimitExceeded,
+                    $"Expression is nested more than {MaximumNestingDepth} levels deep.", marker.Offset);
+            }
+            modifierDepth++;
             if (Peek.Kind != TokenKind.Identifier)
             {
                 FailRange(CompilerDiagnosticCodes.InvalidModifier,
