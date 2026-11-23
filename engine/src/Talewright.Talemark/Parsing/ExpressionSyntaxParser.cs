@@ -374,7 +374,7 @@ internal sealed class ExpressionSyntaxParser
                 new(op.Offset, expression.Span.End - op.Offset));
         }
 
-        return ParseNumberModifiers(expression);
+        return ParseNumberModifiers(expression, prefixes.Count);
     }
 
     private bool TryReadMinimumMagnitude()
@@ -636,13 +636,13 @@ internal sealed class ExpressionSyntaxParser
         return -1;
     }
 
-    private ExpressionNode ParseNumberModifiers(ExpressionNode value)
+    private ExpressionNode ParseNumberModifiers(ExpressionNode value, int prefixDepth = 0)
     {
         var modifierDepth = 0;
         while (Peek.Kind == TokenKind.Hash)
         {
             var marker = Next();
-            if (modifierDepth + _nestingDepth == MaximumNestingDepth)
+            if (modifierDepth + _nestingDepth + prefixDepth == MaximumNestingDepth)
             {
                 Fail(CompilerDiagnosticCodes.NestingLimitExceeded,
                     $"Expression is nested more than {MaximumNestingDepth} levels deep.", marker.Offset);

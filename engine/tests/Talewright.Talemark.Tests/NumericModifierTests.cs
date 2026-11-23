@@ -176,6 +176,28 @@ public sealed class NumericModifierTests
             diagnostic.Location);
     }
 
+    [Fact]
+    public void Numeric_modifiers_count_existing_prefix_depth()
+    {
+        var validExpression = new string('-', 255) + "1#round";
+        var validResult = Compile(2, "vars: { amount: 0 }",
+            $"=== a\n@requires {validExpression} == 1\n-> END");
+
+        Assert.True(validResult.Success, string.Join("\n", validResult.Diagnostics));
+        Assert.DoesNotContain(validResult.Diagnostics, diagnostic =>
+            diagnostic.Code == "TW1016");
+
+        var invalidExpression = new string('-', 256) + "1#round";
+        var invalidResult = Compile(2, "vars: { amount: 0 }",
+            $"=== a\n@requires {invalidExpression} == 1\n-> END");
+        var diagnostic = Assert.Single(invalidResult.Diagnostics, item =>
+            item.Code == "TW1016");
+
+        Assert.Equal("Expression is nested more than 256 levels deep.",
+            diagnostic.Message);
+        Assert.Equal(new SourceLocation("main.tale", 2, 268), diagnostic.Location);
+    }
+
     [Theory]
     [InlineData(2, "=== a\n@requires \"text\"#round == \"text\"\n-> END", "requires a number-valued expression")]
     [InlineData(2, "=== a\n@requires 1#round(2) == 1\n-> END", "takes no arguments")]
