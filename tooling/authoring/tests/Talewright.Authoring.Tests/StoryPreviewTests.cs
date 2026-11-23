@@ -18,7 +18,6 @@ public sealed class StoryPreviewTests
           id: preview
           title: Preview
           start: start
-          talemark: 1
           ruleset: rpg
         characters:
           player: {first-name: Mara, last-name: Burns, pronouns: she}
@@ -55,17 +54,23 @@ public sealed class StoryPreviewTests
     }
 
     [Theory]
-    [InlineData("true", "true")]
-    [InlineData("false", "false")]
-    [InlineData("friendly", "Friendly")]
-    [InlineData("hostile", "Hostile")]
-    [InlineData("0.995", "1")]
-    [InlineData("-0.995", "-1")]
-    [InlineData("true#upper", "TRUE")]
-    [InlineData("friendly#lower", "friendly")]
-    public void Constant_literals_preview_exact_rendered_values_and_hover(string expression, string expected)
+    [InlineData("true", "true", 1)]
+    [InlineData("false", "false", 1)]
+    [InlineData("friendly", "Friendly", 1)]
+    [InlineData("hostile", "Hostile", 1)]
+    [InlineData("0.995", "1", 2)]
+    [InlineData("-0.995", "-1", 2)]
+    [InlineData("true#upper", "TRUE", 1)]
+    [InlineData("friendly#lower", "friendly", 1)]
+    public void Constant_literals_preview_exact_rendered_values_and_hover(
+        string expression, string expected, int talemarkVersion)
     {
-        var analysis = StoryAnalyzer.Analyze(Source("=== start\n{" + expression + "}\n-> END"));
+        var manifest = Manifest.Replace(
+            "  start: start",
+            $"  start: start\n  talemark: {talemarkVersion}",
+            StringComparison.Ordinal);
+        var analysis = StoryAnalyzer.Analyze(Source("=== start\n{" + expression + "}\n-> END", manifest));
+        Assert.Equal(talemarkVersion, analysis.TalemarkVersion);
         Assert.DoesNotContain(analysis.Diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
         var substitution = Assert.Single(analysis.Substitutions);
         var preview = Assert.Single(StoryPreview.Get(analysis, "main.tale"));
