@@ -102,6 +102,10 @@ public static class EventNarrator
     private static string Signed(ExactNumber value)
     {
         var displayed = value.ToDisplayString();
-        return displayed == "0" ? "0" : value < 0 ? $"−{(-value).ToDisplayString()}" : $"+{displayed}";
+        if (displayed == "0")
+            return displayed;
+        if (displayed[0] == '-')
+            return $"−{displayed[1..]}";
+        return $"+{displayed}";
     }
 }
