@@ -17,7 +17,7 @@ Code and the generated MessagePack formatters:
 | Bytes | Content |
 |---|---|
 | 4 | Magic `TWSV` |
-| 1 | Format version, written as `5`; the reader accepts `4` and `5` |
+| 1 | Format version, written as `6`; the reader accepts `4`, `5` and `6` |
 | 4 | Decoded body length, unsigned little-endian |
 | rest | zlib stream (RFC 1950, `CompressionLevel.SmallestSize`) of the body |
 
@@ -36,10 +36,12 @@ The body is an array-keyed MessagePack object. Its positions are the schema:
 | 8 | Replay evidence | nil or a 33-byte binary value: evidence version followed by a SHA-256 digest |
 | 9 | Replay choice identities | nil or an array of binary choice-outcome identities, one per choice |
 | 10 | Continuation | nil or `[current checkpoint, transcript, base checkpoint or nil, base transcript length]` |
+| 11 | Talemark arithmetic version | `1` or `2`; required in format 6 |
 
 Replay evidence and replay choice identities are either both present or both `nil`. The reader
 accepts missing trailing fields. A base requires both evidence fields to be `nil`. Format 4 always
 decodes with a `nil` continuation, including when it has unknown fields at position 10 or later.
+Formats 4 and 5 predate the arithmetic-version field and are interpreted as version 1.
 
 The character array is `[first name, last name, pronouns, preset, stats]`. Optional strings are
 `nil`; `stats` is an array of `[id, value]` arrays, sorted by id before writing. The summary array
@@ -66,8 +68,10 @@ entered. It is an array of:
 
 A character is `[id, first name, last name, pronouns or nil, stats, items]`. Pronouns are
 `[subject, object, possessive, possessive pronoun, reflexive, agreement]`. Stats, items, standings,
-flags (0 or 1), number variables and visits use `[id, int32]` pairs; text variables use
-`[id, string]`. Every id list is sorted ordinally. Seed and character selection remain in the
+flags (0 or 1), number variables and visits use `[id, int32, exact or nil]` arrays; text variables use
+`[id, string]`. For version-2 numeric variables, stats and item quantities, the exact field is a
+canonical reduced integer or `numerator/denominator` string and the int32 field is zero.
+Other values use the int32 field. Older `[id, int32]` pairs convert exactly. Every id list is sorted ordinally. Seed and character selection remain in the
 top-level fields.
 
 The transcript contains frames before the current passage, including earlier continuation segments.
@@ -93,7 +97,7 @@ body's Adler-32 checksum. .NET's `ZLibStream` accepts a truncated stream or one 
 so these checks are done explicitly.
 
 Any other format version is reported as unsupported. Reading version 4 is compatibility support, not
-save migration; a later save writes version 5.
+save migration; a later save writes version 6.
 
 ## Array-key rules
 
@@ -153,12 +157,21 @@ same replay/extension identity. The runtime validates the full timeline, includi
 rebuilding the visible cursor. A save without evidence loads only against the exact story revision.
 Loading never rewrites the original bytes or replaces an active session on failure.
 
-Every normal format-5 player save carries a continuation. For an unchanged story, a save without a
+Every normal format-5 or format-6 player save carries a continuation. For an unchanged story and
+arithmetic version, a save without a
 base replays from the start with evidence; a save with a base rebuilds it, enters its target once,
 then replays the choices since that boundary without evidence. Failure rejects as damaged rather
 than falling back. For a changed story without a base, compatible evidence replay is tried first.
 It preserves undo and redo and re-renders History using the updated prose. If replay fails, or the
 save already has a base, the runtime continues from the current checkpoint.
+
+Arithmetic-version changes count as changes even when the source fingerprint is identical. A
+checkpoint can continue into the new arithmetic using the normal boundary contract below. A
+replay-only save cannot safely infer its old state from a fingerprint. The runtime overload accepting
+the original compiled story can reconstruct a version-1 replay-only save only if its source
+fingerprint, story version, choice identities and replay evidence validate; otherwise it rejects it.
+The normal player does not obtain an old story automatically. This is a bounded compatibility path,
+not a general migration policy; see issues #536 and #172.
 
 ### Continuing from a checkpoint
 
@@ -182,6 +195,7 @@ For declaration changes:
 | Declaration removed | Keep its value for later saves, report it in notes, but do not load it. If the same id and kind return, restore the retained value. |
 | Number variable changed to text, or text to number | Reject, including when the old value was retained through an intermediate version. |
 | Stat range narrowed | Clamp the saved value and add a note. |
+| Fractional quantity or value changed to a whole-only declaration | Reject rather than round or truncate it. |
 | Initial value, stat default, preset or creation defaults changed | Keep the saved values. |
 | Saved character selection no longer validates | Reject with the character detail. |
 | Target scene removed | Reject. Renames are removal plus addition; there is no mapping. |

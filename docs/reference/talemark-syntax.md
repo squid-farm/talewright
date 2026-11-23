@@ -730,7 +730,7 @@ amounts for ordinary items round to the nearest whole number, halves away from z
 before inventory rules apply. Omitted quantities are one; nonpositive changes have no
 effect, and taking more than is held removes only what is held. A positive fractional
 holding applies its modifiers once. Talemark 1 retains its integer behavior.
-Version 2 and fractional checkpoint saves are still under development; see
+Version 2 is still under development; see
 [language versions](../guide/language-versions.md).
 
 ### Item-name grammar
