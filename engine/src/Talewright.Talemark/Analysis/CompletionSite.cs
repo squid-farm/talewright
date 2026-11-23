@@ -357,7 +357,7 @@ internal static class ExpressionCompletion
             ReferenceNamespace.Item => false,
             ReferenceNamespace.Faction => member is null
                 ? false
-                : SpanText(tokens, member.Value) is Standing or Tier,
+                : SpanText(tokens, member.Value) == Standing,
             ReferenceNamespace.Scene => member is not null &&
                                         SpanText(tokens, member.Value) == Visits,
             ReferenceNamespace.Character => InferCharacterNumeric(tokens, name, member, subMember, symbols),

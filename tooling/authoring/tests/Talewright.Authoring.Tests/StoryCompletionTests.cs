@@ -489,6 +489,7 @@ public sealed class StoryCompletionTests
     [InlineData("{0.6#rou|}")]
     [InlineData("@requires var:coins#rou|")]
     [InlineData("{var:coins#rou|}")]
+    [InlineData("{faction:guild:standing#rou|}")]
     public void Numeric_modifier_completion_is_offered_in_version_two_expression_slots(string line)
     {
         var (analysis, position) = Analyze("=== first\n" + line, VersionTwoManifest);
@@ -504,6 +505,7 @@ public sealed class StoryCompletionTests
     [InlineData("{true#rou|}")]
     [InlineData("@requires \"text\"#rou|")]
     [InlineData("@requires flag:ready#rou|")]
+    [InlineData("{faction:guild:tier#rou|}")]
     public void Numeric_modifier_completion_is_not_offered_for_nonnumeric_values(string line)
     {
         var (analysis, position) = Analyze("=== first\n" + line, VersionTwoManifest);
