@@ -127,6 +127,66 @@ public sealed class AuthorInspectionTests
     }
 
     [Fact]
+    public void Effect_division_by_zero_is_observed_with_step_source()
+    {
+        var story = Compile("""
+            === start
+            ~ var:count += 1 / 0
+            -> END
+            """);
+
+        var session = Start(story);
+        var inspection = session.Inspect();
+        var decision = Assert.Single(inspection.FindDecisions(kind: DecisionKind.EffectExpression));
+
+        Assert.Equal("step:2:1", decision.Subject);
+        Assert.Equal(DecisionOutcome.Evaluated, decision.Outcome);
+        Assert.Equal(DecisionReason.DivisionByZero, decision.Reason);
+        Assert.Equal(0, decision.Expression?.Result?.Number);
+        Assert.Equal(2, inspection.SourceFor(decision)!.Start.Line);
+        Assert.Single(inspection.FindDecisions(decision.Subject, DecisionKind.EntryEffect));
+    }
+
+    [Fact]
+    public void Choice_effect_division_by_zero_is_observed_with_choice_step_source()
+    {
+        var story = Compile("""
+            === start
+            * [Continue] { var:count += 1 / 0 } -> END
+            """);
+
+        var session = Start(story);
+        session.Choose("c0");
+        var inspection = session.Inspect();
+        var decision = Assert.Single(inspection.FindDecisions(kind: DecisionKind.EffectExpression));
+
+        Assert.Equal("step:2:1", decision.Subject);
+        Assert.Equal(DecisionReason.DivisionByZero, decision.Reason);
+        Assert.Equal(2, inspection.SourceFor(decision)!.Start.Line);
+    }
+
+    [Fact]
+    public void Trigger_effect_division_by_zero_is_observed_when_the_trigger_fires()
+    {
+        var manifest = CreateManifest();
+        manifest.Trigger("zero", "flag:ready",
+            EffectFaker.Assign(new TaleVariableRef("count"), "1 / 0"));
+        var story = Compile("""
+            === start
+            ~ set flag:ready
+            -> END
+            """, manifest.Build());
+
+        var inspection = Start(story).Inspect();
+        var decision = Assert.Single(inspection.FindDecisions("zero", DecisionKind.EffectExpression));
+
+        Assert.Equal(DecisionOutcome.Evaluated, decision.Outcome);
+        Assert.Equal(DecisionReason.DivisionByZero, decision.Reason);
+        Assert.Equal(0, decision.Expression?.Result?.Number);
+        Assert.Null(inspection.SourceFor(decision));
+    }
+
+    [Fact]
     public void Inspection_includes_all_characters_false_flags_zero_variables_and_unvisited_scenes()
     {
         var manifest = CreateManifest();

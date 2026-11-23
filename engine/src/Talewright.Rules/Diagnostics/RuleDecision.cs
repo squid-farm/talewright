@@ -1,3 +1,4 @@
+using Talewright.Core;
 using Talewright.Core.Identity;
 using Talewright.Rules.Expressions;
 
@@ -14,6 +15,7 @@ public enum DecisionKind
     CheckOutcome,
     Trigger,
     RenderedExpression,
+    EffectExpression,
 }
 
 public enum DecisionOutcome
@@ -97,6 +99,27 @@ public static class RuleObservation
             return ExpressionEvaluator.Evaluate(expression, context);
         }
         return Capture(expression, context, out trace);
+    }
+
+    public static bool ContainsExecutedDivisionByZero(ExpressionTrace trace)
+    {
+        var pending = new Stack<ExpressionTrace>();
+        pending.Push(trace);
+        while (pending.TryPop(out var current))
+        {
+            if (current.Expression is BinaryExpr { Op: BinaryOp.Divide } &&
+                current.Children.Count >= 2 &&
+                current.Children[1].Result is { Type: ExprType.Number } divisor &&
+                divisor.ExactNumber == ExactNumber.Zero)
+            {
+                return true;
+            }
+
+            foreach (var child in current.Children)
+                pending.Push(child);
+        }
+
+        return false;
     }
 
     private static Value Capture(Expr expression, EvaluationContext context, out ExpressionTrace? trace)

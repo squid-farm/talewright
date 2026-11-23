@@ -591,7 +591,7 @@ public sealed class StorySession : IStorySession
         var choice = step.Choice;
         var mark = _log.Events.Count;
         _log.Append(new ChoiceMade(scene.Id, choice.Key));
-        var triggerDivert = _executor.ApplyBatch(choice.Effects);
+        var triggerDivert = _executor.ApplyBatch(choice.Effects, step.Id);
         var target = triggerDivert
             ?? (choice.Check is { } check ? _executor.ResolveCheck(check, step.Id).Target : choice.Divert);
         notes.AddRange(NotesSince(mark));

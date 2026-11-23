@@ -153,7 +153,30 @@ public sealed class TriggerEngine
                 }
 
                 log.Append(new TriggerFired(trigger.Id));
-                EffectExecutor.ExecuteAll(trigger.Effects, log, _predicates, _resolveSkillCheck);
+                var effectStart = log.Events.Count;
+                List<ExpressionTrace>? divisionsByZero = null;
+                Action<ExpressionTrace>? observeExpression = null;
+                if (_observer is not null)
+                {
+                    var capturedTraces = new List<ExpressionTrace>();
+                    divisionsByZero = capturedTraces;
+                    observeExpression = effectTrace =>
+                    {
+                        if (RuleObservation.ContainsExecutedDivisionByZero(effectTrace))
+                            capturedTraces.Add(effectTrace);
+                    };
+                }
+
+                EffectExecutor.ExecuteAll(trigger.Effects, log, _predicates, _resolveSkillCheck, observeExpression);
+                if (_observer is { } observe && divisionsByZero is { } observedTraces)
+                {
+                    foreach (var effectTrace in observedTraces)
+                    {
+                        observe(new RuleDecision(DecisionKind.EffectExpression, trigger.Id,
+                            log.State.CurrentScene, DecisionOutcome.Evaluated, DecisionReason.DivisionByZero,
+                            effectTrace, effectStart, log.Events.Count, Pass: pass));
+                    }
+                }
                 fired.Add(trigger.Id);
                 if (trigger.Divert is { } destination)
                 {

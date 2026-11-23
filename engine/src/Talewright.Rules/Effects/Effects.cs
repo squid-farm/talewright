@@ -2,6 +2,7 @@ using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Core.State;
 using Talewright.Core;
+using Talewright.Rules.Diagnostics;
 using Talewright.Rules.Expressions;
 
 namespace Talewright.Rules.Effects;
@@ -37,19 +38,31 @@ public sealed record TakeItem(EntityId Character, ItemId Item, Expr Quantity) : 
 public static class EffectExecutor
 {
     public static void ExecuteAll(IEnumerable<Effect> effects, EventLog log, NamedPredicateRegistry predicates,
-        Func<SkillCheckExpr, Value>? resolveSkillCheck = null)
+        Func<SkillCheckExpr, Value>? resolveSkillCheck = null) =>
+        ExecuteAll(effects, log, predicates, resolveSkillCheck, observeExpression: null);
+
+    public static void ExecuteAll(IEnumerable<Effect> effects, EventLog log, NamedPredicateRegistry predicates,
+        Func<SkillCheckExpr, Value>? resolveSkillCheck, Action<ExpressionTrace>? observeExpression)
     {
         foreach (var effect in effects)
         {
-            Execute(effect, log, predicates, resolveSkillCheck);
+            Execute(effect, log, predicates, resolveSkillCheck, observeExpression);
         }
     }
 
     public static void Execute(Effect effect, EventLog log, NamedPredicateRegistry predicates,
-        Func<SkillCheckExpr, Value>? resolveSkillCheck = null)
+        Func<SkillCheckExpr, Value>? resolveSkillCheck = null) =>
+        Execute(effect, log, predicates, resolveSkillCheck, observeExpression: null);
+
+    public static void Execute(Effect effect, EventLog log, NamedPredicateRegistry predicates,
+        Func<SkillCheckExpr, Value>? resolveSkillCheck, Action<ExpressionTrace>? observeExpression)
     {
         var state = log.State;
-        var context = new EvaluationContext(state, predicates) { ResolveSkillCheck = resolveSkillCheck };
+        var context = new EvaluationContext(state, predicates)
+        {
+            ResolveSkillCheck = resolveSkillCheck,
+            Trace = observeExpression,
+        };
         var integerArithmetic = state.World.TalemarkVersion == 1;
         ExactNumber Eval(Expr e) => ExpressionEvaluator.EvaluateExactNumber(e, context);
         int EvalWhole(Expr e) => integerArithmetic

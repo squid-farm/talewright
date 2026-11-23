@@ -118,7 +118,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                     {
                         if (rememberEntry) _entryReplay.Add(new("effect", effect.Effects));
                         var mark = log.Events.Count;
-                        target = ApplyBatch(effect.Effects);
+                        target = ApplyBatch(effect.Effects, step.Id);
                         if (rememberEntry) _effectDiverts[step.Id] = target;
                         Observe(DecisionKind.EntryEffect, step.Id, DecisionOutcome.Applied,
                             DecisionReason.Unconditional, null, mark);
@@ -241,9 +241,33 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
         return target;
     }
 
-    public DivertTarget? ApplyBatch(IReadOnlyList<Effect> effects)
+    public DivertTarget? ApplyBatch(IReadOnlyList<Effect> effects, string subject)
     {
-        EffectExecutor.ExecuteAll(effects, log, story.Predicates, ExpressionCheckResolver);
+        var mark = log.Events.Count;
+        List<ExpressionTrace>? divisionsByZero = null;
+        Action<ExpressionTrace>? observeExpression = null;
+        if (observer is not null)
+        {
+            var capturedTraces = new List<ExpressionTrace>();
+            divisionsByZero = capturedTraces;
+            observeExpression = trace =>
+            {
+                if (RuleObservation.ContainsExecutedDivisionByZero(trace))
+                    capturedTraces.Add(trace);
+            };
+        }
+
+        EffectExecutor.ExecuteAll(effects, log, story.Predicates, ExpressionCheckResolver, observeExpression);
+        if (observer is { } observe && divisionsByZero is { } observedTraces)
+        {
+            foreach (var trace in observedTraces)
+            {
+                observe(new(DecisionKind.EffectExpression, subject, log.State.CurrentScene,
+                    DecisionOutcome.Evaluated, DecisionReason.DivisionByZero,
+                    trace, mark, log.Events.Count));
+            }
+        }
+
         return afterBatch();
     }
 
@@ -255,7 +279,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
             ?? throw new InvalidOperationException("A check with no difficulty cannot select a success or failure outcome.");
         var outcome = success ? check.Success : check.Failure;
         var mark = log.Events.Count;
-        var triggerDivert = ApplyBatch(outcome.Effects);
+        var triggerDivert = ApplyBatch(outcome.Effects, stepId);
         Observe(DecisionKind.CheckOutcome, stepId, DecisionOutcome.Applied,
             success ? DecisionReason.CheckSucceeded : DecisionReason.CheckFailed, null, mark);
         return new CheckExecution(triggerDivert ?? outcome.Divert, triggerDivert is not null);
@@ -347,7 +371,7 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
         {
             Trace = trace =>
             {
-                if (ContainsExecutedDivisionByZero(trace))
+                if (RuleObservation.ContainsExecutedDivisionByZero(trace))
                 {
                     observer(new(DecisionKind.RenderedExpression, subject, log.State.CurrentScene,
                         DecisionOutcome.Evaluated, DecisionReason.DivisionByZero,
@@ -355,27 +379,6 @@ internal sealed class SceneExecutor(StoryDefinition story, EventLog log, Templat
                 }
             },
         };
-    }
-
-    private static bool ContainsExecutedDivisionByZero(ExpressionTrace trace)
-    {
-        var pending = new Stack<ExpressionTrace>();
-        pending.Push(trace);
-        while (pending.TryPop(out var current))
-        {
-            if (current.Expression is BinaryExpr { Op: BinaryOp.Divide } &&
-                current.Children.Count >= 2 &&
-                current.Children[1].Result is { Type: ExprType.Number } divisor &&
-                divisor.ExactNumber == Talewright.Core.ExactNumber.Zero)
-            {
-                return true;
-            }
-
-            foreach (var child in current.Children)
-                pending.Push(child);
-        }
-
-        return false;
     }
 
     internal Value ResolveExpressionCheck(SkillCheckExpr expression)
