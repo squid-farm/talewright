@@ -136,7 +136,15 @@ public sealed class StorySession : IStorySession
             }
             foreach (var (stat, value) in stats.OrderBy(kv => kv.Key.Value, StringComparer.Ordinal))
             {
-                _log.Append(new StatChanged(EntityId.Player, stat, _log.State.GetBaseStat(EntityId.Player, stat), value));
+                if (story.TalemarkVersion == 2 && story.World.Ruleset.IsFractionalResource(stat))
+                {
+                    var exact = !character.Stats.ContainsKey(stat.Value)
+                        && story.Creation.Presets.FirstOrDefault(p => p.Id == character.Preset)?.ExactStats is { } exactStats
+                        && exactStats.TryGetValue(stat, out var presetValue) ? presetValue : value;
+                    _log.AppendRange(StateChanges.SetStat(_log.State, EntityId.Player, stat, exact));
+                }
+                else
+                    _log.Append(new StatChanged(EntityId.Player, stat, _log.State.GetBaseStat(EntityId.Player, stat), value));
             }
         }
         if (initialEvents is null)

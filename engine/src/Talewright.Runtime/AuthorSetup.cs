@@ -7,8 +7,22 @@ using Talewright.Talemark.Model;
 
 namespace Talewright.Runtime;
 
-public sealed record AuthorStatValue(EntityId Character, StatId Stat, int Value);
-public sealed record AuthorItemValue(EntityId Character, ItemId Item, int Quantity);
+public sealed record AuthorStatValue(EntityId Character, StatId Stat, int Value)
+{
+    public AuthorStatValue(EntityId character, StatId stat, ExactNumber value)
+        : this(character, stat, value.ToInt32RoundedAwayFromZero()) => ExactValue = value;
+
+    public ExactNumber? ExactValue { get; init; }
+    public ExactNumber Number => ExactValue ?? Value;
+}
+public sealed record AuthorItemValue(EntityId Character, ItemId Item, int Quantity)
+{
+    public AuthorItemValue(EntityId character, ItemId item, ExactNumber quantity)
+        : this(character, item, quantity.ToInt32RoundedAwayFromZero()) => ExactQuantity = quantity;
+
+    public ExactNumber? ExactQuantity { get; init; }
+    public ExactNumber Value => ExactQuantity ?? Quantity;
+}
 
 /// <summary>Fresh-world prerequisites, applied before trigger priming and target scene entry.</summary>
 public sealed record AuthorSetup
@@ -87,15 +101,22 @@ public sealed record AuthorSetup
             {
                 throw new ArgumentException($"Duplicate setup stat '{value.Character}:{value.Stat}'.");
             }
+            if (value.ExactValue is { } exact && (world.TalemarkVersion == 1 ||
+                !world.Ruleset.IsFractionalResource(value.Stat))
+                && exact.Denominator != System.Numerics.BigInteger.One)
+                throw new ArgumentException($"Setup stat '{value.Stat}' requires a whole value.");
         }
         var items = new HashSet<(EntityId, ItemId)>();
         foreach (var value in Inventory)
         {
             if (value is null || !world.Characters.ContainsKey(value.Character) ||
-                !world.Items.ContainsKey(value.Item) || value.Quantity < 0)
+                !world.Items.ContainsKey(value.Item) || value.Value < 0)
             {
                 throw new ArgumentException("Every setup item must name a declared character and item with a nonnegative quantity.");
             }
+            if (value.ExactQuantity is { } exact && (world.TalemarkVersion == 1 || !world.Items[value.Item].Divisible)
+                && exact.Denominator != System.Numerics.BigInteger.One)
+                throw new ArgumentException($"Setup item '{value.Item}' requires a whole quantity.");
             if (!items.Add((value.Character, value.Item)))
             {
                 throw new ArgumentException($"Duplicate setup item '{value.Character}:{value.Item}'.");
@@ -119,14 +140,14 @@ public sealed record AuthorSetup
     {
         foreach (var value in Stats)
         {
-            log.AppendRange(StateChanges.SetStat(log.State, value.Character, value.Stat, value.Value));
+            log.AppendRange(StateChanges.SetStat(log.State, value.Character, value.Stat, value.Number));
         }
         foreach (var value in Inventory)
         {
-            var current = log.State.GetItemCount(value.Character, value.Item);
-            log.AppendRange(value.Quantity >= current
-                ? StateChanges.GiveItem(value.Character, value.Item, value.Quantity - current)
-                : StateChanges.TakeItem(log.State, value.Character, value.Item, current - value.Quantity));
+            var current = log.State.GetExactItemCount(value.Character, value.Item);
+            log.AppendRange(value.Value >= current
+                ? StateChanges.GiveItem(log.State, value.Character, value.Item, value.Value - current)
+                : StateChanges.TakeItem(log.State, value.Character, value.Item, current - value.Value));
         }
         foreach (var (id, value) in Standings.OrderBy(v => v.Key.Value, StringComparer.Ordinal))
         {
@@ -174,11 +195,11 @@ public sealed record AuthorSetup
         }
         foreach (var value in Stats)
         {
-            yield return new($"stat:{value.Character}:{value.Stat}", state.GetBaseStat(value.Character, value.Stat).ToString(CultureInfo.InvariantCulture));
+            yield return new($"stat:{value.Character}:{value.Stat}", state.GetExactBaseStat(value.Character, value.Stat).ToCanonicalString());
         }
         foreach (var value in Inventory)
         {
-            yield return new($"inventory:{value.Character}:{value.Item}", state.GetItemCount(value.Character, value.Item).ToString(CultureInfo.InvariantCulture));
+            yield return new($"inventory:{value.Character}:{value.Item}", state.GetExactItemCount(value.Character, value.Item).ToCanonicalString());
         }
     }
 }

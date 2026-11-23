@@ -1,6 +1,7 @@
 @* Character sheet generated entirely from ruleset metadata: whatever stats a story's ruleset defines are shown,
    grouped by category. Nothing here knows about "strength" or "hit points". The author's visibility settings only
    choose what is shown; hidden sections keep working in play. *@
+@using Talewright.Core
 
 <aside class="tw-sheet" aria-label="Character sheet">
     @if (ShowsStats || ShowsStanding)
@@ -20,14 +21,14 @@
         <dl class="tw-stats">
             @foreach (var stat in stats)
             {
-                var value = State.GetStat(CharacterId, stat.Id);
-                var baseValue = State.GetBaseStat(CharacterId, stat.Id);
+                var value = State.GetExactStat(CharacterId, stat.Id);
+                var baseValue = State.GetExactBaseStat(CharacterId, stat.Id);
                 <dt>@stat.Name</dt>
                 <dd>
-                    @value
+                    @value.ToDecimalString()
                     @if (value != baseValue)
                     {
-                        <span class="tw-modified" title="Base @baseValue, modified by items or rules">(@Signed(value - baseValue))</span>
+                        <span class="tw-modified" title="Base @baseValue.ToDecimalString(), modified by items or rules">(@Signed(value - baseValue))</span>
                     }
                 </dd>
             }
@@ -36,7 +37,7 @@
 
     @if (ShowsInventory)
     {
-        var inventory = State.GetInventory(CharacterId).Where(i => i.Value > 0).ToList();
+        var inventory = State.GetExactInventory(CharacterId).ToList();
         <h3>Inventory</h3>
         @if (inventory.Count == 0)
         {
@@ -47,7 +48,7 @@
             <ul class="tw-inventory">
                 @foreach (var (item, count) in inventory)
                 {
-                    <li>@ItemName(item)@(count > 1 ? $" ×{count}" : string.Empty)</li>
+                    <li>@ItemName(item)@(count != 1 ? $" ×{count.ToDecimalString()}" : string.Empty)</li>
                 }
             </ul>
         }
@@ -101,7 +102,7 @@
 
     private string ItemName(ItemId id) => State.World.Items.TryGetValue(id, out var item) ? item.Name : id.Value;
 
-    private static string Signed(int value) => value < 0 ? $"−{-value}" : $"+{value}";
+    private static string Signed(ExactNumber value) => value < 0 ? $"−{(-value).ToDecimalString()}" : $"+{value.ToDecimalString()}";
 
     private static string CategoryName(StatCategory category) => category switch
     {

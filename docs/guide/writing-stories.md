@@ -203,6 +203,12 @@ See the [item-name grammar table](../reference/talemark-syntax.md#item-name-gram
 
 ### Read and spend item counts
 
+In Talemark 2, declare an item `divisible: true` to hold fractional amounts, for example
+`credits: {name: credits, divisible: true}`. Divisibility is independent of name grammar.
+Other items stay whole: each incoming amount is rounded to the nearest whole number, with
+halves away from zero. Version 2 is still under development; see
+[language versions](language-versions.md).
+
 Use `{player:inventory:credits:count}` in prose, arithmetic and conditions to read the
 quantity held by any character. It returns 0 when the character holds none and is
 read-only; change the inventory with `give` and `take` instead of maintaining a

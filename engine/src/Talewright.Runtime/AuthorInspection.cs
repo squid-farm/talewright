@@ -6,12 +6,23 @@ using Talewright.Core.World;
 using Talewright.Rules.Diagnostics;
 using Talewright.Talemark.Model;
 using Talewright.Talemark.Analysis;
+using System.Text.Json.Serialization;
 
 namespace Talewright.Runtime;
 
-public sealed record AuthorStatInspection(StatId Id, string Name, int BaseValue, int EffectiveValue);
+public sealed record AuthorStatInspection(StatId Id, string Name, int BaseValue, int EffectiveValue)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ExactBaseValue { get; init; }
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ExactEffectiveValue { get; init; }
+}
 public sealed record AuthorEventInspection(int Offset, GameEvent Event);
-public sealed record AuthorItemInspection(ItemId Id, string Name, int Quantity);
+public sealed record AuthorItemInspection(ItemId Id, string Name, int Quantity)
+{
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public string? ExactQuantity { get; init; }
+}
 public sealed record AuthorCharacterInspection(EntityId Id, string FirstName, string LastName, Pronouns Pronouns,
     IReadOnlyList<AuthorStatInspection> Stats, IReadOnlyList<AuthorItemInspection> Inventory);
 public sealed record AuthorFactionInspection(FactionId Id, string Name, int Standing, string? Tier);
@@ -46,9 +57,16 @@ public sealed class AuthorInspection
             var identity = state.GetCharacterDefinition(id);
             var stats = story.World.Ruleset.Stats.Where(stat => story.IsStatVisible(stat.Id, state))
                 .Select(stat => new AuthorStatInspection(stat.Id, stat.Name,
-                state.GetBaseStat(id, stat.Id), state.GetStat(id, stat.Id))).ToArray();
-            var inventory = state.GetInventory(id).Select(item => new AuthorItemInspection(item.Key,
-                story.World.Items[item.Key].Name, item.Value)).ToArray();
+                state.GetBaseStat(id, stat.Id), state.GetStat(id, stat.Id))
+                {
+                    ExactBaseValue = story.TalemarkVersion == 2 ? state.GetExactBaseStat(id, stat.Id).ToCanonicalString() : null,
+                    ExactEffectiveValue = story.TalemarkVersion == 2 ? state.GetExactStat(id, stat.Id).ToCanonicalString() : null,
+                }).ToArray();
+            var inventory = state.GetExactInventory(id).Select(item => new AuthorItemInspection(item.Key,
+                story.World.Items[item.Key].Name, item.Value.ToInt32RoundedAwayFromZero())
+            {
+                ExactQuantity = story.TalemarkVersion == 2 ? item.Value.ToCanonicalString() : null,
+            }).ToArray();
             return new AuthorCharacterInspection(id, identity.FirstName, identity.LastName, identity.Pronouns,
                 Array.AsReadOnly(stats), Array.AsReadOnly(inventory));
         }).ToArray());

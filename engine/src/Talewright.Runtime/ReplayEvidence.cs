@@ -224,6 +224,21 @@ internal static class ReplayEvidence
             writer.WriteNumberValue(stat.Max);
             writer.WriteNumberValue(stat.Default);
             writer.WriteStringValue(stat.GoverningAttribute?.Value);
+            if (state.World.TalemarkVersion == 2)
+            {
+                writer.WriteStringValue(stat.Category switch
+                {
+                    Talewright.Core.Rulesets.StatCategory.Attribute => "attribute",
+                    Talewright.Core.Rulesets.StatCategory.Skill => "skill",
+                    Talewright.Core.Rulesets.StatCategory.Resource => "resource",
+                    Talewright.Core.Rulesets.StatCategory.Progression => "progression",
+                    Talewright.Core.Rulesets.StatCategory.Custom => "custom",
+                    _ => throw new NotSupportedException($"Unsupported stat category {stat.Category}."),
+                });
+                writer.WriteStringValue((stat.ExactMin ?? stat.Min).ToCanonicalString());
+                writer.WriteStringValue((stat.ExactMax ?? stat.Max).ToCanonicalString());
+                writer.WriteStringValue((stat.ExactDefault ?? stat.Default).ToCanonicalString());
+            }
             writer.WriteEndArray();
         }
         writer.WriteEndArray();
@@ -261,8 +276,16 @@ internal static class ReplayEvidence
             {
                 writer.WriteStartArray();
                 writer.WriteStringValue(stat.Id.Value);
-                writer.WriteNumberValue(state.GetBaseStat(id, stat.Id));
-                writer.WriteNumberValue(state.GetStat(id, stat.Id));
+                if (state.World.TalemarkVersion == 1)
+                {
+                    writer.WriteNumberValue(state.GetBaseStat(id, stat.Id));
+                    writer.WriteNumberValue(state.GetStat(id, stat.Id));
+                }
+                else
+                {
+                    writer.WriteStringValue(state.GetExactBaseStat(id, stat.Id).ToCanonicalString());
+                    writer.WriteStringValue(state.GetExactStat(id, stat.Id).ToCanonicalString());
+                }
                 writer.WriteEndArray();
             }
             writer.WriteStartArray();
@@ -270,7 +293,10 @@ internal static class ReplayEvidence
             {
                 writer.WriteStartArray();
                 writer.WriteStringValue(item.Value);
-                writer.WriteNumberValue(state.GetItemCount(id, item));
+                if (state.World.TalemarkVersion == 1)
+                    writer.WriteNumberValue(state.GetItemCount(id, item));
+                else
+                    writer.WriteStringValue(state.GetExactItemCount(id, item).ToCanonicalString());
                 writer.WriteEndArray();
             }
             writer.WriteEndArray();
@@ -283,11 +309,20 @@ internal static class ReplayEvidence
         {
             writer.WriteStartArray();
             writer.WriteStringValue(id.Value);
-            foreach (var (stat, modifier) in item.Modifiers.OrderBy(entry => entry.Key.Value, StringComparer.Ordinal))
+            if (state.World.TalemarkVersion == 2)
+                writer.WriteBooleanValue(item.Divisible);
+            var modifierStats = state.World.TalemarkVersion == 1
+                ? item.Modifiers.Keys
+                : item.Modifiers.Keys.Concat(item.ExactModifiers?.Keys ?? []).Distinct();
+            foreach (var stat in modifierStats.OrderBy(id => id.Value, StringComparer.Ordinal))
             {
                 writer.WriteStartArray();
                 writer.WriteStringValue(stat.Value);
+                var modifier = item.Modifiers.GetValueOrDefault(stat);
                 writer.WriteNumberValue(modifier);
+                if (state.World.TalemarkVersion == 2)
+                    writer.WriteStringValue((item.ExactModifiers is not null && item.ExactModifiers.TryGetValue(stat, out var exact)
+                        ? exact : modifier).ToCanonicalString());
                 writer.WriteEndArray();
             }
             writer.WriteEndArray();
@@ -393,8 +428,11 @@ internal static class ReplayEvidence
     {
         CharacterIdentityChanged => "CharacterIdentityChanged",
         StatChanged => "StatChanged",
+        ExactStatChanged => "ExactStatChanged",
         ItemsGranted => "ItemsGranted",
         ItemsRemoved => "ItemsRemoved",
+        ExactItemsGranted => "ExactItemsGranted",
+        ExactItemsRemoved => "ExactItemsRemoved",
         StandingChanged => "StandingChanged",
         FlagChanged => "FlagChanged",
         VariableChanged => "VariableChanged",

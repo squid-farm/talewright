@@ -22,16 +22,26 @@ public sealed record CharacterDefinition(
     GrammaticalNumber NameAgreement = GrammaticalNumber.Singular)
 {
     public string FullName => string.IsNullOrEmpty(LastName) ? FirstName : $"{FirstName} {LastName}";
+    /// <summary>Exact starting values override matching entries in <see cref="Stats"/>.</summary>
+    public IReadOnlyDictionary<StatId, ExactNumber>? ExactStats { get; init; }
+    /// <summary>Exact starting quantities override matching entries in <see cref="Inventory"/>.</summary>
+    public IReadOnlyDictionary<ItemId, ExactNumber>? ExactInventory { get; init; }
 }
 
 /// <summary>An item that can be held. Items held by a character apply their <see cref="Modifiers"/> to that character's stats.</summary>
-/// <remarks>Name agreement is independent of inventory quantity. Uncountable names take some instead of a/an, without implying plural agreement.</remarks>
+/// <remarks>Name agreement and uncountability are independent of divisibility and inventory quantity.
+/// Uncountable names take some instead of a/an, without implying plural agreement.</remarks>
 public sealed record ItemDefinition(
     ItemId Id,
     string Name,
     IReadOnlyDictionary<StatId, int> Modifiers,
     GrammaticalNumber NameAgreement = GrammaticalNumber.Singular,
-    bool Uncountable = false);
+    bool Uncountable = false,
+    bool Divisible = false)
+{
+    /// <summary>Exact modifiers override matching entries in <see cref="Modifiers"/>.</summary>
+    public IReadOnlyDictionary<StatId, ExactNumber>? ExactModifiers { get; init; }
+}
 
 /// <summary>A faction the player can stand well or badly with.</summary>
 public sealed record FactionDefinition(FactionId Id, string Name, int InitialStanding);

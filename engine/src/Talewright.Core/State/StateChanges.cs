@@ -12,6 +12,12 @@ public static class StateChanges
 {
     public static IEnumerable<GameEvent> SetStat(IGameStateView state, EntityId character, StatId stat, int value)
     {
+        if (state.World.TalemarkVersion == 2 && state.Ruleset.IsFractionalResource(stat))
+        {
+            foreach (var change in SetStat(state, character, stat, ExactNumber.FromInteger(value)))
+                yield return change;
+            yield break;
+        }
         var old = state.GetBaseStat(character, stat);
         var clamped = state.Ruleset.StatsById.TryGetValue(stat, out var def) ? def.Clamp(value) : value;
         if (clamped != old)
@@ -21,7 +27,26 @@ public static class StateChanges
     }
 
     public static IEnumerable<GameEvent> AdjustStat(IGameStateView state, EntityId character, StatId stat, int delta) =>
-        SetStat(state, character, stat, state.GetBaseStat(character, stat) + delta);
+        state.World.TalemarkVersion == 2 && state.Ruleset.IsFractionalResource(stat)
+            ? SetStat(state, character, stat, state.GetExactBaseStat(character, stat) + delta)
+            : SetStat(state, character, stat, state.World.TalemarkVersion == 2
+                ? (int)Math.Clamp((long)state.GetBaseStat(character, stat) + delta, int.MinValue, int.MaxValue)
+                : state.GetBaseStat(character, stat) + delta);
+
+    public static IEnumerable<GameEvent> SetStat(IGameStateView state, EntityId character, StatId stat, ExactNumber value)
+    {
+        if (state.World.TalemarkVersion == 1 || !state.Ruleset.IsFractionalResource(stat))
+            return SetStat(state, character, stat, value.ToInt32RoundedAwayFromZero());
+        var def = state.Ruleset.StatsById[stat];
+        var old = state.GetExactBaseStat(character, stat);
+        var clamped = def.ClampExact(value);
+        return clamped == old ? [] : [new ExactStatChanged(character, stat, old.ToCanonicalString(), clamped.ToCanonicalString())];
+    }
+
+    public static IEnumerable<GameEvent> AdjustStat(IGameStateView state, EntityId character, StatId stat, ExactNumber delta) =>
+        state.World.TalemarkVersion == 2 && state.Ruleset.IsFractionalResource(stat)
+            ? SetStat(state, character, stat, state.GetExactBaseStat(character, stat) + delta)
+            : AdjustStat(state, character, stat, delta.ToInt32RoundedAwayFromZero());
 
     public static IEnumerable<GameEvent> GiveItem(EntityId character, ItemId item, int quantity)
     {
@@ -33,11 +58,33 @@ public static class StateChanges
 
     public static IEnumerable<GameEvent> TakeItem(IGameStateView state, EntityId character, ItemId item, int quantity)
     {
+        if (state.World.TalemarkVersion == 2 && state.World.Items.TryGetValue(item, out var definition) && definition.Divisible)
+        {
+            foreach (var change in TakeItem(state, character, item, ExactNumber.FromInteger(quantity)))
+                yield return change;
+            yield break;
+        }
         var removed = Math.Min(quantity, state.GetItemCount(character, item));
         if (removed > 0)
         {
             yield return new ItemsRemoved(character, item, removed);
         }
+    }
+
+    public static IEnumerable<GameEvent> GiveItem(IGameStateView state, EntityId character, ItemId item, ExactNumber quantity)
+    {
+        if (state.World.TalemarkVersion == 1 || !state.World.Items[item].Divisible)
+            return GiveItem(character, item, quantity.ToInt32RoundedAwayFromZero());
+        return quantity > 0 ? [new ExactItemsGranted(character, item, quantity.ToCanonicalString())] : [];
+    }
+
+    public static IEnumerable<GameEvent> TakeItem(IGameStateView state, EntityId character, ItemId item, ExactNumber quantity)
+    {
+        if (state.World.TalemarkVersion == 1 || !state.World.Items[item].Divisible)
+            return TakeItem(state, character, item, quantity.ToInt32RoundedAwayFromZero());
+        var held = state.GetExactItemCount(character, item);
+        var removed = quantity < held ? quantity : held;
+        return removed > 0 ? [new ExactItemsRemoved(character, item, removed.ToCanonicalString())] : [];
     }
 
     public static IEnumerable<GameEvent> SetStanding(IGameStateView state, FactionId faction, int value)

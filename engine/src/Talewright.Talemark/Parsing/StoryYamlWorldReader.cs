@@ -19,7 +19,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
     private readonly StatDiagnosticGuidance _statGuidance = statGuidance;
     internal Dictionary<EntityId, SourceLocation> CharacterLocations { get; } = [];
 
-    internal CharacterCreation? ReadCreation(YamlNode? node, Ruleset ruleset)
+    internal CharacterCreation? ReadCreation(YamlNode? node, Ruleset ruleset, int talemarkVersion)
     {
         if (node is null || _yaml.Mapping(node, ManifestVocabulary.Creation) is not { } map)
         {
@@ -66,7 +66,9 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
                 var values = new List<int>();
                 foreach (var option in _yaml.Sequence(value, "creation stat values"))
                 {
-                    if (_yaml.Int(option) is { } number && definition.Clamp(number) == number && !values.Contains(number))
+                    if (_yaml.Int(option) is { } number &&
+                        (talemarkVersion == 2 ? definition.ClampExact(number) == number : definition.Clamp(number) == number)
+                        && !values.Contains(number))
                     {
                         values.Add(number);
                     }
@@ -112,17 +114,21 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
                     continue;
                 }
 
-                var presetStats = ReadStatMap(Get(preset, ManifestVocabulary.Stats), ruleset);
+                var exactStats = talemarkVersion == 2 ? ReadExactStatMap(Get(preset, ManifestVocabulary.Stats), ruleset) : null;
+                var presetStats = exactStats is null ? ReadStatMap(Get(preset, ManifestVocabulary.Stats), ruleset)
+                    : exactStats.ToDictionary(pair => pair.Key, pair => pair.Value.ToInt32RoundedAwayFromZero());
                 foreach (var (stat, number) in presetStats)
                 {
-                    if (ruleset.StatsById[stat].Clamp(number) != number ||
-                        stats.TryGetValue(stat, out var choices) && !choices.Contains(number))
+                    var exact = exactStats is not null ? exactStats[stat] : ExactNumber.FromInteger(number);
+                    if ((talemarkVersion == 2 ? ruleset.StatsById[stat].ClampExact(exact) != exact : ruleset.StatsById[stat].Clamp(number) != number) ||
+                        stats.TryGetValue(stat, out var choices) && (exact != number || !choices.Contains(number)))
                     {
                         _yaml.Error(value, CompilerDiagnosticCodes.InvalidConfigurationValue, $"Preset stat '{stat}' must respect ruleset bounds and its selectable values.", 0);
                     }
                 }
 
-                presets.Add(new CharacterPreset(id, Scalar(Get(preset, ManifestVocabulary.Label)) ?? id, presetStats));
+                presets.Add(new CharacterPreset(id, Scalar(Get(preset, ManifestVocabulary.Label)) ?? id, presetStats)
+                    { ExactStats = exactStats });
             }
 
             if (presets.Count > 16)
@@ -134,7 +140,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
         return new CharacterCreation { EditName = editName, Pronouns = pronouns.AsReadOnly(), Stats = stats, Presets = presets.AsReadOnly() };
     }
 
-    internal Dictionary<ItemId, ItemDefinition> ReadItems(YamlNode? node, Ruleset ruleset)
+    internal Dictionary<ItemId, ItemDefinition> ReadItems(YamlNode? node, Ruleset ruleset, int talemarkVersion)
     {
         var items = new Dictionary<ItemId, ItemDefinition>();
         if (node is null || _yaml.Mapping(node, ManifestVocabulary.Items) is not { } map)
@@ -157,24 +163,35 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
             var id = new ItemId(rawId);
             var name = id.Value;
             var modifiers = new Dictionary<StatId, int>();
+            Dictionary<StatId, ExactNumber>? exactModifiers = null;
             var nameAgreement = GrammaticalNumber.Singular;
             var uncountable = false;
+            var divisible = false;
             if (value is YamlMappingNode body)
             {
-                _yaml.CheckKeys(body, ManifestVocabulary.Name, ManifestVocabulary.Modifiers, ManifestVocabulary.NameAgreement, ManifestVocabulary.Uncountable);
+                _yaml.CheckKeys(body, ManifestVocabulary.Name, ManifestVocabulary.Modifiers, ManifestVocabulary.NameAgreement, ManifestVocabulary.Uncountable, ManifestVocabulary.Divisible);
                 name = Scalar(Get(body, ManifestVocabulary.Name)) ?? name;
-                modifiers = ReadStatMap(Get(body, ManifestVocabulary.Modifiers), ruleset);
+                if (talemarkVersion == 1)
+                    modifiers = ReadStatMap(Get(body, ManifestVocabulary.Modifiers), ruleset);
+                else
+                {
+                    exactModifiers = ReadExactStatMap(Get(body, ManifestVocabulary.Modifiers), ruleset);
+                    modifiers = exactModifiers.ToDictionary(pair => pair.Key, pair => pair.Value.ToInt32RoundedAwayFromZero());
+                }
                 if (Get(body, ManifestVocabulary.NameAgreement) is { } number)
                     nameAgreement = ReadGrammaticalNumber(number, ManifestVocabulary.NameAgreement);
                 if (Get(body, ManifestVocabulary.Uncountable) is { } mass)
                     uncountable = _yaml.Boolean(mass, ManifestVocabulary.Uncountable, false);
+                if (Get(body, ManifestVocabulary.Divisible) is { } division)
+                    divisible = _yaml.Boolean(division, ManifestVocabulary.Divisible, false);
             }
             else if (Scalar(value) is { Length: > 0 } shortName)
             {
                 name = shortName;
             }
 
-            items[id] = new ItemDefinition(id, name, modifiers, nameAgreement, uncountable);
+            items[id] = new ItemDefinition(id, name, modifiers, nameAgreement, uncountable, divisible)
+                { ExactModifiers = exactModifiers };
         }
 
         return items;
@@ -208,7 +225,7 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
         return factions;
     }
 
-    internal List<CharacterDefinition> ReadCharacters(YamlNode? node, YamlMappingNode root, Ruleset ruleset, Dictionary<ItemId, ItemDefinition> items)
+    internal List<CharacterDefinition> ReadCharacters(YamlNode? node, YamlMappingNode root, Ruleset ruleset, Dictionary<ItemId, ItemDefinition> items, int talemarkVersion)
     {
         var characters = new List<CharacterDefinition>();
         var map = node is null ? null : _yaml.Mapping(node, ManifestVocabulary.Characters);
@@ -239,12 +256,19 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
             var firstName = _yaml.RequiredScalar(body, ManifestVocabulary.FirstName) ?? id;
             var lastName = Scalar(Get(body, ManifestVocabulary.LastName)) ?? string.Empty;
             var pronouns = ReadPronouns(Get(body, ManifestVocabulary.Pronouns));
-            var stats = ReadStatMap(Get(body, ManifestVocabulary.Stats), ruleset);
-            var inventory = ReadInventory(Get(body, ManifestVocabulary.Inventory), items, characterId);
+            var exactStats = talemarkVersion == 2 ? ReadExactStatMap(Get(body, ManifestVocabulary.Stats), ruleset) : null;
+            var stats = exactStats is null ? ReadStatMap(Get(body, ManifestVocabulary.Stats), ruleset)
+                : exactStats.ToDictionary(pair => pair.Key, pair => pair.Value.ToInt32RoundedAwayFromZero());
+            var inventory = ReadInventory(Get(body, ManifestVocabulary.Inventory), items, characterId, talemarkVersion);
             var nameAgreement = Get(body, ManifestVocabulary.NameAgreement) is { } number
                 ? ReadGrammaticalNumber(number, ManifestVocabulary.NameAgreement)
                 : GrammaticalNumber.Singular;
-            characters.Add(new CharacterDefinition(characterId, firstName, lastName, pronouns, stats, inventory, nameAgreement));
+            characters.Add(new CharacterDefinition(characterId, firstName, lastName, pronouns, stats,
+                inventory.ToDictionary(pair => pair.Key, pair => pair.Value.ToInt32RoundedAwayFromZero()), nameAgreement)
+            {
+                ExactInventory = inventory,
+                ExactStats = exactStats,
+            });
         }
 
         if (map is not null && !characters.Any(c => c.Id == EntityId.Player))
@@ -335,13 +359,85 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
         return stats;
     }
 
-    private Dictionary<ItemId, int> ReadInventory(YamlNode? node, Dictionary<ItemId, ItemDefinition> items, EntityId character)
+    private Dictionary<StatId, ExactNumber> ReadExactStatMap(YamlNode? node, Ruleset ruleset)
     {
-        var inventory = new Dictionary<ItemId, int>();
+        var stats = new Dictionary<StatId, ExactNumber>();
+        if (node is null || _yaml.Mapping(node, ManifestVocabulary.Stats) is not { } map) return stats;
+        foreach (var (key, value) in map.Children)
+        {
+            var rawId = _yaml.Identifier(key, IdentifierLabels.Stat);
+            if (rawId is null) continue;
+            var id = new StatId(rawId);
+            if (!ruleset.HasStat(id))
+            {
+                var guidance = _statGuidance.ForMissingStat(id);
+                _yaml.Error(key, CompilerDiagnosticCodes.UnknownConfigurationReference,
+                    $"Unknown stat '{id}' (ruleset '{ruleset.Id}')." +
+                    (guidance.Length > 0 ? guidance : " Add it under ruleset.stats."), 0);
+                continue;
+            }
+            var number = _yaml.Number(value) ?? ExactNumber.Zero;
+            stats[id] = ruleset.IsFractionalResource(id) ? number : number.ToInt32RoundedAwayFromZero();
+        }
+        return stats;
+    }
+
+    private Dictionary<ItemId, ExactNumber> ReadInventory(YamlNode? node, Dictionary<ItemId, ItemDefinition> items, EntityId character, int talemarkVersion)
+    {
+        if (talemarkVersion == 1)
+            return ReadIntegerInventory(node, items, character)
+                .ToDictionary(pair => pair.Key, pair => ExactNumber.FromInteger(pair.Value));
+
+        var inventory = new Dictionary<ItemId, ExactNumber>();
         if (node is null)
         {
             return inventory;
         }
+
+        IEnumerable<(YamlNode Key, YamlNode? QuantityNode)> entries = node switch
+        {
+            YamlSequenceNode seq => seq.Children.Select(c => (c, (YamlNode?)null)),
+            YamlMappingNode map => map.Children.Select(c => (c.Key, (YamlNode?)c.Value)),
+            _ => _yaml.Error<IEnumerable<(YamlNode, YamlNode?)>>(node, CompilerDiagnosticCodes.InvalidConfigurationValue, "inventory must be a list of item ids or a map of item id to quantity.", []),
+        };
+
+        foreach (var (key, quantityNode) in entries)
+        {
+            var rawId = _yaml.Identifier(key, IdentifierLabels.Item);
+            if (rawId is null) continue;
+            var id = new ItemId(rawId);
+            if (!items.TryGetValue(id, out var item))
+            {
+                _yaml.Error(key, CompilerDiagnosticCodes.UnknownConfigurationReference, $"Unknown item '{id}'. Declare it under items.", 0);
+                continue;
+            }
+
+            var quantity = ExactNumber.One;
+            if (quantityNode is not null)
+            {
+                if (quantityNode is not YamlScalarNode { Style: not (ScalarStyle.DoubleQuoted or ScalarStyle.SingleQuoted), Value: { } raw }
+                    || !TryParseVariableNumber(raw, talemarkVersion, out quantity))
+                    quantity = _yaml.Error(quantityNode, CompilerDiagnosticCodes.InvalidConfigurationValue,
+                        "Starting inventory quantity must be a decimal number.", ExactNumber.Zero);
+
+                if (quantity < 0)
+                    quantity = _yaml.Error(quantityNode, CompilerDiagnosticCodes.InvalidConfigurationValue,
+                        $"Starting inventory quantity for item '{id}' on character '{character}' must be non-negative.", ExactNumber.Zero);
+            }
+
+            if (!item.Divisible)
+                quantity = quantity.ToInt32RoundedAwayFromZero();
+            inventory[id] = inventory.GetValueOrDefault(id) + quantity;
+        }
+
+        return inventory;
+    }
+
+    private Dictionary<ItemId, int> ReadIntegerInventory(YamlNode? node, Dictionary<ItemId, ItemDefinition> items, EntityId character)
+    {
+        var inventory = new Dictionary<ItemId, int>();
+        if (node is null)
+            return inventory;
 
         IEnumerable<(YamlNode Key, YamlNode? QuantityNode, int Quantity)> entries = node switch
         {
@@ -349,7 +445,6 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
             YamlMappingNode map => map.Children.Select(c => (c.Key, (YamlNode?)c.Value, _yaml.Int(c.Value) ?? 1)),
             _ => _yaml.Error<IEnumerable<(YamlNode, YamlNode?, int)>>(node, CompilerDiagnosticCodes.InvalidConfigurationValue, "inventory must be a list of item ids or a map of item id to quantity.", []),
         };
-
         foreach (var (key, quantityNode, quantity) in entries)
         {
             var rawId = _yaml.Identifier(key, IdentifierLabels.Item);
@@ -360,17 +455,12 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
                 _yaml.Error(key, CompilerDiagnosticCodes.UnknownConfigurationReference, $"Unknown item '{id}'. Declare it under items.", 0);
                 continue;
             }
-
             var startingQuantity = quantity;
             if (quantityNode is not null && quantity < 0)
-            {
                 startingQuantity = _yaml.Error(quantityNode, CompilerDiagnosticCodes.InvalidConfigurationValue,
                     $"Starting inventory quantity for item '{id}' on character '{character}' must be non-negative.", 0);
-            }
-
             inventory[id] = inventory.GetValueOrDefault(id) + startingQuantity;
         }
-
         return inventory;
     }
 

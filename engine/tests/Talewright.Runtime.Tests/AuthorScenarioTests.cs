@@ -70,6 +70,37 @@ public sealed class AuthorScenarioTests
     private static byte[] Bytes(JsonNode data) => Encoding.UTF8.GetBytes(data.ToJsonString());
     private static JsonNode Data(AuthorSession? session = null) => JsonNode.Parse(AuthorScenario.Export(session ?? Start(), Extensions))!;
 
+    [Fact]
+    public void Divisible_inventory_setup_edits_and_events_roundtrip_in_author_scenarios()
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = """
+                game: { id: inventory-scenario, title: Inventory, talemark: 2, start: start }
+                items: { coin: { divisible: true } }
+                characters: { player: { first-name: Tester } }
+                """,
+            ["main.tale"] = """
+                === start
+                ~ give player coin 1 / 3
+                * [Continue] -> start
+                """,
+        }));
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var story = result.Story!;
+        var source = AuthorSession.Create(story, new("start"), seed: 42, setup: new()
+        {
+            Inventory = [new(EntityId.Player, new("coin"), ExactNumber.Parse(".25"))],
+        });
+        source.Edit(new() { Inventory = [new(EntityId.Player, new("coin"), ExactNumber.Parse("1/3"))] });
+
+        var bytes = AuthorScenario.Export(source, Extensions);
+        var copy = AuthorScenario.Import(story, bytes, Extensions).Session;
+        Assert.Equal(ExactNumber.Parse("1/3"), copy.State.GetExactItemCount(EntityId.Player, new("coin")));
+        Assert.Equal(source.Events, copy.Events);
+        Assert.Equal(bytes, AuthorScenario.Export(copy, Extensions));
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
@@ -232,6 +263,29 @@ public sealed class AuthorScenarioTests
         var restored = AuthorScenario.Import(story, bytes, Extensions).Session;
 
         Assert.Equal(ExactNumber.FromFraction(1, 2), restored.State.GetExactVariable(new("amount")));
+        Assert.Equal(bytes, AuthorScenario.Export(restored, Extensions));
+    }
+
+    [Fact]
+    public void Scenario_roundtrip_preserves_fractional_resource_setup_and_edit()
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = """
+                game: { id: exact-resource-scenario, title: Resource, talemark: 2, start: start, ruleset: rpg }
+                characters: { player: { first-name: Tester } }
+                """,
+            ["main.tale"] = "=== start\n* [Finish] -> END\n",
+        }));
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var source = AuthorSession.Create(result.Story!, new("start"), seed: 42, setup: new()
+        {
+            Stats = [new(EntityId.Player, new("hp"), ExactNumber.Parse("14.75"))],
+        });
+        source.Edit(new() { Stats = [new(EntityId.Player, new("hp"), ExactNumber.FromFraction(1, 3))] });
+        var bytes = AuthorScenario.Export(source, Extensions);
+        var restored = AuthorScenario.Import(result.Story!, bytes, Extensions).Session;
+        Assert.Equal(ExactNumber.FromFraction(1, 3), restored.State.GetExactBaseStat(EntityId.Player, new("hp")));
         Assert.Equal(bytes, AuthorScenario.Export(restored, Extensions));
     }
 

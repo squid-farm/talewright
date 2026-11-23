@@ -235,6 +235,11 @@ using the quoted-text rules when it is inside syntax.
 Effects also use `set flag:id`, `clear flag:id`, `give character item [number-expression]` and
 `take character item [number-expression]`. An omitted inventory quantity is one. These are word
 commands, not additional sigils.
+In Talemark 2, items marked `divisible: true` keep exact fractional amounts; other item
+quantities round each incoming amount to the nearest whole number, halves away from zero.
+Resource-category stats keep exact values, while other stats and check difficulty round each
+incoming amount the same way. A resource used in a check is rounded for that check only.
+Talemark 1 retains integer behavior.
 
 Variable assignment can introduce integer or text state without YAML declarations.
 Discovery is story-wide; implicit text starts empty until an assignment executes.

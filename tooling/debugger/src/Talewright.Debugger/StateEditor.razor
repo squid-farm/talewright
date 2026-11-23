@@ -48,7 +48,7 @@
                             <tr class="@RowClass(field?.Enabled)">
                                 <th scope="row"><code>@stat.Id</code> @stat.Name</th>
                                 <td>@NumberInput(field, $"{character.Id}:{stat.Id}")@(field?.Enabled == true ? Was(true, field.Initial) : null)</td>
-                                <td class="state-muted">@stat.EffectiveValue</td>
+                                <td class="state-muted">@(stat.ExactEffectiveValue ?? stat.EffectiveValue.ToString())</td>
                             </tr>
                         }
                     </tbody>

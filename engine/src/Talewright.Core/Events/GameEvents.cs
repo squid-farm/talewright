@@ -19,11 +19,17 @@ public sealed record CharacterIdentityChanged(EntityId Character, string FirstNa
 /// <summary>A character's base stat was set to a new (already clamped) value.</summary>
 public sealed record StatChanged(EntityId Character, StatId Stat, int OldValue, int NewValue) : GameEvent;
 
+public sealed record ExactStatChanged(EntityId Character, StatId Stat, string OldValue, string NewValue) : GameEvent;
+
 /// <summary>Items were added to a character's inventory.</summary>
 public sealed record ItemsGranted(EntityId Character, ItemId Item, int Quantity) : GameEvent;
 
 /// <summary>Items were removed from a character's inventory (quantity actually removed).</summary>
 public sealed record ItemsRemoved(EntityId Character, ItemId Item, int Quantity) : GameEvent;
+
+public sealed record ExactItemsGranted(EntityId Character, ItemId Item, string Quantity) : GameEvent;
+
+public sealed record ExactItemsRemoved(EntityId Character, ItemId Item, string Quantity) : GameEvent;
 
 /// <summary>The player's standing with a faction changed.</summary>
 public sealed record StandingChanged(FactionId Faction, int OldValue, int NewValue) : GameEvent;

@@ -28,6 +28,10 @@ The checked-in Lost Relic does not mark `courage-earned` as a saving trigger. To
 
 Each save has a fixed summary time, and its SHA-256 is pinned in `GoldenSaveTests`.
 
+The separate [`fractional-v6.twsave`](../fractional-v6.twsave) fixture records Talemark 2 state:
+one-third in a variable and divisible inventory, and 59/3 HP. `StoryHistoryTests` pins its bytes,
+restores both replay and checkpoint paths, then verifies further exact arithmetic.
+
 ## Changing these files
 
 Changing, removing or regenerating a golden save is a compatibility break. It needs:

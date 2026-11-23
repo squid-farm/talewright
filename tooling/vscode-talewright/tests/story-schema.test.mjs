@@ -103,7 +103,7 @@ test('player declarations may be in the root or a supporting configuration file'
   assertValid(validateManifest, { items: { coin: 'Coin' } }, 'item fragment');
 });
 
-test('inventory quantities must be nonnegative integers', () => {
+test('inventory quantities are nonnegative and respect the Talemark version', () => {
   const manifest = quantity => ({
     game: { id: 'inventory-quantity', title: 'Inventory quantity', start: 'beginning' },
     characters: { player: { 'first-name': 'Ada', inventory: { coin: quantity } } },
@@ -112,15 +112,39 @@ test('inventory quantities must be nonnegative integers', () => {
   assertValid(validateManifest, manifest(0), 'zero inventory quantity');
   assertValid(validateManifest, manifest(3), 'positive inventory quantity');
   assertInvalid(validateManifest, manifest(-1), 'negative inventory quantity', 'minimum');
+  assertInvalid(validateManifest, manifest(0.5), 'version 1 fractional inventory');
+  const fractional = manifest(0.5);
+  fractional.game.talemark = 2;
+  assertValid(validateManifest, fractional, 'version 2 fractional inventory');
+  fractional.characters.player.inventory.coin = -0.5;
+  assertInvalid(validateManifest, fractional, 'negative version 2 inventory', 'minimum');
 });
 
 test('inventory is not a valid item ID', () => {
   assertInvalid(validateManifest, { items: { inventory: 'Inventory' } }, 'reserved inventory item ID', 'not');
 });
 
+test('resource declarations and stat values respect the Talemark version', () => {
+  for (const [label, add] of [
+    ['bounds', m => { m.game.ruleset = { stats: [{ id: 'mana', category: 'resource', min: 0.25 }] }; }],
+    ['initial', m => { m.characters.player.stats = { mana: 12.5 }; }],
+    ['modifiers', m => { m.items = { charm: { modifiers: { mana: 0.25 } } }; }],
+    ['preset', m => { m.game.creation = { presets: { mage: { stats: { mana: 12.5 } } } }; }],
+  ]) {
+    const manifest = {
+      game: { id: 'resource', title: 'Resource', start: 'beginning' },
+      characters: { player: { 'first-name': 'Ada' } },
+    };
+    add(manifest);
+    assertInvalid(validateManifest, manifest, `version 1 fractional ${label}`);
+    manifest.game.talemark = 2;
+    assertValid(validateManifest, manifest, `version 2 fractional ${label}`);
+  }
+});
+
 test('item grammar has explicit enum/boolean values and independent defaults', () => {
   const item = compileSubschema(schema.definitions.itemValue);
-  for (const value of ['sword', {}, { name: 'armor', uncountable: true },
+  for (const value of ['sword', {}, { name: 'armor', uncountable: true, divisible: true },
     { name: 'armor', uncountable: 'true' }, { name: 'armor', uncountable: 'false' },
     { name: 'pants', 'name-agreement': 'plural' },
     { name: 'pair of boots', 'name-agreement': 'singular', uncountable: false }]) {
@@ -128,7 +152,8 @@ test('item grammar has explicit enum/boolean values and independent defaults', (
   }
   for (const value of [{ 'name-agreement': 'many' }, { 'name-agreement': true },
     { 'name-agreement': ['singular'] }, { uncountable: 'sometimes' },
-    { uncountable: 'yes' }, { uncountable: 'no' }, { uncountable: 1 }, { uncountable: {} }]) {
+    { uncountable: 'yes' }, { uncountable: 'no' }, { uncountable: 1 }, { uncountable: {} },
+    { divisible: 'yes' }, { divisible: 1 }]) {
     assertInvalid(item, value, JSON.stringify(value));
   }
   assert.equal(schema.definitions.item.properties['name-agreement'].default, 'singular');

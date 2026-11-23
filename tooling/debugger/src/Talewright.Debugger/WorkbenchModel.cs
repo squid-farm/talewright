@@ -211,10 +211,10 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
                 standing.ToString(CultureInfo.InvariantCulture),
             SetupNumberKind.Stat when setup.Stats.SingleOrDefault(value =>
                 value.Character.Value == field.Character && value.Stat.Value == field.Id) is { } stat =>
-                stat.Value.ToString(CultureInfo.InvariantCulture),
+                stat.Number.ToCanonicalString(),
             SetupNumberKind.Inventory when setup.Inventory.SingleOrDefault(value =>
                 value.Character.Value == field.Character && value.Item.Value == field.Id) is { } item =>
-                item.Quantity.ToString(CultureInfo.InvariantCulture),
+                item.Value.ToCanonicalString(),
             SetupNumberKind.Variable or SetupNumberKind.Standing or SetupNumberKind.Stat or SetupNumberKind.Inventory => null,
             _ => throw new InvalidOperationException($"Unsupported setup field {field.Kind}."),
         };
@@ -420,7 +420,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
                 });
             }
             var (numbers, flags, texts, missing) = SynchronizeSetup(story);
-            BuildSetup(numbers, flags, texts, story.TalemarkVersion).Validate(story);
+            BuildSetup(numbers, flags, texts, story).Validate(story);
             var seed = Story is null ? story.Seed?.ToString(CultureInfo.InvariantCulture) ?? "" : Seed;
             var resolvedSeed = DeterministicDice.ResolveSeed(ParseSeed(seed), story.Seed, _randomSeed);
             var selection = RevalidateCharacter(story, resolvedSeed);
@@ -524,12 +524,16 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
             foreach (var stat in story.World.Ruleset.Stats)
             {
                 numbers.Add(new(SetupNumberKind.Stat, stat.Id.Value, $"{character.Id}:{stat.Id}",
-                    character.Stats.GetValueOrDefault(stat.Id, stat.Default), character.Id.Value));
+                    (character.ExactStats is not null && character.ExactStats.TryGetValue(stat.Id, out var exactStat)
+                        ? exactStat : character.Stats.TryGetValue(stat.Id, out var initial)
+                            ? initial : story.TalemarkVersion == 2 ? stat.ExactDefault ?? stat.Default : stat.Default)
+                        .ToCanonicalString(), character.Id.Value));
             }
             foreach (var item in story.World.Items.Values)
             {
                 numbers.Add(new(SetupNumberKind.Inventory, item.Id.Value, $"{character.Id} inventory:{item.Id}",
-                    character.Inventory.GetValueOrDefault(item.Id), character.Id.Value));
+                    (character.ExactInventory is { } exact && exact.TryGetValue(item.Id, out var quantity)
+                        ? quantity : character.Inventory.GetValueOrDefault(item.Id)).ToCanonicalString(), character.Id.Value));
             }
         }
         var flags = story.World.Flags.Select(id => new SetupFlag(id, story.World.InitialFlags[id])).ToArray();
@@ -614,7 +618,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
         {
             var story = Story ?? throw new InvalidOperationException("Load a valid story first.");
             var candidate = AuthorSession.Create(story, new SceneId(Target), captureDecisions: true,
-                BuildSetup(Numbers, Flags, Texts, story.TalemarkVersion),
+                BuildSetup(Numbers, Flags, Texts, story),
                 story.Creation is null ? ParseSeed(Seed) : ValidatedCreationSeed(), Character);
             var inspection = candidate.Inspect();
             Session = candidate;
@@ -665,18 +669,23 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
             foreach (var (stat, value) in character.Stats)
                 stats[new StatId(stat)] = value;
             foreach (var (stat, value) in stats.OrderBy(pair => pair.Key.Value, StringComparer.Ordinal))
-                Apply(StateChanges.SetStat(state, EntityId.Player, stat, value));
+            {
+                var exact = !character.Stats.ContainsKey(stat.Value)
+                    && story.Creation.Presets.FirstOrDefault(p => p.Id == character.Preset)?.ExactStats is { } exactStats
+                    && exactStats.TryGetValue(stat, out var presetValue) ? presetValue : value;
+                Apply(StateChanges.SetStat(state, EntityId.Player, stat, exact));
+            }
         }
 
-        var setup = BuildSetup(Numbers, Flags, Texts, story.TalemarkVersion).Validate(story);
+        var setup = BuildSetup(Numbers, Flags, Texts, story).Validate(story);
         foreach (var value in setup.Stats)
-            Apply(StateChanges.SetStat(state, value.Character, value.Stat, value.Value));
+            Apply(StateChanges.SetStat(state, value.Character, value.Stat, value.Number));
         foreach (var value in setup.Inventory)
         {
-            var current = state.GetItemCount(value.Character, value.Item);
-            Apply(value.Quantity >= current
-                ? StateChanges.GiveItem(value.Character, value.Item, value.Quantity - current)
-                : StateChanges.TakeItem(state, value.Character, value.Item, current - value.Quantity));
+            var current = state.GetExactItemCount(value.Character, value.Item);
+            Apply(value.Value >= current
+                ? StateChanges.GiveItem(state, value.Character, value.Item, value.Value - current)
+                : StateChanges.TakeItem(state, value.Character, value.Item, current - value.Value));
         }
         foreach (var (id, value) in setup.Standings)
             Apply(StateChanges.SetStanding(state, id, value));
@@ -693,8 +702,9 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
     }
 
     private static AuthorSetup BuildSetup(IEnumerable<SetupNumber> numbers, IEnumerable<SetupFlag> flags,
-        IEnumerable<SetupText> texts, int talemarkVersion)
+        IEnumerable<SetupText> texts, StoryDefinition story)
     {
+        var talemarkVersion = story.TalemarkVersion;
         var variables = new Dictionary<VarId, int>();
         var exactVariables = new Dictionary<VarId, ExactNumber>();
         var standings = new Dictionary<FactionId, int>();
@@ -717,10 +727,24 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
                     standings.Add(new(field.Id), ParseWhole(field));
                     break;
                 case SetupNumberKind.Stat:
-                    stats.Add(new(new(field.Character!), new(field.Id), ParseWhole(field)));
+                    if (talemarkVersion == 2 && story.World.Ruleset.IsFractionalResource(new(field.Id)))
+                    {
+                        if (!ExactNumber.TryParse(field.Value, out var statValue))
+                            throw new ArgumentException($"{field.Label} requires a decimal number.");
+                        stats.Add(new(new(field.Character!), new(field.Id), statValue));
+                    }
+                    else
+                        stats.Add(new(new(field.Character!), new(field.Id), ParseWhole(field)));
                     break;
                 case SetupNumberKind.Inventory:
-                    inventory.Add(new(new(field.Character!), new(field.Id), ParseWhole(field)));
+                    if (talemarkVersion == 2 && story.World.Items[new(field.Id)].Divisible)
+                    {
+                        if (!ExactNumber.TryParse(field.Value, out var quantity))
+                            throw new ArgumentException($"{field.Label} requires a decimal number.");
+                        inventory.Add(new(new(field.Character!), new(field.Id), quantity));
+                    }
+                    else
+                        inventory.Add(new(new(field.Character!), new(field.Id), ParseWhole(field)));
                     break;
                 default: throw new InvalidOperationException($"Unsupported setup field {field.Kind}.");
             }
@@ -749,7 +773,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
     public void RevertEdits() => RefreshEdits();
 
     public void ApplyEdits() => RunCommand(session => session.Edit(BuildSetup(EditNumbers, EditFlags, EditTexts,
-        session.Story.TalemarkVersion)));
+        session.Story)));
     public void JumpPreservingState() => RunCommand(session => session.Jump(new SceneId(Target)));
     public void Back() => RunCommand(session => session.Back());
     public void Forward() => RunCommand(session => session.Forward());
@@ -776,8 +800,8 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
         {
             SetupNumberKind.Variable => state.GetExactVariable(new(field.Id)).ToCanonicalString(),
             SetupNumberKind.Standing => state.GetStanding(new(field.Id)).ToString(CultureInfo.InvariantCulture),
-            SetupNumberKind.Stat => state.GetBaseStat(new(field.Character!), new(field.Id)).ToString(CultureInfo.InvariantCulture),
-            SetupNumberKind.Inventory => state.GetItemCount(new(field.Character!), new(field.Id)).ToString(CultureInfo.InvariantCulture),
+            SetupNumberKind.Stat => state.GetExactBaseStat(new(field.Character!), new(field.Id)).ToCanonicalString(),
+            SetupNumberKind.Inventory => state.GetExactItemCount(new(field.Character!), new(field.Id)).ToCanonicalString(),
             _ => throw new InvalidOperationException($"Unsupported edit field {field.Kind}."),
         }, field.Character)).ToArray();
         EditFlags = Flags.Select(flag => new SetupFlag(flag.Id, state.GetFlag(flag.Id))).ToArray();

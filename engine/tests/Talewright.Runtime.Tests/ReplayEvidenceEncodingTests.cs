@@ -28,10 +28,16 @@ public sealed class ReplayEvidenceEncodingTests
             """["CharacterIdentityChanged",{"character":{"value":"player"},"firstName":"Ada","lastName":"Burns","pronouns":{"subject":"they","object":"them","possessive":"their","possessivePronoun":"theirs","reflexive":"themselves","agreement":1}}]""" },
         { "stat", new StatChanged(Player, new StatId("hp"), 10, 7),
             """["StatChanged",{"character":{"value":"player"},"stat":{"value":"hp"},"oldValue":10,"newValue":7}]""" },
+        { "exact stat", new ExactStatChanged(Player, new StatId("hp"), "20", "59/4"),
+            """["ExactStatChanged",{"character":{"value":"player"},"stat":{"value":"hp"},"oldValue":"20","newValue":"59/4"}]""" },
         { "granted", new ItemsGranted(Player, new ItemId("rope"), 2),
             """["ItemsGranted",{"character":{"value":"player"},"item":{"value":"rope"},"quantity":2}]""" },
         { "removed", new ItemsRemoved(Player, new ItemId("rope"), 1),
             """["ItemsRemoved",{"character":{"value":"player"},"item":{"value":"rope"},"quantity":1}]""" },
+        { "exact granted", new ExactItemsGranted(Player, new ItemId("coin"), "1/3"),
+            """["ExactItemsGranted",{"character":{"value":"player"},"item":{"value":"coin"},"quantity":"1/3"}]""" },
+        { "exact removed", new ExactItemsRemoved(Player, new ItemId("coin"), "1/4"),
+            """["ExactItemsRemoved",{"character":{"value":"player"},"item":{"value":"coin"},"quantity":"1/4"}]""" },
         { "standing", new StandingChanged(new FactionId("guild"), 0, 5),
             """["StandingChanged",{"faction":{"value":"guild"},"oldValue":0,"newValue":5}]""" },
         { "flag", new FlagChanged(new FlagId("door-open"), true),
@@ -107,6 +113,56 @@ public sealed class ReplayEvidenceEncodingTests
             [["nickname",""]]]
             """.ReplaceLineEndings(""), Encoding.UTF8.GetString(input));
         Assert.Equal(SHA256.HashData(input), ReplayEvidence.InitialState(story, state));
+    }
+
+    [Fact]
+    public void Version_two_initial_evidence_distinguishes_fractional_resource_values()
+    {
+        static StoryDefinition Story(string hp)
+        {
+            var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+            {
+                ["story.talewright.yaml"] = $$"""
+                    game: { id: exact-evidence, title: Evidence, talemark: 2, start: a, ruleset: rpg }
+                    characters: { player: { first-name: Tester, stats: { hp: {{hp}} } } }
+                    """,
+                ["main.tale"] = "=== a\n* [Next] -> END",
+            }));
+            Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+            return result.Story!;
+        }
+        var first = Story("14.6");
+        var second = Story("14.7");
+        Assert.NotEqual(ReplayEvidence.InitialState(first, GameState.CreateInitial(first.World, 42)),
+            ReplayEvidence.InitialState(second, GameState.CreateInitial(second.World, 42)));
+    }
+
+    [Fact]
+    public void Version_two_initial_evidence_distinguishes_stat_categories()
+    {
+        static StoryDefinition Story(string category)
+        {
+            var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+            {
+                ["story.talewright.yaml"] = $$"""
+                    game:
+                      id: category-evidence
+                      title: Evidence
+                      talemark: 2
+                      start: a
+                      ruleset:
+                        stats: [{ id: mana, category: {{category}}, default: 10 }]
+                    characters: { player: { first-name: Tester } }
+                    """,
+                ["main.tale"] = "=== a\n* [Next] -> END",
+            }));
+            Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+            return result.Story!;
+        }
+        var resource = Story("resource");
+        var custom = Story("custom");
+        Assert.NotEqual(ReplayEvidence.InitialState(resource, GameState.CreateInitial(resource.World, 42)),
+            ReplayEvidence.InitialState(custom, GameState.CreateInitial(custom.World, 42)));
     }
 
     [Fact]

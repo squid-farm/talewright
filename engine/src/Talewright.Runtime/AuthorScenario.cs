@@ -339,8 +339,14 @@ internal sealed class ScenarioData
     public required string EndDigest { get; init; }
 }
 
-internal sealed record ScenarioStat(string Character, string Stat, [property: JsonRequired] int Value);
-internal sealed record ScenarioItem(string Character, string Item, [property: JsonRequired] int Quantity);
+internal sealed record ScenarioStat(string Character, string Stat, [property: JsonRequired] int Value)
+{
+    public string? ExactValue { get; init; }
+}
+internal sealed record ScenarioItem(string Character, string Item, [property: JsonRequired] int Quantity)
+{
+    public string? ExactQuantity { get; init; }
+}
 
 internal sealed class ScenarioValues
 {
@@ -361,8 +367,14 @@ internal sealed class ScenarioValues
             : setup.ExactVariables.ToDictionary(pair => pair.Key.Value, pair => pair.Value.ToCanonicalString()),
         TextVariables = setup.TextVariables.ToDictionary(pair => pair.Key.Value, pair => pair.Value),
         Standings = setup.Standings.ToDictionary(pair => pair.Key.Value, pair => pair.Value),
-        Stats = setup.Stats.Select(value => new ScenarioStat(value.Character.Value, value.Stat.Value, value.Value)).ToArray(),
-        Inventory = setup.Inventory.Select(value => new ScenarioItem(value.Character.Value, value.Item.Value, value.Quantity)).ToArray(),
+        Stats = setup.Stats.Select(value => new ScenarioStat(value.Character.Value, value.Stat.Value, value.Value)
+        {
+            ExactValue = value.ExactValue?.ToCanonicalString(),
+        }).ToArray(),
+        Inventory = setup.Inventory.Select(value => new ScenarioItem(value.Character.Value, value.Item.Value, value.Quantity)
+        {
+            ExactQuantity = value.ExactQuantity?.ToCanonicalString(),
+        }).ToArray(),
     };
 
     public void Validate()
@@ -399,12 +411,17 @@ internal sealed class ScenarioValues
             }
             AuthorScenario.Identifier(stat.Character);
             AuthorScenario.Identifier(stat.Stat);
+            if (stat.ExactValue is { } exact &&
+                (!ExactNumber.TryParse(exact, out var parsed) || parsed.ToInt32RoundedAwayFromZero() != stat.Value))
+                throw new InvalidDataException("Scenario stats require valid exact values.");
         }
         foreach (var item in Inventory)
         {
-            if (item is null || item.Quantity < 0)
+            if (item is null || item.Quantity < 0 || item.ExactQuantity is { } exact &&
+                (!ExactNumber.TryParse(exact, out var parsed) || parsed < 0 ||
+                 parsed.ToInt32RoundedAwayFromZero() != item.Quantity))
             {
-                throw new InvalidDataException("Scenario inventory requires nonnegative integer quantities.");
+                throw new InvalidDataException("Scenario inventory requires nonnegative valid quantities.");
             }
             AuthorScenario.Identifier(item.Character);
             AuthorScenario.Identifier(item.Item);
@@ -419,8 +436,12 @@ internal sealed class ScenarioValues
             pair => ExactNumber.Parse(pair.Value)) ?? new Dictionary<VarId, ExactNumber>(),
         TextVariables = TextVariables.ToDictionary(pair => new VarId(pair.Key), pair => pair.Value),
         Standings = Standings.ToDictionary(pair => new FactionId(pair.Key), pair => pair.Value),
-        Stats = Stats.Select(value => new AuthorStatValue(new(value.Character), new(value.Stat), value.Value)).ToArray(),
-        Inventory = Inventory.Select(value => new AuthorItemValue(new(value.Character), new(value.Item), value.Quantity)).ToArray(),
+        Stats = Stats.Select(value => value.ExactValue is { } exact
+            ? new AuthorStatValue(new(value.Character), new(value.Stat), ExactNumber.Parse(exact))
+            : new AuthorStatValue(new(value.Character), new(value.Stat), value.Value)).ToArray(),
+        Inventory = Inventory.Select(value => value.ExactQuantity is { } exact
+            ? new AuthorItemValue(new(value.Character), new(value.Item), ExactNumber.Parse(exact))
+            : new AuthorItemValue(new(value.Character), new(value.Item), value.Quantity)).ToArray(),
     };
 }
 
@@ -475,8 +496,11 @@ internal sealed class ScenarioCommand
 [JsonSerializable(typeof(RenderedMedia))]
 [JsonSerializable(typeof(CharacterIdentityChanged))]
 [JsonSerializable(typeof(StatChanged))]
+[JsonSerializable(typeof(ExactStatChanged))]
 [JsonSerializable(typeof(ItemsGranted))]
 [JsonSerializable(typeof(ItemsRemoved))]
+[JsonSerializable(typeof(ExactItemsGranted))]
+[JsonSerializable(typeof(ExactItemsRemoved))]
 [JsonSerializable(typeof(StandingChanged))]
 [JsonSerializable(typeof(FlagChanged))]
 [JsonSerializable(typeof(VariableChanged))]

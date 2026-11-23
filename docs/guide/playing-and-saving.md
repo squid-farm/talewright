@@ -145,6 +145,10 @@ history no longer matches, the save remains unchanged and can still be opened wi
 story version. Keep a copy of each version you release; exporting a save backs it up but does not
 make it compatible with a changed story.
 
+A change in Talemark arithmetic version also counts as an update, even if the story files have not
+changed. A supported checkpoint can continue at a new Back boundary. Replay-only saves that require
+the old arithmetic cannot be migrated automatically by the player; keep the old story and player.
+
 The [save format notes](../developer/save-format.md#compatibility) have the exact rules.
 
 The story format itself is still changing between preview releases, so saves from one preview of

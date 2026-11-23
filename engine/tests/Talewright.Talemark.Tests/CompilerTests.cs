@@ -1370,7 +1370,7 @@ public class CompilerTests
         var error = Assert.Single(result.Errors, diagnostic => diagnostic.Code == "TW4006");
 
         Assert.False(result.Success);
-        Assert.Equal("Unknown key 'plural'. Expected one of: name, modifiers, name-agreement, uncountable.", error.Message);
+        Assert.Equal("Unknown key 'plural'. Expected one of: name, modifiers, name-agreement, uncountable, divisible.", error.Message);
         AssertYamlKeyLocation(error, yaml, "plural:");
     }
 

@@ -52,6 +52,11 @@ public sealed class Ruleset
 
     public bool HasStat(StatId id) => StatsById.ContainsKey(id);
 
+    /// <summary>Whether this stat may retain fractions under Talemark 2.</summary>
+    public bool IsFractionalResource(StatId id) =>
+        StatsById.TryGetValue(id, out var stat) && stat.Category == StatCategory.Resource
+        && LevelingRule?.LevelStat != id;
+
     /// <summary>The tier a standing value falls in, or null if the ruleset defines no tiers.</summary>
     public ReputationTier? TierFor(int standing)
     {

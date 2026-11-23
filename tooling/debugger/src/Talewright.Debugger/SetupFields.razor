@@ -13,12 +13,12 @@
         }
     </fieldset>
     <fieldset>
-        <legend>Integer variables, standings, base stats and inventory</legend>
+        <legend>@(TalemarkVersion == 1 ? "Integer variables, standings, base stats and inventory" : "Variables, standings, base stats and inventory")</legend>
         @foreach (var field in Numbers.Where(f => f.Label.Contains(_filter, StringComparison.OrdinalIgnoreCase)))
         {
             <div class="setup-row">
                 <label><input type="checkbox" aria-label="@($"{OverrideLabel} {field.Label}")" @bind="field.Enabled" /> @field.Label</label>
-                <label>Value <input aria-label="@($"{ValueLabel} {field.Label}")" inputmode="numeric" @bind="field.Value" /></label>
+                <label>Value <input aria-label="@($"{ValueLabel} {field.Label}")" inputmode="@(TalemarkVersion == 1 ? "numeric" : "text")" @bind="field.Value" /></label>
             </div>
         }
     </fieldset>
@@ -41,6 +41,7 @@
     [Parameter, EditorRequired] public IReadOnlyList<SetupText> Texts { get; set; } = [];
     [Parameter] public string Title { get; set; } = "Prerequisite overrides";
     [Parameter] public string Prefix { get; set; } = "setup";
+    [Parameter] public int TalemarkVersion { get; set; } = 1;
     private string OverrideLabel => Prefix == "setup" ? "Override" : "Edit";
     private string ValueLabel => Prefix == "setup" ? "Value" : "Edit value";
     private string _filter = "";

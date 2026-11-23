@@ -76,6 +76,12 @@ requested explicitly. If nuget.org isn't in your NuGet configuration, add
 
 ## Writing extensions
 
+For Talemark 2 resource stats, use `IGameStateView.GetExactBaseStat` and `GetExactStat`
+instead of the legacy integer projections. `StatDefinition.ExactMin`, `ExactMax` and
+`ExactDefault`, character `ExactStats`, item `ExactModifiers`, and
+`IStatModifier.GetExactModifier` carry exact values; use the exact `StateChanges` overloads
+to emit resource changes. The integer APIs remain appropriate for Talemark 1 and whole stats.
+
 - [C# story example](../../examples/CSharpStory/README.md): registering a predicate and validating Talemark at build time.
 - [Extension points](architecture.md#6-extension-points): what can be replaced and where.
 - [Writing your own ruleset](../../engine/src/Talewright.Rulesets.Generic/README.md#writing-your-own-ruleset).

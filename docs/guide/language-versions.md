@@ -31,9 +31,11 @@ loaded by a future player may follow that future player's documented omission de
 
 Version `2` adds exact decimal arithmetic and numeric variables. For example, `1 / 4` and `.25`
 represent the same exact value, and numeric variables may start with decimal values or exponent
-notation. Version 2 is
-still under development: resource and inventory behavior, exact save preservation, and player
-presentation are not complete. The current player rejects saves when a version-2 numeric variable
-is fractional or outside the int32 range. Do not select version 2 for an author-facing story until
-those parts ship together. The compiler and debugger support below exists for implementation and
-testing only.
+notation. Saves preserve exact numeric variables, resources and divisible inventory. Version 2 is
+still under development, including player presentation; do not select it for an author-facing story
+until its features ship together.
+
+When a story changes arithmetic versions, a supported checkpoint can carry its state forward and
+starts a new Back boundary. Older replay-only saves need a validated replay against their original
+story; the player does not automatically find that story. Keep the original story and save, and test
+your migration. Some updates cannot be migrated.

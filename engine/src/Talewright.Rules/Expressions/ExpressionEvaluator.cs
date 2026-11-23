@@ -157,7 +157,9 @@ public static class ExpressionEvaluator
             BoolLiteral e => Value.Of(e.Value),
             TextLiteral e => Value.Of(e.Value),
             TierLiteral e => Value.Of(e.Tier),
-            StatRef e => Value.Of(state.GetStat(e.Character, e.Stat)),
+            StatRef e => state.World.TalemarkVersion == 1
+                ? Value.Of(state.GetStat(e.Character, e.Stat))
+                : Value.Of(state.GetExactStat(e.Character, e.Stat)),
             StandingRef e => Value.Of(state.GetStanding(e.Faction)),
             StandingTierRef e => state.Ruleset.TierFor(state.GetStanding(e.Faction)) is { } tier
                 ? Value.Of(tier)
@@ -169,12 +171,12 @@ public static class ExpressionEvaluator
             PronounRef e => Value.Of(Pronoun(state, e)),
             FactionNameRef e => Value.Of(state.World.Factions[e.Faction].Name),
             ItemNameRef e => Value.Of(state.World.Items[e.Item].Name),
-            HasItem e => Value.Of(state.GetItemCount(e.Character, e.Item) > 0),
+            HasItem e => Value.Of(state.GetExactItemCount(e.Character, e.Item) > 0),
             Visited e => Value.Of(state.VisitCount(e.Scene) > 0),
             SceneVisitCountRef e => Value.Of(e.Scene is { } scene
                 ? state.VisitCount(scene)
                 : state.CurrentScene is { } current ? state.VisitCount(current) : 0),
-            InventoryCountRef e => Value.Of(state.GetItemCount(e.Character, e.Item)),
+            InventoryCountRef e => Value.Of(state.GetExactItemCount(e.Character, e.Item)),
             SkillCheckExpr e => context.ResolveSkillCheck?.Invoke(e)
                 ?? throw new InvalidOperationException("A skill check requires an active play evaluation context."),
             NamedPredicate e => Value.Of(context.Predicates.Evaluate(e.Name, state)),
