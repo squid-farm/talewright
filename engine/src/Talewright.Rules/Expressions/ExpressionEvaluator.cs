@@ -246,6 +246,9 @@ public static class ExpressionEvaluator
             return Value.Of(value);
         }
 
+        if (op == BinaryOp.Divide && right.ExactNumber == ExactNumber.Zero)
+            return Value.Of(ExactNumber.Zero);
+
         return Value.Of(op switch
         {
             BinaryOp.Add => left.ExactNumber + right.ExactNumber,

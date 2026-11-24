@@ -191,7 +191,7 @@ public readonly struct ExactNumber : IEquatable<ExactNumber>, IComparable<ExactN
     public static ExactNumber operator /(ExactNumber left, ExactNumber right)
     {
         if (right.Numerator.IsZero)
-            return Zero;
+            throw new DivideByZeroException("Cannot divide an exact number by zero.");
 
         var numeratorDivisor = BigInteger.GreatestCommonDivisor(
             BigInteger.Abs(left.Numerator), BigInteger.Abs(right.Numerator));
