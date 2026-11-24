@@ -322,7 +322,8 @@ internal static class ExpressionCompletion
             {
                 UnaryOp.Not => false,
                 UnaryOp.Negate => InferNumeric(tokens, unary.Operand, symbols),
-                UnaryOp.Round or UnaryOp.RoundUp or UnaryOp.RoundDown => true,
+                UnaryOp.Round or UnaryOp.RoundUp or UnaryOp.RoundDown =>
+                    InferNumeric(tokens, unary.Operand, symbols),
                 _ => null,
             },
             BinaryExpressionNode binary => binary.Operator switch

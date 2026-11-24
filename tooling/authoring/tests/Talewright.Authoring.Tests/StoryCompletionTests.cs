@@ -491,6 +491,8 @@ public sealed class StoryCompletionTests
     [InlineData("{var:coins#rou|}")]
     [InlineData("{faction:guild:standing#rou|}")]
     [InlineData("{(var:coins + 1 * 2)#rou|}")]
+    [InlineData("{1#round#rou|}")]
+    [InlineData("{var:coins#round-up#rou|}")]
     public void Numeric_modifier_completion_is_offered_in_version_two_expression_slots(string line)
     {
         var (analysis, position) = Analyze("=== first\n" + line, VersionTwoManifest);
@@ -511,6 +513,9 @@ public sealed class StoryCompletionTests
     [InlineData("{(var:coins + var:missing)#rou|}")]
     [InlineData("{(var:missing + var:coins)#rou|}")]
     [InlineData("{(var:coins + \"text\")#rou|}")]
+    [InlineData("{\"text\"#round#rou|}")]
+    [InlineData("{\"text\"#round-up#rou|}")]
+    [InlineData("{\"text\"#round-down#rou|}")]
     public void Numeric_modifier_completion_is_not_offered_for_nonnumeric_values(string line)
     {
         var (analysis, position) = Analyze("=== first\n" + line, VersionTwoManifest);
