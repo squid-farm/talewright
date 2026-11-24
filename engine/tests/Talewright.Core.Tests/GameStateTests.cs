@@ -104,6 +104,95 @@ public class GameStateTests
     }
 
     [Fact]
+    public void Version_one_variable_changes_retain_integer_events_and_no_op_changes_emit_none()
+    {
+        var log = new EventLog(CreateWorld(), 1);
+        var variable = new VarId("counter");
+
+        log.AppendRange(StateChanges.SetVariable(log.State, variable, 10));
+        log.AppendRange(StateChanges.SetVariable(log.State, variable, 10));
+
+        Assert.Equal(10, log.State.GetVariable(variable));
+        Assert.Equal(new VariableChanged(variable, 0, 10), Assert.Single(log.Events));
+
+        log.AppendRange(StateChanges.SetVariable(log.State, variable, 11));
+        Assert.Equal(new VariableChanged(variable, 10, 11), log.Events[^1]);
+    }
+
+    [Fact]
+    public void Version_one_item_grants_wrap_and_removal_to_zero_deletes_entries()
+    {
+        var log = new EventLog(CreateWorld(), 1);
+
+        log.Append(new ItemsGranted(EntityId.Player, Rope, int.MaxValue));
+
+        Assert.Equal(unchecked(1 + int.MaxValue), log.State.GetItemCount(EntityId.Player, Rope));
+
+        var removalLog = new EventLog(CreateWorld(), 1);
+        removalLog.AppendRange(StateChanges.GiveItem(EntityId.Player, Rope, 2));
+        removalLog.AppendRange(StateChanges.TakeItem(removalLog.State, EntityId.Player, Rope, 5));
+
+        Assert.Equal(0, removalLog.State.GetItemCount(EntityId.Player, Rope));
+        Assert.DoesNotContain(removalLog.State.GetInventory(EntityId.Player),
+            item => item.Key == Rope);
+    }
+
+    [Fact]
+    public void Stored_negative_version_one_item_counts_stay_queryable_but_are_hidden_from_enumeration()
+    {
+        var log = new EventLog(CreateWorld(), 1);
+
+        log.Append(new ItemsGranted(EntityId.Player, Rope, -3));
+
+        Assert.Equal(-2, log.State.GetItemCount(EntityId.Player, Rope));
+        Assert.Equal(-2, log.State.GetExactItemCount(EntityId.Player, Rope).ToInt32RoundedAwayFromZero());
+        Assert.DoesNotContain(log.State.GetInventory(EntityId.Player),
+            item => item.Key == Rope);
+    }
+
+    [Fact]
+    public void Held_item_modifiers_wrap_before_version_one_bounds()
+    {
+        var stat = new StatId("overflow");
+        var ruleset = GenericRuleset.Create().ToBuilder()
+            .AddStat(new StatDefinition(stat, "Overflow", StatCategory.Custom, 0, 20, 0))
+            .Build();
+        var world = new WorldDefinition(ruleset,
+            [new CharacterDefinition(EntityId.Player, "Mara", "", Pronouns.She,
+                new Dictionary<StatId, int> { [stat] = 20 },
+                new Dictionary<ItemId, int> { [Amulet] = 1 })],
+            [new ItemDefinition(Amulet, "amulet", new Dictionary<StatId, int> { [stat] = int.MaxValue })],
+            [], [], new Dictionary<VarId, int>());
+        var state = GameState.CreateInitial(world, 1);
+
+        Assert.Equal(0, state.GetStat(EntityId.Player, stat));
+    }
+
+    [Fact]
+    public void Ruleset_modifiers_wrap_before_version_one_bounds()
+    {
+        var stat = new StatId("overflow");
+        var ruleset = GenericRuleset.Create().ToBuilder()
+            .AddStat(new StatDefinition(stat, "Overflow", StatCategory.Custom, 0, 20, 0))
+            .AddModifier(new IntOverflowModifier(stat))
+            .Build();
+        var world = new WorldDefinition(ruleset,
+            [new CharacterDefinition(EntityId.Player, "Mara", "", Pronouns.She,
+                new Dictionary<StatId, int> { [stat] = 20 },
+                new Dictionary<ItemId, int>())],
+            [], [], [], new Dictionary<VarId, int>());
+        var state = GameState.CreateInitial(world, 1);
+
+        Assert.Equal(0, state.GetStat(EntityId.Player, stat));
+    }
+
+    private sealed record IntOverflowModifier(StatId Stat) : IStatModifier
+    {
+        public int GetModifier(IGameStateView state, EntityId character, StatId stat) =>
+            stat == Stat ? int.MaxValue : 0;
+    }
+
+    [Fact]
     public void Replay_reproduces_state_and_truncate_rewinds()
     {
         var world = CreateWorld();

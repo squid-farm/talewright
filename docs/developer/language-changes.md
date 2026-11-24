@@ -4,6 +4,19 @@ Use this checklist when proposing any Talemark syntax, including images or forma
 The [operator registry](../reference/talemark-operators.md) is the source of truth for existing
 meanings and the difference between implemented and decided syntax.
 
+## Numeric compatibility
+
+New numeric behavior belongs to Talemark 2. The omitted-version default remains Talemark 1 until
+[#829](https://github.com/squid-farm/talewright/issues/829), and Talemark 1 support continues through
+Talewright 1.x. Talemark 1 keeps its existing int32 expression and state behavior, including
+truncation toward zero for division, zero for division by zero, saturation at each arithmetic
+operation, variable and stat saturation, legacy inventory wrapping, and legacy replay events.
+This rule freezes behavior, not shared implementation: shared code may change for maintenance or
+regression fixes as long as Talemark 1 behavior and replay evidence remain unchanged.
+
+Reject a construct that is new to Talemark 2 when it appears in a Talemark 1 story. Its diagnostic
+must be actionable and direct the author to `game.talemark: 2`.
+
 ## Before implementation
 
 - [ ] Read the [naming conventions](naming-conventions.md); keep author-facing
