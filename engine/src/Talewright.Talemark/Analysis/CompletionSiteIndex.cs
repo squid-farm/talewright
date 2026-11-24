@@ -59,8 +59,8 @@ internal sealed class ExpressionSiteSource(TokenBuffer tokens, int expressionLen
     internal YamlScalarSource? Scalar { get; } = scalar;
     internal Func<int, SourceLocation>? Locate { get; } = locate;
 
-    internal IEnumerable<CompletionSite> Sites(IReadOnlyList<AuthoringSymbol> symbols) =>
-        ExpressionCompletion.Sites(Tokens, Kind, new ExpressionSourceMap(this).Map, symbols);
+    internal IEnumerable<CompletionSite> Sites(IReadOnlyList<AuthoringSymbol> symbols, int talemarkVersion) =>
+        ExpressionCompletion.Sites(Tokens, Kind, new ExpressionSourceMap(this).Map, symbols, talemarkVersion);
 }
 
 /// <summary>A precomputed site, or an expression whose sites are computed on request, covering <see cref="Region"/>.</summary>
@@ -68,17 +68,18 @@ internal readonly record struct CompletionSiteSource(SourceRange Region, Complet
 {
     internal static CompletionSiteSource Of(CompletionSite site) => new(site.Range, site, null);
 
-    internal IEnumerable<CompletionSite> Sites(IReadOnlyList<AuthoringSymbol> symbols) =>
-        Site is not null ? [Site] : Expression!.Sites(symbols);
+    internal IEnumerable<CompletionSite> Sites(IReadOnlyList<AuthoringSymbol> symbols, int talemarkVersion) =>
+        Site is not null ? [Site] : Expression!.Sites(symbols, talemarkVersion);
 }
 
 /// <summary>
 /// Finds the site sources whose regions contain a position, preserving analysis order. The position index is
 /// built on the first query, so analyses that are never queried do not pay for it.
 /// </summary>
-internal sealed class CompletionSiteIndex(CompletionSiteSource[] sources)
+internal sealed class CompletionSiteIndex(CompletionSiteSource[] sources, int talemarkVersion)
 {
     private readonly CompletionSiteSource[] _sources = sources;
+    private readonly int _talemarkVersion = talemarkVersion;
     private Dictionary<string, FileSources>? _files;
 
     // Sources sorted by region start; MaxEnds[i] is the furthest region end among the first i + 1 entries.
@@ -125,7 +126,7 @@ internal sealed class CompletionSiteIndex(CompletionSiteSource[] sources)
         matches.Sort();
         var result = new List<CompletionSite>();
         foreach (var index in matches)
-            foreach (var site in _sources[index].Sites(symbols))
+            foreach (var site in _sources[index].Sites(symbols, _talemarkVersion))
                 if (site.Range.Start.File == position.File && Compare(site.Range.Start, position) <= 0 &&
                     Compare(position, site.Range.End) <= 0)
                     result.Add(site);
@@ -133,7 +134,7 @@ internal sealed class CompletionSiteIndex(CompletionSiteSource[] sources)
     }
 
     internal IEnumerable<CompletionSite> All(IReadOnlyList<AuthoringSymbol> symbols) =>
-        _sources.SelectMany(source => source.Sites(symbols));
+        _sources.SelectMany(source => source.Sites(symbols, _talemarkVersion));
 
     private static int Compare(SourceLocation left, SourceLocation right) =>
         left.Line != right.Line ? left.Line.CompareTo(right.Line) : left.Column.CompareTo(right.Column);

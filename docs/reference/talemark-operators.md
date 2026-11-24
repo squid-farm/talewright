@@ -72,8 +72,8 @@ is needed.
 | Line directive | The first characters of a trimmed line. One directive per line. | Scene bodies; metadata directly after `===`. | Story structure: a scene, metadata, choice, speech, effect batch, check block, divert or comment. | `=== camp`, `@title`, `* [Go] -> hall`, `> guide: Hi.`, `~ set flag:x`, `::: skill-check`, `-> hall`, `// note` |
 | Reader text | The default content of a text unit. | Paragraphs, speech text, choice labels, image alt text. | Formatted text shown to the reader. | `**Danger** ahead` |
 | Inline construct | `{` and its matching `}` inside reader text. | Any reader text. | Substituted text, a conditional branch, or media. | `{player:first-name}`, `{if flag:x}`, `{image("map")}` |
-| Expression | An expression slot. | Substitutions, `{if}`, `@requires`, `(requires ...)`, assignment values, quantities and check DCs. | A typed value: number, boolean, text or tier. Never changes state. | `player:hp > 0`, `player visited camp`, `camp:player:visits` |
-| Text manipulator | `#name` after a substitution's value. | The end of a substitution only. | Text or formatted text. Applied left to right. Never changes state. | `#capitalize`, `#bold`, `#one-many("is", "are")` |
+| Expression | An expression slot. | Substitutions, `{if}`, `@requires`, `(requires ...)`, assignment values, quantities and check DCs. | A typed value: number, boolean, text or tier. Talemark 2 numeric postfix operations preserve the number type. Never changes state. | `player:hp > 0`, `player visited camp`, `(player:hp * 0.1)#round-up`, `0.6#round#one-many("point", "points")` |
+| Text manipulator | `#name` after a substitution's value. | The end of a substitution only, after any numeric modifiers. | Text or formatted text. Applied left to right. Never changes state. | `#capitalize`, `#bold`, `#one-many("is", "are")` |
 | Effect | A statement in a `~` line or a choice `{ ... }` block, separated by `;`. | Effect lines and choice effects. | A state change, with no value. | `set flag:x`, `give player rope 2`, `var:coins += 1` |
 | Clause | A fixed word, or a word followed by `:`, attached to a directive. | Choices, checks and hub requirements. | Modifies its directive. | `(requires ..., shown "reader text")`, `success:`, `skill-check perception dc 12` |
 
@@ -127,6 +127,7 @@ New callables follow this guideline. Existing exceptions are listed below.
 | Callable | Family and result | Arguments (slot kind) | Contexts | Notes |
 |---|---|---|---|---|
 | `player visited scene` | Expression predicate; boolean. | One scene name. | Expressions. | True when the player has entered the scene at least once. |
+| `#round`, `#round-up`, `#round-down` | Numeric modifier; number. | None. | Numeric expression slots in Talemark 2. | Round to nearest with midpoint ties away from zero, mathematical ceiling, or mathematical floor. Use exact values; chain left to right and parenthesize compound expressions. |
 | `scene:player:visits`, `<scene>:player:visits` | Expression reference; number. | Owning-scene alias or one scene name. | Expressions. | Counts player entries, including repeated entries. In a scene, `scene` means the containing scene; in hub candidates and their labels/text it remains the candidate scene. Manifest triggers and character rules with no scene owner read the current scene. Other-character visit counts are unsupported. |
 | `character:inventory:item`, `character:inventory:item:name` | Expression reference; text. | Character ID and item ID. | Expressions. | Same shared item display name as `item:<id>`, whether or not the character holds it. |
 | `character:inventory:item:count` | Expression reference; number. | Character ID and item ID. | Expressions. | Reads the held quantity, or 0 when not held; read-only, changed with `give` or `take`. |
@@ -210,7 +211,7 @@ using the quoted-text rules when it is inside syntax.
 | `:` | Access a named value/property in expressions and substitutions; also select an effect target. Repeats for nested access. Never use `.` instead. | 1 | `{faction:explorers-guild:standing}` | TW2001 unknown name/property or old spelling; TW2004 undeclared flag/variable. |
 | `.` | Group words within one identifier, never access a property. | Name | `{item:weapon.knife}` | Invalid identifiers produce TW1001 in expressions, TW1008 for scenes, TW4003 in YAML. |
 | `-` in names | Separate groups within a name; not subtraction. | Name | `{player:first-name}` | Same identifier diagnostics as `.`. |
-| `#` | Text manipulator in a substitution. Takes the value to its left and returns text or formatted text; repeated manipulators run left to right. Inside quoted text it is literal content. | After the value expression | `{player:pronoun:reflexive#capitalize}` | TW2006 unknown manipulator, bad argument syntax or value, or incompatible chain. |
+| `#` | Numeric modifier after an expression in Talemark 2, or a text manipulator at the end of a substitution. Numeric modifiers return whole-number-valued numbers and remain usable in arithmetic and comparisons; text manipulators return text or formatted text. Each chain runs left to right. Inside quoted text `#` is literal content. | After a numeric expression; text manipulators follow the value and any numeric modifiers | `{(var:loss)#round-up}`; `{(0.6)#round#one-many("point", "points")}` | TW2006 invalid modifier, argument syntax, value or incompatible chain. |
 | `(` `)` | Group an expression; also bound manipulator arguments, choice conditions, and hub tag groups. | 1 for grouping; otherwise structural | `{(var:coins + 1) * 2}` | TW1001 expression mismatch; TW2006 manipulator; TW1011 choice; TW1006 hub. |
 | `"` | Bound text literals, manipulator string arguments and image arguments. All decode `\"` and `\\`; no single-quoted Talemark string form. | 1 | `{("a # literal")#capitalize}` | TW1001 malformed expression; TW2006 malformed manipulator; TW1014 malformed image; TW1004 enclosing brace not found. |
 | `\` | Escape a quote or backslash inside literal strings, or ASCII punctuation and symbols in reader text. | During text scanning | `Literal \{braces\}` | Unsupported string escapes are errors; unescaped `{` can cause TW1004. Not a numeric or boolean operator. |
@@ -251,7 +252,7 @@ See [declaration ordering and inference](talemark-syntax.md#declaring-variables-
 From tightest to loosest:
 
 1. Parenthesized expressions, literals, references, `has`, `player visited <scene>`, named predicates.
-2. Unary numeric `-`.
+2. Unary numeric `-`, then a postfix numeric modifier (`#round`, `#round-up`, `#round-down`).
 3. `*`, `/`.
 4. `+`, binary `-`.
 5. One comparison (`==`, `!=`, `<`, `<=`, `>`, `>=`); comparisons do not chain.
@@ -261,16 +262,21 @@ From tightest to loosest:
 
 Arithmetic at the same level groups left to right: `8 - 3 - 1` is `(8 - 3) - 1`.
 `not player:hp > 0` means `not (player:hp > 0)`. Use parentheses when the intended grouping
-is not obvious. Expressions allow at most 256 nested groups and prefix operators combined
-(TW1016 beyond the limit). In a substitution, the value expression is evaluated before the `#` chain.
-`#upper#lower` applies upper case, then lower case.
+is not obvious. Numeric modifiers apply after a unary minus and before arithmetic operators, so
+`-0.1#round-up` rounds the negative value. Parenthesize compound expressions before a modifier,
+as in `(player:hp * 0.1)#round-up`. Expressions allow at most 256 nested groups, prefix operators
+and numeric postfix modifiers combined (TW1016 beyond the limit). In a substitution, the numeric
+expression is evaluated before its numeric modifiers and then its text modifiers. `#round#one-many(...)`
+first rounds the number, then selects wording from that result; `#upper#lower` applies upper case,
+then lower case.
 
 ### Manipulator arguments
 
 Manipulator arguments use the shape `#name("first", "second")`: commas separate double-quoted
 arguments. Argument values belong to the manipulator; they are not globally reserved names.
 Each manipulator validates its own supported values and reports a clear diagnostic for invalid ones.
-Today only `#one-many` takes arguments; passing arguments to any other manipulator is an error.
+Today only `#one-many` takes arguments; numeric modifiers and other text manipulators take none.
+Passing arguments to any of them is an error.
 
 Pronoun forms are properties, not manipulators; for example,
 `{player:pronoun:possessive-pronoun:independent}` gives *hers*. The selector
@@ -301,7 +307,9 @@ Completion offers `subject`, `object`, `possessive-pronoun` and `reflexive` afte
 `character:pronoun:possessive-pronoun:`. Both possessive properties are explicit; neither is a default.
 Completion currently offers `one-many` on pronoun and item-name references; the
 same selector is valid after number-valued expressions. Its strings are author
-text, not finite argument suggestions.
+text, not finite argument suggestions. Talemark 2 numeric expressions also complete the three
+numeric modifiers; hover describes their exact rounding behavior. They are not offered in
+Talemark 1.
 Wrong targets, missing strings and extra arguments produce TW2006.
 
 ### Image syntax

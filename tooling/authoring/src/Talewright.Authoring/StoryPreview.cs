@@ -66,7 +66,8 @@ public static class StoryPreview
         var declaredDefault = variable is not null && analysis.Tokens.Any(token =>
             token.ManifestPath is { Count: 2 } path && path[0] == ManifestVocabulary.Vars && path[1] == variable);
         var numericSelector = template.Modifiers.Any(modifier => modifier is OneManyTextModifier);
-        var numericDefault = numericSelector && template.Value.Type == ExprType.Number &&
+        var numericDefault = (numericSelector || ContainsNumericModifier(template.Value)) &&
+            template.Value.Type == ExprType.Number &&
             HasNumericDefault(template.Value, analysis);
         if (!declaredDefault &&
             !numericDefault &&
@@ -113,6 +114,14 @@ public static class StoryPreview
             _ => false,
         };
 
+    private static bool ContainsNumericModifier(Expr expression) => expression switch
+    {
+        UnaryExpr { Op: UnaryOp.Round or UnaryOp.RoundUp or UnaryOp.RoundDown } => true,
+        UnaryExpr unary => ContainsNumericModifier(unary.Operand),
+        BinaryExpr binary => ContainsNumericModifier(binary.Left) || ContainsNumericModifier(binary.Right),
+        _ => false,
+    };
+
     private static bool HasNumericDefault(Expr expression, StoryAnalysis analysis) => expression switch
     {
         NumberLiteral => true,
@@ -120,7 +129,8 @@ public static class StoryPreview
             token.ManifestPath is { Count: 2 } path &&
             path[0] == ManifestVocabulary.Vars && path[1] == reference.Variable.Value),
         StatRef or StandingRef or SceneVisitCountRef or InventoryCountRef => true,
-        UnaryExpr { Op: UnaryOp.Negate } unary => HasNumericDefault(unary.Operand, analysis),
+        UnaryExpr { Op: UnaryOp.Negate or UnaryOp.Round or UnaryOp.RoundUp or UnaryOp.RoundDown } unary =>
+            HasNumericDefault(unary.Operand, analysis),
         BinaryExpr { Op: BinaryOp.Add or BinaryOp.Subtract or BinaryOp.Multiply or BinaryOp.Divide } binary =>
             HasNumericDefault(binary.Left, analysis) && HasNumericDefault(binary.Right, analysis),
         _ => false,

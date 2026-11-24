@@ -85,6 +85,35 @@ public sealed class StoryPreviewTests
         Assert.DoesNotContain("Preview unavailable", hover.PlainText);
     }
 
+    [Fact]
+    public void Numeric_modifier_previews_use_exact_expression_results_and_match_gameplay()
+    {
+        var manifest = Manifest.Replace(
+            "  start: start",
+            "  start: start\n  talemark: 2",
+            StringComparison.Ordinal);
+        var analysis = StoryAnalyzer.Analyze(Source("""
+            === start
+            {0.6#round}
+            {(var:coins / 2)#round-up}
+            {0.6#round#one-many("one", "many")}
+            -> END
+            """, manifest));
+        Assert.DoesNotContain(analysis.Diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+
+        var previews = StoryPreview.Get(analysis, "main.tale");
+
+        Assert.Equal(["1", "2", "one"], previews.Select(preview => preview.Value));
+        Assert.Equal(["1", "2", "1"], previews.Select(preview => preview.Steps[0].Value));
+        var state = GameState.CreateInitial(analysis.World!, 0);
+        foreach (var (substitution, preview) in analysis.Substitutions.Zip(previews))
+        {
+            var rendered = Assert.IsType<RenderedText>(Assert.Single(
+                new TemplateRenderer().RenderInlines([substitution.Template], state)));
+            Assert.Equal(rendered.Text, preview.Value);
+        }
+    }
+
     [Theory]
     [InlineData("she", "has", "her")]
     [InlineData("they", "have", "them")]

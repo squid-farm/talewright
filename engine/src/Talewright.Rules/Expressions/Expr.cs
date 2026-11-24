@@ -163,6 +163,9 @@ public enum UnaryOp
 {
     Not,
     Negate,
+    Round,
+    RoundUp,
+    RoundDown,
 }
 
 public sealed record UnaryExpr(UnaryOp Op, Expr Operand) : Expr

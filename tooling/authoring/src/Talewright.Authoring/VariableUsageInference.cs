@@ -93,7 +93,9 @@ internal static class VariableUsageInference
                 return InferWithin(analysis, text, parenthesized.Inner, offset, required);
             case UnaryExpressionNode unary:
                 return InferWithin(analysis, text, unary.Operand, offset,
-                    unary.Operator == UnaryOp.Negate ? VariableUsageType.Number : VariableUsageType.Unknown);
+                    unary.Operator is UnaryOp.Negate or UnaryOp.Round or UnaryOp.RoundUp or UnaryOp.RoundDown
+                        ? VariableUsageType.Number
+                        : VariableUsageType.Unknown);
             case BinaryExpressionNode binary:
             {
                 var left = binary.Operator switch
@@ -120,7 +122,8 @@ internal static class VariableUsageInference
         NumberExpressionNode => VariableUsageType.Number,
         TextExpressionNode => VariableUsageType.Text,
         ParenthesizedExpressionNode parenthesized => OperandType(analysis, text, parenthesized.Inner),
-        UnaryExpressionNode { Operator: UnaryOp.Negate } => VariableUsageType.Number,
+        UnaryExpressionNode { Operator: UnaryOp.Negate or UnaryOp.Round or UnaryOp.RoundUp or UnaryOp.RoundDown } =>
+            VariableUsageType.Number,
         BinaryExpressionNode
         {
             Operator: BinaryOp.Add or BinaryOp.Subtract or BinaryOp.Multiply or BinaryOp.Divide

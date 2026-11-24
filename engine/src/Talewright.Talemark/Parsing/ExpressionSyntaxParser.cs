@@ -62,7 +62,7 @@ internal sealed class ExpressionSyntaxParser
     internal static SubstitutionSyntaxTree ParseSubstitution(TokenBuffer tokens, int expressionLength,
         Func<int, SourceLocation> locate, DiagnosticBag diagnostics)
     {
-        var hashIndex = FindHash(tokens, expressionLength);
+        var hashIndex = FindTextModifierStart(tokens, expressionLength);
         var endOffset = hashIndex < 0 ? expressionLength : tokens[hashIndex].Offset;
         var endIndex = hashIndex < 0 ? FindEndIndex(tokens, expressionLength) : hashIndex;
         var parser = new ExpressionSyntaxParser(tokens, endOffset, locate, diagnostics, endIndex);
@@ -223,9 +223,18 @@ internal sealed class ExpressionSyntaxParser
         return default!;
     }
 
+    [DoesNotReturn]
+    private void FailRange(string code, string message, int offset, int length)
+    {
+        _hasErrors = true;
+        _failureOffset = offset;
+        _diagnostics.Error(code, message, _locate(offset), _locate(offset + length));
+        throw new ParseException();
+    }
+
     private ExpressionNode ParseNested(Token opener, Func<ExpressionNode> parse)
     {
-        if (_nestingDepth == MaximumNestingDepth)
+        if (_nestingDepth >= MaximumNestingDepth)
         {
             Fail(CompilerDiagnosticCodes.NestingLimitExceeded, $"Expression is nested more than {MaximumNestingDepth} levels deep.", opener.Offset);
         }
@@ -327,21 +336,55 @@ internal sealed class ExpressionSyntaxParser
 
     private ExpressionNode ParseUnary()
     {
-        if (Peek.Kind == TokenKind.Minus)
+        if (_tokens.TalemarkVersion == 1)
         {
-            var op = Next();
-            if (TryReadMinimumMagnitude())
+            if (Peek.Kind == TokenKind.Minus)
             {
-                return new NumberExpressionNode(ExactNumber.FromInteger(int.MinValue),
-                    new(op.Offset, TokenAt(_position - 1).Offset + TokenAt(_position - 1).Length - op.Offset));
+                var op = Next();
+                if (TryReadMinimumMagnitude())
+                {
+                    var number = new NumberExpressionNode(ExactNumber.FromInteger(int.MinValue),
+                        new(op.Offset, TokenAt(_position - 1).Offset + TokenAt(_position - 1).Length - op.Offset));
+                    return ParseNumberModifiers(number);
+                }
+
+                var operand = ParseNested(op, ParseUnary);
+                return new UnaryExpressionNode(UnaryOp.Negate, operand, Span(op),
+                    new(op.Offset, operand.Span.End - op.Offset));
             }
 
-            var operand = ParseNested(op, ParseUnary);
-            return new UnaryExpressionNode(UnaryOp.Negate, operand, Span(op),
-                new(op.Offset, operand.Span.End - op.Offset));
+            return ParseNumberModifiers(ParsePrimary());
         }
 
-        return ParsePrimary();
+        var prefixes = new List<Token>();
+        while (Peek.Kind == TokenKind.Minus)
+        {
+            var op = Next();
+            if (prefixes.Count + _nestingDepth >= MaximumNestingDepth)
+                Fail(CompilerDiagnosticCodes.NestingLimitExceeded,
+                    $"Expression is nested more than {MaximumNestingDepth} levels deep.", op.Offset);
+            prefixes.Add(op);
+        }
+
+        _nestingDepth += prefixes.Count;
+        ExpressionNode expression;
+        try
+        {
+            expression = ParsePrimary();
+        }
+        finally
+        {
+            _nestingDepth -= prefixes.Count;
+        }
+
+        for (var index = prefixes.Count - 1; index >= 0; index--)
+        {
+            var op = prefixes[index];
+            expression = new UnaryExpressionNode(UnaryOp.Negate, expression, Span(op),
+                new(op.Offset, expression.Span.End - op.Offset));
+        }
+
+        return ParseNumberModifiers(expression);
     }
 
     private bool TryReadMinimumMagnitude()
@@ -586,14 +629,103 @@ internal sealed class ExpressionSyntaxParser
         return tokens.Count - 1;
     }
 
-    private static int FindHash(TokenBuffer tokens, int endOffset)
+    private static int FindTextModifierStart(TokenBuffer tokens, int endOffset)
     {
         for (var index = 0; index < tokens.Count && tokens[index].Offset < endOffset; index++)
         {
-            if (tokens[index].Kind == TokenKind.Hash) return index;
+            if (tokens[index].Kind != TokenKind.Hash)
+                continue;
+
+            var next = tokens[index + 1];
+            if (next.Kind == TokenKind.Identifier &&
+                ExpressionVocabulary.TryGetNumericModifier(next.Text, out _))
+                continue;
+            return index;
         }
 
         return -1;
+    }
+
+    private static int GetExpressionNestingDepth(ExpressionNode expression)
+    {
+        var maximumDepth = 0;
+        var pending = new Stack<(ExpressionNode Expression, int Depth)>();
+        pending.Push((expression, 0));
+        while (pending.Count > 0)
+        {
+            var (current, depth) = pending.Pop();
+            switch (current)
+            {
+                case ParenthesizedExpressionNode parenthesized:
+                    depth++;
+                    maximumDepth = Math.Max(maximumDepth, depth);
+                    pending.Push((parenthesized.Inner, depth));
+                    break;
+                case UnaryExpressionNode unary:
+                    depth++;
+                    maximumDepth = Math.Max(maximumDepth, depth);
+                    pending.Push((unary.Operand, depth));
+                    break;
+                case BinaryExpressionNode binary:
+                    pending.Push((binary.Left, depth));
+                    pending.Push((binary.Right, depth));
+                    break;
+                case SkillCheckExpressionNode { Difficulty: { } difficulty }:
+                    pending.Push((difficulty, depth));
+                    break;
+            }
+        }
+
+        return maximumDepth;
+    }
+
+    private ExpressionNode ParseNumberModifiers(ExpressionNode value)
+    {
+        if (Peek.Kind != TokenKind.Hash)
+            return value;
+
+        var modifierDepth = 0;
+        var nestedDepth = _nestingDepth + GetExpressionNestingDepth(value);
+        while (Peek.Kind == TokenKind.Hash)
+        {
+            var marker = Next();
+            if (modifierDepth + nestedDepth >= MaximumNestingDepth)
+            {
+                Fail(CompilerDiagnosticCodes.NestingLimitExceeded,
+                    $"Expression is nested more than {MaximumNestingDepth} levels deep.", marker.Offset);
+            }
+            modifierDepth++;
+            if (Peek.Kind != TokenKind.Identifier)
+            {
+                FailRange(CompilerDiagnosticCodes.InvalidModifier,
+                    $"Write a numeric modifier after '{ExpressionVocabulary.ModifierMarker}'. Use: " +
+                    string.Join(", ", ExpressionVocabulary.NumericModifierSpellings) + ".",
+                    marker.Offset, marker.Length);
+            }
+
+            var name = Next();
+            if (!ExpressionVocabulary.TryGetNumericModifier(name.Text, out var op))
+            {
+                FailRange(CompilerDiagnosticCodes.InvalidModifier,
+                    $"Unknown numeric modifier '{ExpressionVocabulary.ModifierMarker}{name.Value}'. Use: " +
+                    string.Join(", ", ExpressionVocabulary.NumericModifierSpellings) + ".",
+                    marker.Offset, name.Offset + name.Length - marker.Offset);
+            }
+
+            if (Peek.Kind == TokenKind.LeftParen)
+            {
+                FailRange(CompilerDiagnosticCodes.InvalidModifier,
+                    $"Numeric modifier '{ExpressionVocabulary.NumericModifierSpelling(op)}' takes no arguments.",
+                    marker.Offset, name.Offset + name.Length - marker.Offset);
+            }
+
+            var operatorSpan = new ExpressionSpan(marker.Offset,
+                name.Offset + name.Length - marker.Offset);
+            value = new UnaryExpressionNode(op, value, operatorSpan,
+                new(value.Span.Start, operatorSpan.End - value.Span.Start));
+        }
+
+        return value;
     }
 
     private ImmutableArray<ModifierCallSyntax> ParseModifiers(int start, int endOffset)
@@ -612,6 +744,20 @@ internal sealed class ExpressionSyntaxParser
             }
 
             var name = text[nameStart..index].Trim();
+            if (name.Length == 0)
+            {
+                FailRange(CompilerDiagnosticCodes.InvalidModifier,
+                    "Write a text modifier name after '#'.", offset, 1);
+            }
+
+            if (ExpressionVocabulary.TryGetNumericModifier(name.AsSpan(), out var numericModifier))
+            {
+                FailRange(CompilerDiagnosticCodes.InvalidModifier,
+                    $"Apply numeric modifier '{ExpressionVocabulary.NumericModifierSpelling(numericModifier)}' " +
+                    "before text modifiers.",
+                    offset, index - offset);
+            }
+
             string? argument = null;
             string? pluralArgument = null;
             if (index < text.Length && text[index] == ExpressionVocabulary.OpenParen)

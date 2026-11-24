@@ -152,6 +152,43 @@ public class ExactNumberTests
         Assert.Equal(expected, ExactNumber.Parse(text).ToInt32RoundedAwayFromZero());
     }
 
+    [Theory]
+    [InlineData("2.5", "3", "3", "2")]
+    [InlineData("-2.5", "-3", "-2", "-3")]
+    [InlineData("2.499", "2", "3", "2")]
+    [InlineData("-2.499", "-2", "-2", "-3")]
+    [InlineData("0.1", "0", "1", "0")]
+    [InlineData("-0.1", "0", "0", "-1")]
+    [InlineData("1/3", "0", "1", "0")]
+    [InlineData("-1/3", "0", "0", "-1")]
+    [InlineData("2", "2", "2", "2")]
+    [InlineData("-2", "-2", "-2", "-2")]
+    public void Exact_integer_rounding_handles_signs_ties_and_fractions(
+        string text, string nearest, string ceiling, string floor)
+    {
+        var value = ExactNumber.Parse(text);
+
+        Assert.Equal(ExactNumber.Parse(nearest), value.RoundToNearestInteger());
+        Assert.Equal(ExactNumber.Parse(ceiling), value.Ceiling());
+        Assert.Equal(ExactNumber.Parse(floor), value.Floor());
+    }
+
+    [Fact]
+    public void Exact_integer_rounding_preserves_arbitrary_precision()
+    {
+        var digits = new string('9', 500);
+        var integer = BigInteger.Parse(digits);
+        var positive = ExactNumber.Parse($"{digits}.6");
+        var negative = ExactNumber.Parse($"-{digits}.6");
+
+        Assert.Equal(ExactNumber.FromInteger(integer + 1), positive.RoundToNearestInteger());
+        Assert.Equal(ExactNumber.FromInteger(integer + 1), positive.Ceiling());
+        Assert.Equal(ExactNumber.FromInteger(integer), positive.Floor());
+        Assert.Equal(ExactNumber.FromInteger(-integer - 1), negative.RoundToNearestInteger());
+        Assert.Equal(ExactNumber.FromInteger(-integer), negative.Ceiling());
+        Assert.Equal(ExactNumber.FromInteger(-integer - 1), negative.Floor());
+    }
+
     [Fact]
     public void Arbitrary_precision_values_are_not_limited()
     {

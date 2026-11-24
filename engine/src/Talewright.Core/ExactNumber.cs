@@ -301,6 +301,30 @@ public readonly struct ExactNumber : IEquatable<ExactNumber>, IComparable<ExactN
         return $"+{displayed}";
     }
 
+    public ExactNumber RoundToNearestInteger()
+    {
+        var quotient = BigInteger.DivRem(Numerator, Denominator, out var remainder);
+        if (!remainder.IsZero && BigInteger.Abs(remainder) * 2 >= Denominator)
+            quotient += Numerator.Sign;
+        return FromInteger(quotient);
+    }
+
+    public ExactNumber Ceiling()
+    {
+        var quotient = BigInteger.DivRem(Numerator, Denominator, out var remainder);
+        if (remainder.Sign > 0)
+            quotient++;
+        return FromInteger(quotient);
+    }
+
+    public ExactNumber Floor()
+    {
+        var quotient = BigInteger.DivRem(Numerator, Denominator, out var remainder);
+        if (remainder.Sign < 0)
+            quotient--;
+        return FromInteger(quotient);
+    }
+
     public override string ToString() => ToCanonicalString();
 
     public string ToString(IFormatProvider? formatProvider) => ToCanonicalString();

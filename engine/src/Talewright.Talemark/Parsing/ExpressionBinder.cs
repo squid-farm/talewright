@@ -101,8 +101,12 @@ internal sealed class ExpressionBinder
 
                     if (!symbols.Modifiers.TryGet(call.Name, out modifier!))
                     {
+                        var knownModifiers = symbols.Modifiers.Names.Select(name =>
+                            ExpressionVocabulary.ModifierMarker + name);
+                        if (syntax.Tokens.TalemarkVersion == 2 && value.Type == ExprType.Number)
+                            knownModifiers = knownModifiers.Concat(ExpressionVocabulary.NumericModifierSpellings);
                         binder.Fail(CompilerDiagnosticCodes.InvalidModifier,
-                            $"Unknown modifier '#{call.Name}'. Known: {string.Join(", ", symbols.Modifiers.Names.Select(name => ExpressionVocabulary.ModifierMarker + name))}.",
+                            $"Unknown modifier '#{call.Name}'. Known: {string.Join(", ", knownModifiers)}.",
                             call.Offset);
                     }
                 }
@@ -498,6 +502,23 @@ internal sealed class ExpressionBinder
                 }
 
                 return new UnaryExpr(UnaryOp.Negate, operand);
+            case UnaryOp.Round or UnaryOp.RoundUp or UnaryOp.RoundDown:
+                var modifier = ExpressionVocabulary.NumericModifierSpelling(unary.Operator);
+                if (_symbols.World.TalemarkVersion == 1)
+                {
+                    Fail(CompilerDiagnosticCodes.InvalidModifier,
+                        $"Numeric modifier '{modifier}' is available only in Talemark 2. Set 'game.talemark: 2' to use it.",
+                        unary.OperatorSpan);
+                }
+
+                if (operand.Type != ExprType.Number)
+                {
+                    Fail(CompilerDiagnosticCodes.InvalidModifier,
+                        $"Numeric modifier '{modifier}' requires a number-valued expression, but found {Describe(operand.Type)}.",
+                        unary.OperatorSpan);
+                }
+
+                return new UnaryExpr(unary.Operator, operand);
             default:
                 throw new InvalidOperationException($"Unsupported unary operator '{unary.Operator}'.");
         }

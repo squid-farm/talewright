@@ -1,4 +1,5 @@
 using Talewright.Core.Identity;
+using Talewright.Rules.Expressions;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Parsing;
 using Talewright.Narrative.Templates;
@@ -27,6 +28,11 @@ internal static class ExpressionCompletion
         AuthoringSyntaxVocabulary.KeywordDetails(SubjectForm, ObjectForm, PossessivePronoun, ReflexiveForm,
             OneManyTextModifier.ModifierName);
 
+    private static readonly string[] NumericModifierKeywords =
+        [ExpressionVocabulary.Round, ExpressionVocabulary.RoundUp, ExpressionVocabulary.RoundDown];
+    private static readonly IReadOnlyDictionary<string, string> NumericModifierDetails =
+        AuthoringSyntaxVocabulary.KeywordDetails(NumericModifierKeywords);
+
     private static readonly IReadOnlyDictionary<string, string> PossessivePropertyDetails =
         AuthoringSyntaxVocabulary.KeywordDetails(Determiner, Independent);
 
@@ -36,7 +42,7 @@ internal static class ExpressionCompletion
     private static readonly string[] NumericInventoryItemKeywords = [Count];
 
     internal static IEnumerable<CompletionSite> Sites(TokenBuffer tokens, ExpressionContextKind kind, Func<int, int, SourceRange> map,
-        IReadOnlyList<AuthoringSymbol> symbols)
+        IReadOnlyList<AuthoringSymbol> symbols, int talemarkVersion)
     {
         var text = tokens.Source;
         var offsets = new HashSet<int> { text.Length };
@@ -76,10 +82,23 @@ internal static class ExpressionCompletion
                 if (kind == ExpressionContextKind.Substitution)
                 {
                     kinds = [AuthoringSymbolKind.Modifier];
+                    if (talemarkVersion == 2 && IsNumericExpressionBeforeModifier(tokens, start, symbols))
+                    {
+                        keywords = NumericModifierKeywords;
+                        details = NumericModifierDetails;
+                    }
                     if (IsAgreementReference(tokens, symbols))
                     {
-                        keywords = [OneManyTextModifier.ModifierName];
+                        keywords = [.. keywords, OneManyTextModifier.ModifierName];
                         details = PronounFormDetails;
+                    }
+                }
+                else if (kind is ExpressionContextKind.Condition or ExpressionContextKind.Number or ExpressionContextKind.Effects)
+                {
+                    if (talemarkVersion == 2 && IsNumericExpressionBeforeModifier(tokens, start, symbols))
+                    {
+                        keywords = NumericModifierKeywords;
+                        details = NumericModifierDetails;
                     }
                 }
             }
@@ -204,12 +223,12 @@ internal static class ExpressionCompletion
                 }
             }
             else if (kind is ExpressionContextKind.Condition or ExpressionContextKind.Substitution &&
-                     before is [.., { Kind: TokenKind.Identifier } visitedSubject, { Text: Visited }] &&
+                     before is [.., { Kind: TokenKind.Identifier } visitedSubject, { Text: ExpressionVocabulary.Visited }] &&
                      visitedSubject.Is(Player))
                 kinds = [AuthoringSymbolKind.Scene];
             else if (kind is ExpressionContextKind.Condition or ExpressionContextKind.Substitution &&
                      before is [.., { Kind: TokenKind.Identifier } playerSubject] && playerSubject.Is(Player))
-                keywords = [Visited];
+                keywords = [ExpressionVocabulary.Visited];
             else if (before is [.., { Text: Has }])
                 kinds = kind is ExpressionContextKind.Condition or ExpressionContextKind.Effects ? [AuthoringSymbolKind.Item] : [];
             else if (before is [.., { Text: Give or Take }, { Kind: TokenKind.Identifier }])
@@ -266,6 +285,159 @@ internal static class ExpressionCompletion
         return false;
     }
 
+    private static bool IsNumericExpressionBeforeModifier(TokenBuffer tokens, int position,
+        IReadOnlyList<AuthoringSymbol> symbols)
+    {
+        var hashIndex = -1;
+        for (var index = 0; index < tokens.Count; index++)
+        {
+            if (tokens[index].Kind == TokenKind.Hash && tokens[index].Offset < position)
+                hashIndex = index;
+        }
+        if (hashIndex < 0) return false;
+
+        var hashOffset = tokens[hashIndex].Offset;
+        if (hashIndex > 0 && tokens[hashIndex - 1].Kind == TokenKind.RightParen)
+        {
+            var openIndex = FindMatchingOpenParen(tokens, hashIndex - 1);
+            if (openIndex >= 0)
+                return IsNumericExpression(tokens, tokens[openIndex].Offset, hashOffset, symbols);
+        }
+
+        for (var index = hashIndex - 1; index >= 0; index--)
+        {
+            var token = tokens[index];
+            if (token.Kind is not (TokenKind.Number or TokenKind.String or TokenKind.Identifier or
+                TokenKind.LeftParen or TokenKind.Minus))
+                continue;
+            if (token.Kind == TokenKind.Identifier && index > 0 &&
+                tokens[index - 1].Kind is TokenKind.Colon or TokenKind.Hash)
+                continue;
+
+            if (IsNumericExpression(tokens, token.Offset, hashOffset, symbols))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsNumericExpression(TokenBuffer tokens, int startOffset, int endOffset,
+        IReadOnlyList<AuthoringSymbol> symbols)
+    {
+        var source = tokens.Source[startOffset..endOffset];
+        var operandTokens = Lexer.Tokenize(source, tokens.TalemarkVersion);
+        var syntax = ExpressionSyntaxParser.ParseExpression(operandTokens, source.Length,
+            offset => new SourceLocation("completion", 1, offset + 1), new DiagnosticBag());
+        return !syntax.HasErrors && InferNumeric(operandTokens, syntax.Root, symbols) == true;
+    }
+
+    private static int FindMatchingOpenParen(TokenBuffer tokens, int closingIndex)
+    {
+        var depth = 0;
+        for (var index = closingIndex; index >= 0; index--)
+        {
+            switch (tokens[index].Kind)
+            {
+                case TokenKind.RightParen:
+                    depth++;
+                    break;
+                case TokenKind.LeftParen:
+                    if (--depth == 0) return index;
+                    break;
+            }
+        }
+
+        return -1;
+    }
+
+    private static bool? InferNumeric(TokenBuffer tokens, ExpressionNode node,
+        IReadOnlyList<AuthoringSymbol> symbols)
+    {
+        return node switch
+        {
+            NumberExpressionNode => true,
+            TextExpressionNode => false,
+            BooleanExpressionNode => false,
+            NameExpressionNode => false,
+            NamedPredicateExpressionNode => false,
+            PlayerVisitedExpressionNode => false,
+            ParenthesizedExpressionNode parenthesized => InferNumeric(tokens, parenthesized.Inner, symbols),
+            InventoryCountExpressionNode => true,
+            InventoryItemNameExpressionNode => false,
+            SkillCheckExpressionNode => true,
+            HasItemExpressionNode => false,
+            UnaryExpressionNode unary => unary.Operator switch
+            {
+                UnaryOp.Not => false,
+                UnaryOp.Negate => InferNumeric(tokens, unary.Operand, symbols),
+                UnaryOp.Round or UnaryOp.RoundUp or UnaryOp.RoundDown =>
+                    InferNumeric(tokens, unary.Operand, symbols),
+                _ => null,
+            },
+            BinaryExpressionNode binary => binary.Operator switch
+            {
+                BinaryOp.Add or BinaryOp.Subtract or BinaryOp.Multiply or BinaryOp.Divide =>
+                    InferNumeric(tokens, binary.Left, symbols) & InferNumeric(tokens, binary.Right, symbols),
+                BinaryOp.Equal or BinaryOp.NotEqual or BinaryOp.Less or BinaryOp.LessOrEqual or
+                    BinaryOp.Greater or BinaryOp.GreaterOrEqual or BinaryOp.And or BinaryOp.Or => false,
+                _ => null,
+            },
+            ReferenceExpressionNode reference => InferReferenceNumeric(tokens, reference, symbols),
+            _ => null,
+        };
+    }
+
+    private static bool? InferReferenceNumeric(TokenBuffer tokens, ReferenceExpressionNode reference,
+        IReadOnlyList<AuthoringSymbol> symbols)
+    {
+        var name = reference.Name;
+        var member = reference.Member;
+        var subMember = reference.SubMember;
+        return reference.Kind switch
+        {
+            ReferenceNamespace.Variable => InferSymbolNumeric(tokens, name, AuthoringSymbolKind.Variable, symbols),
+            ReferenceNamespace.Flag => false,
+            ReferenceNamespace.Item => false,
+            ReferenceNamespace.Faction => member is null
+                ? false
+                : SpanText(tokens, member.Value) == Standing,
+            ReferenceNamespace.Scene => member is not null &&
+                                        SpanText(tokens, member.Value) == Visits,
+            ReferenceNamespace.Character => InferCharacterNumeric(tokens, name, member, subMember, symbols),
+            _ => null,
+        };
+    }
+
+    private static bool? InferSymbolNumeric(TokenBuffer tokens, ExpressionSpan name,
+        AuthoringSymbolKind kind, IReadOnlyList<AuthoringSymbol> symbols)
+    {
+        var nameText = SpanText(tokens, name);
+        foreach (var symbol in symbols)
+        {
+            if (symbol.Kind != kind || symbol.Name != nameText) continue;
+            return symbol.Type is ManifestVocabulary.SymbolNumber or ManifestVocabulary.SymbolInteger;
+        }
+        return null;
+    }
+
+    private static bool? InferCharacterNumeric(TokenBuffer tokens, ExpressionSpan name,
+        ExpressionSpan? member, ExpressionSpan? subMember, IReadOnlyList<AuthoringSymbol> symbols)
+    {
+        if (member is null)
+            return InferSymbolNumeric(tokens, name, AuthoringSymbolKind.Stat, symbols);
+        var memberText = SpanText(tokens, member.Value);
+        if (memberText == Visits) return true;
+        if (memberText == Inventory)
+        {
+            return subMember is null
+                ? false
+                : SpanText(tokens, subMember.Value) == Count;
+        }
+        return InferSymbolNumeric(tokens, member.Value, AuthoringSymbolKind.Stat, symbols);
+    }
+
+    private static string SpanText(TokenBuffer tokens, ExpressionSpan span) =>
+        tokens.Source[span.Start..span.End];
     private static bool IsAgreementReference(TokenBuffer tokens, IReadOnlyList<AuthoringSymbol> symbols)
     {
         var hash = tokens.FindHash();

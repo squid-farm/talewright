@@ -26,6 +26,8 @@ public sealed class StoryCompletionTests
         flags: [ready, door-open]
         vars: {coins: 0}
         """;
+    private static readonly string VersionTwoManifest =
+        Manifest.Replace("  start: first", "  talemark: 2\n  start: first", StringComparison.Ordinal);
 
     [Theory]
     [InlineData("-> sec|", "second")]
@@ -480,6 +482,104 @@ public sealed class StoryCompletionTests
         var (hoverAnalysis, hoverPosition) = Analyze("=== first\n" + partial);
         var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(hoverAnalysis, hoverPosition));
         Assert.Contains(expected, hover.PlainText);
+    }
+
+    [Theory]
+    [InlineData("@requires 0.6#rou|")]
+    [InlineData("{0.6#rou|}")]
+    [InlineData("@requires var:coins > 0.6#rou|")]
+    [InlineData("@requires 1 <= var:coins#rou|")]
+    [InlineData("@requires flag:ready and var:coins#rou|")]
+    [InlineData("@requires var:coins#round == var:coins#rou|")]
+    [InlineData("@requires (var:coins#rou|)")]
+    [InlineData("@requires var:coins#rou|")]
+    [InlineData("{var:coins#rou|}")]
+    [InlineData("{player:hp#rou|}")]
+    [InlineData("{(player:hp * 0.1)#rou|}")]
+    [InlineData("~ var:coins = 0.6#rou|")]
+    [InlineData("~ var:coins += 0.6#rou|")]
+    [InlineData("~ var:coins = 1; var:coins += 0.6#rou|")]
+    [InlineData("~ give player rope 1.5#rou|")]
+    [InlineData("~ take player rope (var:coins * 0.1)#rou|")]
+    [InlineData("* [Go] { var:coins = 0.6#rou| } -> second")]
+    [InlineData("{faction:guild:standing#rou|}")]
+    [InlineData("{(var:coins + 1 * 2)#rou|}")]
+    [InlineData("{1#round#rou|}")]
+    [InlineData("{var:coins#round-up#rou|}")]
+    public void Numeric_modifier_completion_is_offered_in_version_two_expression_slots(string line)
+    {
+        var (analysis, position) = Analyze("=== first\n" + line, VersionTwoManifest);
+        var completions = StoryCompletion.Complete(analysis, position);
+
+        Assert.Equal(["round", "round-down", "round-up"], completions.Select(item => item.Label));
+        Assert.All(completions, item => Assert.Contains("Talemark 2", item.Detail));
+    }
+
+    [Fact]
+    public void Numeric_modifier_completion_is_offered_in_manifest_conditions()
+    {
+        var markedManifest = VersionTwoManifest.Replace("vars: {coins: 0}",
+            """
+            vars: {coins: 0}
+            triggers:
+              - id: rounding
+                when: "var:coins > 0.6#rou|"
+                do: set flag:ready
+            """, StringComparison.Ordinal);
+        var caret = markedManifest.IndexOf('|');
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = markedManifest.Remove(caret, 1),
+            ["main.tale"] = "=== first\n-> END",
+        });
+        var analysis = StoryAnalyzer.Analyze(source);
+
+        var completions = StoryCompletion.Complete(analysis,
+            Position(StorySource.ManifestFileName, markedManifest[..caret]));
+
+        Assert.Equal(["round", "round-down", "round-up"],
+            completions.Select(item => item.Label));
+    }
+
+    [Theory]
+    [InlineData("{player:first-name#rou|}")]
+    [InlineData("{\"text\"#rou|}")]
+    [InlineData("{true#rou|}")]
+    [InlineData("@requires \"text\"#rou|")]
+    [InlineData("@requires flag:ready#rou|")]
+    [InlineData("@requires friendly#rou|")]
+    [InlineData("{faction:guild:tier#rou|}")]
+    [InlineData("{(var:coins + var:missing)#rou|}")]
+    [InlineData("{(var:missing + var:coins)#rou|}")]
+    [InlineData("{(var:coins + \"text\")#rou|}")]
+    [InlineData("{\"text\"#round#rou|}")]
+    [InlineData("{\"text\"#round-up#rou|}")]
+    [InlineData("{\"text\"#round-down#rou|}")]
+    public void Numeric_modifier_completion_is_not_offered_for_nonnumeric_values(string line)
+    {
+        var (analysis, position) = Analyze("=== first\n" + line, VersionTwoManifest);
+
+        Assert.DoesNotContain(StoryCompletion.Complete(analysis, position),
+            item => item.Label is "round" or "round-up" or "round-down");
+    }
+
+    [Fact]
+    public void Numeric_modifier_completion_handles_long_arithmetic_with_unknown_operand()
+    {
+        var expression = "var:missing" + string.Concat(Enumerable.Repeat(" + 1", 40));
+        var (analysis, position) = Analyze("=== first\n{(" + expression + ")#rou|}", VersionTwoManifest);
+
+        Assert.DoesNotContain(StoryCompletion.Complete(analysis, position),
+            item => item.Label is "round" or "round-up" or "round-down");
+    }
+
+    [Fact]
+    public void Numeric_modifier_completion_is_not_offered_to_talemark_one_stories()
+    {
+        var (analysis, position) = Analyze("=== first\n@requires 1#rou|");
+
+        Assert.DoesNotContain(StoryCompletion.Complete(analysis, position),
+            item => item.Label is "round" or "round-up" or "round-down");
     }
 
     [Theory]
