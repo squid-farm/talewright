@@ -5,6 +5,8 @@ namespace Talewright.BenchmarkDotNet;
 [MemoryDiagnoser]
 public class ExactNumberBenchmarks
 {
+    private Talewright.Core.ExactNumber _currentValue;
+
     [Params(100, 1000)]
     public int HistoryDepth { get; set; }
 
@@ -13,6 +15,7 @@ public class ExactNumberBenchmarks
     {
         var current = ExactNumberWorkload.ApplyOnePercentCurrentHitPoints(HistoryDepth);
         var history = ExactNumberWorkload.BuildRetainedHistory(HistoryDepth);
+        _currentValue = current;
         if (history.Count != HistoryDepth || history[^1].NewValue != current)
             throw new InvalidOperationException("The repeated-effect and retained-history workloads diverged.");
 
@@ -27,6 +30,9 @@ public class ExactNumberBenchmarks
     [Benchmark]
     public Talewright.Core.ExactNumber ApplyRepeatedOnePercentEffect() =>
         ExactNumberWorkload.ApplyOnePercentCurrentHitPoints(HistoryDepth);
+
+    [Benchmark]
+    public string FormatRepeatedOnePercentEffect() => _currentValue.ToDecimalString();
 
     [Benchmark]
     public List<NumericResourceChange> BuildRetainedEffectHistory() =>

@@ -10,6 +10,9 @@ namespace Talewright.Core;
 public readonly struct ExactNumber : IEquatable<ExactNumber>, IComparable<ExactNumber>
 {
     private const int MaximumExponent = 1000;
+    private const int FiveFactorChunkPower = 32;
+    private static readonly BigInteger FiveFactorChunk =
+        BigInteger.Pow(new BigInteger(5), FiveFactorChunkPower);
 
     private readonly BigInteger _numerator;
     private readonly BigInteger _denominator;
@@ -199,16 +202,26 @@ public readonly struct ExactNumber : IEquatable<ExactNumber>, IComparable<ExactN
             return Numerator.ToString(CultureInfo.InvariantCulture);
 
         var denominator = Denominator;
-        var twos = 0;
+        var twos = checked((int)BigInteger.TrailingZeroCount(denominator));
+        denominator >>= twos;
+
         var fives = 0;
-        while ((denominator % 2).IsZero)
+        while (true)
         {
-            denominator /= 2;
-            twos++;
+            var quotient = BigInteger.DivRem(denominator, FiveFactorChunk, out var remainder);
+            if (!remainder.IsZero)
+                break;
+
+            denominator = quotient;
+            fives += FiveFactorChunkPower;
         }
-        while ((denominator % 5).IsZero)
+        while (true)
         {
-            denominator /= 5;
+            var quotient = BigInteger.DivRem(denominator, 5, out var remainder);
+            if (!remainder.IsZero)
+                break;
+
+            denominator = quotient;
             fives++;
         }
         if (!denominator.IsOne)

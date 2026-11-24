@@ -42,6 +42,22 @@ public class ExactNumberTests
         Assert.Equal("1/3", ExactNumber.Parse("1/3").ToDecimalString());
     }
 
+    [Fact]
+    public void Decimal_presentation_handles_deep_terminating_and_non_terminating_denominators()
+    {
+        const int scale = 2000;
+        var powerOfTen = BigInteger.Pow(10, scale);
+
+        Assert.Equal(
+            $"-0.{new string('0', scale - 3)}123",
+            ExactNumber.FromFraction(-123, powerOfTen).ToDecimalString());
+
+        var nonTerminatingDenominator = powerOfTen * 3;
+        Assert.Equal(
+            $"1/{nonTerminatingDenominator}",
+            ExactNumber.FromFraction(BigInteger.One, nonTerminatingDenominator).ToDecimalString());
+    }
+
     [Theory]
     [InlineData("1.234", "1.23")]
     [InlineData("1.235", "1.24")]
