@@ -126,46 +126,7 @@ public readonly struct ExactNumber : IEquatable<ExactNumber>, IComparable<ExactN
             return true;
         }
 
-        var sign = 1;
-        var index = 0;
-        if (value[index] is '+' or '-')
-        {
-            if (value[index] == '-')
-                sign = -1;
-            index++;
-        }
-
-        if (index == value.Length)
-            return false;
-
-        var dot = value.IndexOf('.');
-        if (dot >= 0 && dot != value.LastIndexOf('.'))
-            return false;
-
-        var wholeText = dot < 0 ? value[index..] : value[index..dot];
-        var fractionText = dot < 0 ? string.Empty : value[(dot + 1)..];
-        if (wholeText.Length == 0 && fractionText.Length == 0)
-            return false;
-        if (wholeText.Length > 0 && !ContainsOnlyDigits(wholeText))
-            return false;
-        if (dot >= 0 && fractionText.Length == 0)
-            return false;
-        if (fractionText.Length > 0 && !ContainsOnlyDigits(fractionText))
-            return false;
-
-        var whole = wholeText.Length == 0
-            ? BigInteger.Zero
-            : BigInteger.Parse(wholeText, NumberStyles.None, CultureInfo.InvariantCulture);
-        var fraction = fractionText.Length == 0
-            ? BigInteger.Zero
-            : BigInteger.Parse(fractionText, NumberStyles.None, CultureInfo.InvariantCulture);
-        var scale = BigInteger.Pow(new BigInteger(10), fractionText.Length);
-        var parsedNumerator = whole * scale + fraction;
-        if (sign < 0)
-            parsedNumerator = -parsedNumerator;
-
-        number = new(parsedNumerator, scale);
-        return true;
+        return TryParseMantissa(value, out number);
     }
 
     public static ExactNumber operator +(ExactNumber left, ExactNumber right) =>
