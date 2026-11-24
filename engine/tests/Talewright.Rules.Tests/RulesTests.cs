@@ -117,6 +117,7 @@ public class RulesTests
     [InlineData(BinaryOp.Multiply, int.MinValue, -1, int.MaxValue)]
     [InlineData(BinaryOp.Divide, int.MinValue, -1, int.MaxValue)]
     [InlineData(BinaryOp.Divide, 12, 0, 0)]
+    [InlineData(BinaryOp.Divide, -5, 2, -2)]
     [InlineData(BinaryOp.Add, 12, 3, 15)]
     [InlineData(BinaryOp.Subtract, 12, 3, 9)]
     [InlineData(BinaryOp.Multiply, -12, 3, -36)]
@@ -124,6 +125,19 @@ public class RulesTests
     public void Arithmetic_saturates_without_changing_normal_results(BinaryOp op, int left, int right, int expected)
     {
         Assert.Equal(expected, Eval(new BinaryExpr(op, new NumberLiteral(left), new NumberLiteral(right)), NewLog()).Number);
+    }
+
+    [Fact]
+    public void Arithmetic_saturates_at_every_operation_in_a_chain()
+    {
+        var expression = new BinaryExpr(
+            BinaryOp.Subtract,
+            new BinaryExpr(BinaryOp.Add,
+                new NumberLiteral(int.MaxValue),
+                new NumberLiteral(1)),
+            new NumberLiteral(1));
+
+        Assert.Equal(int.MaxValue - 1, Eval(expression, NewLog()).Number);
     }
 
     [Theory]
