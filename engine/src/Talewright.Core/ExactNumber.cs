@@ -9,6 +9,8 @@ namespace Talewright.Core;
 /// </summary>
 public readonly struct ExactNumber : IEquatable<ExactNumber>, IComparable<ExactNumber>
 {
+    private const int MaximumExponent = 1000;
+
     private readonly BigInteger _numerator;
     private readonly BigInteger _denominator;
 
@@ -90,7 +92,7 @@ public readonly struct ExactNumber : IEquatable<ExactNumber>, IComparable<ExactN
             var exponentText = value[(exponentIndex + 1)..];
             if (!int.TryParse(exponentText, NumberStyles.AllowLeadingSign,
                     CultureInfo.InvariantCulture, out var exponent) ||
-                exponent == int.MinValue ||
+                exponent < -MaximumExponent || exponent > MaximumExponent ||
                 !TryParseMantissa(mantissa, out var mantissaNumber))
                 return false;
 

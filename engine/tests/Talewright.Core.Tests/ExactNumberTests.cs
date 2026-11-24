@@ -78,6 +78,29 @@ public class ExactNumberTests
     }
 
     [Fact]
+    public void Exponent_notation_accepts_the_supported_limits()
+    {
+        var powerOfTen = BigInteger.Pow(10, 1000);
+
+        Assert.True(ExactNumber.TryParse("1e1000", out var positive));
+        Assert.Equal(ExactNumber.FromInteger(powerOfTen), positive);
+        Assert.True(ExactNumber.TryParse("1e-1000", out var negative));
+        Assert.Equal(ExactNumber.FromFraction(BigInteger.One, powerOfTen), negative);
+    }
+
+    [Theory]
+    [InlineData("1e1001")]
+    [InlineData("1e-1001")]
+    [InlineData("1e10000000")]
+    [InlineData("1e-10000000")]
+    [InlineData("1e2147483647")]
+    [InlineData("1e-2147483648")]
+    public void Exponents_outside_the_supported_range_are_rejected(string value)
+    {
+        Assert.False(ExactNumber.TryParse(value, out _));
+    }
+
+    [Fact]
     public void Addition_and_comparison_work_for_negative_values()
     {
         var negativeHalf = ExactNumber.Parse("-1/2");
