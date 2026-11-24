@@ -538,9 +538,9 @@ matching tag scenes, even if the current limit would hide some; their requiremen
 
 **Conditional structure.** A block `{if}` selects one branch once, when reached. Its nested steps run in
 order without retesting that condition. Inline conditions are evaluated when their prose line renders.
-Block and inline conditions each allow 64 nested `{if}` levels; expressions allow 256 nested groups
-and prefix operators combined. Formatting spans allow 64 nested levels. Exceeding any limit reports
-TW1016.
+Block and inline conditions each allow 64 nested `{if}` levels; expressions allow 256 nested groups,
+prefix operators, and numeric modifiers combined. Formatting spans allow 64 nested levels.
+Exceeding any limit reports TW1016.
 Several conditional diverts may precede the choices; the first reached divert ends execution.
 
 **Literal braces.** Write `\{` and `\}` for literal braces in prose. A line starting with `*` followed

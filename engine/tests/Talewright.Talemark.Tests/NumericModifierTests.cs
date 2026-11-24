@@ -223,6 +223,21 @@ public sealed class NumericModifierTests
             diagnostic.Location);
     }
 
+    [Fact]
+    public void Talemark_two_prefixes_count_toward_the_nesting_limit_of_grouped_operands()
+    {
+        var expression = "-" + new string('(', 256) + "1" + new string(')', 256);
+        var result = Compile(2, "vars: { amount: 0 }",
+            $"=== a\n@requires {expression} == -1\n-> END");
+
+        var diagnostic = Assert.Single(result.Diagnostics, item =>
+            item.Code == CompilerDiagnosticCodes.NestingLimitExceeded);
+
+        Assert.Equal("Expression is nested more than 256 levels deep.",
+            diagnostic.Message);
+        Assert.Equal(new SourceLocation("main.tale", 2, 267), diagnostic.Location);
+    }
+
     [Theory]
     [InlineData(2, "=== a\n@requires \"text\"#round == \"text\"\n-> END", "requires a number-valued expression")]
     [InlineData(2, "=== a\n@requires 1#round(2) == 1\n-> END", "takes no arguments")]
@@ -238,6 +253,19 @@ public sealed class NumericModifierTests
         var diagnostic = Assert.Single(result.Errors);
         Assert.Equal("TW2006", diagnostic.Code);
         Assert.Contains(expectedMessage, diagnostic.Message);
+    }
+
+    [Fact]
+    public void Misspelled_numeric_substitution_modifier_lists_numeric_modifiers()
+    {
+        var result = Compile(2, "vars: { amount: 0 }",
+            "=== a\n{0.6#rnd}\n-> END");
+
+        var diagnostic = Assert.Single(result.Errors);
+        Assert.Equal("TW2006", diagnostic.Code);
+        Assert.Contains("#round", diagnostic.Message);
+        Assert.Contains("#round-up", diagnostic.Message);
+        Assert.Contains("#round-down", diagnostic.Message);
     }
 
     [Fact]

@@ -234,7 +234,7 @@ internal sealed class ExpressionSyntaxParser
 
     private ExpressionNode ParseNested(Token opener, Func<ExpressionNode> parse)
     {
-        if (_nestingDepth == MaximumNestingDepth)
+        if (_nestingDepth >= MaximumNestingDepth)
         {
             Fail(CompilerDiagnosticCodes.NestingLimitExceeded, $"Expression is nested more than {MaximumNestingDepth} levels deep.", opener.Offset);
         }
@@ -360,13 +360,23 @@ internal sealed class ExpressionSyntaxParser
         while (Peek.Kind == TokenKind.Minus)
         {
             var op = Next();
-            if (prefixes.Count + _nestingDepth == MaximumNestingDepth)
+            if (prefixes.Count + _nestingDepth >= MaximumNestingDepth)
                 Fail(CompilerDiagnosticCodes.NestingLimitExceeded,
                     $"Expression is nested more than {MaximumNestingDepth} levels deep.", op.Offset);
             prefixes.Add(op);
         }
 
-        var expression = ParsePrimary();
+        _nestingDepth += prefixes.Count;
+        ExpressionNode expression;
+        try
+        {
+            expression = ParsePrimary();
+        }
+        finally
+        {
+            _nestingDepth -= prefixes.Count;
+        }
+
         for (var index = prefixes.Count - 1; index >= 0; index--)
         {
             var op = prefixes[index];
@@ -679,7 +689,7 @@ internal sealed class ExpressionSyntaxParser
         while (Peek.Kind == TokenKind.Hash)
         {
             var marker = Next();
-            if (modifierDepth + nestedDepth == MaximumNestingDepth)
+            if (modifierDepth + nestedDepth >= MaximumNestingDepth)
             {
                 Fail(CompilerDiagnosticCodes.NestingLimitExceeded,
                     $"Expression is nested more than {MaximumNestingDepth} levels deep.", marker.Offset);

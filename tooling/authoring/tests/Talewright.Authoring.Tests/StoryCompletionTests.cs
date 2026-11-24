@@ -487,8 +487,21 @@ public sealed class StoryCompletionTests
     [Theory]
     [InlineData("@requires 0.6#rou|")]
     [InlineData("{0.6#rou|}")]
+    [InlineData("@requires var:coins > 0.6#rou|")]
+    [InlineData("@requires 1 <= var:coins#rou|")]
+    [InlineData("@requires flag:ready and var:coins#rou|")]
+    [InlineData("@requires var:coins#round == var:coins#rou|")]
+    [InlineData("@requires (var:coins#rou|)")]
     [InlineData("@requires var:coins#rou|")]
     [InlineData("{var:coins#rou|}")]
+    [InlineData("{player:hp#rou|}")]
+    [InlineData("{(player:hp * 0.1)#rou|}")]
+    [InlineData("~ var:coins = 0.6#rou|")]
+    [InlineData("~ var:coins += 0.6#rou|")]
+    [InlineData("~ var:coins = 1; var:coins += 0.6#rou|")]
+    [InlineData("~ give player rope 1.5#rou|")]
+    [InlineData("~ take player rope (var:coins * 0.1)#rou|")]
+    [InlineData("* [Go] { var:coins = 0.6#rou| } -> second")]
     [InlineData("{faction:guild:standing#rou|}")]
     [InlineData("{(var:coins + 1 * 2)#rou|}")]
     [InlineData("{1#round#rou|}")]
@@ -500,6 +513,32 @@ public sealed class StoryCompletionTests
 
         Assert.Equal(["round", "round-down", "round-up"], completions.Select(item => item.Label));
         Assert.All(completions, item => Assert.Contains("Talemark 2", item.Detail));
+    }
+
+    [Fact]
+    public void Numeric_modifier_completion_is_offered_in_manifest_conditions()
+    {
+        var markedManifest = VersionTwoManifest.Replace("vars: {coins: 0}",
+            """
+            vars: {coins: 0}
+            triggers:
+              - id: rounding
+                when: "var:coins > 0.6#rou|"
+                do: set flag:ready
+            """, StringComparison.Ordinal);
+        var caret = markedManifest.IndexOf('|');
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = markedManifest.Remove(caret, 1),
+            ["main.tale"] = "=== first\n-> END",
+        });
+        var analysis = StoryAnalyzer.Analyze(source);
+
+        var completions = StoryCompletion.Complete(analysis,
+            Position(StorySource.ManifestFileName, markedManifest[..caret]));
+
+        Assert.Equal(["round", "round-down", "round-up"],
+            completions.Select(item => item.Label));
     }
 
     [Theory]

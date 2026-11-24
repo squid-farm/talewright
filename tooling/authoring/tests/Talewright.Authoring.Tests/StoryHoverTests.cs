@@ -74,6 +74,9 @@ public sealed class StoryHoverTests
 
     [Theory]
     [InlineData("{0.6#rou|nd}", "round", "nearest whole number")]
+    [InlineData("@requires var:coins > 0.6#rou|nd", "round", "nearest whole number")]
+    [InlineData("~ var:coins = 0.6#rou|nd", "round", "nearest whole number")]
+    [InlineData("{player:hp#rou|nd}", "round", "nearest whole number")]
     [InlineData("{0.6#rou|nd-up}", "round-up", "mathematical ceiling")]
     [InlineData("{0.6#rou|nd-down}", "round-down", "mathematical floor")]
     public void Numeric_modifier_hover_explains_exact_rounding(string line, string token, string description)

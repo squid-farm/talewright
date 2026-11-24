@@ -297,9 +297,57 @@ internal static class ExpressionCompletion
         if (hashIndex < 0) return false;
 
         var hashOffset = tokens[hashIndex].Offset;
-        var syntax = ExpressionSyntaxParser.ParseExpression(tokens, hashOffset,
+        if (hashIndex > 0 && tokens[hashIndex - 1].Kind == TokenKind.RightParen)
+        {
+            var openIndex = FindMatchingOpenParen(tokens, hashIndex - 1);
+            if (openIndex >= 0)
+                return IsNumericExpression(tokens, tokens[openIndex].Offset, hashOffset, symbols);
+        }
+
+        for (var index = hashIndex - 1; index >= 0; index--)
+        {
+            var token = tokens[index];
+            if (token.Kind is not (TokenKind.Number or TokenKind.String or TokenKind.Identifier or
+                TokenKind.LeftParen or TokenKind.Minus))
+                continue;
+            if (token.Kind == TokenKind.Identifier && index > 0 &&
+                tokens[index - 1].Kind is TokenKind.Colon or TokenKind.Hash)
+                continue;
+
+            if (IsNumericExpression(tokens, token.Offset, hashOffset, symbols))
+                return true;
+        }
+
+        return false;
+    }
+
+    private static bool IsNumericExpression(TokenBuffer tokens, int startOffset, int endOffset,
+        IReadOnlyList<AuthoringSymbol> symbols)
+    {
+        var source = tokens.Source[startOffset..endOffset];
+        var operandTokens = Lexer.Tokenize(source, tokens.TalemarkVersion);
+        var syntax = ExpressionSyntaxParser.ParseExpression(operandTokens, source.Length,
             offset => new SourceLocation("completion", 1, offset + 1), new DiagnosticBag());
-        return !syntax.HasErrors && InferNumeric(tokens, syntax.Root, symbols) == true;
+        return !syntax.HasErrors && InferNumeric(operandTokens, syntax.Root, symbols) == true;
+    }
+
+    private static int FindMatchingOpenParen(TokenBuffer tokens, int closingIndex)
+    {
+        var depth = 0;
+        for (var index = closingIndex; index >= 0; index--)
+        {
+            switch (tokens[index].Kind)
+            {
+                case TokenKind.RightParen:
+                    depth++;
+                    break;
+                case TokenKind.LeftParen:
+                    if (--depth == 0) return index;
+                    break;
+            }
+        }
+
+        return -1;
     }
 
     private static bool? InferNumeric(TokenBuffer tokens, ExpressionNode node,
@@ -375,7 +423,8 @@ internal static class ExpressionCompletion
     private static bool? InferCharacterNumeric(TokenBuffer tokens, ExpressionSpan name,
         ExpressionSpan? member, ExpressionSpan? subMember, IReadOnlyList<AuthoringSymbol> symbols)
     {
-        if (member is null) return false;
+        if (member is null)
+            return InferSymbolNumeric(tokens, name, AuthoringSymbolKind.Stat, symbols);
         var memberText = SpanText(tokens, member.Value);
         if (memberText == Visits) return true;
         if (memberText == Inventory)

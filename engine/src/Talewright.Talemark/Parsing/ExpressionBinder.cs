@@ -101,8 +101,12 @@ internal sealed class ExpressionBinder
 
                     if (!symbols.Modifiers.TryGet(call.Name, out modifier!))
                     {
+                        var knownModifiers = symbols.Modifiers.Names.Select(name =>
+                            ExpressionVocabulary.ModifierMarker + name);
+                        if (syntax.Tokens.TalemarkVersion == 2 && value.Type == ExprType.Number)
+                            knownModifiers = knownModifiers.Concat(ExpressionVocabulary.NumericModifierSpellings);
                         binder.Fail(CompilerDiagnosticCodes.InvalidModifier,
-                            $"Unknown modifier '#{call.Name}'. Known: {string.Join(", ", symbols.Modifiers.Names.Select(name => ExpressionVocabulary.ModifierMarker + name))}.",
+                            $"Unknown modifier '#{call.Name}'. Known: {string.Join(", ", knownModifiers)}.",
                             call.Offset);
                     }
                 }
