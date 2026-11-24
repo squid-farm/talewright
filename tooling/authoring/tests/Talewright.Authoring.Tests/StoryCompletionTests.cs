@@ -506,6 +506,7 @@ public sealed class StoryCompletionTests
     [InlineData("{true#rou|}")]
     [InlineData("@requires \"text\"#rou|")]
     [InlineData("@requires flag:ready#rou|")]
+    [InlineData("@requires friendly#rou|")]
     [InlineData("{faction:guild:tier#rou|}")]
     [InlineData("{(var:coins + var:missing)#rou|}")]
     [InlineData("{(var:missing + var:coins)#rou|}")]

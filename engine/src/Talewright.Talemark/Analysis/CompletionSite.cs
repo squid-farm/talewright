@@ -310,7 +310,7 @@ internal static class ExpressionCompletion
             NumberExpressionNode => true,
             TextExpressionNode => false,
             BooleanExpressionNode => false,
-            NameExpressionNode => true,
+            NameExpressionNode => false,
             NamedPredicateExpressionNode => false,
             PlayerVisitedExpressionNode => false,
             ParenthesizedExpressionNode parenthesized => InferNumeric(tokens, parenthesized.Inner, symbols),
