@@ -264,11 +264,11 @@ Arithmetic at the same level groups left to right: `8 - 3 - 1` is `(8 - 3) - 1`.
 `not player:hp > 0` means `not (player:hp > 0)`. Use parentheses when the intended grouping
 is not obvious. Numeric modifiers apply after a unary minus and before arithmetic operators, so
 `-0.1#round-up` rounds the negative value. Parenthesize compound expressions before a modifier,
-as in `(player:hp * 0.1)#round-up`. Expressions allow at most 256 nested groups and prefix
-operators combined (TW1016 beyond the limit). In a substitution, the numeric expression is
-evaluated before its numeric modifiers and then its text modifiers. `#round#one-many(...)` first
-rounds the number, then selects wording from that result; `#upper#lower` applies upper case, then
-lower case.
+as in `(player:hp * 0.1)#round-up`. Expressions allow at most 256 nested groups, prefix operators
+and numeric postfix modifiers combined (TW1016 beyond the limit). In a substitution, the numeric
+expression is evaluated before its numeric modifiers and then its text modifiers. `#round#one-many(...)`
+first rounds the number, then selects wording from that result; `#upper#lower` applies upper case,
+then lower case.
 
 ### Manipulator arguments
 

@@ -374,7 +374,7 @@ internal sealed class ExpressionSyntaxParser
                 new(op.Offset, expression.Span.End - op.Offset));
         }
 
-        return ParseNumberModifiers(expression, prefixes.Count);
+        return ParseNumberModifiers(expression);
     }
 
     private bool TryReadMinimumMagnitude()
@@ -636,13 +636,50 @@ internal sealed class ExpressionSyntaxParser
         return -1;
     }
 
-    private ExpressionNode ParseNumberModifiers(ExpressionNode value, int prefixDepth = 0)
+    private static int GetExpressionNestingDepth(ExpressionNode expression)
     {
+        var maximumDepth = 0;
+        var pending = new Stack<(ExpressionNode Expression, int Depth)>();
+        pending.Push((expression, 0));
+        while (pending.Count > 0)
+        {
+            var (current, depth) = pending.Pop();
+            switch (current)
+            {
+                case ParenthesizedExpressionNode parenthesized:
+                    depth++;
+                    maximumDepth = Math.Max(maximumDepth, depth);
+                    pending.Push((parenthesized.Inner, depth));
+                    break;
+                case UnaryExpressionNode unary:
+                    depth++;
+                    maximumDepth = Math.Max(maximumDepth, depth);
+                    pending.Push((unary.Operand, depth));
+                    break;
+                case BinaryExpressionNode binary:
+                    pending.Push((binary.Left, depth));
+                    pending.Push((binary.Right, depth));
+                    break;
+                case SkillCheckExpressionNode { Difficulty: { } difficulty }:
+                    pending.Push((difficulty, depth));
+                    break;
+            }
+        }
+
+        return maximumDepth;
+    }
+
+    private ExpressionNode ParseNumberModifiers(ExpressionNode value)
+    {
+        if (Peek.Kind != TokenKind.Hash)
+            return value;
+
         var modifierDepth = 0;
+        var nestedDepth = _nestingDepth + GetExpressionNestingDepth(value);
         while (Peek.Kind == TokenKind.Hash)
         {
             var marker = Next();
-            if (modifierDepth + _nestingDepth + prefixDepth == MaximumNestingDepth)
+            if (modifierDepth + nestedDepth == MaximumNestingDepth)
             {
                 Fail(CompilerDiagnosticCodes.NestingLimitExceeded,
                     $"Expression is nested more than {MaximumNestingDepth} levels deep.", marker.Offset);
