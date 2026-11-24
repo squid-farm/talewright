@@ -182,6 +182,18 @@ public sealed class TalemarkClassifierTests
     }
 
     [Fact]
+    public void Numeric_modifiers_receive_modifier_classifications_in_talemark_two()
+    {
+        const string tale = "=== start\n@requires 0.6#round-up > 0\n{(0.6)#round#one-many(\"one\", \"many\")}\n";
+        var classifications = TalemarkClassifier.Classify("main.tale", tale, talemarkVersion: 2);
+
+        foreach (var modifier in new[] { "round-up", "round", "one-many" })
+            Assert.Contains(classifications, classification =>
+                classification.Kind == TalemarkClassificationKind.Modifier &&
+                TextOf(tale, classification) == modifier);
+    }
+
+    [Fact]
     public void Story_analysis_uses_the_manifest_version_for_decimal_classifications()
     {
         const string tale = "=== start\n@requires .25 == 0.25\n-> END\n";

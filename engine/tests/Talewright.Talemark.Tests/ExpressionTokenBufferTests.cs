@@ -95,7 +95,7 @@ public sealed class ExpressionTokenBufferTests
         Assert.Equal(2, collector.CompletionSites.Count);
         Assert.All(collector.CompletionSites, site => Assert.Same(first, site.Expression!.Tokens));
         var symbols = new[] { new AuthoringSymbol("gold", AuthoringSymbolKind.Variable, "integer", null) };
-        var columns = collector.CompletionSites[0].Sites(symbols)
+        var columns = collector.CompletionSites[0].Sites(symbols, talemarkVersion: 1)
             .Where(site => site.Text == "" && site.Kinds.Contains(AuthoringSymbolKind.Variable))
             .Select(site => site.Range.Start.Column);
         Assert.Equal([5, 6, 7, 8], columns);

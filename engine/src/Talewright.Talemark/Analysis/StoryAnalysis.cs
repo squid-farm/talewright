@@ -133,7 +133,7 @@ public sealed class StoryAnalysis
             source.Site is { } site && site.Kinds.Contains(AuthoringSymbolKind.Tag)
                 ? source with { Site = site with { Candidates = readOnlyTagCandidates } }
                 : source).ToArray();
-        _sites = new CompletionSiteIndex(siteSources);
+        _sites = new CompletionSiteIndex(siteSources, TalemarkVersion);
         var names = collector.Names.ToArray();
         _names = currentFileAnalysis ? null : new(() => NameIndex.Build(Symbols, names, siteSources));
         Tokens = Array.AsReadOnly(collector.Tokens.ToArray());

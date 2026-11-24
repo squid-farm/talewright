@@ -84,6 +84,9 @@ public static class ExpressionEvaluator
                         UnaryOp.Negate => context.State.World.TalemarkVersion == 1
                             ? Value.Of(Arithmetic.Saturate(-(long)returnedValue.Number))
                             : Value.Of(-returnedValue.ExactNumber),
+                        UnaryOp.Round => ApplyNumericModifier(unary.Op, returnedValue.ExactNumber, context),
+                        UnaryOp.RoundUp => ApplyNumericModifier(unary.Op, returnedValue.ExactNumber, context),
+                        UnaryOp.RoundDown => ApplyNumericModifier(unary.Op, returnedValue.ExactNumber, context),
                         _ => throw new NotSupportedException(unary.Op.ToString()),
                     };
                     Complete(frame, returnedValue);
@@ -202,6 +205,20 @@ public static class ExpressionEvaluator
             BinaryOp.Or => Value.Of(left.Bool || right.Bool),
             _ => throw new NotSupportedException(e.Op.ToString()),
         };
+    }
+
+    private static Value ApplyNumericModifier(UnaryOp op, ExactNumber value, EvaluationContext context)
+    {
+        if (context.State.World.TalemarkVersion == 1)
+            throw new InvalidOperationException("Numeric rounding modifiers require Talemark 2.");
+
+        return Value.Of(op switch
+        {
+            UnaryOp.Round => value.RoundToNearestInteger(),
+            UnaryOp.RoundUp => value.Ceiling(),
+            UnaryOp.RoundDown => value.Floor(),
+            _ => throw new NotSupportedException(op.ToString()),
+        });
     }
 
     private static int Compare(Value left, Value right, EvaluationContext context) => left.Type switch

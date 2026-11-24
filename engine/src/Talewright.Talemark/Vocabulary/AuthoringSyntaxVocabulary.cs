@@ -36,6 +36,9 @@ public static class AuthoringSyntaxVocabulary
         [TextModifierRegistry.BoldName] = "Applies bold formatting to the value without changing its text.",
         [TextModifierRegistry.ItalicName] = "Applies italic formatting to the value without changing its text.",
         [ExpressionVocabulary.Decorative] = "Marks image media as purely decorative so assistive technology ignores it. Do not combine it with descriptive alt text.",
+        [ExpressionVocabulary.Round] = "Rounds to the nearest whole number, with midpoint ties away from zero. Uses the exact number and is available in Talemark 2.",
+        [ExpressionVocabulary.RoundUp] = "Returns the mathematical ceiling of the exact number. It is available in Talemark 2.",
+        [ExpressionVocabulary.RoundDown] = "Returns the mathematical floor of the exact number. It is available in Talemark 2.",
     };
 
     /// <summary>Characters that can start a Talemark completion request.</summary>
