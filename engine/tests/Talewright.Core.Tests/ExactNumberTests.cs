@@ -135,11 +135,16 @@ public class ExactNumberTests
             Assert.Equal(
                 ExactNumber.FromFraction(leftNumerator * rightNumerator, leftDenominator * rightDenominator),
                 left * right);
-            Assert.Equal(
-                rightNumerator == 0
-                    ? ExactNumber.Zero
-                    : ExactNumber.FromFraction(leftNumerator * rightDenominator, leftDenominator * rightNumerator),
-                left / right);
+            if (rightNumerator == 0)
+            {
+                Assert.Throws<DivideByZeroException>(() => _ = left / right);
+            }
+            else
+            {
+                Assert.Equal(
+                    ExactNumber.FromFraction(leftNumerator * rightDenominator, leftDenominator * rightNumerator),
+                    left / right);
+            }
         }
     }
 
@@ -155,9 +160,9 @@ public class ExactNumberTests
     }
 
     [Fact]
-    public void Division_by_zero_returns_zero_but_invalid_fraction_construction_throws()
+    public void Division_by_zero_throws_for_arithmetic_and_fraction_construction()
     {
-        Assert.Equal(ExactNumber.Zero, ExactNumber.Parse("12") / ExactNumber.Zero);
+        Assert.Throws<DivideByZeroException>(() => _ = ExactNumber.One / ExactNumber.Zero);
         Assert.Throws<DivideByZeroException>(() => ExactNumber.FromFraction(BigInteger.One, BigInteger.Zero));
     }
 
