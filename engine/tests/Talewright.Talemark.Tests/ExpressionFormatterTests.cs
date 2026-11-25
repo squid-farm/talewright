@@ -11,7 +11,8 @@ namespace Talewright.Talemark.Tests;
 
 public class ExpressionFormatterTests
 {
-    private static readonly string Manifest = TestStories.ExpressionManifest("formatter", "Formatter", "a").Build();
+    private static readonly string Manifest = TestStories.ExpressionManifest("formatter", "Formatter", "a").Build()
+        .Replace("    name: Lantern", "    name: Lantern\n    color: blue", StringComparison.Ordinal);
 
     private static readonly CompilerOptions Options = new()
     {
@@ -199,7 +200,7 @@ public class ExpressionFormatterTests
             "1", "true", "\"text\"", "friendly", "player:dex", "faction:river", "faction:river:standing",
             "faction:river:tier",
             "flag:ready", "var:coins", "var:weather", "player:name", "player:pronoun", "faction:river:name",
-            "item:lantern", "player has lantern", "player visited a", "scene:player:visits",
+            "item:lantern", "item:lantern:color", "player has lantern", "player visited a", "scene:player:visits",
             "player:inventory:lantern:count", "@CanGo", "not true", "1 + 2",
         ];
         var covered = representatives.Select(source => Parse(source).GetType()).ToHashSet();

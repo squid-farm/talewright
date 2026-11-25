@@ -9,9 +9,9 @@ chapters/03-temple.tale:14:23: error TW2002: Unknown scene 'temple.hal'.
 ```
 
 **Errors** stop the story from loading. **Warnings** (marked ⚠) don't, but usually point at a mistake.
-Talewright reports only mistakes it can be certain of from the source. It trusts your conditions and
-variables to do what you intend; problems that depend on how a playthrough goes, such as a scene
-where no choice is available, show up when you playtest.
+Hints and informational notices are non-blocking. Talewright reports only mistakes it can be certain
+of from the source. It trusts your conditions and variables to do what you intend; problems that
+depend on how a playthrough goes, such as a scene where no choice is available, show up when you playtest.
 When you see several errors, fix the first one and check again: one mistake can cause others.
 
 For contributors: codes are defined in the `CompilerDiagnosticCodes`, `AuthoringDiagnosticCodes`,
@@ -125,6 +125,7 @@ story ends there.
 | TW4006 | Unknown or non-scalar configuration key. | Correct or remove the key; the message lists the expected keys. |
 | TW4007 | A declaration identity is repeated, two triggers have the same id, or more than one configuration file declares `triggers:`. | Remove or rename the duplicate; keep one authored trigger list. Cross-file conflicts name both sources. |
 | TW4008 | `game.talemark` is omitted (informational). | Add `talemark: 1` to preserve current integer arithmetic. The notice does not block validation or publishing. |
+| TW4009 | A custom item key is close to an engine setting (hint). | Correct the key if you meant the engine setting; otherwise keep it as a custom property. |
 
 ## Lint rule codes
 

@@ -122,7 +122,7 @@ internal static class ManifestVocabulary
         Id, Title, Version, Talemark, Start, Randomness, Seed, Undo, Autosave, CharacterSheet, Ruleset, Creation,
         When, Do, Effect, Divert, Once, Save, Base, Disable, Stats, Shown, Name, Category, Min, Max, Default, GoverningAttribute,
         FirstName, LastName, Pronouns, Inventory, NameAgreement, Subject, Object, PossessivePronoun, Reflexive,
-        Agreement, Determiner, Independent, Uncountable, Divisible, Modifiers, Standing, Presets, Label,
+        Agreement, Determiner, Independent, Uncountable, Divisible, Stowable, Modifiers, Standing, Presets, Label,
     ];
     internal static readonly ImmutableArray<string> ItemEngineKeys =
     [
