@@ -39,6 +39,9 @@ public enum StoryStateReadKind
     /// <summary>An item name, such as <c>item:lantern</c>.</summary>
     ItemName,
 
+    /// <summary>A static declared item property, such as <c>item:lantern:color</c>.</summary>
+    ItemProperty,
+
     /// <summary>Whether a character holds an item, such as <c>player has lantern</c>.</summary>
     ItemsHeld,
 
@@ -145,6 +148,7 @@ public sealed class StoryCondition
                 PronounRef value => Create(StoryStateReadKind.CharacterPronoun, value),
                 FactionNameRef value => Create(StoryStateReadKind.FactionName, value),
                 ItemNameRef value => Create(StoryStateReadKind.ItemName, value),
+                ItemPropertyRef value => Create(StoryStateReadKind.ItemProperty, value),
                 HasItem value => Create(StoryStateReadKind.ItemsHeld, value),
                 Visited value => Create(StoryStateReadKind.VisitedScene, value),
                 NamedPredicate value => Create(StoryStateReadKind.NamedPredicate, value, isOpaque: true),

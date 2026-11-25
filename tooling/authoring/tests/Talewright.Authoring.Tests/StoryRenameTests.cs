@@ -169,6 +169,37 @@ public sealed class StoryRenameTests
         Assert.Empty(renamed.Names.Occurrences(target.Kind, target.Name));
     }
 
+    [Fact]
+    public void Renaming_an_item_updates_custom_item_property_references()
+    {
+        var story = new StorySource(new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [StorySource.ManifestFileName] = """
+                game: {id: item-rename, title: Item rename, start: start}
+                characters:
+                  player: {first-name: Ada}
+                items:
+                  rope: {name: Rope, material: hemp}
+                """,
+            ["main.tale"] = """
+                === start
+                The rope is {item:rope:material}.
+                -> END
+                """,
+        });
+        var analysis = StoryAnalyzer.Analyze(story);
+        var position = Find(story, "main.tale", "{item:|rope:material}");
+        var result = StoryRename.Rename(analysis, position, "cord", Analyze);
+
+        Assert.Null(result.Refusal);
+        Assert.Equal(2, result.Edits.Count);
+        var renamed = new StorySource(Apply(story, result.Edits));
+        Assert.Contains("cord: {name: Rope, material: hemp}", renamed.Files[StorySource.ManifestFileName]);
+        Assert.Contains("{item:cord:material}", renamed.Files["main.tale"]);
+        Assert.DoesNotContain(StoryAnalyzer.Analyze(renamed).Diagnostics,
+            diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
     private static int CompareRanges(SourceRange left, SourceRange right)
     {
         var file = string.CompareOrdinal(left.Start.File, right.Start.File);

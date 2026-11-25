@@ -97,6 +97,7 @@ public static class ExpressionFormatter
         PronounRef pronoun => PronounReference(Character(pronoun.Character), pronoun.Form),
         FactionNameRef faction => Reference(Faction, Name(faction.Faction.Value)),
         ItemNameRef item => Reference(Item, Name(item.Item.Value)),
+        ItemPropertyRef property => Reference(Item, Name(property.Item.Value), Name(property.Property)),
         HasItem item => $"{Character(item.Character)} {Has} {Name(item.Item.Value)}",
         Visited visited => $"{Player} {ExpressionVocabulary.Visited} {Name(visited.Scene.Value)}",
         SceneVisitCountRef visits => Reference(

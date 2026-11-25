@@ -1,3 +1,4 @@
+using Talewright.Core.Identity;
 using Talewright.Rules.Expressions;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
@@ -189,5 +190,24 @@ public sealed class StoryDivertConditionsTests
             read => Assert.False(read.IsOpaque));
         Assert.All(offer.Condition.Reads.Where(read => read.Kind == StoryStateReadKind.NamedPredicate),
             read => Assert.True(read.IsOpaque));
+    }
+
+    [Fact]
+    public void Custom_item_property_reads_are_reported_as_static_definition_reads()
+    {
+        const string manifest = """
+            game: { id: conditions, title: Conditions, start: start, talemark: 1, ruleset: rpg }
+            characters: { player: { first-name: Ada } }
+            items: { lantern: { name: Lantern, color: blue } }
+            """;
+        var result = Compile("""
+            === start
+            @requires item:lantern:color == "blue"
+            -> END
+            """, manifest);
+        var condition = StoryCondition.FromExpressions([result.Story!.GetScene(new SceneId("start")).Requires!]);
+
+        Assert.Equal([(StoryStateReadKind.ItemProperty, "item:lantern:color")],
+            condition.Reads.Select(read => (read.Kind, read.Reference)));
     }
 }

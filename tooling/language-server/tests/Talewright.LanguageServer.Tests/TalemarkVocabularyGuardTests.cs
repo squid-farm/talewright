@@ -353,6 +353,11 @@ public sealed class TalemarkVocabularyGuardTests
 
     private static bool IsManifestRead(MemberAccessExpressionSyntax member)
     {
+        if (member.Parent is BinaryExpressionSyntax comparison
+            && comparison.IsKind(SyntaxKind.EqualsExpression)
+            && comparison.Right.Span.Contains(member.Span))
+            return true;
+
         foreach (var invocation in member.Ancestors().OfType<InvocationExpressionSyntax>())
         {
             var method = invocation.Expression switch

@@ -4,6 +4,12 @@ using Talewright.Core.Rulesets;
 
 namespace Talewright.Talemark.Vocabulary;
 
+/// <summary>Engine-owned item settings; other valid item keys are custom properties.</summary>
+public static class ItemPropertyVocabulary
+{
+    public static ImmutableArray<string> EngineKeys => ManifestVocabulary.ItemEngineKeys;
+}
+
 /// <summary>Owned manifest property names and fixed values accepted by the Talewright configuration reader.</summary>
 internal static class ManifestVocabulary
 {
@@ -61,6 +67,7 @@ internal static class ManifestVocabulary
     internal const string Independent = ExpressionVocabulary.Independent;
     internal const string Uncountable = "uncountable";
     internal const string Divisible = "divisible";
+    internal const string Stowable = "stowable";
     internal const string Modifiers = "modifiers";
     internal const string Standing = ExpressionVocabulary.Standing;
     internal const string Presets = "presets";
@@ -115,7 +122,11 @@ internal static class ManifestVocabulary
         Id, Title, Version, Talemark, Start, Randomness, Seed, Undo, Autosave, CharacterSheet, Ruleset, Creation,
         When, Do, Effect, Divert, Once, Save, Base, Disable, Stats, Shown, Name, Category, Min, Max, Default, GoverningAttribute,
         FirstName, LastName, Pronouns, Inventory, NameAgreement, Subject, Object, PossessivePronoun, Reflexive,
-        Agreement, Determiner, Independent, Uncountable, Divisible, Modifiers, Standing, Presets, Label,
+        Agreement, Determiner, Independent, Uncountable, Divisible, Stowable, Modifiers, Standing, Presets, Label,
+    ];
+    internal static readonly ImmutableArray<string> ItemEngineKeys =
+    [
+        Name, Modifiers, NameAgreement, Uncountable, Divisible, Stowable,
     ];
 
     internal static readonly ImmutableArray<string> FixedKeywordValues =

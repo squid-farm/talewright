@@ -3,6 +3,7 @@ using Talewright.Core;
 using Talewright.Core.Identity;
 using Talewright.Core.Randomness;
 using Talewright.Core.Rulesets;
+using Talewright.Core.World;
 using Talewright.Rules.Checks;
 using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
@@ -59,6 +60,9 @@ public sealed class ChoiceReplayIdentityEncodingTests
             """["pronoun-ref","player","PossessivePronoun"]""" },
         { "faction name", new FactionNameRef(Guild), """["faction-name-ref","guild"]""" },
         { "item name", new ItemNameRef(Torch), """["item-name-ref","torch"]""" },
+        { "item property", new ItemPropertyRef(Rope, "weight",
+            new ItemPropertyValue.Number(ExactNumber.FromFraction(5, 4))),
+            """["item-property-ref","rope","weight",["number","5/4"]]""" },
         { "has item", new HasItem(Player, Rope), """["has-item","player","rope"]""" },
         { "visited", new Visited(new SceneId("cave")), """["visited","cave"]""" },
         { "current scene visits", new SceneVisitCountRef(null), """["scene-visit-count-ref",null]""" },
@@ -164,6 +168,47 @@ public sealed class ChoiceReplayIdentityEncodingTests
 
         Assert.Equal(["CCC3E9B409F6854D", "AB84B0E5AAEDE3E0"],
             choices.Select(choice => Convert.ToHexString(choice.ReplayIdentity!)));
+    }
+
+    [Fact]
+    public void Item_property_values_participate_in_choice_quantity_and_check_difficulty_identity()
+    {
+        static string[] Compile(int price, int difficulty)
+        {
+            var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+            {
+                [StorySource.ManifestFileName] = $$"""
+                    game: { id: replay, title: Replay, start: start, talemark: 2, ruleset: rpg }
+                    characters:
+                      player: { first-name: Ada }
+                    items:
+                      rope:
+                        price: {{price}}
+                        difficulty: {{difficulty}}
+                    """,
+                ["main.tale"] = """
+                    === start
+                    * [Buy] {take player rope item:rope:price} -> finish
+                    * [Check] skill-check athletics dc item:rope:difficulty
+                      success: -> finish
+                      failure: -> END
+                    === finish
+                    -> END
+                    """,
+            }));
+            Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+            return result.Story!.GetScene(new SceneId("start")).Choices
+                .Select(choice => Convert.ToHexString(choice.ReplayIdentity!)).ToArray();
+        }
+
+        var baseline = Compile(price: 2, difficulty: 12);
+        var changedPrice = Compile(price: 3, difficulty: 12);
+        var changedDifficulty = Compile(price: 2, difficulty: 13);
+
+        Assert.NotEqual(baseline[0], changedPrice[0]);
+        Assert.Equal(baseline[1], changedPrice[1]);
+        Assert.Equal(baseline[0], changedDifficulty[0]);
+        Assert.NotEqual(baseline[1], changedDifficulty[1]);
     }
 
     private static string Describe(SceneId? divert, IReadOnlyList<Effect> effects, CheckBranch? check) =>

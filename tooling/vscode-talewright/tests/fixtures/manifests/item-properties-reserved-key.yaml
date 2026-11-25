@@ -1,0 +1,10 @@
+game:
+  id: item-properties-reserved-key
+  title: Reserved item property key
+  start: beginning
+  talemark: 1
+characters:
+  player: { first-name: Ada }
+items:
+  charm:
+    stowable: false

@@ -1,5 +1,6 @@
 using Talewright.Core.Rulesets;
 using Talewright.Core.State;
+using Talewright.Core.World;
 using Talewright.Core;
 
 namespace Talewright.Rules.Expressions;
@@ -174,6 +175,7 @@ public static class ExpressionEvaluator
             PronounRef e => Value.Of(Pronoun(state, e)),
             FactionNameRef e => Value.Of(state.World.Factions[e.Faction].Name),
             ItemNameRef e => Value.Of(state.World.Items[e.Item].Name),
+            ItemPropertyRef e => ItemProperty(e.Value),
             HasItem e => Value.Of(state.GetExactItemCount(e.Character, e.Item) > 0),
             Visited e => Value.Of(state.VisitCount(e.Scene) > 0),
             SceneVisitCountRef e => Value.Of(e.Scene is { } scene
@@ -186,6 +188,14 @@ public static class ExpressionEvaluator
             _ => throw new NotSupportedException($"Unknown expression {expr.GetType().Name}."),
         };
     }
+
+    private static Value ItemProperty(ItemPropertyValue value) => value switch
+    {
+        ItemPropertyValue.Number number => Value.Of(number.Value),
+        ItemPropertyValue.Boolean boolean => Value.Of(boolean.Value),
+        ItemPropertyValue.Text text when text.Value is not null => Value.Of(text.Value),
+        _ => throw new InvalidOperationException("Compiled item property has an invalid value."),
+    };
 
     private static Value ApplyBinary(BinaryExpr e, Value left, Value right, EvaluationContext context)
     {

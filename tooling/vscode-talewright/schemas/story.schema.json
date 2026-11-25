@@ -2,7 +2,7 @@
   "$schema": "http://json-schema.org/draft-07/schema#",
   "$id": "https://raw.githubusercontent.com/squid-farm/talewright/main/tooling/vscode-talewright/schemas/story.schema.json",
   "title": "Talewright story configuration (*.talewright.yaml)",
-  "description": "Structural validation and authoring help for a Talewright root manifest or supporting configuration file. Whole-story requirements, story-specific identifiers, and Talemark expressions are checked by the Talewright compiler. Optional mappings and lists must be omitted or supplied as containers; YAML null is not an empty container. Unknown keys are errors in the editor schema and compiler (TW4006).",
+  "description": "Structural validation and authoring help for a Talewright root manifest or supporting configuration file. Whole-story requirements, story-specific identifiers, and Talemark expressions are checked by the Talewright compiler. Optional mappings and lists must be omitted or supplied as containers; YAML null is not an empty container. Unknown keys are errors in the editor schema and compiler (TW4006), except valid custom item properties.",
   "type": "object",
   "properties": {
     "game": {
@@ -198,7 +198,16 @@
           "items": {
             "additionalProperties": {
               "if": { "type": "object" },
-              "then": { "properties": { "modifiers": { "$ref": "#/definitions/integerMap" } } }
+              "then": {
+                "properties": { "modifiers": { "$ref": "#/definitions/integerMap" } },
+                "additionalProperties": {
+                  "oneOf": [
+                    { "type": "boolean" },
+                    { "$ref": "#/definitions/integer" },
+                    { "type": "string", "minLength": 1 }
+                  ]
+                }
+              }
             }
           },
           "game": {
@@ -534,6 +543,14 @@
     },
     "item": {
       "type": "object",
+      "propertyNames": {
+        "$ref": "#/definitions/identifier",
+        "description": "Engine and custom property keys use the shared identifier rules."
+      },
+      "not": {
+        "required": ["stowable"],
+        "description": "stowable is reserved for an engine setting that is not supported yet."
+      },
       "properties": {
         "name": {
           "type": "string",
@@ -555,12 +572,26 @@
           "default": false,
           "description": "In Talemark 2, retain exact fractional quantities. Independent of name agreement and uncountable."
         },
+        "stowable": {
+          "type": "boolean",
+          "description": "Reserved engine key; not supported yet."
+        },
         "modifiers": {
           "$ref": "#/definitions/statMap",
           "description": "Stat modifiers while the item is held."
         }
       },
-      "additionalProperties": false
+      "additionalProperties": {
+        "$ref": "#/definitions/itemPropertyValue"
+      }
+    },
+    "itemPropertyValue": {
+      "oneOf": [
+        { "type": "boolean" },
+        { "type": "number" },
+        { "type": "string", "minLength": 1 }
+      ],
+      "description": "A custom item property is a boolean, number, or text scalar; lists, mappings, and null are invalid."
     },
     "faction": {
       "type": "object",

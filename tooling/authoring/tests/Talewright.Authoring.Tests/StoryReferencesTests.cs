@@ -164,6 +164,35 @@ public sealed class StoryReferencesTests
     }
 
     [Fact]
+    public void Custom_item_property_expressions_index_the_item_id_reference()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = """
+                game: { id: item-property-refs, title: Item property refs, start: start, talemark: 1 }
+                characters: { player: { first-name: Ada } }
+                items: { rope: { name: Rope, color: blue } }
+                """,
+            ["main.tale"] = """
+                === start
+                @requires item:rope:color == "blue"
+                -> END
+                """,
+        });
+
+        var analysis = StoryAnalyzer.Analyze(source);
+        var line = source.Files["main.tale"].Split('\n')[1];
+        var itemReference = new SourceLocation("main.tale", 2,
+            line.IndexOf("rope", StringComparison.Ordinal) + 1);
+        var occurrences = analysis.Names.Occurrences(AuthoringSymbolKind.Item, "rope");
+
+        Assert.Equal(2, occurrences.Count);
+        Assert.Single(occurrences, occurrence => occurrence.IsDeclaration);
+        Assert.Single(occurrences, occurrence => !occurrence.IsDeclaration);
+        Assert.Equal(2, StoryReferences.Find(analysis, itemReference, includeDeclaration: true).Count);
+    }
+
+    [Fact]
     public void Dotted_scene_references_span_diverts_outcomes_visits_and_the_start_scene()
     {
         AssertReferences("town.gate",

@@ -160,6 +160,20 @@ public sealed class CompilerDiagnosticCoverageTests
                 game: {id: coverage, title: Coverage, start: start, talemark: 1}
                 characters: {player: {first-name: Ada}}
                 """)),
+        new("TW4009", Story("=== start\n-> END", """
+            game: {id: coverage, title: Coverage, start: start}
+            characters: {player: {first-name: Ada}}
+            items:
+              rope:
+                nme: Rope
+            """), DiagnosticSeverity.Hint, new(StorySource.ManifestFileName, 5, 5),
+            Story("=== start\n-> END", """
+                game: {id: coverage, title: Coverage, start: start}
+                characters: {player: {first-name: Ada}}
+                items:
+                  rope:
+                    name: Rope
+                """)),
     ];
 
     [Fact]

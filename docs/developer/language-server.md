@@ -126,6 +126,11 @@ at the first hidden position with the number omitted. Files at or below the
 limit are unchanged. This limit applies only to editor publication, not compiler
 results or CLI validation and lint output.
 
+Custom item keys within one or two Damerau-Levenshtein edits of an engine item
+setting remain valid custom properties but receive a non-blocking Hint and a
+quick fix to the engine spelling. `stowable` is reserved but unsupported, so
+choosing that spelling still produces a configuration error.
+
 ### Semantic completion
 
 The compiler records reference slots using its Talemark parser, expression lexer,
@@ -140,7 +145,9 @@ Supported slots include scene diverts (including `END`), speech characters,
 scene metadata directives, skill-check actors/stats, and expression namespaces
 for stats, items, factions, flags, and variables. `player visited ` offers scene IDs;
 `scene:player:visits` and `<scene>:player:visits` complete the visit-count references.
-`item:` references offer item names, and `give`/`take` quantities offer numeric
+`item:` references offer item names; `item:<id>:` offers `name` and the item's declared custom
+properties, with type/value details on custom-property completions. Numeric expression contexts
+offer only number-valued custom properties. `give`/`take` quantities offer numeric
 expression operands after the actor and item.
 `@` in conditions offers explicitly registered predicates, and `#` in
 substitutions offers registered text modifiers. After `<character>:pronoun:`,
@@ -205,14 +212,14 @@ documentation. Already-recognized tokens in incomplete expressions still work;
 syntactically broken YAML has no fabricated schema locations. Registered
 predicates/modifiers expose their names and types, not undocumented signatures
 or runtime results. Source context is authored text, never a current gameplay
-value or evaluated custom registration. Complete substitutions additionally show authored-default
+value or evaluated custom registration. Custom item-property references show their declared scalar
+type and value. Complete substitutions additionally show authored-default
 examples and built-in manipulator steps. Symbol cards list authored facts only:
 characters show their default name and pronoun forms; items their name, stat
 modifiers and starting holders; stats their name, category, range, default and
 per-character starting values; factions their name, initial standing and tier;
 scenes their authored title, tags, priority, `once` and hub settings. Each kind's
-facts come from one list in `StoryHover`, where future authored metadata (such as
-custom item properties) can be added.
+facts come from one list in `StoryHover`.
 
 Clients advertising Markdown receive formatted help with authored names, paths,
 and source lines isolated in code spans; no authored text is promoted into links,

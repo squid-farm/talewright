@@ -281,7 +281,13 @@ public class EditorManifestSchemaTests
                 Assert.Contains(result.Diagnostics, diagnostic =>
                     diagnostic.Code == "TW4003" && diagnostic.Message == "autosave must be true or false.");
             }
-            Assert.All(result.Diagnostics.Where(diagnostic => diagnostic.Code == "TW4006"), diagnostic =>
+            if (file == "item-properties-reserved-key.yaml")
+            {
+                Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Code == "TW4006" &&
+                    diagnostic.Message == "Unknown key 'stowable'. This engine setting is not supported yet.");
+            }
+            Assert.All(result.Diagnostics.Where(diagnostic => diagnostic.Code == "TW4006" &&
+                !diagnostic.Message.Contains("This engine setting is not supported yet.", StringComparison.Ordinal)), diagnostic =>
             {
                 Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
                 Assert.StartsWith("Unknown key '", diagnostic.Message);

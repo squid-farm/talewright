@@ -78,14 +78,21 @@ public sealed class ValidationTests : IDisposable
         {
             var actual = diagnostics[i];
             var diagnostic = expected.Diagnostics[i];
-            Assert.Equal(["code", "column", "file", "line", "message", "severity"],
-                actual.EnumerateObject().Select(p => p.Name).Order());
+            var expectedProperties = diagnostic.EndLocation is null
+                ? new[] { "code", "column", "file", "line", "message", "severity" }
+                : new[] { "code", "column", "endColumn", "endLine", "file", "line", "message", "severity" };
+            Assert.Equal(expectedProperties, actual.EnumerateObject().Select(p => p.Name).Order());
             Assert.Equal(diagnostic.Code, actual.GetProperty("code").GetString());
             Assert.Equal(diagnostic.Message, actual.GetProperty("message").GetString());
             Assert.Equal(diagnostic.Severity.ToString().ToLowerInvariant(), actual.GetProperty("severity").GetString());
             Assert.Equal(diagnostic.Location.File, actual.GetProperty("file").GetString());
             Assert.Equal(diagnostic.Location.Line, actual.GetProperty("line").GetInt32());
             Assert.Equal(diagnostic.Location.Column, actual.GetProperty("column").GetInt32());
+            if (diagnostic.EndLocation is { } end)
+            {
+                Assert.Equal(end.Line, actual.GetProperty("endLine").GetInt32());
+                Assert.Equal(end.Column, actual.GetProperty("endColumn").GetInt32());
+            }
         }
     }
 

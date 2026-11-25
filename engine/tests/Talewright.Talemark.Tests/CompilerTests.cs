@@ -693,7 +693,8 @@ public class CompilerTests
     {
         Assert.Contains("Unknown property 'strenght'", Error("=== a\n{player:strenght}\n-> END", "TW2001").Message);
         Error("=== a\n{faction:nobody}\n-> END", "TW2001");
-        Assert.Contains("item:rope:name", Error("=== a\n{item:rope:color}\n-> END", "TW2001").Message);
+        Assert.Contains("Unknown item property 'color' on 'rope'.",
+            Error("=== a\n{item:rope:color}\n-> END", "TW2001").Message);
         Error("=== a\n{if player has sword}x{/if}\n-> END", "TW2001");
         Error("=== a\n> ghost: boo\n-> END", "TW2001");
         Error("=== a\n-> nowhere", "TW2002");
@@ -1361,17 +1362,16 @@ public class CompilerTests
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
-    public void Unknown_item_plural_key_uses_the_same_diagnostic(bool withAgreement)
+    public void Item_plural_key_is_a_custom_property_even_with_name_agreement(bool withAgreement)
     {
         var agreement = withAgreement ? ", name-agreement: plural" : "";
         var yaml = Yaml.Replace("rope: { name: coil of rope }",
             $"rope: {{ name: coil of rope, plural: true{agreement} }}");
         var result = Compile("=== a\n-> END", yaml);
-        var error = Assert.Single(result.Errors, diagnostic => diagnostic.Code == "TW4006");
 
-        Assert.False(result.Success);
-        Assert.Equal("Unknown key 'plural'. Expected one of: name, modifiers, name-agreement, uncountable, divisible.", error.Message);
-        AssertYamlKeyLocation(error, yaml, "plural:");
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var item = result.Story!.World.Items[new ItemId("rope")];
+        Assert.Equal(new ItemPropertyValue.Boolean(true), item.CustomProperties["plural"]);
     }
 
     [Fact]
