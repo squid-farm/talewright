@@ -1,0 +1,13 @@
+game:
+  id: item-properties-v1
+  title: Item properties v1
+  start: beginning
+  talemark: 1
+characters:
+  player: { first-name: Ada }
+items:
+  charm:
+    name: Charm
+    uses: 3
+    magical: true
+    label: "true"

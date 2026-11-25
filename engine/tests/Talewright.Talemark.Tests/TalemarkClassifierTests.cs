@@ -38,7 +38,7 @@ public sealed class TalemarkClassifierTests
             @once
             // scene comment
             Narrative *emphasis* and **strong**.
-            {if player visited entry}Here {player:first-name#upper} {player:pronoun#one-many("has", "have")}{else}{image("maps/old", "A {player:first-name} map")}{/if}
+            {if player visited entry}Here {player:first-name#upper} {player:pronoun#one-many("has", "have")} {item:rope:weight > 2}{else}{image("maps/old", "A {player:first-name} map")}{/if}
             > guide: Hello, {player:name}.
             ~ set flag:ready; var:count += 2; var:count = var:count + 1 * 2 - 3 / 4
             ~ take player key; clear flag:ready
@@ -112,6 +112,7 @@ public sealed class TalemarkClassifierTests
         Has(TalemarkClassificationKind.Namespace, "flag");
         Has(TalemarkClassificationKind.Property, "strength");
         Has(TalemarkClassificationKind.Property, "first-name");
+        Has(TalemarkClassificationKind.Property, "weight");
         Has(TalemarkClassificationKind.Property, "visits");
         Has(TalemarkClassificationKind.Function, "image");
         Has(TalemarkClassificationKind.Function, "@CanPickLock");

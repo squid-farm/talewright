@@ -38,6 +38,31 @@ public sealed partial class ServerTests
     }
 
     [Fact]
+    public async Task Near_engine_item_key_hint_offers_a_quick_fix_without_an_error()
+    {
+        await using var client = new Client();
+        await client.Initialize(capabilities: new
+        {
+            workspace = new { workspaceEdit = new { documentChanges = true } }
+        });
+        const string manifest = "game:\n  id: key-hint\n  title: Key hint\n  start: start\ncharacters:\n  player: {first-name: Ada}\nitems:\n  rope:\n    stowabl: false\n";
+        await client.Open(StorySource.ManifestFileName, manifest, 1);
+        await client.Open("start.tale", "=== start\n-> END\n", 1);
+
+        var diagnostic = Assert.Single(await client.Diagnostics(StorySource.ManifestFileName, 1),
+            item => item.GetProperty("code").GetString() == "TW4009");
+        Assert.Equal(4, diagnostic.GetProperty("severity").GetInt32());
+
+        var action = Assert.Single(await CodeActions(client, manifest, [diagnostic], StorySource.ManifestFileName));
+        Assert.Equal("Change to `stowable`", action.GetProperty("title").GetString());
+        var edit = action.GetProperty("edit").GetProperty("documentChanges")[0].GetProperty("edits")[0];
+        Assert.Equal("stowable", edit.GetProperty("newText").GetString());
+        Assert.Equal(8, edit.GetProperty("range").GetProperty("start").GetProperty("line").GetInt32());
+        Assert.Equal(4, edit.GetProperty("range").GetProperty("start").GetProperty("character").GetInt32());
+        Assert.Equal(11, edit.GetProperty("range").GetProperty("end").GetProperty("character").GetInt32());
+    }
+
+    [Fact]
     public async Task Unsafe_manifest_shape_returns_a_disabled_flag_action_with_a_reason()
     {
         await using var client = new Client();
@@ -400,12 +425,13 @@ public sealed partial class ServerTests
         Assert.True(action.GetProperty("edit").TryGetProperty("changes", out _));
     }
 
-    private static async Task<JsonElement[]> CodeActions(Client client, string text, JsonElement[] diagnostics)
+    private static async Task<JsonElement[]> CodeActions(
+        Client client, string text, JsonElement[] diagnostics, string file = "start.tale")
     {
         var lines = text.ReplaceLineEndings("\n").Split('\n');
         var response = await client.Request("textDocument/codeAction", new
         {
-            textDocument = new { uri = client.UriOf("start.tale") },
+            textDocument = new { uri = client.UriOf(file) },
             range = new
             {
                 start = new { line = 0, character = 0 },

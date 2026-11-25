@@ -1,4 +1,5 @@
 using Talewright.Core.Identity;
+using Talewright.Core.World;
 using Talewright.Rules.Expressions;
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Parsing;
@@ -42,7 +43,7 @@ internal static class ExpressionCompletion
     private static readonly string[] NumericInventoryItemKeywords = [Count];
 
     internal static IEnumerable<CompletionSite> Sites(TokenBuffer tokens, ExpressionContextKind kind, Func<int, int, SourceRange> map,
-        IReadOnlyList<AuthoringSymbol> symbols, int talemarkVersion)
+        IReadOnlyList<AuthoringSymbol> symbols, int talemarkVersion, WorldDefinition? world)
     {
         var text = tokens.Source;
         var offsets = new HashSet<int> { text.Length };
@@ -178,12 +179,22 @@ internal static class ExpressionCompletion
                 if (owner.Is(Faction))
                     keywords = [.. FactionProperties];
                 else if (owner.Is(Item))
-                    keywords = [.. ItemProperties];
+                {
+                    var customProperties = world?.Items.GetValueOrDefault(new ItemId(member.Text.ToString()))?.CustomProperties;
+                    var availableProperties = customProperties?
+                        .Where(property => kind != ExpressionContextKind.Number || property.Value is ItemPropertyValue.Number)
+                        .ToArray() ?? [];
+                    keywords = [.. ItemProperties.Where(property =>
+                        kind != ExpressionContextKind.Number || property != Name), .. availableProperties.Select(property => property.Key)];
+                    details = availableProperties.ToDictionary(property => property.Key,
+                        property => ItemPropertyDetails(property.Value), StringComparer.Ordinal);
+                }
                 else
                 {
                     keywords = [.. PronounProperties];
                     details = PronounFormDetails;
                 }
+
                 if (member.Is(Player) && symbols.Any(symbol =>
                         symbol.Kind == AuthoringSymbolKind.Scene && owner.Is(symbol.Name)))
                     keywords = [.. keywords, Visits];
@@ -277,6 +288,14 @@ internal static class ExpressionCompletion
                 end < text.Length && text[end] is Separator or OpenParen ? text[end] : null, null, details);
         }
     }
+
+    private static string ItemPropertyDetails(ItemPropertyValue value) => value switch
+    {
+        ItemPropertyValue.Number number => $"Read-only custom item property (number): {number.Value.ToDecimalString()}.",
+        ItemPropertyValue.Boolean boolean => $"Read-only custom item property (boolean): {boolean.Value.ToString().ToLowerInvariant()}.",
+        ItemPropertyValue.Text text => $"Read-only custom item property (text): {text.Value}.",
+        _ => throw new InvalidOperationException("Unknown item property value type."),
+    };
 
     private static bool HasSymbol(IReadOnlyList<AuthoringSymbol> symbols, AuthoringSymbolKind kind, Token token)
     {

@@ -656,7 +656,8 @@ public sealed class LanguageServer
         {
             var diagnostics = analysis.Diagnostics.Where(diagnostic =>
                 (diagnostic.Code is CompilerDiagnosticCodes.UnknownScene or CompilerDiagnosticCodes.UnsetFlagOrUnassignedVariable or
-                    CompilerDiagnosticCodes.UnknownNameOrProperty or CompilerDiagnosticCodes.UnknownPredicate) &&
+                    CompilerDiagnosticCodes.UnknownNameOrProperty or CompilerDiagnosticCodes.UnknownPredicate or
+                    CompilerDiagnosticCodes.PossibleItemEngineKey) &&
                 diagnostic.Location.File == position.File &&
                 Compare(position, diagnostic.Location) <= 0 && Compare(diagnostic.Location, request.End) <= 0);
             var lines = new LineMap(request.Text);
@@ -1375,6 +1376,7 @@ public sealed class LanguageServer
             {
                 DiagnosticSeverity.Error => 1,
                 DiagnosticSeverity.Warning => 2,
+                DiagnosticSeverity.Hint => 4,
                 _ => 3,
             },
             code = diagnostic.Code,

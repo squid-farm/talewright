@@ -1,4 +1,5 @@
 using Talewright.Core.Identity;
+using Talewright.Core.Text;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
@@ -219,6 +220,9 @@ public static class StoryQuickFixes
 
     public static StoryQuickFixResult ForCloseNameMatches(StoryAnalysis analysis, Diagnostic diagnostic)
     {
+        if (diagnostic.Code == CompilerDiagnosticCodes.PossibleItemEngineKey)
+            return ForPossibleItemEngineKey(analysis, diagnostic);
+
         if (diagnostic.Code is not (CompilerDiagnosticCodes.UnknownNameOrProperty or
                 CompilerDiagnosticCodes.UnknownScene or
                 CompilerDiagnosticCodes.UnsetFlagOrUnassignedVariable or
@@ -244,7 +248,7 @@ public static class StoryQuickFixes
 
         var suggestions = candidates
             .Where(name => name != site.Text && IdentifierRules.IsValid(name))
-            .Select(name => (Name: name, Distance: DamerauLevenshteinDistance(site.Text, name)))
+            .Select(name => (Name: name, Distance: DamerauLevenshtein.Distance(site.Text, name)))
             .Where(candidate => candidate.Distance <= Math.Max(site.Text.Length, candidate.Name.Length) / 3)
             .OrderBy(candidate => candidate.Distance)
             .ThenBy(candidate => candidate.Name, StringComparer.Ordinal)
@@ -255,6 +259,50 @@ public static class StoryQuickFixes
             $"Change to `{predicatePrefix}{candidate.Name}`", StoryQuickFixKind.TextEdit,
             diagnostic.Location.File, site.Range, candidate.Name, IsPreferred: suggestions.Length == 1)).ToArray();
         return new(fixes);
+    }
+
+    private static StoryQuickFixResult ForPossibleItemEngineKey(StoryAnalysis analysis, Diagnostic diagnostic)
+    {
+        if (diagnostic.EndLocation is not { } end || end.File != diagnostic.Location.File ||
+            !analysis.Source.Files.TryGetValue(diagnostic.Location.File, out var sourceText) ||
+            ReadSourceText(sourceText, diagnostic.Location, end) is not { } sourceKey)
+            return new([]);
+
+        var key = sourceKey.Length >= 2 &&
+            (sourceKey[0] == '"' && sourceKey[^1] == '"' || sourceKey[0] == '\'' && sourceKey[^1] == '\'')
+            ? sourceKey[1..^1]
+            : sourceKey;
+        if (!IdentifierRules.IsValid(key))
+            return new([]);
+
+        var suggestions = ItemPropertyVocabulary.EngineKeys
+            .Where(name => Math.Abs(key.Length - name.Length) <= 2)
+            .Select(name => (Name: name, Distance: DamerauLevenshtein.Distance(key, name)))
+            .Where(candidate => candidate.Distance is > 0 and <= 2)
+            .OrderBy(candidate => candidate.Distance)
+            .ThenBy(candidate => candidate.Name, StringComparer.Ordinal)
+            .Take(3)
+            .ToArray();
+        var range = new SourceRange(diagnostic.Location, end);
+        var fixes = suggestions.Select(candidate => new StoryQuickFix(
+            $"Change to `{candidate.Name}`", StoryQuickFixKind.TextEdit,
+            diagnostic.Location.File, range, candidate.Name, IsPreferred: suggestions.Length == 1)).ToArray();
+        return new(fixes);
+    }
+
+    private static string? ReadSourceText(string source, SourceLocation start, SourceLocation end)
+    {
+        if (start.Line != end.Line || start.Line < 1 || start.Column < 1 || end.Column < start.Column)
+            return null;
+
+        var lines = source.ReplaceLineEndings("\n").Split('\n');
+        if (start.Line > lines.Length)
+            return null;
+
+        var line = lines[start.Line - 1];
+        var first = start.Column - 1;
+        var last = end.Column - 1;
+        return first <= line.Length && last <= line.Length ? line[first..last] : null;
     }
 
     public static IReadOnlyList<StoryQuickFix> ForMissingScene(StoryAnalysis analysis, Diagnostic diagnostic)
@@ -318,29 +366,6 @@ public static class StoryQuickFixes
         string.Join(' ', id.Replace('_', ' ').Replace('.', ' ').Replace('-', ' ')
             .Split(' ', StringSplitOptions.RemoveEmptyEntries)
             .Select(part => part[..1].ToUpperInvariant() + part[1..]));
-
-    private static int DamerauLevenshteinDistance(string left, string right)
-    {
-        var distances = new int[left.Length + 1, right.Length + 1];
-        for (var index = 0; index <= left.Length; index++) distances[index, 0] = index;
-        for (var index = 0; index <= right.Length; index++) distances[0, index] = index;
-
-        for (var row = 1; row <= left.Length; row++)
-        {
-            for (var column = 1; column <= right.Length; column++)
-            {
-                var substitution = left[row - 1] == right[column - 1] ? 0 : 1;
-                distances[row, column] = Math.Min(
-                    Math.Min(distances[row - 1, column] + 1, distances[row, column - 1] + 1),
-                    distances[row - 1, column - 1] + substitution);
-                if (row > 1 && column > 1 && left[row - 1] == right[column - 2] &&
-                    left[row - 2] == right[column - 1])
-                    distances[row, column] = Math.Min(distances[row, column], distances[row - 2, column - 2] + 1);
-            }
-        }
-
-        return distances[left.Length, right.Length];
-    }
 
     private static string SyntaxSpelling(AuthoringTokenKind kind) =>
         AuthoringSyntaxVocabulary.TryGetHelp(kind, out var help)

@@ -147,7 +147,8 @@ test('item grammar has explicit enum/boolean values and independent defaults', (
   for (const value of ['sword', {}, { name: 'armor', uncountable: true, divisible: true },
     { name: 'armor', uncountable: 'true' }, { name: 'armor', uncountable: 'false' },
     { name: 'pants', 'name-agreement': 'plural' },
-    { name: 'pair of boots', 'name-agreement': 'singular', uncountable: false }]) {
+    { name: 'pair of boots', 'name-agreement': 'singular', uncountable: false,
+      rarity: 'rare', weight: 2, cursed: false }]) {
     assertValid(item, value, JSON.stringify(value));
   }
   for (const value of [{ 'name-agreement': 'many' }, { 'name-agreement': true },
@@ -156,8 +157,24 @@ test('item grammar has explicit enum/boolean values and independent defaults', (
     { divisible: 'yes' }, { divisible: 1 }]) {
     assertInvalid(item, value, JSON.stringify(value));
   }
+  for (const invalidProperty of [null, '', [], {}]) {
+    assertInvalid(item, { rarity: invalidProperty }, `custom item property ${JSON.stringify(invalidProperty)}`);
+  }
+  assertInvalid(item, { 'invalid key': 'unexpected' }, 'invalid custom item key', 'propertyNames');
+  assertInvalid(item, { stowable: false }, 'reserved stowable item key', 'not');
+  assert.deepEqual(schema.definitions.item.additionalProperties, { $ref: '#/definitions/itemPropertyValue' });
   assert.equal(schema.definitions.item.properties['name-agreement'].default, 'singular');
   assert.equal(schema.definitions.item.properties.uncountable.default, false);
+});
+
+test('custom item numeric properties follow the Talemark version', () => {
+  const manifest = {
+    game: { id: 'item-properties', title: 'Item properties', start: 'beginning' },
+    items: { charm: { weight: 1.5 } },
+  };
+  assertInvalid(validateManifest, manifest, 'Talemark 1 fractional item property');
+  manifest.game.talemark = 2;
+  assertValid(validateManifest, manifest, 'Talemark 2 fractional item property');
 });
 
 test('compiler and schema accept the same identifiers', async () => {
@@ -355,7 +372,6 @@ test('schema rejects unknown keys at every closed reader mapping', async () => {
       agreement: 'singular',
     }],
     ['possessivePronouns', schema.definitions.possessivePronouns, { determiner: 'xyr', independent: 'xyrs' }],
-    ['item', schema.definitions.item, {}],
     ['faction', schema.definitions.faction, {}],
     ['creation', schema.definitions.creation, {}],
     ['preset', schema.definitions.preset, {}],

@@ -375,6 +375,30 @@ public sealed class StoryCompletionTests
         Assert.DoesNotContain("pronoun", labels);
     }
 
+    [Fact]
+    public void Custom_item_properties_complete_with_type_details_and_numeric_context_filtering()
+    {
+        var manifest = VersionTwoManifest.Replace("  rope: {name: Rope}",
+            "  rope: {name: Rope, weight: 1.25, fragile: false, color: blue}", StringComparison.Ordinal);
+        var (analysis, position) = Analyze("=== first\n@requires item:rope:|", manifest);
+        var completions = StoryCompletion.Complete(analysis, position);
+
+        Assert.Contains(completions, item => item.Label == "name");
+        Assert.Contains(completions, item => item.Label == "weight" &&
+            item.Detail.Contains("number): 1.25", StringComparison.Ordinal));
+        Assert.Contains(completions, item => item.Label == "fragile" &&
+            item.Detail.Contains("boolean): false", StringComparison.Ordinal));
+        Assert.Contains(completions, item => item.Label == "color" &&
+            item.Detail.Contains("text): blue", StringComparison.Ordinal));
+
+        (analysis, position) = Analyze("=== first\n::: skill-check athletics dc item:rope:|", manifest);
+        var numericLabels = StoryCompletion.Complete(analysis, position).Select(item => item.Label).ToArray();
+        Assert.Contains("weight", numericLabels);
+        Assert.DoesNotContain("name", numericLabels);
+        Assert.DoesNotContain("fragile", numericLabels);
+        Assert.DoesNotContain("color", numericLabels);
+    }
+
     [Theory]
     [InlineData("{player:inventory:|}")]
     [InlineData("{guide:inventory:|}")]

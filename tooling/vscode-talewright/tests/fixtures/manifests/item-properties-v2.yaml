@@ -1,0 +1,11 @@
+game:
+  id: item-properties-v2
+  title: Item properties v2
+  start: beginning
+  talemark: 2
+characters:
+  player: { first-name: Ada }
+items:
+  charm:
+    weight: 1.25
+    durability: 0.5

@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Talewright.Core.Identity;
+using Talewright.Core.World;
 using Talewright.Rules.Checks;
 using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
@@ -392,6 +393,12 @@ internal static class ChoiceReplayIdentity
                 writer.WriteStringValue("item-name-ref");
                 writer.WriteStringValue(value.Item.Value);
                 break;
+            case ItemPropertyRef value:
+                writer.WriteStringValue("item-property-ref");
+                writer.WriteStringValue(value.Item.Value);
+                writer.WriteStringValue(value.Property);
+                WriteItemPropertyValue(writer, value.Value);
+                break;
             case HasItem value:
                 writer.WriteStringValue("has-item");
                 writer.WriteStringValue(value.Character.Value);
@@ -439,6 +446,32 @@ internal static class ChoiceReplayIdentity
                 break;
             default:
                 throw new NotSupportedException($"Unknown choice expression '{expression.GetType().Name}'.");
+        }
+        writer.WriteEndArray();
+    }
+
+    private static void WriteItemPropertyValue(Utf8JsonWriter writer, ItemPropertyValue value)
+    {
+        writer.WriteStartArray();
+        switch (value)
+        {
+            case ItemPropertyValue.Number number:
+                writer.WriteStringValue("number");
+                if (number.Value.Denominator.IsOne)
+                    writer.WriteRawValue(number.Value.Numerator.ToString(System.Globalization.CultureInfo.InvariantCulture));
+                else
+                    writer.WriteStringValue(number.Value.ToCanonicalString());
+                break;
+            case ItemPropertyValue.Boolean boolean:
+                writer.WriteStringValue("bool");
+                writer.WriteBooleanValue(boolean.Value);
+                break;
+            case ItemPropertyValue.Text text when text.Value is not null:
+                writer.WriteStringValue("text");
+                writer.WriteStringValue(text.Value);
+                break;
+            default:
+                throw new InvalidOperationException("Compiled item property has an invalid value.");
         }
         writer.WriteEndArray();
     }

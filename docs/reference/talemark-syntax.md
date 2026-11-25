@@ -174,7 +174,11 @@ factions:
   explorers-guild: { name: "Explorers' Guild", standing: 0 }
 
 items:
-  rope: { name: coil of rope }
+  rope:
+    name: coil of rope
+    weight: 1
+    material: hemp
+    magical: false
   relic: { name: Relic of Ysh, modifiers: { wis: 2 } } # held items modify stats
 
 flags: [door-open, interview.str-known] # optional; flags/vars can also be auto-declared by effects
@@ -188,6 +192,11 @@ triggers:
     do: set flag:guild-hostile
     once: true
 ```
+
+Items may declare additional flat custom properties alongside engine settings such as `name` and
+`modifiers`. Custom property values are booleans, numbers or text scalars; lists, mappings, null
+and empty values are invalid. Talemark 1 requires whole-number values, while Talemark 2 retains
+exact decimals. Quoted YAML scalars are text, including numeric- or boolean-looking values.
 
 `do` may stay a scalar effect string or be a mapping with `effect`, `divert`, or both. A redirect
 target is a scene ID or `END`; if both keys are present, effects run before the redirect regardless
@@ -612,6 +621,7 @@ Text wraps to fit the player, with tabs at four-space stops.
 | `faction:<id>:standing`                                                                     | Player standing with the faction (number) |
 | `faction:<id>:tier`                                                                         | Standing tier name (`friendly`, …)        |
 | `faction:<id>:name`, `item:<id>`, `item:<id>:name`                                         | Display names                             |
+| `item:<id>:<property>`                                                                      | A declared custom item property           |
 | `character:inventory:item`, `character:inventory:item:name`                               | The item's display name, even when not held |
 | `var:<id>`, `flag:<id>`                                                                     | Story variables / flags                   |
 
@@ -626,6 +636,11 @@ The bare `character:inventory` namespace has no printable value.
 For these terms, see the [glossary](glossary.md).
 
 Any character id can replace `player`.
+
+`item:<id>:<property>` reads a declared custom item property with its scalar type. Properties are
+static and read-only; they are not inventory state and cannot be assigned. Engine item settings keep
+their existing meanings and are not custom properties. `stowable` is reserved for an unsupported
+engine setting.
 
 | Text manipulator    | Effect                                                                                       |
 | ------------------- | -------------------------------------------------------------------------------------------- |
@@ -809,6 +824,26 @@ Choose helpers explicitly. They do not infer context, inflect nouns, count items
 or add pair/suit/unit wording. Author exceptional phrasing directly; `#a` retains
 the existing a/an rules, not a pronunciation dictionary. These helpers take no
 arguments; only `#one-many` accepts its exact two quoted strings.
+
+### Custom item properties
+
+Custom properties are flat scalar values declared directly on an item:
+
+```yaml
+items:
+  rope:
+    name: coil of rope
+    weight: 2
+    material: hemp
+    magical: false
+```
+
+Read them in any expression context that accepts their type: `{item:rope:weight}` is numeric,
+`{item:rope:material}` is text, and `{item:rope:magical}` is boolean. Use them in arithmetic and
+conditions as appropriate. These definitions are read-only; assigning to `item:rope:weight` is an
+error. Engine keys such as `name`, `name-agreement`, `uncountable`, `divisible`, and `modifiers`
+retain their engine behavior and cannot be read as custom properties. `stowable` is reserved but not
+implemented.
 
 ### Images
 

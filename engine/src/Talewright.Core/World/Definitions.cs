@@ -41,6 +41,18 @@ public sealed record ItemDefinition(
 {
     /// <summary>Exact modifiers override matching entries in <see cref="Modifiers"/>.</summary>
     public IReadOnlyDictionary<StatId, ExactNumber>? ExactModifiers { get; init; }
+
+    /// <summary>Static, read-only authored properties that are not engine item settings.</summary>
+    public IReadOnlyDictionary<string, ItemPropertyValue> CustomProperties { get; init; } =
+        new Dictionary<string, ItemPropertyValue>(StringComparer.Ordinal);
+}
+
+/// <summary>A typed scalar declared as a custom item property.</summary>
+public abstract record ItemPropertyValue
+{
+    public sealed record Number(ExactNumber Value) : ItemPropertyValue;
+    public sealed record Boolean(bool Value) : ItemPropertyValue;
+    public sealed record Text(string Value) : ItemPropertyValue;
 }
 
 /// <summary>A faction the player can stand well or badly with.</summary>

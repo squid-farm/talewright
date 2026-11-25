@@ -539,7 +539,9 @@ internal sealed class ExpressionSyntaxParser
             {
                 Next();
                 member = Expect(TokenKind.Identifier, $"a property after '{token.Text}:{name.Text}:'");
-                if (name.Is(ExpressionVocabulary.Pronoun) && member.Value.Is(ExpressionVocabulary.PossessivePronoun))
+                if (ExpressionVocabulary.Namespace(token.Text) == ReferenceNamespace.Character &&
+                    name.Is(ExpressionVocabulary.Pronoun) &&
+                    member.Value.Is(ExpressionVocabulary.PossessivePronoun))
                 {
                     Expect(TokenKind.Colon, $"':' after '{ExpressionVocabulary.PossessivePronoun}'");
                     subMember = Expect(TokenKind.Identifier, "a possessive pronoun property");
@@ -857,10 +859,12 @@ internal sealed class ExpressionSyntaxParser
         Expect(TokenKind.Colon, "':' (effects look like 'player:hp -= 3', 'set flag:x', 'give player rope')");
         var target = Expect(TokenKind.Identifier, "a name");
         Token? member = null;
-        if (first.Is(ExpressionVocabulary.Faction) && Peek.Kind == TokenKind.Colon)
+        if ((first.Is(ExpressionVocabulary.Faction) || first.Is(ExpressionVocabulary.Item)) &&
+            Peek.Kind == TokenKind.Colon)
         {
             Next();
-            member = Expect(TokenKind.Identifier, "a faction property");
+            member = Expect(TokenKind.Identifier, first.Is(ExpressionVocabulary.Item)
+                ? "an item property" : "a faction property");
         }
 
         var op = Next();

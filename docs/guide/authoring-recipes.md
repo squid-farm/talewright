@@ -61,7 +61,7 @@ current text. A text variable can also change during play, for example
 it does not keep the two linked.
 
 These substitutions reuse **values**, not whole paragraphs or scenes. They are not reusable prose
-templates or custom item properties. See [text variables](../reference/talemark-syntax.md#text-variables)
+templates. See [text variables](../reference/talemark-syntax.md#text-variables)
 for the supported operations.
 
 ## Your own stats with skill checks

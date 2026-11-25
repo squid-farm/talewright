@@ -48,12 +48,12 @@ internal sealed class ExpressionBinder
                 if (expected == ExprType.Number && value is FactionNameRef faction)
                 {
                     binder.Fail(CompilerDiagnosticCodes.TypeMismatch,
-                        FactionValueHint(faction, ExpressionVocabulary.Standing), syntax.Root.Span.Start);
+                        FactionValueHint(faction, ExpressionVocabulary.Standing), TypeMismatchSpan(syntax.Root));
                 }
 
                 binder.Fail(CompilerDiagnosticCodes.TypeMismatch,
                     $"Expected a {Describe(expected)} expression but found a {Describe(value.Type)}.",
-                    syntax.Root.Span.Start);
+                    TypeMismatchSpan(syntax.Root));
             }
 
             return value;
@@ -226,7 +226,7 @@ internal sealed class ExpressionBinder
         var difficulty = syntax.Difficulty is { } difficultySyntax ? Bind(difficultySyntax) : null;
         if (difficulty is { Type: not ExprType.Number })
             Fail(CompilerDiagnosticCodes.TypeMismatch,
-                $"'{SceneVocabulary.Difficulty}' needs a number.", syntax.Difficulty!.Span.Start);
+                $"'{SceneVocabulary.Difficulty}' needs a number.", TypeMismatchSpan(syntax.Difficulty!));
 
         var identity = _createSkillCheckIdentity(actor, skill);
         return new SkillCheckExpr(actor, skill, identity, difficulty, syntax.IsHidden);
@@ -344,16 +344,22 @@ internal sealed class ExpressionBinder
             }
 
             case ReferenceNamespace.Item:
-                if (member is not null && member != ExpressionVocabulary.Name)
+            {
+                var item = Item(reference.Name);
+                if (member is null || member == ExpressionVocabulary.Name)
                 {
-                    Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
-                        $"Unknown item property '{member}'. Use " +
-                        $"'{ExpressionVocabulary.ItemPrefix}{path}{ExpressionVocabulary.Separator}{ExpressionVocabulary.Name}' " +
-                        "or omit the property for its display name.",
-                        reference.Member!.Value.Start);
+                    return new ItemNameRef(item);
                 }
 
-                return new ItemNameRef(Item(reference.Name));
+                var definition = _symbols.World.Items[item];
+                if (definition.CustomProperties.TryGetValue(member, out var value))
+                    return new ItemPropertyRef(item, member, value);
+
+                Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
+                    $"Unknown item property '{member}' on '{path}'.",
+                    reference.Member!.Value);
+                return default!;
+            }
             case ReferenceNamespace.Flag:
             {
                 if (member is not null)
@@ -474,7 +480,8 @@ internal sealed class ExpressionBinder
             case UnaryOp.Not:
                 if (operand.Type != ExprType.Bool)
                 {
-                    Fail(CompilerDiagnosticCodes.TypeMismatch, $"'{ExpressionVocabulary.Not}' needs a true/false condition.", unary.OperatorSpan.Start);
+                    Fail(CompilerDiagnosticCodes.TypeMismatch, $"'{ExpressionVocabulary.Not}' needs a true/false condition.",
+                        TypeMismatchSpan(unary.Operand, unary.OperatorSpan));
                 }
 
                 return new UnaryExpr(UnaryOp.Not, operand);
@@ -484,10 +491,12 @@ internal sealed class ExpressionBinder
                     if (operand is FactionNameRef faction)
                     {
                         Fail(CompilerDiagnosticCodes.TypeMismatch,
-                            FactionValueHint(faction, ExpressionVocabulary.Standing), unary.OperatorSpan.Start);
+                            FactionValueHint(faction, ExpressionVocabulary.Standing),
+                            TypeMismatchSpan(unary.Operand, unary.OperatorSpan));
                     }
 
-                    Fail(CompilerDiagnosticCodes.TypeMismatch, $"'{ExpressionVocabulary.Minus}' needs a number.", unary.OperatorSpan.Start);
+                    Fail(CompilerDiagnosticCodes.TypeMismatch, $"'{ExpressionVocabulary.Minus}' needs a number.",
+                        TypeMismatchSpan(unary.Operand, unary.OperatorSpan));
                 }
 
                 if (operand is NumberLiteral number)
@@ -515,7 +524,7 @@ internal sealed class ExpressionBinder
                 {
                     Fail(CompilerDiagnosticCodes.InvalidModifier,
                         $"Numeric modifier '{modifier}' requires a number-valued expression, but found {Describe(operand.Type)}.",
-                        unary.OperatorSpan);
+                        TypeMismatchSpan(unary.Operand, unary.OperatorSpan));
                 }
 
                 return new UnaryExpr(unary.Operator, operand);
@@ -552,7 +561,7 @@ internal sealed class ExpressionBinder
                 if (left.Type != ExprType.Bool || right.Type != ExprType.Bool)
                 {
                     Fail(CompilerDiagnosticCodes.TypeMismatch, $"'{ExpressionVocabulary.Spelling(op)}' needs true/false conditions on both sides.",
-                        binary.OperatorSpan.Start);
+                        TypeMismatchSpan(binary, binary.OperatorSpan));
                 }
 
                 break;
@@ -562,16 +571,19 @@ internal sealed class ExpressionBinder
                     if (left is FactionNameRef leftFaction)
                     {
                         Fail(CompilerDiagnosticCodes.TypeMismatch,
-                            FactionValueHint(leftFaction, ExpressionVocabulary.Standing), binary.OperatorSpan.Start);
+                            FactionValueHint(leftFaction, ExpressionVocabulary.Standing),
+                            TypeMismatchSpan(binary, binary.OperatorSpan));
                     }
 
                     if (right is FactionNameRef rightFaction)
                     {
                         Fail(CompilerDiagnosticCodes.TypeMismatch,
-                            FactionValueHint(rightFaction, ExpressionVocabulary.Standing), binary.OperatorSpan.Start);
+                            FactionValueHint(rightFaction, ExpressionVocabulary.Standing),
+                            TypeMismatchSpan(binary, binary.OperatorSpan));
                     }
 
-                    Fail(CompilerDiagnosticCodes.TypeMismatch, "Arithmetic needs numbers on both sides.", binary.OperatorSpan.Start);
+                    Fail(CompilerDiagnosticCodes.TypeMismatch, "Arithmetic needs numbers on both sides.",
+                        TypeMismatchSpan(binary, binary.OperatorSpan));
                 }
 
                 break;
@@ -584,7 +596,7 @@ internal sealed class ExpressionBinder
                         Fail(CompilerDiagnosticCodes.TypeMismatch,
                             FactionValueHint(leftFaction, right.Type == ExprType.Tier
                                 ? ExpressionVocabulary.Tier
-                                : ExpressionVocabulary.Standing), binary.OperatorSpan.Start);
+                                : ExpressionVocabulary.Standing), TypeMismatchSpan(binary, binary.OperatorSpan));
                     }
 
                     if (right is FactionNameRef rightFaction && left.Type is ExprType.Number or ExprType.Tier)
@@ -592,18 +604,18 @@ internal sealed class ExpressionBinder
                         Fail(CompilerDiagnosticCodes.TypeMismatch,
                             FactionValueHint(rightFaction, left.Type == ExprType.Tier
                                 ? ExpressionVocabulary.Tier
-                                : ExpressionVocabulary.Standing), binary.OperatorSpan.Start);
+                                : ExpressionVocabulary.Standing), TypeMismatchSpan(binary, binary.OperatorSpan));
                     }
 
                     Fail(CompilerDiagnosticCodes.TypeMismatch,
                         $"Cannot compare a {Describe(left.Type)} with a {Describe(right.Type)}.",
-                        binary.OperatorSpan.Start);
+                        TypeMismatchSpan(binary, binary.OperatorSpan));
                 }
 
                 if (left.Type is ExprType.Bool or ExprType.Text && op is not (BinaryOp.Equal or BinaryOp.NotEqual))
                 {
                     Fail(CompilerDiagnosticCodes.TypeMismatch, $"Only {ExpressionVocabulary.EqualTo} and {ExpressionVocabulary.NotEqualTo} can compare {Describe(left.Type)} values.",
-                        binary.OperatorSpan.Start);
+                        TypeMismatchSpan(binary, binary.OperatorSpan));
                 }
 
                 break;
@@ -640,7 +652,7 @@ internal sealed class ExpressionBinder
                         FactionValueHint(faction, ExpressionVocabulary.Standing), quantitySyntax.Span.Start);
                 }
 
-                Fail(CompilerDiagnosticCodes.TypeMismatch, "Item quantity must be a number.", quantitySyntax.Span.Start);
+                Fail(CompilerDiagnosticCodes.TypeMismatch, "Item quantity must be a number.", TypeMismatchSpan(quantitySyntax));
             }
         }
 
@@ -678,6 +690,22 @@ internal sealed class ExpressionBinder
     private Effect BindAssignment(AssignmentEffectSyntax effect)
     {
         var targetName = Text(effect.Target);
+        if (effect.Kind == ReferenceNamespace.Item)
+        {
+            var item = Item(effect.Target);
+            var definition = _symbols.World.Items[item];
+            if (effect.Member is { } member &&
+                Text(member) != ExpressionVocabulary.Name &&
+                !definition.CustomProperties.ContainsKey(Text(member)))
+            {
+                Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
+                    $"Unknown item property '{Text(member)}' on '{targetName}'.", member);
+            }
+
+            Fail(CompilerDiagnosticCodes.UnknownNameOrProperty, "Item properties are read-only.",
+                effect.Member ?? effect.Target);
+        }
+
         var variable = new VarId(targetName);
         if (effect.Kind == ReferenceNamespace.Variable && _symbols.UnresolvedVariables.Contains(variable))
         {
@@ -715,7 +743,7 @@ internal sealed class ExpressionBinder
             if (amount.Type != ExprType.Text)
             {
                 Fail(CompilerDiagnosticCodes.TypeMismatch, $"Text variable '{targetName}' needs text, not {Describe(amount.Type)}.",
-                    effect.Amount.Span.Start);
+                    TypeMismatchSpan(effect.Amount));
             }
 
             return new SetTextVariable(variable, amount);
@@ -726,12 +754,12 @@ internal sealed class ExpressionBinder
             if (amount is FactionNameRef faction)
             {
                 Fail(CompilerDiagnosticCodes.TypeMismatch,
-                    FactionValueHint(faction, ExpressionVocabulary.Standing), effect.Amount.Span.Start);
+                    FactionValueHint(faction, ExpressionVocabulary.Standing), TypeMismatchSpan(effect.Amount));
             }
 
             Fail(CompilerDiagnosticCodes.TypeMismatch, effect.Kind == ReferenceNamespace.Variable
                 ? $"Variable '{targetName}' has a fixed numeric type and needs a number, not {Describe(amount.Type)}."
-                : "Only numbers can be assigned to stats or faction standings.", effect.Amount.Span.Start);
+                : "Only numbers can be assigned to stats or faction standings.", TypeMismatchSpan(effect.Amount));
         }
 
         return effect.Kind switch
@@ -824,6 +852,18 @@ internal sealed class ExpressionBinder
     }
 
     private string Text(ExpressionSpan span) => _tokens.Source.AsSpan(span.Start, span.Length).ToString();
+
+    private static ExpressionSpan TypeMismatchSpan(ExpressionNode syntax) =>
+        TypeMismatchSpan(syntax, syntax.Span);
+
+    private static ExpressionSpan TypeMismatchSpan(ExpressionNode syntax, ExpressionSpan fallback) => syntax switch
+    {
+        ReferenceExpressionNode { Kind: ReferenceNamespace.Item, Member: { } member } => member,
+        ParenthesizedExpressionNode parenthesized => TypeMismatchSpan(parenthesized.Inner, fallback),
+        UnaryExpressionNode unary => TypeMismatchSpan(unary.Operand, fallback),
+        BinaryExpressionNode binary => TypeMismatchSpan(binary.Left, TypeMismatchSpan(binary.Right, fallback)),
+        _ => fallback,
+    };
 
     private static string Describe(ExprType type) => type switch
     {

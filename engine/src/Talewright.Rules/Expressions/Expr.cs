@@ -1,6 +1,7 @@
 using Talewright.Core.Identity;
 using Talewright.Core.Randomness;
 using Talewright.Core.Rulesets;
+using Talewright.Core.World;
 using Talewright.Core;
 
 namespace Talewright.Rules.Expressions;
@@ -120,6 +121,18 @@ public sealed record FactionNameRef(FactionId Faction) : Expr
 public sealed record ItemNameRef(ItemId Item) : Expr
 {
     public override ExprType Type => ExprType.Text;
+}
+
+/// <summary>A read-only scalar property declared on an item.</summary>
+public sealed record ItemPropertyRef(ItemId Item, string Property, ItemPropertyValue Value) : Expr
+{
+    public override ExprType Type => Value switch
+    {
+        ItemPropertyValue.Number => ExprType.Number,
+        ItemPropertyValue.Boolean => ExprType.Bool,
+        ItemPropertyValue.Text => ExprType.Text,
+        _ => throw new InvalidOperationException("Unknown item property value type."),
+    };
 }
 
 /// <summary><c>player has rope</c>.</summary>

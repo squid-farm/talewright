@@ -2,6 +2,7 @@ using System.Globalization;
 using Talewright.Core;
 using Talewright.Core.Identity;
 using Talewright.Core.Rulesets;
+using Talewright.Core.Text;
 using Talewright.Core.World;
 using Talewright.Talemark.Model;
 using Talewright.Talemark.Vocabulary;
@@ -167,9 +168,38 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
             var nameAgreement = GrammaticalNumber.Singular;
             var uncountable = false;
             var divisible = false;
+            var customProperties = new Dictionary<string, ItemPropertyValue>(StringComparer.Ordinal);
             if (value is YamlMappingNode body)
             {
-                _yaml.CheckKeys(body, ManifestVocabulary.Name, ManifestVocabulary.Modifiers, ManifestVocabulary.NameAgreement, ManifestVocabulary.Uncountable, ManifestVocabulary.Divisible);
+                foreach (var (propertyKey, propertyValue) in body.Children)
+                {
+                    if (Scalar(propertyKey) is not { } propertyName)
+                    {
+                        _yaml.Diagnostics.Error(CompilerDiagnosticCodes.UnknownConfigurationKey,
+                            "Configuration keys must be scalar values. Expected item engine keys or custom property names.",
+                            _yaml.At(propertyKey));
+                        continue;
+                    }
+
+                    if (propertyName == ManifestVocabulary.Stowable)
+                    {
+                        _yaml.Diagnostics.Error(CompilerDiagnosticCodes.UnknownConfigurationKey,
+                            $"Unknown key '{propertyName}'. This engine setting is not supported yet.",
+                            _yaml.At(propertyKey));
+                        continue;
+                    }
+
+                    if (ManifestVocabulary.ItemEngineKeys.Contains(propertyName))
+                        continue;
+
+                    if (_yaml.Identifier(propertyKey, "item property") is { } customName)
+                    {
+                        HintIfNearItemEngineKey(propertyKey, customName);
+                        if (ReadCustomItemProperty(customName, propertyValue, talemarkVersion) is { } customValue)
+                            customProperties.Add(customName, customValue);
+                    }
+                }
+
                 name = Scalar(Get(body, ManifestVocabulary.Name)) ?? name;
                 if (talemarkVersion == 1)
                     modifiers = ReadStatMap(Get(body, ManifestVocabulary.Modifiers), ruleset);
@@ -191,10 +221,70 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
             }
 
             items[id] = new ItemDefinition(id, name, modifiers, nameAgreement, uncountable, divisible)
-                { ExactModifiers = exactModifiers };
+                { ExactModifiers = exactModifiers, CustomProperties = customProperties };
         }
 
         return items;
+    }
+
+    private void HintIfNearItemEngineKey(YamlNode keyNode, string propertyName)
+    {
+        var candidates = ManifestVocabulary.ItemEngineKeys
+            .Where(engineKey => Math.Abs(propertyName.Length - engineKey.Length) <= 2)
+            .Select(engineKey => (Name: engineKey, Distance: DamerauLevenshtein.Distance(propertyName, engineKey)))
+            .Where(candidate => candidate.Distance is > 0 and <= 2)
+            .OrderBy(candidate => candidate.Distance)
+            .ThenBy(candidate => candidate.Name, StringComparer.Ordinal)
+            .ToArray();
+        if (candidates.Length == 0)
+            return;
+
+        var start = _yaml.At(keyNode);
+        var endMark = keyNode.End;
+        var end = new SourceLocation(start.File, Math.Max(1, (int)endMark.Line), Math.Max(1, (int)endMark.Column));
+        _yaml.Diagnostics.Hint(CompilerDiagnosticCodes.PossibleItemEngineKey,
+            $"Custom item key '{propertyName}' is close to engine key '{candidates[0].Name}'.", start, end);
+    }
+
+    private ItemPropertyValue? ReadCustomItemProperty(string name, YamlNode node, int talemarkVersion)
+    {
+        if (node is not YamlScalarNode scalar)
+            return _yaml.Error<ItemPropertyValue?>(node, CompilerDiagnosticCodes.InvalidConfigurationValue,
+                $"Item property '{name}' must be a scalar value.", null);
+
+        var raw = scalar.Value;
+        if (raw is null || raw.Length == 0 || scalar.Style is ScalarStyle.Plain &&
+            (raw == "~" || raw.Equals("null", StringComparison.OrdinalIgnoreCase)))
+        {
+            return _yaml.Error<ItemPropertyValue?>(node, CompilerDiagnosticCodes.InvalidConfigurationValue,
+                $"Item property '{name}' cannot be null or empty.", null);
+        }
+
+        if (scalar.Style is not ScalarStyle.Plain)
+            return new ItemPropertyValue.Text(raw);
+
+        if (bool.TryParse(raw, out var boolean))
+            return new ItemPropertyValue.Boolean(boolean);
+
+        if (TryParseVariableNumber(raw, talemarkVersion, out var number))
+            return new ItemPropertyValue.Number(number);
+
+        if (ExactNumber.TryParse(raw, out _) || IsSlashFraction(raw))
+        {
+            var requirement = talemarkVersion == 1 ? "a whole number" : "a decimal number without slash fractions";
+            return _yaml.Error<ItemPropertyValue?>(node, CompilerDiagnosticCodes.InvalidConfigurationValue,
+                $"Item property '{name}' must be {requirement} in Talemark {talemarkVersion}.", null);
+        }
+
+        return new ItemPropertyValue.Text(raw);
+    }
+
+    private static bool IsSlashFraction(string value)
+    {
+        var separator = value.IndexOf('/');
+        return separator > 0 && separator == value.LastIndexOf('/') &&
+            ExactNumber.TryParse(value[..separator], out _) &&
+            ExactNumber.TryParse(value[(separator + 1)..], out _);
     }
 
     internal List<FactionDefinition> ReadFactions(YamlNode? node)

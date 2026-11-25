@@ -114,7 +114,7 @@ public sealed class StoryHoverTests
     [Fact]
     public void Item_grammar_keys_explain_defaults_and_quantity_independence()
     {
-        var yaml = Manifest.Replace("items: {rope: Rope, first-name: Token}",
+        var yaml = VersionTwoManifest.Replace("items: {rope: Rope, first-name: Token}",
             "items:\n  rope: {name: Rope, name-agreement: plural, uncountable: false}\n  first-name: Token");
         var source = new StorySource(new Dictionary<string, string>
         {
@@ -134,6 +134,30 @@ public sealed class StoryHoverTests
             Assert.NotNull(hover);
             Assert.Contains(expected, hover.PlainText);
         }
+    }
+
+    [Fact]
+    public void Custom_item_property_hover_reports_its_type_value_and_read_only_status()
+    {
+        var yaml = VersionTwoManifest.Replace("items: {rope: Rope, first-name: Token}",
+            "items:\n  rope: {name: Rope, weight: 1.25, color: blue}\n  first-name: Token",
+            StringComparison.Ordinal);
+        var tale = "=== first\n@requires item:rope:weight > 1";
+        var position = new SourceLocation("main.tale", 2, tale.Split('\n')[1].IndexOf("weight", StringComparison.Ordinal) + 1);
+        var analysis = StoryAnalyzer.Analyze(new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = yaml,
+            ["main.tale"] = tale,
+        }));
+        Assert.NotNull(analysis.World);
+        Assert.Contains("weight", analysis.World!.Items.Values.Single(item => item.Id.Value == "rope").CustomProperties.Keys);
+        var propertySite = Assert.Single(analysis.CompletionSitesAt(position), site => site.Text == "weight");
+        Assert.Contains("weight", propertySite.KeywordDetails!.Keys);
+
+        var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, position));
+
+        Assert.Contains("Read-only custom item property (number): 1.25", hover.PlainText);
+        Assert.Equal("weight", tale.Split('\n')[1][(hover.Range.Start.Column - 1)..(hover.Range.End.Column - 1)]);
     }
 
     [Fact]
