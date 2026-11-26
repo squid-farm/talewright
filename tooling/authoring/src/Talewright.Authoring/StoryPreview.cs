@@ -71,7 +71,7 @@ public static class StoryPreview
             HasNumericDefault(template.Value, analysis);
         if (!declaredDefault &&
             !numericDefault &&
-            template.Value is not (NameRef or PronounRef or ItemNameRef or FactionNameRef or
+            template.Value is not (NameRef or PronounRef or ItemNameRef { Item: FixedItemOperand } or FactionNameRef or
                 ItemPropertyRef or InventoryItemPropertyRef or
                 TextLiteral or NumberLiteral or BoolLiteral or TierLiteral))
             return new(substitution.Range, null, [], "This value depends on gameplay state; no default example is shown.");

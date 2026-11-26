@@ -212,6 +212,31 @@ public sealed class StoryPreviewTests
     }
 
     [Fact]
+    public void Item_variable_names_are_gameplay_dependent_but_fixed_item_names_have_previews()
+    {
+        var manifest = Manifest.Replace("  start: start", "  start: start\n  talemark: 2");
+        var analysis = StoryAnalyzer.Analyze(Source("""
+            === start
+            ~ var:chosen = item:rope
+            {var:chosen} {var:chosen#upper} {item:rope#upper}
+            -> END
+            """, manifest));
+        Assert.DoesNotContain(analysis.Diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+
+        var previews = StoryPreview.Get(analysis, "main.tale");
+        Assert.Equal([null, null, "ROPE"], previews.Select(preview => preview.Value));
+        Assert.All(previews.Take(2), preview =>
+        {
+            Assert.Empty(preview.Steps);
+            Assert.Contains("gameplay state", preview.UnavailableReason);
+        });
+        Assert.Null(previews[2].UnavailableReason);
+        var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, new("main.tale", 3, 5)));
+        Assert.Contains("Preview unavailable", hover.PlainText);
+        Assert.Contains("no default example", hover.PlainText);
+    }
+
+    [Fact]
     public void Item_name_previews_keep_plural_and_uncountable_grammar_through_modifier_chains()
     {
         var manifest = Manifest.Replace("items: {rope: Rope}", """
