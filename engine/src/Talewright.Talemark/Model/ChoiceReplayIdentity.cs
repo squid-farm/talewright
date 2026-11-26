@@ -311,19 +311,37 @@ internal static class ChoiceReplayIdentity
             case GiveItem change:
                 writer.WriteStringValue("give-item");
                 writer.WriteStringValue(change.Character.Value);
-                writer.WriteStringValue(change.Item.Value);
+                WriteItemOperand(writer, change.Item);
                 WriteExpr(writer, change.Quantity);
                 break;
             case TakeItem change:
                 writer.WriteStringValue("take-item");
                 writer.WriteStringValue(change.Character.Value);
-                writer.WriteStringValue(change.Item.Value);
+                WriteItemOperand(writer, change.Item);
                 WriteExpr(writer, change.Quantity);
                 break;
             default:
                 throw new NotSupportedException($"Unknown choice effect '{effect.GetType().Name}'.");
         }
         writer.WriteEndArray();
+    }
+
+    private static void WriteItemOperand(Utf8JsonWriter writer, ItemOperand operand)
+    {
+        switch (operand)
+        {
+            case FixedItemOperand fixedItem:
+                writer.WriteStringValue(fixedItem.Item.Value);
+                break;
+            case ResolvedItemOperand resolved:
+                writer.WriteStartArray();
+                writer.WriteStringValue("resolved-item");
+                WriteExpr(writer, resolved.Expression);
+                writer.WriteEndArray();
+                break;
+            default:
+                throw new NotSupportedException($"Unknown item operand '{operand.GetType().Name}'.");
+        }
     }
 
     private static void WriteExpr(Utf8JsonWriter writer, Expr expression)
@@ -391,7 +409,7 @@ internal static class ChoiceReplayIdentity
                 break;
             case ItemNameRef value:
                 writer.WriteStringValue("item-name-ref");
-                writer.WriteStringValue(value.Item.Value);
+                WriteItemOperand(writer, value.Item);
                 break;
             case ItemPropertyRef value:
                 writer.WriteStringValue("item-property-ref");
@@ -402,7 +420,7 @@ internal static class ChoiceReplayIdentity
             case HasItem value:
                 writer.WriteStringValue("has-item");
                 writer.WriteStringValue(value.Character.Value);
-                writer.WriteStringValue(value.Item.Value);
+                WriteItemOperand(writer, value.Item);
                 break;
             case Visited value:
                 writer.WriteStringValue(ExpressionVocabulary.Visited);
@@ -415,7 +433,7 @@ internal static class ChoiceReplayIdentity
             case InventoryCountRef value:
                 writer.WriteStringValue("inventory-count-ref");
                 writer.WriteStringValue(value.Character.Value);
-                writer.WriteStringValue(value.Item.Value);
+                WriteItemOperand(writer, value.Item);
                 break;
             case SkillCheckExpr value:
                 writer.WriteStringValue("skill-check-expr");

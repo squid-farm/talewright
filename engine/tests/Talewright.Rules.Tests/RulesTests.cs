@@ -4,6 +4,7 @@ using Talewright.Core.Randomness;
 using Talewright.Core.State;
 using Talewright.Core.World;
 using Talewright.Rules.Checks;
+using Talewright.Rules.Diagnostics;
 using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
 using Talewright.Rules.Storylets;
@@ -18,7 +19,7 @@ public class RulesTests
     private static readonly ItemId Rope = new("rope");
     private static readonly StatId Athletics = new("athletics");
 
-    private static EventLog NewLog(ulong seed = 7) => new(
+    private static EventLog NewLog(ulong seed = 7, IReadOnlyDictionary<VarId, string>? textVariables = null) => new(
         new WorldDefinition(
             GenericRuleset.Create(),
             [new CharacterDefinition(EntityId.Player, "Mara", "Burns", Pronouns.She,
@@ -27,7 +28,8 @@ public class RulesTests
             [new ItemDefinition(Rope, "coil of rope", new Dictionary<StatId, int>())],
             [new FactionDefinition(Guild, "Explorers' Guild", 0)],
             [new FlagId("door-open")],
-            new Dictionary<VarId, int>()),
+            new Dictionary<VarId, int>(),
+            textVariables),
         seed);
 
     private static Value Eval(Expr expr, EventLog log) => ExpressionEvaluator.Evaluate(expr, EvaluationContext.For(log.State));
@@ -92,6 +94,31 @@ public class RulesTests
         Assert.True(ExpressionEvaluator.IsTrue(new BoolLiteral(true), context));
 
         Assert.Equal(Value.Of(true), Assert.IsType<ExpressionTrace>(trace).Result);
+    }
+
+    [Fact]
+    public void Traces_runtime_item_operands_as_children_of_item_references()
+    {
+        var selectedItem = new VarId("selected-item");
+        var log = NewLog(textVariables: new Dictionary<VarId, string> { [selectedItem] = Rope.Value });
+        var expressions = new Expr[]
+        {
+            new ItemNameRef(new TextVarRef(selectedItem)),
+            new HasItem(EntityId.Player, new TextVarRef(selectedItem)),
+            new InventoryCountRef(EntityId.Player, new TextVarRef(selectedItem)),
+        };
+        var context = EvaluationContext.For(log.State);
+
+        foreach (var expression in expressions)
+        {
+            var result = RuleObservation.Evaluate(expression, context, capture: true, out var trace);
+            var root = Assert.IsType<ExpressionTrace>(trace);
+
+            Assert.Equal(result, root.Result);
+            var operand = Assert.Single(root.Children);
+            Assert.Equal(new TextVarRef(selectedItem), operand.Expression);
+            Assert.Equal(Value.Of(Rope.Value), operand.Result);
+        }
     }
 
     [Fact]
@@ -214,6 +241,60 @@ public class RulesTests
         Assert.False(log.State.GetItemCount(EntityId.Player, Rope) > 0);
         Assert.True(log.State.GetFlag(new FlagId("door-open")));
         Assert.Equal(4, log.Events.Count);
+    }
+
+    [Fact]
+    public void Runtime_item_operands_resolve_for_item_references_and_effects()
+    {
+        var log = NewLog();
+
+        Assert.Equal("coil of rope", Eval(new ItemNameRef(new TextLiteral("rope")), log).Text);
+        Assert.True(Eval(new HasItem(EntityId.Player, new TextLiteral("rope")), log).Bool);
+        Assert.Equal(1, Eval(new InventoryCountRef(EntityId.Player, new TextLiteral("rope")), log).Number);
+
+        EffectExecutor.Execute(
+            new GiveItem(EntityId.Player, new TextLiteral("rope"), new NumberLiteral(2)),
+            log,
+            NamedPredicateRegistry.Empty);
+        Assert.Equal(3, log.State.GetItemCount(EntityId.Player, Rope));
+
+        EffectExecutor.Execute(
+            new TakeItem(EntityId.Player, new TextLiteral("rope"), new NumberLiteral(2)),
+            log,
+            NamedPredicateRegistry.Empty);
+        Assert.Equal(1, log.State.GetItemCount(EntityId.Player, Rope));
+    }
+
+    [Fact]
+    public void Runtime_item_operands_that_resolve_to_nothing_are_treated_as_nothing()
+    {
+        var log = NewLog();
+        var missing = new TextLiteral("missing");
+
+        Assert.Equal(string.Empty, Eval(new ItemNameRef(missing), log).Text);
+        Assert.False(Eval(new HasItem(EntityId.Player, missing), log).Bool);
+        Assert.Equal(0, Eval(new InventoryCountRef(EntityId.Player, missing), log).Number);
+
+        var eventCount = log.Events.Count;
+        EffectExecutor.Execute(new GiveItem(EntityId.Player, missing, new NumberLiteral(2)),
+            log, NamedPredicateRegistry.Empty);
+        EffectExecutor.Execute(new TakeItem(EntityId.Player, missing, new NumberLiteral(2)),
+            log, NamedPredicateRegistry.Empty);
+
+        Assert.Equal(eventCount, log.Events.Count);
+        Assert.Equal(1, log.State.GetItemCount(EntityId.Player, Rope));
+    }
+
+    [Fact]
+    public void Runtime_item_operands_reject_non_text_expressions()
+    {
+        var invalidItem = new NumberLiteral(1);
+
+        Assert.Throws<ArgumentException>(() => new ItemNameRef(invalidItem));
+        Assert.Throws<ArgumentException>(() => new HasItem(EntityId.Player, invalidItem));
+        Assert.Throws<ArgumentException>(() => new InventoryCountRef(EntityId.Player, invalidItem));
+        Assert.Throws<ArgumentException>(() => new GiveItem(EntityId.Player, invalidItem, new NumberLiteral(1)));
+        Assert.Throws<ArgumentException>(() => new TakeItem(EntityId.Player, invalidItem, new NumberLiteral(1)));
     }
 
     private sealed record TestStorylet(string Name, Expr? Requires, int Priority = 0, bool Once = false) : IStorylet

@@ -96,9 +96,19 @@ public static class ExpressionFormatter
             TryGetSpelling(name.Part, out var part) ? part : throw Invalid("Unknown name part.")),
         PronounRef pronoun => PronounReference(Character(pronoun.Character), pronoun.Form),
         FactionNameRef faction => Reference(Faction, Name(faction.Faction.Value)),
-        ItemNameRef item => Reference(Item, Name(item.Item.Value)),
+        ItemNameRef item => item.Item switch
+        {
+            FixedItemOperand fixedItem => Reference(Item, Name(fixedItem.Item.Value)),
+            ResolvedItemOperand resolved => Write(resolved.Expression),
+            _ => throw new NotSupportedException($"Unknown item operand '{item.Item.GetType().Name}'."),
+        },
         ItemPropertyRef property => Reference(Item, Name(property.Item.Value), Name(property.Property)),
-        HasItem item => $"{Character(item.Character)} {Has} {Name(item.Item.Value)}",
+        HasItem item => item.Item switch
+        {
+            FixedItemOperand fixedItem => $"{Character(item.Character)} {Has} {Name(fixedItem.Item.Value)}",
+            ResolvedItemOperand resolved => $"{Character(item.Character)} {Has} {Write(resolved.Expression)}",
+            _ => throw new NotSupportedException($"Unknown item operand '{item.Item.GetType().Name}'."),
+        },
         Visited visited => $"{Player} {ExpressionVocabulary.Visited} {Name(visited.Scene.Value)}",
         SceneVisitCountRef visits => Reference(
             visits.IsSceneAlias
@@ -108,8 +118,14 @@ public static class ExpressionFormatter
                     : ExpressionVocabulary.Scene,
             Player,
             Visits),
-        InventoryCountRef count => Reference(
-            Character(count.Character), Inventory, Name(count.Item.Value), Count),
+        InventoryCountRef count => count.Item switch
+        {
+            FixedItemOperand fixedItem => Reference(
+                Character(count.Character), Inventory, Name(fixedItem.Item.Value), Count),
+            ResolvedItemOperand resolved => Reference(
+                Character(count.Character), Inventory, Write(resolved.Expression), Count),
+            _ => throw new NotSupportedException($"Unknown item operand '{count.Item.GetType().Name}'."),
+        },
         SkillCheckExpr check => SkillCheck(check),
         NamedPredicate predicate => $"{PredicateMarker}{Name(predicate.Name)}",
         UnaryExpr or BinaryExpr => throw new InvalidOperationException("Composite expressions are formatted separately."),

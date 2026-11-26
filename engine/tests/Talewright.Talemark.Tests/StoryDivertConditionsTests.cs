@@ -193,6 +193,26 @@ public sealed class StoryDivertConditionsTests
     }
 
     [Fact]
+    public void Resolved_item_operands_report_the_source_expression_and_item_read()
+    {
+        var condition = StoryCondition.FromExpressions([
+            new BinaryExpr(BinaryOp.And,
+                new HasItem(EntityId.Player, new TextVarRef(new("picked-item"))),
+                new BinaryExpr(BinaryOp.Greater,
+                    new InventoryCountRef(EntityId.Player, new TextVarRef(new("picked-item"))),
+                    new NumberLiteral(0))),
+        ]);
+
+        Assert.Equal(
+            [
+                (StoryStateReadKind.ItemsHeld, "player has var:picked-item"),
+                (StoryStateReadKind.TextVariable, "var:picked-item"),
+                (StoryStateReadKind.InventoryCount, "player:inventory:var:picked-item:count"),
+            ],
+            condition.Reads.Select(read => (read.Kind, read.Reference)));
+    }
+
+    [Fact]
     public void Custom_item_property_reads_are_reported_as_static_definition_reads()
     {
         const string manifest = """

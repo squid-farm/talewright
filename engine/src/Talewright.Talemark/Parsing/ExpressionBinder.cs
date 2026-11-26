@@ -147,7 +147,8 @@ internal sealed class ExpressionBinder
             {
                 NameRef name => symbols.World.Characters[name.Character].NameAgreement == GrammaticalNumber.Plural,
                 PronounRef pronoun => symbols.World.Characters[pronoun.Character].Pronouns.Agreement == GrammaticalNumber.Plural,
-                ItemNameRef item => symbols.World.Items[item.Item].NameAgreement == GrammaticalNumber.Plural,
+                ItemNameRef item => item.Item is FixedItemOperand fixedItem
+                    && symbols.World.Items[fixedItem.Item].NameAgreement == GrammaticalNumber.Plural,
                 _ => false,
             };
             var substitution = new SubstitutionTemplate(value, modifiers, isPlural);

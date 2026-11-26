@@ -30,9 +30,21 @@ public sealed record SetTextVariable(VarId Variable, Expr Value) : Effect;
 
 public sealed record SetFlag(FlagId Flag, bool Value) : Effect;
 
-public sealed record GiveItem(EntityId Character, ItemId Item, Expr Quantity) : Effect;
+public sealed record GiveItem(EntityId Character, ItemOperand Item, Expr Quantity) : Effect
+{
+    public GiveItem(EntityId character, ItemId item, Expr quantity)
+        : this(character, new FixedItemOperand(item), quantity) { }
+    public GiveItem(EntityId character, Expr item, Expr quantity)
+        : this(character, new ResolvedItemOperand(item), quantity) { }
+}
 
-public sealed record TakeItem(EntityId Character, ItemId Item, Expr Quantity) : Effect;
+public sealed record TakeItem(EntityId Character, ItemOperand Item, Expr Quantity) : Effect
+{
+    public TakeItem(EntityId character, ItemId item, Expr quantity)
+        : this(character, new FixedItemOperand(item), quantity) { }
+    public TakeItem(EntityId character, Expr item, Expr quantity)
+        : this(character, new ResolvedItemOperand(item), quantity) { }
+}
 
 /// <summary>Executes effects against an <see cref="EventLog"/>, one at a time so later effects see earlier results.</summary>
 public static class EffectExecutor
@@ -88,10 +100,16 @@ public static class EffectExecutor
                 StateChanges.SetTextVariable(state, e.Variable, ExpressionEvaluator.Evaluate(e.Value, context).Text
                     ?? throw new InvalidOperationException("A text expression produced no text.")),
             SetFlag e => StateChanges.SetFlag(state, e.Flag, e.Value),
-            GiveItem e when integerArithmetic => StateChanges.GiveItem(e.Character, e.Item, EvalWhole(e.Quantity)),
-            TakeItem e when integerArithmetic => StateChanges.TakeItem(state, e.Character, e.Item, EvalWhole(e.Quantity)),
-            GiveItem e => StateChanges.GiveItem(state, e.Character, e.Item, Eval(e.Quantity)),
-            TakeItem e => StateChanges.TakeItem(state, e.Character, e.Item, Eval(e.Quantity)),
+            GiveItem e => e.Item.Resolve(context) is { } item
+                ? integerArithmetic
+                    ? StateChanges.GiveItem(e.Character, item, EvalWhole(e.Quantity))
+                    : StateChanges.GiveItem(state, e.Character, item, Eval(e.Quantity))
+                : [],
+            TakeItem e => e.Item.Resolve(context) is { } item
+                ? integerArithmetic
+                    ? StateChanges.TakeItem(state, e.Character, item, EvalWhole(e.Quantity))
+                    : StateChanges.TakeItem(state, e.Character, item, Eval(e.Quantity))
+                : [],
             _ => throw new NotSupportedException($"Unknown effect {effect.GetType().Name}."),
         };
         log.AppendRange(events.ToArray());
