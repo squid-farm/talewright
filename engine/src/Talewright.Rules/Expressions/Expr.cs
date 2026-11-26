@@ -44,8 +44,13 @@ public abstract record ItemOperand
 
     private static ItemId? ResolveRuntime(Expr expression, EvaluationContext context)
     {
+        if (expression.Type != ExprType.Text)
+            throw new InvalidOperationException("A runtime item operand must be a text expression.");
+
         var value = ExpressionEvaluator.Evaluate(expression, context);
-        if (value.Type != ExprType.Text || string.IsNullOrEmpty(value.Text))
+        if (value.Type != ExprType.Text)
+            throw new InvalidOperationException("A runtime item expression evaluated to a non-text value.");
+        if (string.IsNullOrEmpty(value.Text))
             return null;
 
         var item = new ItemId(value.Text);
@@ -60,7 +65,17 @@ public sealed record FixedItemOperand(ItemId Item) : ItemOperand
 
 public sealed record ResolvedItemOperand(Expr Expression) : ItemOperand
 {
+    public Expr Expression { get; init; } = Validate(Expression);
+
     public override string ToString() => $"<{Expression}>";
+
+    private static Expr Validate(Expr expression)
+    {
+        ArgumentNullException.ThrowIfNull(expression);
+        if (expression.Type != ExprType.Text)
+            throw new ArgumentException("A runtime item operand must be a text expression.", nameof(expression));
+        return expression;
+    }
 }
 
 public sealed record NumberLiteral(ExactNumber Value) : Expr

@@ -258,6 +258,18 @@ public class RulesTests
         Assert.Equal(1, log.State.GetItemCount(EntityId.Player, Rope));
     }
 
+    [Fact]
+    public void Runtime_item_operands_reject_non_text_expressions()
+    {
+        var invalidItem = new NumberLiteral(1);
+
+        Assert.Throws<ArgumentException>(() => new ItemNameRef(invalidItem));
+        Assert.Throws<ArgumentException>(() => new HasItem(EntityId.Player, invalidItem));
+        Assert.Throws<ArgumentException>(() => new InventoryCountRef(EntityId.Player, invalidItem));
+        Assert.Throws<ArgumentException>(() => new GiveItem(EntityId.Player, invalidItem, new NumberLiteral(1)));
+        Assert.Throws<ArgumentException>(() => new TakeItem(EntityId.Player, invalidItem, new NumberLiteral(1)));
+    }
+
     private sealed record TestStorylet(string Name, Expr? Requires, int Priority = 0, bool Once = false) : IStorylet
     {
         public SceneId Id => new(Name);
