@@ -1,3 +1,4 @@
+using Talewright.Core.Identity;
 using Talewright.Core.Rulesets;
 using Talewright.Core.State;
 using Talewright.Core.World;
@@ -59,8 +60,9 @@ public static class ExpressionEvaluator
 
         if (expr is not (UnaryExpr or BinaryExpr))
         {
-            var value = EvaluateAtom(expr, context);
-            context.Trace?.Invoke(new ExpressionTrace(expr, value, Array.Empty<ExpressionTrace>()));
+            var value = EvaluateAtom(expr, context, out var childTrace);
+            context.Trace?.Invoke(new ExpressionTrace(expr, value,
+                childTrace is null ? Array.Empty<ExpressionTrace>() : [childTrace]));
             return value;
         }
 
@@ -123,7 +125,9 @@ public static class ExpressionEvaluator
                     Complete(frame, returnedValue);
                     break;
                 default:
-                    returnedValue = EvaluateAtom(frame.Expression, context);
+                    returnedValue = EvaluateAtom(frame.Expression, context, out var childTrace);
+                    if (frame.Children is not null && childTrace is not null)
+                        frame.Children.Add(childTrace);
                     Complete(frame, returnedValue);
                     break;
             }
@@ -152,9 +156,30 @@ public static class ExpressionEvaluator
         public List<ExpressionTrace>? Children { get; } = trace ? [] : null;
     }
 
-    private static Value EvaluateAtom(Expr expr, EvaluationContext context)
+    private static Value EvaluateAtom(Expr expr, EvaluationContext context, out ExpressionTrace? childTrace)
     {
+        childTrace = null;
         var state = context.State;
+        if (expr is ItemNameRef itemName)
+        {
+            var item = ResolveItemOperand(itemName.Item, context, out childTrace);
+            return item is { } itemNameId && state.World.Items.TryGetValue(itemNameId, out var definition)
+                ? Value.Of(definition.Name)
+                : Value.Of(string.Empty);
+        }
+        if (expr is HasItem hasItem)
+        {
+            var item = ResolveItemOperand(hasItem.Item, context, out childTrace);
+            return Value.Of(item is { } itemId && state.GetExactItemCount(hasItem.Character, itemId) > 0);
+        }
+        if (expr is InventoryCountRef inventoryCount)
+        {
+            var item = ResolveItemOperand(inventoryCount.Item, context, out childTrace);
+            return item is { } itemId
+                ? Value.Of(state.GetExactItemCount(inventoryCount.Character, itemId))
+                : Value.Of(ExactNumber.Zero);
+        }
+
         return expr switch
         {
             NumberLiteral e => Value.Of(e.Value),
@@ -174,25 +199,30 @@ public static class ExpressionEvaluator
             NameRef e => Value.Of(Name(state, e)),
             PronounRef e => Value.Of(Pronoun(state, e)),
             FactionNameRef e => Value.Of(state.World.Factions[e.Faction].Name),
-            ItemNameRef e => e.Item.Resolve(context) is { } itemNameId
-                && state.World.Items.TryGetValue(itemNameId, out var itemName)
-                    ? Value.Of(itemName.Name)
-                    : Value.Of(string.Empty),
             ItemPropertyRef e => ItemProperty(e.Value),
-            HasItem e => Value.Of(e.Item.Resolve(context) is { } hasItemId
-                && state.GetExactItemCount(e.Character, hasItemId) > 0),
             Visited e => Value.Of(state.VisitCount(e.Scene) > 0),
             SceneVisitCountRef e => Value.Of(e.Scene is { } scene
                 ? state.VisitCount(scene)
                 : state.CurrentScene is { } current ? state.VisitCount(current) : 0),
-            InventoryCountRef e => e.Item.Resolve(context) is { } inventoryItemId
-                ? Value.Of(state.GetExactItemCount(e.Character, inventoryItemId))
-                : Value.Of(ExactNumber.Zero),
             SkillCheckExpr e => context.ResolveSkillCheck?.Invoke(e)
                 ?? throw new InvalidOperationException("A skill check requires an active play evaluation context."),
             NamedPredicate e => Value.Of(context.Predicates.Evaluate(e.Name, state)),
             _ => throw new NotSupportedException($"Unknown expression {expr.GetType().Name}."),
         };
+    }
+
+    private static ItemId? ResolveItemOperand(ItemOperand item, EvaluationContext context,
+        out ExpressionTrace? trace)
+    {
+        trace = null;
+        if (item is not ResolvedItemOperand || context.Trace is null)
+            return item.Resolve(context);
+
+        ExpressionTrace? operandTrace = null;
+        var operandContext = context with { Trace = observed => operandTrace = observed };
+        var resolved = item.Resolve(operandContext);
+        trace = operandTrace;
+        return resolved;
     }
 
     private static Value ItemProperty(ItemPropertyValue value) => value switch

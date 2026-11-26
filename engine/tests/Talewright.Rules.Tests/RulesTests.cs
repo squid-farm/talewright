@@ -4,6 +4,7 @@ using Talewright.Core.Randomness;
 using Talewright.Core.State;
 using Talewright.Core.World;
 using Talewright.Rules.Checks;
+using Talewright.Rules.Diagnostics;
 using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
 using Talewright.Rules.Storylets;
@@ -18,7 +19,7 @@ public class RulesTests
     private static readonly ItemId Rope = new("rope");
     private static readonly StatId Athletics = new("athletics");
 
-    private static EventLog NewLog(ulong seed = 7) => new(
+    private static EventLog NewLog(ulong seed = 7, IReadOnlyDictionary<VarId, string>? textVariables = null) => new(
         new WorldDefinition(
             GenericRuleset.Create(),
             [new CharacterDefinition(EntityId.Player, "Mara", "Burns", Pronouns.She,
@@ -27,7 +28,8 @@ public class RulesTests
             [new ItemDefinition(Rope, "coil of rope", new Dictionary<StatId, int>())],
             [new FactionDefinition(Guild, "Explorers' Guild", 0)],
             [new FlagId("door-open")],
-            new Dictionary<VarId, int>()),
+            new Dictionary<VarId, int>(),
+            textVariables),
         seed);
 
     private static Value Eval(Expr expr, EventLog log) => ExpressionEvaluator.Evaluate(expr, EvaluationContext.For(log.State));
@@ -92,6 +94,31 @@ public class RulesTests
         Assert.True(ExpressionEvaluator.IsTrue(new BoolLiteral(true), context));
 
         Assert.Equal(Value.Of(true), Assert.IsType<ExpressionTrace>(trace).Result);
+    }
+
+    [Fact]
+    public void Traces_runtime_item_operands_as_children_of_item_references()
+    {
+        var selectedItem = new VarId("selected-item");
+        var log = NewLog(textVariables: new Dictionary<VarId, string> { [selectedItem] = Rope.Value });
+        var expressions = new Expr[]
+        {
+            new ItemNameRef(new TextVarRef(selectedItem)),
+            new HasItem(EntityId.Player, new TextVarRef(selectedItem)),
+            new InventoryCountRef(EntityId.Player, new TextVarRef(selectedItem)),
+        };
+        var context = EvaluationContext.For(log.State);
+
+        foreach (var expression in expressions)
+        {
+            var result = RuleObservation.Evaluate(expression, context, capture: true, out var trace);
+            var root = Assert.IsType<ExpressionTrace>(trace);
+
+            Assert.Equal(result, root.Result);
+            var operand = Assert.Single(root.Children);
+            Assert.Equal(new TextVarRef(selectedItem), operand.Expression);
+            Assert.Equal(Value.Of(Rope.Value), operand.Result);
+        }
     }
 
     [Fact]
