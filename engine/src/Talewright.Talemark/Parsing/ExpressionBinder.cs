@@ -583,11 +583,16 @@ internal sealed class ExpressionBinder
             if (left is ItemNameRef { Item: ResolvedItemOperand operand } &&
                 current.Operator is BinaryOp.Equal or BinaryOp.NotEqual)
             {
-                if (current.Right is not NameExpressionNode name)
-                    return Fail<Expr>(CompilerDiagnosticCodes.TypeMismatch,
-                        "Compare an item variable with a bare item id, for example 'var:tool == hammer'.",
-                        current.Right.Span.Start);
-                left = new ItemComparison(operand, current.Operator, Item(name.Name));
+                var item = current.Right switch
+                {
+                    NameExpressionNode name => name.Name,
+                    BooleanExpressionNode boolean => boolean.Span,
+                    ReferenceExpressionNode { Kind: ReferenceNamespace.Item, Member: null } reference => reference.Name,
+                    _ => Fail<ExpressionSpan>(CompilerDiagnosticCodes.TypeMismatch,
+                        "Compare an item variable with a bare item id or item reference, for example 'var:tool == hammer'.",
+                        current.Right.Span.Start),
+                };
+                left = new ItemComparison(operand, current.Operator, Item(item));
             }
             else
                 left = BindBinaryOperation(current, left, Bind(current.Right));

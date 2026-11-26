@@ -185,10 +185,13 @@ public sealed class NameIndex
                 case BinaryExpressionNode binary:
                     Expression(binary.Left);
                     Expression(binary.Right);
-                    if (binary is { Operator: BinaryOp.Equal or BinaryOp.NotEqual,
-                        Right: NameExpressionNode itemComparison } &&
-                        ItemComparisonLeft(binary.Left))
-                        Add(AuthoringSymbolKind.Item, itemComparison.Name);
+                    if (binary.Operator is BinaryOp.Equal or BinaryOp.NotEqual && ItemComparisonLeft(binary.Left))
+                    {
+                        if (binary.Right is NameExpressionNode itemComparison)
+                            Add(AuthoringSymbolKind.Item, itemComparison.Name);
+                        else if (binary.Right is BooleanExpressionNode boolean)
+                            Add(AuthoringSymbolKind.Item, boolean.Span);
+                    }
                     break;
                 case SkillCheckExpressionNode skillCheck:
                     if (skillCheck.Actor is { } actor)

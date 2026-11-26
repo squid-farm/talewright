@@ -851,7 +851,9 @@ In Talemark 2, a variable first assigned `item:<id>` holds that item, not its na
 text. Copy it with `~ var:remembered = var:first`. `{var:first}` displays its
 name; `player:inventory:var:first:count` reads the held quantity. `give` and
 `take` accept it wherever an item ID normally goes. Compare it with a bare item
-ID on the right of `==` or `!=`, not a quoted name or `item:<id>`.
+ID on the right of `==` or `!=`, including `true` and `false`. If an ID conflicts
+with expression syntax, use `item:<id>` instead, for example
+`var:first == item:skill-check`. Quoted names do not compare item identities.
 `var:first:<key>` reads a declared item property. That key must have the same
 scalar type on every item that declares it.
 

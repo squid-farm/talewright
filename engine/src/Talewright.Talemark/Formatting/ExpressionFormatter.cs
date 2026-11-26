@@ -104,7 +104,7 @@ public static class ExpressionFormatter
         },
         ItemPropertyRef property => Reference(Item, Name(property.Item.Value), Name(property.Property)),
         ItemComparison comparison =>
-            $"{Operand(comparison.Item)} {ExpressionVocabulary.Spelling(comparison.Op)} {Name(comparison.Expected.Value)}",
+            $"{Operand(comparison.Item)} {ExpressionVocabulary.Spelling(comparison.Op)} {ComparisonItem(comparison.Expected)}",
         ItemReferencePropertyRef property => Reference(Operand(property.Item), Name(property.Property)),
         HasItem item => item.Item switch
         {
@@ -148,6 +148,12 @@ public static class ExpressionFormatter
     }
 
     private static string Reference(params string[] parts) => string.Join(Separator, parts);
+
+    private static string ComparisonItem(ItemId item)
+    {
+        var name = Name(item.Value);
+        return name == SceneVocabulary.SkillCheck ? Reference(Item, name) : name;
+    }
 
     private static string Operand(ItemOperand operand) => operand switch
     {

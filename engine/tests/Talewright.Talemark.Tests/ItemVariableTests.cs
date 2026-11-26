@@ -62,6 +62,43 @@ public sealed class ItemVariableTests
     }
 
     [Theory]
+    [InlineData("true", "true", "==", true)]
+    [InlineData("false", "false", "==", true)]
+    [InlineData("false", "false", "!=", false)]
+    [InlineData("true", "false", "!=", true)]
+    [InlineData("true", "item:true", "==", true)]
+    [InlineData("skill-check", "item:skill-check", "==", true)]
+    public void Keyword_item_ids_can_be_compared_and_formatted(string assigned, string expected, string op, bool matches)
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = Manifest + "\n  \"true\": True item\n  \"false\": False item\n  skill-check: Skill item\n",
+            ["main.tale"] = $"""
+                === start
+                ~ var:chosen = item:{assigned}
+                * [Use] (requires var:chosen {op} {expected}) -> END
+                """,
+        });
+        var result = StoryCompiler.Compile(source);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var story = result.Story!;
+        var log = new EventLog(story.World, 1);
+        EffectExecutor.Execute(story.Scenes[0].Steps.OfType<EffectStep>().Single().Effects.Single(), log, story.Predicates);
+        var condition = story.Scenes[0].Steps.OfType<ChoiceStep>().Single().Choice.Requires!;
+        Assert.Equal(matches, ExpressionEvaluator.IsTrue(condition, EvaluationContext.For(log.State)));
+
+        var formatted = ExpressionFormatter.Format(condition);
+        var formattedItem = assigned == "skill-check" ? "item:skill-check" : expected.Replace("item:", "", StringComparison.Ordinal);
+        Assert.Equal($"var:chosen {op} {formattedItem}", formatted);
+        var reparsed = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = source.Files[StorySource.ManifestFileName],
+            ["main.tale"] = $"=== start\n~ var:chosen = item:{assigned}\n* [Use] (requires {formatted}) -> END",
+        }));
+        Assert.True(reparsed.Success, string.Join("\n", reparsed.Diagnostics));
+    }
+
+    [Theory]
     [InlineData(1)]
     [InlineData(2)]
     public void Item_name_copy_keeps_legacy_output_including_modifiers(int version)
@@ -154,6 +191,7 @@ public sealed class ItemVariableTests
     [InlineData("{var:chosen#round}", "holds an item, not a number")]
     [InlineData("{if var:chosen > 1}bad{/if}", "holds an item, not a number")]
     [InlineData("{if var:chosen == unknown}bad{/if}", "Unknown item 'unknown'")]
+    [InlineData("{if var:chosen == item:iron-ore:heat}bad{/if}", "bare item id")]
     [InlineData("{if var:chosen == \"iron-ore\"}bad{/if}", "bare item id")]
     [InlineData("{if \"iron-ore\" == iron-ore}bad{/if}", "Unknown name")]
     public void Diagnoses_item_number_and_comparison_mistakes(string source, string message)
@@ -161,6 +199,18 @@ public sealed class ItemVariableTests
         var result = Result($"=== start\n~ var:chosen = item:iron-ore\n{source}\n-> END");
         Assert.False(result.Success);
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Message.Contains(message, StringComparison.Ordinal));
+    }
+
+    [Theory]
+    [InlineData("true", "true")]
+    [InlineData("item:unknown", "unknown")]
+    public void Unknown_comparison_items_report_the_item_id_location(string operand, string id)
+    {
+        var line = $"{{if var:chosen == {operand}}}bad{{/if}}";
+        var result = Result($"=== start\n~ var:chosen = item:iron-ore\n{line}\n-> END");
+        var error = Assert.Single(result.Errors, diagnostic => diagnostic.Code == "TW2001");
+        Assert.Contains($"Unknown item '{id}'", error.Message);
+        Assert.Equal((3, line.IndexOf(id, StringComparison.Ordinal) + 1), (error.Location.Line, error.Location.Column));
     }
 
     [Fact]

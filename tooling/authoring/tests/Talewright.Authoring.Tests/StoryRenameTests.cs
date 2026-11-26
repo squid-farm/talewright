@@ -207,6 +207,44 @@ public sealed class StoryRenameTests
             diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
     }
 
+    [Theory]
+    [InlineData("true", "true")]
+    [InlineData("false", "false")]
+    [InlineData("skill-check", "item:skill-check")]
+    public void Renaming_a_keyword_item_updates_comparisons_without_renaming_boolean_literals(string id, string operand)
+    {
+        var story = new StorySource(new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [StorySource.ManifestFileName] = $$"""
+                game: {id: item-comparison, title: Item comparison, talemark: 2, start: start}
+                characters:
+                  player: {first-name: Ada}
+                items:
+                  "{{id}}": Token
+                """,
+            ["main.tale"] = $$"""
+                === start
+                ~ var:chosen = item:{{id}}
+                {if var:chosen == {{operand}}}A token.{/if}
+                {if true}Always.{/if}
+                -> END
+                """,
+        });
+        var analysis = StoryAnalyzer.Analyze(story);
+        Assert.DoesNotContain(analysis.Diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        var result = StoryRename.Rename(analysis,
+            Find(story, "main.tale", $"~ var:chosen = item:|{id}"), "token", Analyze);
+
+        Assert.Null(result.Refusal);
+        Assert.Equal(3, result.Edits.Count);
+        var renamed = new StorySource(Apply(story, result.Edits));
+        Assert.Contains("var:chosen == " + (operand.StartsWith("item:", StringComparison.Ordinal) ? "item:" : "") + "token",
+            renamed.Files["main.tale"]);
+        Assert.Contains("{if true}Always.{/if}", renamed.Files["main.tale"]);
+        Assert.DoesNotContain(StoryAnalyzer.Analyze(renamed).Diagnostics,
+            diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
     [Fact]
     public void Renaming_an_item_updates_custom_item_property_references()
     {
