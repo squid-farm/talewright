@@ -99,14 +99,14 @@ public static class ExpressionFormatter
         ItemNameRef item => item.Item switch
         {
             FixedItemOperand fixedItem => Reference(Item, Name(fixedItem.Item.Value)),
-            ResolvedItemOperand => "runtime item",
+            ResolvedItemOperand resolved => Write(resolved.Expression),
             _ => throw new NotSupportedException($"Unknown item operand '{item.Item.GetType().Name}'."),
         },
         ItemPropertyRef property => Reference(Item, Name(property.Item.Value), Name(property.Property)),
         HasItem item => item.Item switch
         {
             FixedItemOperand fixedItem => $"{Character(item.Character)} {Has} {Name(fixedItem.Item.Value)}",
-            ResolvedItemOperand => $"{Character(item.Character)} {Has} runtime item",
+            ResolvedItemOperand resolved => $"{Character(item.Character)} {Has} {Write(resolved.Expression)}",
             _ => throw new NotSupportedException($"Unknown item operand '{item.Item.GetType().Name}'."),
         },
         Visited visited => $"{Player} {ExpressionVocabulary.Visited} {Name(visited.Scene.Value)}",
@@ -122,7 +122,8 @@ public static class ExpressionFormatter
         {
             FixedItemOperand fixedItem => Reference(
                 Character(count.Character), Inventory, Name(fixedItem.Item.Value), Count),
-            ResolvedItemOperand => $"{Character(count.Character)} inventory runtime-item count",
+            ResolvedItemOperand resolved => Reference(
+                Character(count.Character), Inventory, Write(resolved.Expression), Count),
             _ => throw new NotSupportedException($"Unknown item operand '{count.Item.GetType().Name}'."),
         },
         SkillCheckExpr check => SkillCheck(check),

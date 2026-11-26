@@ -156,6 +156,13 @@ public sealed class StoryCondition
             };
             if (seen.Add(read))
                 reads.Add(read);
+
+            if (current is ItemNameRef { Item: ResolvedItemOperand itemNameOperand })
+                pending.Push(itemNameOperand.Expression);
+            else if (current is HasItem { Item: ResolvedItemOperand hasItemOperand })
+                pending.Push(hasItemOperand.Expression);
+            else if (current is InventoryCountRef { Item: ResolvedItemOperand inventoryOperand })
+                pending.Push(inventoryOperand.Expression);
         }
     }
 

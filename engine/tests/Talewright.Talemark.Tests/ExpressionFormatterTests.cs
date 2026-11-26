@@ -259,6 +259,17 @@ public class ExpressionFormatterTests
         Assert.Equal(expression, Parse(formatted));
     }
 
+    [Fact]
+    public void Resolved_item_operands_format_their_source_expression()
+    {
+        var operand = new TextVarRef(new("picked-item"));
+
+        Assert.Equal("var:picked-item", ExpressionFormatter.Format(new ItemNameRef(operand)));
+        Assert.Equal("player has var:picked-item", ExpressionFormatter.Format(new HasItem(EntityId.Player, operand)));
+        Assert.Equal("player:inventory:var:picked-item:count",
+            ExpressionFormatter.Format(new InventoryCountRef(EntityId.Player, operand)));
+    }
+
     [Theory]
     [InlineData("\"\\\\n\"", "\\n")]
     [InlineData("\"\\\\u0041\"", "\\u0041")]
