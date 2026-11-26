@@ -84,6 +84,24 @@ public sealed class CompletionSiteQueryTests
         Assert.DoesNotContain("fragile", numericSite.Keywords);
     }
 
+    [Theory]
+    [InlineData("count", true)]
+    [InlineData("weight", true)]
+    [InlineData("color", false)]
+    [InlineData("fragile", false)]
+    public void Held_item_property_modifier_completions_follow_declared_property_type(string property, bool isNumeric)
+    {
+        var version2Manifest = Manifest.Replace("start: start", "start: start\n  talemark: 2", StringComparison.Ordinal);
+        var (analysis, position) = Analyze(
+            $"=== start\n{{player:inventory:lantern:{property}#|}}\n-> END",
+            manifest: version2Manifest);
+        var site = Assert.Single(analysis.CompletionSitesAt(position));
+
+        Assert.Equal(isNumeric, site.Keywords.Contains("round"));
+        Assert.Equal(isNumeric, site.Keywords.Contains("round-up"));
+        Assert.Equal(isNumeric, site.Keywords.Contains("round-down"));
+    }
+
     [Fact]
     public void Mapping_flag_declarations_are_exposed_to_authoring_analysis()
     {
