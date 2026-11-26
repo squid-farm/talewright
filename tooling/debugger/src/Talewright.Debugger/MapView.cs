@@ -1,6 +1,7 @@
 using Talewright.Core.Identity;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Effects;
+using Talewright.Rules.Expressions;
 using Talewright.Talemark.Formatting;
 using Talewright.Talemark.Model;
 
@@ -261,9 +262,16 @@ public sealed record MapView(
         ChangeVariable change => $"var:{change.Variable.Value} {Assignment(change.Op)} {ExpressionFormatter.Format(change.Amount)}",
         SetTextVariable change => $"var:{change.Variable.Value} = {ExpressionFormatter.Format(change.Value)}",
         SetFlag change => $"{(change.Value ? "set" : "clear")} flag:{change.Flag.Value}",
-        GiveItem change => $"give {change.Character.Value} {change.Item.Value} {ExpressionFormatter.Format(change.Quantity)}",
-        TakeItem change => $"take {change.Character.Value} {change.Item.Value} {ExpressionFormatter.Format(change.Quantity)}",
+        GiveItem change => $"give {change.Character.Value} {FormatItem(change.Item)} {ExpressionFormatter.Format(change.Quantity)}",
+        TakeItem change => $"take {change.Character.Value} {FormatItem(change.Item)} {ExpressionFormatter.Format(change.Quantity)}",
         _ => throw new NotSupportedException($"Effect kind '{effect.GetType().Name}' has no debugger map description."),
+    };
+
+    private static string FormatItem(ItemOperand operand) => operand switch
+    {
+        FixedItemOperand fixedItem => fixedItem.Item.Value,
+        ResolvedItemOperand resolved => $"runtime {ExpressionFormatter.Format(resolved.Expression)}",
+        _ => throw new NotSupportedException($"Unknown item operand '{operand.GetType().Name}'."),
     };
 
     private static string Assignment(AssignOp op) => op switch

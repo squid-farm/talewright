@@ -25,6 +25,44 @@ public abstract record Expr
     public abstract ExprType Type { get; }
 }
 
+/// <summary>A fixed item identifier or an expression that resolves to an item identifier at runtime.</summary>
+public abstract record ItemOperand
+{
+    public static implicit operator ItemOperand(ItemId item) => new FixedItemOperand(item);
+    public static implicit operator ItemOperand(Expr expression) => new ResolvedItemOperand(expression);
+
+    public ItemId? Resolve(EvaluationContext context)
+    {
+        ArgumentNullException.ThrowIfNull(context);
+        return this switch
+        {
+            FixedItemOperand fixedItem => fixedItem.Item,
+            ResolvedItemOperand resolved => ResolveRuntime(resolved.Expression, context),
+            _ => throw new NotSupportedException($"Unknown item operand {GetType().Name}."),
+        };
+    }
+
+    private static ItemId? ResolveRuntime(Expr expression, EvaluationContext context)
+    {
+        var value = ExpressionEvaluator.Evaluate(expression, context);
+        if (value.Type != ExprType.Text || string.IsNullOrEmpty(value.Text))
+            return null;
+
+        var item = new ItemId(value.Text);
+        return context.State.World.Items.ContainsKey(item) ? item : null;
+    }
+}
+
+public sealed record FixedItemOperand(ItemId Item) : ItemOperand
+{
+    public override string ToString() => Item.Value;
+}
+
+public sealed record ResolvedItemOperand(Expr Expression) : ItemOperand
+{
+    public override string ToString() => $"<{Expression}>";
+}
+
 public sealed record NumberLiteral(ExactNumber Value) : Expr
 {
     public NumberLiteral(int value) : this(ExactNumber.FromInteger(value)) { }
@@ -118,9 +156,12 @@ public sealed record FactionNameRef(FactionId Faction) : Expr
 }
 
 /// <summary><c>item:rope</c> or <c>item:rope:name</c>: item display name.</summary>
-public sealed record ItemNameRef(ItemId Item) : Expr
+public sealed record ItemNameRef(ItemOperand Item) : Expr
 {
     public override ExprType Type => ExprType.Text;
+
+    public ItemNameRef(ItemId item) : this(new FixedItemOperand(item)) { }
+    public ItemNameRef(Expr item) : this(new ResolvedItemOperand(item)) { }
 }
 
 /// <summary>A read-only scalar property declared on an item.</summary>
@@ -136,9 +177,12 @@ public sealed record ItemPropertyRef(ItemId Item, string Property, ItemPropertyV
 }
 
 /// <summary><c>player has rope</c>.</summary>
-public sealed record HasItem(EntityId Character, ItemId Item) : Expr
+public sealed record HasItem(EntityId Character, ItemOperand Item) : Expr
 {
     public override ExprType Type => ExprType.Bool;
+
+    public HasItem(EntityId character, ItemId item) : this(character, new FixedItemOperand(item)) { }
+    public HasItem(EntityId character, Expr item) : this(character, new ResolvedItemOperand(item)) { }
 }
 
 /// <summary><c>player visited temple.hall</c>.</summary>
@@ -154,9 +198,12 @@ public sealed record SceneVisitCountRef(SceneId? Scene, bool IsSceneAlias = fals
 }
 
 /// <summary><c>player:inventory:rope:count</c>: quantity of an item held by a character.</summary>
-public sealed record InventoryCountRef(EntityId Character, ItemId Item) : Expr
+public sealed record InventoryCountRef(EntityId Character, ItemOperand Item) : Expr
 {
     public override ExprType Type => ExprType.Number;
+
+    public InventoryCountRef(EntityId character, ItemId item) : this(character, new FixedItemOperand(item)) { }
+    public InventoryCountRef(EntityId character, Expr item) : this(character, new ResolvedItemOperand(item)) { }
 }
 
 /// <summary>A keyed skill check; without a DC it evaluates to the ruleset total, otherwise to pass/fail.</summary>

@@ -146,7 +146,11 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
         if (substitution.Modifiers.Count == 0)
             return text;
 
-        var item = substitution.Value is ItemNameRef itemName ? context.State.World.Items[itemName.Item] : null;
+        var item = substitution.Value is ItemNameRef itemName
+            && itemName.Item.Resolve(context) is { } itemId
+            && context.State.World.Items.TryGetValue(itemId, out var resolvedItem)
+                ? resolvedItem
+                : null;
         var isPlural = item is not null
             ? item.NameAgreement == GrammaticalNumber.Plural
             : substitution.Value is PronounRef pronoun

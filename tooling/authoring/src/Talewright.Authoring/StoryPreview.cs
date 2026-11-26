@@ -82,7 +82,11 @@ public static class StoryPreview
             ? evaluated.ExactNumber.ToDisplayString()
             : evaluated.ToString();
         var steps = new List<PreviewStep> { new("Input", value) };
-        var item = template.Value is ItemNameRef itemName ? context.State.World.Items[itemName.Item] : null;
+        var item = template.Value is ItemNameRef itemName
+            && itemName.Item.Resolve(context) is { } itemId
+            && context.State.World.Items.TryGetValue(itemId, out var resolvedItem)
+                ? resolvedItem
+                : null;
         var plural = item is not null
             ? item.NameAgreement == Talewright.Core.World.GrammaticalNumber.Plural
             : template.Value is PronounRef pronoun

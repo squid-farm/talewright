@@ -174,14 +174,20 @@ public static class ExpressionEvaluator
             NameRef e => Value.Of(Name(state, e)),
             PronounRef e => Value.Of(Pronoun(state, e)),
             FactionNameRef e => Value.Of(state.World.Factions[e.Faction].Name),
-            ItemNameRef e => Value.Of(state.World.Items[e.Item].Name),
+            ItemNameRef e => e.Item.Resolve(context) is { } itemNameId
+                && state.World.Items.TryGetValue(itemNameId, out var itemName)
+                    ? Value.Of(itemName.Name)
+                    : Value.Of(string.Empty),
             ItemPropertyRef e => ItemProperty(e.Value),
-            HasItem e => Value.Of(state.GetExactItemCount(e.Character, e.Item) > 0),
+            HasItem e => Value.Of(e.Item.Resolve(context) is { } hasItemId
+                && state.GetExactItemCount(e.Character, hasItemId) > 0),
             Visited e => Value.Of(state.VisitCount(e.Scene) > 0),
             SceneVisitCountRef e => Value.Of(e.Scene is { } scene
                 ? state.VisitCount(scene)
                 : state.CurrentScene is { } current ? state.VisitCount(current) : 0),
-            InventoryCountRef e => Value.Of(state.GetExactItemCount(e.Character, e.Item)),
+            InventoryCountRef e => e.Item.Resolve(context) is { } inventoryItemId
+                ? Value.Of(state.GetExactItemCount(e.Character, inventoryItemId))
+                : Value.Of(ExactNumber.Zero),
             SkillCheckExpr e => context.ResolveSkillCheck?.Invoke(e)
                 ?? throw new InvalidOperationException("A skill check requires an active play evaluation context."),
             NamedPredicate e => Value.Of(context.Predicates.Evaluate(e.Name, state)),

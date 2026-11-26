@@ -216,6 +216,48 @@ public class RulesTests
         Assert.Equal(4, log.Events.Count);
     }
 
+    [Fact]
+    public void Runtime_item_operands_resolve_for_item_references_and_effects()
+    {
+        var log = NewLog();
+
+        Assert.Equal("coil of rope", Eval(new ItemNameRef(new TextLiteral("rope")), log).Text);
+        Assert.True(Eval(new HasItem(EntityId.Player, new TextLiteral("rope")), log).Bool);
+        Assert.Equal(1, Eval(new InventoryCountRef(EntityId.Player, new TextLiteral("rope")), log).Number);
+
+        EffectExecutor.Execute(
+            new GiveItem(EntityId.Player, new TextLiteral("rope"), new NumberLiteral(2)),
+            log,
+            NamedPredicateRegistry.Empty);
+        Assert.Equal(3, log.State.GetItemCount(EntityId.Player, Rope));
+
+        EffectExecutor.Execute(
+            new TakeItem(EntityId.Player, new TextLiteral("rope"), new NumberLiteral(2)),
+            log,
+            NamedPredicateRegistry.Empty);
+        Assert.Equal(1, log.State.GetItemCount(EntityId.Player, Rope));
+    }
+
+    [Fact]
+    public void Runtime_item_operands_that_resolve_to_nothing_are_treated_as_nothing()
+    {
+        var log = NewLog();
+        var missing = new TextLiteral("missing");
+
+        Assert.Equal(string.Empty, Eval(new ItemNameRef(missing), log).Text);
+        Assert.False(Eval(new HasItem(EntityId.Player, missing), log).Bool);
+        Assert.Equal(0, Eval(new InventoryCountRef(EntityId.Player, missing), log).Number);
+
+        var eventCount = log.Events.Count;
+        EffectExecutor.Execute(new GiveItem(EntityId.Player, missing, new NumberLiteral(2)),
+            log, NamedPredicateRegistry.Empty);
+        EffectExecutor.Execute(new TakeItem(EntityId.Player, missing, new NumberLiteral(2)),
+            log, NamedPredicateRegistry.Empty);
+
+        Assert.Equal(eventCount, log.Events.Count);
+        Assert.Equal(1, log.State.GetItemCount(EntityId.Player, Rope));
+    }
+
     private sealed record TestStorylet(string Name, Expr? Requires, int Priority = 0, bool Once = false) : IStorylet
     {
         public SceneId Id => new(Name);
