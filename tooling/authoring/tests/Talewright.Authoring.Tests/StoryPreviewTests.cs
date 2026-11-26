@@ -408,6 +408,39 @@ public sealed class StoryPreviewTests
         Assert.Equal(expected, Assert.Single(StoryPreview.Get(analysis, "main.tale")).Value);
     }
 
+    [Theory]
+    [InlineData("player:inventory:sword:sharpness >= 5", true)]
+    [InlineData("player:inventory:sword:sharpness > 5", false)]
+    [InlineData("player:inventory:sword:material == \"iron\"", true)]
+    [InlineData("player:inventory:sword:magical", false)]
+    [InlineData("not player:inventory:sword:magical", true)]
+    public void Held_item_property_visibility_matches_gameplay_for_previews_and_stat_hover(
+        string condition, bool visible)
+    {
+        var manifest = Manifest.Replace("  start: start", "  start: start\n  talemark: 2")
+            .Replace("  ruleset: rpg",
+                $"  ruleset: rpg\n  character-sheet:\n    stats:\n      str: '{condition}'")
+            .Replace("items: {rope: Rope}", """
+                items:
+                  sword:
+                    name: sword
+                    sharpness: 5
+                    material: iron
+                    magical: false
+                """);
+        var analysis = StoryAnalyzer.Analyze(Source(
+            "=== start\n{player:str#one-many(\"one\", \"many\")}\n~ player:str += 1\n-> END", manifest));
+        Assert.DoesNotContain(analysis.Diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+        var story = Assert.IsType<StoryDefinition>(analysis.Story);
+        var state = GameState.CreateInitial(story.World, 0);
+        Assert.Equal(visible, story.IsStatVisible(new StatId("str"), state));
+
+        var preview = Assert.Single(StoryPreview.Get(analysis, "main.tale"));
+        Assert.Equal(visible ? "many" : null, preview.Value);
+        var statHover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, new("main.tale", 3, 11)));
+        Assert.Equal(visible, statHover.PlainText.Contains("Default:", StringComparison.Ordinal));
+    }
+
     [Fact]
     public void Visibility_and_previews_do_not_evaluate_project_stat_modifiers()
     {

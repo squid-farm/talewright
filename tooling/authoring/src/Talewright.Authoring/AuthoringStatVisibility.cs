@@ -25,7 +25,7 @@ internal static class AuthoringStatVisibility
         StandingTierRef => state.Ruleset.Tiers.Count > 0,
         NumberLiteral or BoolLiteral or TextLiteral or TierLiteral or StandingRef or FlagRef or VarRef or TextVarRef
             or NameRef or PronounRef or FactionNameRef or ItemNameRef or HasItem or Visited
-            or SceneVisitCountRef or InventoryCountRef => true,
+            or SceneVisitCountRef or InventoryCountRef or InventoryItemPropertyRef => true,
         _ => false,
     };
 }
