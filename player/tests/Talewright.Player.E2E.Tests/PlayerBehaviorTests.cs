@@ -379,7 +379,7 @@ public sealed class PlayerBehaviorTests(WebHostFixture host, ITestOutputHelper o
     [Trait("Host", "Browser")]
     public async Task Bundled_sample_assets_work_when_served_at_the_selected_base_path()
     {
-        await Page.Locator(".tw-story-list").GetByRole(AriaRole.Button).First.ClickAsync();
+        await Driver.OpenBundledAsync();
         await Page.GetByRole(AriaRole.Button, new() { Name = "Start story", Exact = true }).ClickAsync();
         await Expect(Latest).ToBeVisibleAsync();
         Assert.NotEmpty(await Latest.InnerTextAsync());

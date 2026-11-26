@@ -57,7 +57,8 @@ public sealed class BrowserPlayerDriver(IPage page) : IPlayerDriver
             Name = name, MimeType = "application/zip", Buffer = content,
         });
 
-    public Task OpenBundledAsync() => page.Locator(".tw-story-list").GetByRole(AriaRole.Button).First.ClickAsync();
+    public Task OpenBundledAsync() =>
+        page.GetByRole(AriaRole.Button, new() { Name = "The Lost Relic Built-in", Exact = true }).ClickAsync();
     public Task ClickAsync(string name) => page.GetByRole(AriaRole.Button, new() { Name = name, Exact = true }).ClickAsync();
     public Task ChooseAsync(string label) => ChooseAsync(label, passageTimeout: null);
 
