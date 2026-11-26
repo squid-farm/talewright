@@ -100,19 +100,19 @@ public static class EffectExecutor
                 StateChanges.SetTextVariable(state, e.Variable, ExpressionEvaluator.Evaluate(e.Value, context).Text
                     ?? throw new InvalidOperationException("A text expression produced no text.")),
             SetFlag e => StateChanges.SetFlag(state, e.Flag, e.Value),
-            GiveItem e => ResolveItemAndExecute(e.Item, item => integerArithmetic
-                ? StateChanges.GiveItem(e.Character, item, EvalWhole(e.Quantity))
-                : StateChanges.GiveItem(state, e.Character, item, Eval(e.Quantity))),
-            TakeItem e => ResolveItemAndExecute(e.Item, item => integerArithmetic
-                ? StateChanges.TakeItem(state, e.Character, item, EvalWhole(e.Quantity))
-                : StateChanges.TakeItem(state, e.Character, item, Eval(e.Quantity))),
+            GiveItem e => e.Item.Resolve(context) is { } item
+                ? integerArithmetic
+                    ? StateChanges.GiveItem(e.Character, item, EvalWhole(e.Quantity))
+                    : StateChanges.GiveItem(state, e.Character, item, Eval(e.Quantity))
+                : [],
+            TakeItem e => e.Item.Resolve(context) is { } item
+                ? integerArithmetic
+                    ? StateChanges.TakeItem(state, e.Character, item, EvalWhole(e.Quantity))
+                    : StateChanges.TakeItem(state, e.Character, item, Eval(e.Quantity))
+                : [],
             _ => throw new NotSupportedException($"Unknown effect {effect.GetType().Name}."),
         };
         log.AppendRange(events.ToArray());
-
-        IEnumerable<GameEvent> ResolveItemAndExecute(ItemOperand operand,
-            Func<ItemId, IEnumerable<GameEvent>> execute) =>
-            operand.Resolve(context) is { } item ? execute(item) : [];
     }
 
     private static int Apply(int current, AssignOp op, int amount) => op switch

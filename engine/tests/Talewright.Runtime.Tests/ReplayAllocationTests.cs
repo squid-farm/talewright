@@ -14,14 +14,14 @@ public sealed class ReplayAllocationTests(ITestOutputHelper output)
     private const int ChoiceCount = 10_000;
     private const int RedoCursor = 5_000;
     private const long MiB = 1024 * 1024;
-    private const long IndependentRestoreCeiling = 66 * MiB;
+    private const long IndependentRestoreCeiling = 64 * MiB;
     private const long IndependentSaveCeiling = 12 * MiB;
     private const long RealisticSaveCeiling = 32 * MiB;
     private const long RealisticReplayCeiling = 896 * MiB;
     private const long RealisticContinuationCeiling = 768 * MiB;
 
     [Fact]
-    public void Release_historical_independent_corpus_restores_within_the_66_mib_ceiling()
+    public void Release_historical_independent_corpus_restores_within_the_64_mib_ceiling()
     {
 #if DEBUG
         return;
