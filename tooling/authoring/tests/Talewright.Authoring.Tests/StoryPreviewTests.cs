@@ -115,6 +115,50 @@ public sealed class StoryPreviewTests
     }
 
     [Theory]
+    [InlineData("player:inventory:sword")]
+    [InlineData("item:sword")]
+    public void Item_property_previews_match_declared_defaults_and_gameplay(string reference)
+    {
+        var manifest = Manifest.Replace("  start: start", "  start: start\n  talemark: 2")
+            .Replace("items: {rope: Rope}", """
+                items:
+                  sword:
+                    name: sword
+                    sharpness: 1.25
+                    material: iron
+                    magical: false
+                """);
+        var analysis = StoryAnalyzer.Analyze(Source($$"""
+            === start
+            ~ var:implicit = 3
+            {{{reference}}:sharpness}
+            {{{reference}}:material#upper}
+            {{{reference}}:magical}
+            {{{reference}}:sharpness#round}
+            {{{reference}}:sharpness#one-many("one", "many")}
+            {{{reference}}:sharpness#round#one-many("one", "many")}
+            {({{reference}}:sharpness + 1)#round-up}
+            {({{reference}}:sharpness + var:implicit)#round}
+            -> END
+            """, manifest));
+        Assert.DoesNotContain(analysis.Diagnostics, diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+
+        var previews = StoryPreview.Get(analysis, "main.tale");
+        Assert.Equal(["1.25", "IRON", "false", "1", "many", "one", "3", null],
+            previews.Select(preview => preview.Value));
+        Assert.Contains("gameplay state", previews[^1].UnavailableReason);
+        var state = GameState.CreateInitial(analysis.World!, 0);
+        foreach (var (substitution, preview) in analysis.Substitutions.Zip(previews).SkipLast(1))
+        {
+            var rendered = Assert.IsType<RenderedText>(Assert.Single(
+                new TemplateRenderer().RenderInlines([substitution.Template], state)));
+            Assert.Equal(rendered.Text, preview.Value);
+        }
+        var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(analysis, new("main.tale", 3, 5)));
+        Assert.Contains("Result: \"1.25\" (default)", hover.PlainText);
+    }
+
+    [Theory]
     [InlineData("she", "has", "her")]
     [InlineData("they", "have", "them")]
     public void Pronoun_agreement_and_builtin_chains_use_engine_implementations(string pronoun, string verb, string obj)
@@ -414,6 +458,9 @@ public sealed class StoryPreviewTests
     [InlineData("player:inventory:sword:material == \"iron\"", true)]
     [InlineData("player:inventory:sword:magical", false)]
     [InlineData("not player:inventory:sword:magical", true)]
+    [InlineData("item:sword:sharpness >= 5", true)]
+    [InlineData("item:sword:material == \"wood\"", false)]
+    [InlineData("not item:sword:magical", true)]
     public void Held_item_property_visibility_matches_gameplay_for_previews_and_stat_hover(
         string condition, bool visible)
     {

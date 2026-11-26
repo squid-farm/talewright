@@ -72,6 +72,7 @@ public static class StoryPreview
         if (!declaredDefault &&
             !numericDefault &&
             template.Value is not (NameRef or PronounRef or ItemNameRef or FactionNameRef or
+                ItemPropertyRef or InventoryItemPropertyRef or
                 TextLiteral or NumberLiteral or BoolLiteral or TierLiteral))
             return new(substitution.Range, null, [], "This value depends on gameplay state; no default example is shown.");
         if (template.Modifiers.Any(modifier => !TextModifierRegistry.IsBuiltIn(modifier)))
@@ -132,7 +133,8 @@ public static class StoryPreview
         VarRef reference => analysis.Tokens.Any(token =>
             token.ManifestPath is { Count: 2 } path &&
             path[0] == ManifestVocabulary.Vars && path[1] == reference.Variable.Value),
-        StatRef or StandingRef or SceneVisitCountRef or InventoryCountRef => true,
+        StatRef or StandingRef or SceneVisitCountRef or InventoryCountRef or ItemPropertyRef
+            or InventoryItemPropertyRef => true,
         UnaryExpr { Op: UnaryOp.Negate or UnaryOp.Round or UnaryOp.RoundUp or UnaryOp.RoundDown } unary =>
             HasNumericDefault(unary.Operand, analysis),
         BinaryExpr { Op: BinaryOp.Add or BinaryOp.Subtract or BinaryOp.Multiply or BinaryOp.Divide } binary =>

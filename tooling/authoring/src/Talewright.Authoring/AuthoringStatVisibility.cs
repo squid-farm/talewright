@@ -24,7 +24,7 @@ internal static class AuthoringStatVisibility
         BinaryExpr binary => CanEvaluate(binary.Left, state) && CanEvaluate(binary.Right, state),
         StandingTierRef => state.Ruleset.Tiers.Count > 0,
         NumberLiteral or BoolLiteral or TextLiteral or TierLiteral or StandingRef or FlagRef or VarRef or TextVarRef
-            or NameRef or PronounRef or FactionNameRef or ItemNameRef or HasItem or Visited
+            or NameRef or PronounRef or FactionNameRef or ItemNameRef or ItemPropertyRef or HasItem or Visited
             or SceneVisitCountRef or InventoryCountRef or InventoryItemPropertyRef => true,
         _ => false,
     };
