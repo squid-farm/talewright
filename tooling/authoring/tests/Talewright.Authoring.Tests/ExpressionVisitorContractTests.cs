@@ -42,6 +42,9 @@ public sealed class ExpressionVisitorContractTests
             SelectedPreview: "many"),
         new(typeof(InventoryItemPropertyRef), "player:inventory:sword:sharpness", "1.25", "1", true,
             StoryStateReadKind.InventoryItemProperty, SelectedPreview: "many"),
+        new(typeof(ItemComparison), "var:tool == sword", null, null, true, StoryStateReadKind.ItemName),
+        new(typeof(ItemReferencePropertyRef), "var:tool:sharpness", null, null, true,
+            StoryStateReadKind.InventoryItemProperty),
         new(typeof(SkillCheckExpr), "skill-check perception dc 12", null, null, null, StoryStateReadKind.SkillCheck,
             "depends on a perception check", ConditionOnly: true),
         new(typeof(NamedPredicate), "@Ready", null, null, false, StoryStateReadKind.NamedPredicate),
@@ -139,7 +142,15 @@ public sealed class ExpressionVisitorContractTests
             Assert.Empty(reads);
             return;
         }
-        var read = Assert.Single(reads);
+        if (item.Type == typeof(ItemComparison) || item.Type == typeof(ItemReferencePropertyRef))
+        {
+            var variable = Assert.Single(reads, read => read.Kind == StoryStateReadKind.TextVariable);
+            Assert.Equal("var:tool", variable.Reference);
+            Assert.Equal(2, reads.Count);
+        }
+        var read = item.Type == typeof(ItemComparison) || item.Type == typeof(ItemReferencePropertyRef)
+            ? Assert.Single(reads, read => read.Kind == kind)
+            : Assert.Single(reads);
         Assert.Equal(kind, read.Kind);
         Assert.Equal(item.ReadReference ?? item.Source, read.Reference);
         Assert.Equal(kind == StoryStateReadKind.NamedPredicate, read.IsOpaque);
@@ -154,6 +165,8 @@ public sealed class ExpressionVisitorContractTests
 
     private static StoryAnalysis AnalyzeSource(string manifest, string tale, CompilerOptions options)
     {
+        if (tale.Contains("var:tool", StringComparison.Ordinal))
+            tale = tale.Replace("=== start\n", "=== start\n~ var:tool = item:sword\n", StringComparison.Ordinal);
         var source = new StorySource(new Dictionary<string, string>
         {
             [StorySource.ManifestFileName] = manifest,

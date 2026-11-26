@@ -1,6 +1,7 @@
 using Talewright.Core.Identity;
 using Talewright.Core.Randomness;
 using Talewright.Core.Rulesets;
+using Talewright.Core.State;
 using Talewright.Core.World;
 using Talewright.Core;
 
@@ -31,18 +32,25 @@ public abstract record ItemOperand
     public static implicit operator ItemOperand(ItemId item) => new FixedItemOperand(item);
     public static implicit operator ItemOperand(Expr expression) => new ResolvedItemOperand(expression);
 
-    public ItemId? Resolve(EvaluationContext context)
+    /// <summary>The item this operand names now, or null when it holds nothing.</summary>
+    public ItemId? Resolve(EvaluationContext context) => ResolveReference(context)?.Resolve(context.State);
+
+    /// <summary>
+    /// The item or held group this operand refers to, or null for an unset value or an item the story no longer
+    /// declares. A group reference is returned even when its group is gone; callers decide what that means.
+    /// </summary>
+    public ItemReference? ResolveReference(EvaluationContext context)
     {
         ArgumentNullException.ThrowIfNull(context);
         return this switch
         {
-            FixedItemOperand fixedItem => fixedItem.Item,
+            FixedItemOperand fixedItem => ItemReference.ForItem(fixedItem.Item),
             ResolvedItemOperand resolved => ResolveRuntime(resolved.Expression, context),
             _ => throw new NotSupportedException($"Unknown item operand {GetType().Name}."),
         };
     }
 
-    private static ItemId? ResolveRuntime(Expr expression, EvaluationContext context)
+    private static ItemReference? ResolveRuntime(Expr expression, EvaluationContext context)
     {
         if (expression.Type != ExprType.Text)
             throw new InvalidOperationException("A runtime item operand must be a text expression.");
@@ -50,11 +58,11 @@ public abstract record ItemOperand
         var value = ExpressionEvaluator.Evaluate(expression, context);
         if (value.Type != ExprType.Text)
             throw new InvalidOperationException("A runtime item expression evaluated to a non-text value.");
-        if (string.IsNullOrEmpty(value.Text))
-            return null;
-
-        var item = new ItemId(value.Text);
-        return context.State.World.Items.ContainsKey(item) ? item : null;
+        return ItemReference.TryDecode(value.Text, out var reference)
+            && context.State.World.Items.ContainsKey(reference.Item)
+            && (reference.Holder is not { } holder || context.State.World.Characters.ContainsKey(holder))
+                ? reference
+                : null;
     }
 }
 
@@ -198,6 +206,34 @@ public sealed record HasItem(EntityId Character, ItemOperand Item) : Expr
 
     public HasItem(EntityId character, ItemId item) : this(character, new FixedItemOperand(item)) { }
     public HasItem(EntityId character, Expr item) : this(character, new ResolvedItemOperand(item)) { }
+}
+
+/// <summary>
+/// <c>var:tool == hammer</c>: whether an item variable currently names an item. A variable holding nothing equals no
+/// item.
+/// </summary>
+public sealed record ItemComparison(ItemOperand Item, BinaryOp Op, ItemId Expected) : Expr
+{
+    public BinaryOp Op { get; init; } = Op is BinaryOp.Equal or BinaryOp.NotEqual
+        ? Op
+        : throw new ArgumentOutOfRangeException(nameof(Op), Op, "Item comparisons use == or != only.");
+
+    public override ExprType Type => ExprType.Bool;
+}
+
+/// <summary>
+/// <c>var:tool:charge</c>: a property read through an item variable. A held group gives its value; an item gives its
+/// declared value; nothing, or an item without the property, gives the type's default.
+/// </summary>
+public sealed record ItemReferencePropertyRef(ItemOperand Item, string Property, ItemPropertyValueKind Kind) : Expr
+{
+    public override ExprType Type => Kind switch
+    {
+        ItemPropertyValueKind.Number => ExprType.Number,
+        ItemPropertyValueKind.Boolean => ExprType.Bool,
+        ItemPropertyValueKind.Text => ExprType.Text,
+        _ => throw new InvalidOperationException("Unknown item property value type."),
+    };
 }
 
 /// <summary><c>player visited temple.hall</c>.</summary>

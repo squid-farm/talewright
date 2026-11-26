@@ -83,7 +83,7 @@ public static class StoryPreview
             ? evaluated.ExactNumber.ToDisplayString()
             : evaluated.ToString();
         var steps = new List<PreviewStep> { new("Input", value) };
-        var item = template.Value is ItemNameRef itemName
+        var item = template.Value is ItemNameRef { Item: FixedItemOperand } itemName
             && itemName.Item.Resolve(context) is { } itemId
             && context.State.World.Items.TryGetValue(itemId, out var resolvedItem)
                 ? resolvedItem

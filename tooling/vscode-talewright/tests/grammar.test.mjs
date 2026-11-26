@@ -82,6 +82,14 @@ test('fallback highlights held item property references', () => {
   hasScope(line, 'sharpness', 'variable.other.property.tale');
 });
 
+test('fallback highlights item variables in inventory, effects and property reads', () => {
+  hasScope('{player:inventory:var:chosen:count}', 'var', 'entity.name.namespace.tale');
+  hasScope('{player:inventory:var:chosen:count}', 'chosen', 'variable.other.tale');
+  hasScope('{player:inventory:var:chosen:count}', 'count', 'variable.other.property.tale');
+  hasScope('~ take player var:chosen', 'chosen', 'variable.other.tale');
+  hasScope('{var:chosen:sharpness}', 'sharpness', 'variable.other.property.tale');
+});
+
 test('fallback keeps common bold and italic forms', () => {
   hasScope('**bold** text', 'bold', 'markup.bold.markdown');
   hasScope('__strong__ text', 'strong', 'markup.bold.markdown');

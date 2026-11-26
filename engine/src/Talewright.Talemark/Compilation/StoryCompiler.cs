@@ -122,8 +122,9 @@ public static class StoryCompiler
             }
         }
 
+        var itemVariables = new HashSet<VarId>();
         var unresolved = VariableDiscovery.Resolve(manifest.World, flags, scenes.Keys.ToHashSet(),
-            declarations, variables, textVariables, options, diagnostics);
+            declarations, variables, textVariables, options, diagnostics, itemVariables);
         var world = new WorldDefinition(manifest.World.Ruleset, manifest.World.Characters.Values,
             manifest.World.Items.Values, manifest.World.Factions.Values, flags, variables, textVariables,
             manifest.World.InitialFlags, manifest.TalemarkVersion);
@@ -134,6 +135,7 @@ public static class StoryCompiler
             Flags = world.Flags,
             Variables = world.Variables.Keys.Concat(world.TextVariables.Keys).Concat(unresolved).ToHashSet(),
             UnresolvedVariables = unresolved,
+            ItemVariables = itemVariables,
             Scenes = scenes.Keys.ToHashSet(),
             Predicates = options.Predicates,
             Modifiers = options.Modifiers,

@@ -332,6 +332,7 @@ public static class StoryAnalyzer
             IReadOnlySet<FlagId> flags;
             IReadOnlySet<VarId> variables;
             IReadOnlySet<VarId> unresolved;
+            IReadOnlySet<VarId> itemVariables;
             IReadOnlySet<SceneId> scenes;
             if (unchangedDeclarations)
             {
@@ -339,6 +340,7 @@ public static class StoryAnalyzer
                 flags = context!.Flags;
                 variables = context.Variables;
                 unresolved = context.UnresolvedVariables;
+                itemVariables = context.ItemVariables;
                 scenes = context.Scenes;
                 collector.CurrentWorld(world);
             }
@@ -357,8 +359,9 @@ public static class StoryAnalyzer
                     previousWorld.Items.Values, previousWorld.Factions.Values, mutableFlags, numbers, textVariables,
                     previousWorld.InitialFlags.Where(pair => mutableFlags.Contains(pair.Key)).ToDictionary(),
                     previousWorld.TalemarkVersion);
+                var mutableItemVariables = context?.ItemVariables.Where(textVariables.ContainsKey).ToHashSet() ?? [];
                 var localUnresolved = VariableDiscovery.Resolve(baseWorld, mutableFlags, mutableScenes,
-                    declarations, numbers, textVariables, options, diagnostics);
+                    declarations, numbers, textVariables, options, diagnostics, mutableItemVariables);
                 mutableUnresolved.UnionWith(localUnresolved);
                 world = new WorldDefinition(previousWorld.Ruleset, previousWorld.Characters.Values,
                     previousWorld.Items.Values, previousWorld.Factions.Values, mutableFlags, numbers, textVariables,
@@ -368,6 +371,7 @@ public static class StoryAnalyzer
                 flags = mutableFlags;
                 variables = numbers.Keys.Concat(textVariables.Keys).Concat(mutableUnresolved).ToHashSet();
                 unresolved = mutableUnresolved;
+                itemVariables = mutableItemVariables;
                 scenes = mutableScenes;
             }
 
@@ -380,6 +384,7 @@ public static class StoryAnalyzer
                 Flags = flags,
                 Variables = variables,
                 UnresolvedVariables = unresolved,
+                ItemVariables = itemVariables,
                 Scenes = scenes,
                 Predicates = context?.Predicates ?? options.Predicates,
                 Modifiers = context?.Modifiers ?? options.Modifiers,

@@ -122,6 +122,41 @@ public sealed partial class ServerTests
     }
 
     [Fact]
+    public async Task Item_variables_keep_their_roles_through_semantic_token_encoding()
+    {
+        const string tale = """
+            === start
+            ~ var:chosen = item:sword
+            {var:chosen:sharpness} {player:inventory:var:chosen:count}
+            * [Use {var:chosen}] (requires player has var:chosen and var:chosen == sword) { take player var:chosen } -> END
+            """;
+        await using var client = new Client();
+        File.WriteAllText(client.PathOf(StorySource.ManifestFileName), """
+            game: {id: item-variables, title: Item variables, start: start, talemark: 2}
+            characters:
+              player: {first-name: Ada}
+            items:
+              sword: {name: Sword, sharpness: 5}
+            """);
+        var initialized = await client.Initialize();
+        await client.Open("start.tale", tale, 1);
+        var response = await client.Request("textDocument/semanticTokens/full", new
+        {
+            textDocument = new { uri = client.UriOf("start.tale") }
+        });
+        var data = response.GetProperty("result").GetProperty("data")
+            .EnumerateArray().Select(value => value.GetInt32()).ToArray();
+        var legend = initialized.GetProperty("result").GetProperty("capabilities")
+            .GetProperty("semanticTokensProvider").GetProperty("legend").GetProperty("tokenTypes")
+            .EnumerateArray().Select(value => value.GetString()!).ToArray();
+        var tokens = Decode(data, legend, tale);
+        Assert.Equal(7, tokens.Count(token => token.Text == "chosen" && token.Type == "variable"));
+        Assert.All(tokens.Where(token => token.Text == "var"), token => Assert.Equal("namespace", token.Type));
+        Assert.Contains(tokens, token => token.Text == "sharpness" && token.Type == "property");
+        Assert.Contains(tokens, token => token.Text == "count" && token.Type == "property");
+    }
+
+    [Fact]
     public async Task Full_semantic_tokens_match_classifier_ranges_in_utf16_delta_encoding()
     {
         const string tale = """

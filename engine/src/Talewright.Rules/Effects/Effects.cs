@@ -110,6 +110,8 @@ public static class EffectExecutor
                     ? StateChanges.GiveItem(e.Character, item, EvalWhole(e.Quantity))
                     : StateChanges.GiveItem(state, e.Character, item, Eval(e.Quantity))
                 : [],
+            TakeItem e when e.Item.ResolveReference(context) is { IsGroup: true } group =>
+                StateChanges.TakeItemGroup(state, e.Character, group, Eval(e.Quantity)),
             TakeItem e => e.Item.Resolve(context) is { } item
                 ? integerArithmetic
                     ? StateChanges.TakeItem(state, e.Character, item, EvalWhole(e.Quantity))

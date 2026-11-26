@@ -3,6 +3,14 @@
 Complete stories to play, read and copy. The desktop player and the
 [web player](https://play.trytalewright.com/) both include them.
 
+## Remembered Ingredients (`Crafting/`)
+
+A short Talemark 2 crafting story that remembers two items in variables, displays
+their names and counts, compares an item ID, and spends the remembered ingredients
+at the forge. No loops are needed.
+
+Run it with `dotnet run --project apps/desktop -- samples/Crafting`.
+
 ## A Sharp Edge (`Blacksmith/`)
 
 A short Talemark 2 story about sharpening one of three swords. It demonstrates

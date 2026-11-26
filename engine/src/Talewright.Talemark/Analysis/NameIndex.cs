@@ -123,6 +123,20 @@ public sealed class NameIndex
             if (span.Length > 0) references.Add(new(kind, Text(span), map.Map(span.Start, span.Length), false));
         }
 
+        void Item(ExpressionSpan span)
+        {
+            var value = Text(span);
+            var separator = value.IndexOf(ExpressionVocabulary.Separator);
+            if (separator < 0)
+                Add(AuthoringSymbolKind.Item, span);
+            else
+            {
+                var nameStart = separator + 1;
+                while (nameStart < value.Length && char.IsWhiteSpace(value[nameStart])) nameStart++;
+                Add(AuthoringSymbolKind.Variable, new(span.Start + nameStart, span.Length - nameStart));
+            }
+        }
+
         void Reference(ReferenceExpressionNode reference)
         {
             switch (reference.Kind)
@@ -169,15 +183,15 @@ public sealed class NameIndex
                     break;
                 case InventoryItemPropertyExpressionNode inventoryProperty:
                     Add(AuthoringSymbolKind.Character, inventoryProperty.Character);
-                    Add(AuthoringSymbolKind.Item, inventoryProperty.Item);
+                    Item(inventoryProperty.Item);
                     break;
                 case InventoryItemNameExpressionNode inventoryItemName:
                     Add(AuthoringSymbolKind.Character, inventoryItemName.Character);
-                    Add(AuthoringSymbolKind.Item, inventoryItemName.Item);
+                    Item(inventoryItemName.Item);
                     break;
                 case HasItemExpressionNode hasItem:
                     Add(AuthoringSymbolKind.Character, hasItem.Character);
-                    Add(AuthoringSymbolKind.Item, hasItem.Item);
+                    Item(hasItem.Item);
                     break;
                 case ReferenceExpressionNode reference: Reference(reference); break;
             }
@@ -202,7 +216,7 @@ public sealed class NameIndex
                         case SetFlagEffectSyntax setFlag: Add(AuthoringSymbolKind.Flag, setFlag.Flag); break;
                         case GiveTakeEffectSyntax giveTake:
                             Add(AuthoringSymbolKind.Character, giveTake.Character);
-                            Add(AuthoringSymbolKind.Item, giveTake.Item);
+                            Item(giveTake.Item);
                             Expression(giveTake.Quantity);
                             break;
                         case AssignmentEffectSyntax assignment:

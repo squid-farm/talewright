@@ -67,10 +67,15 @@ public static class TalemarkClassifier
             return TalemarkClassificationKind.Modifier;
         if (IsInventoryNamespace(tokens, index))
             return TalemarkClassificationKind.Keyword;
-        if (IsInventoryItem(tokens, index))
+        if (IsInventoryItem(tokens, index) &&
+            !(tokens[index].Is(ExpressionVocabulary.Var) && index + 3 < tokens.Count &&
+              tokens[index + 3].Kind == TokenKind.Colon))
             return TalemarkClassificationKind.Identifier;
         if (IsInventoryCount(tokens, index))
             return TalemarkClassificationKind.Property;
+        if (index >= 2 && tokens[index - 2].Is(ExpressionVocabulary.Var) &&
+            tokens[index - 1].Kind == TokenKind.Colon)
+            return TalemarkClassificationKind.Identifier;
         if (index + 1 < tokens.Count && tokens[index + 1].Kind == TokenKind.Colon)
             return TalemarkClassificationKind.Namespace;
         if (index > 0 && tokens[index - 1].Kind == TokenKind.Colon)
