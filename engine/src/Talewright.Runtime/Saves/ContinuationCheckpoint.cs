@@ -97,6 +97,35 @@ internal sealed class ContinuationCheckpoint
             }
             ValidatePairs(character.Stats, exact: true);
             ValidatePairs(character.Items, value => value > 0, exact: true);
+            if (character.ItemGroups is { } itemGroups)
+            {
+                var quantities = character.Items.ToDictionary(item => item.Id, item => item.Number,
+                    StringComparer.Ordinal);
+                var itemIds = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var item in itemGroups)
+                {
+                    if (item is null || string.IsNullOrEmpty(item.Item) || !itemIds.Add(item.Item)
+                        || !checkpoint.KnownItems.Contains(item.Item) || item.Groups is null
+                        || !quantities.TryGetValue(item.Item, out var itemQuantity))
+                        throw new InvalidDataException(SaveFormat.MalformedMessage);
+                    var total = ExactNumber.Zero;
+                    foreach (var group in item.Groups)
+                    {
+                        if (group is null || !IsPositiveInteger(group.Quantity) || group.Properties is null)
+                            throw new InvalidDataException(SaveFormat.MalformedMessage);
+                        var propertyIds = new HashSet<string>(StringComparer.Ordinal);
+                        foreach (var property in group.Properties)
+                        {
+                            if (property is null || string.IsNullOrEmpty(property.Key)
+                                || !propertyIds.Add(property.Key) || !IsValidProperty(property))
+                                throw new InvalidDataException(SaveFormat.MalformedMessage);
+                        }
+                        total += ExactNumber.Parse(group.Quantity);
+                    }
+                    if (item.Groups.Count == 0 || total != itemQuantity)
+                        throw new InvalidDataException(SaveFormat.MalformedMessage);
+                }
+            }
         }
         ValidatePairs(checkpoint.Standings);
         ValidatePairs(checkpoint.Flags, value => value is 0 or 1);
@@ -143,6 +172,18 @@ internal sealed class ContinuationCheckpoint
     private static bool IsCanonical(string value) =>
         value.Length > 0 && value.All(c => char.IsAsciiDigit(c) || c is '-' or '/')
         && ExactNumber.TryParse(value, out var number) && number.ToCanonicalString() == value;
+
+    private static bool IsPositiveInteger(string value) =>
+        IsCanonical(value) && ExactNumber.TryParse(value, out var number)
+        && number > ExactNumber.Zero && number.Denominator.IsOne;
+
+    private static bool IsValidProperty(ItemPropertyPayload property) => property.Kind switch
+    {
+        (int)ItemPropertyValueKind.Number => IsCanonical(property.Value),
+        (int)ItemPropertyValueKind.Boolean => property.Value is "true" or "false",
+        (int)ItemPropertyValueKind.Text => property.Value is not null,
+        _ => false,
+    };
 
     private static void ValidateIds(IEnumerable<string> values)
     {
@@ -193,6 +234,27 @@ internal sealed class ContinuationCheckpoint
                     .Select(item => world.TalemarkVersion == 2
                         ? new NamedValuePayload(item.Key.Value, item.Value)
                         : new NamedValuePayload(item.Key.Value, item.Value.ToInt32RoundedAwayFromZero())).ToList(),
+                ItemGroups = world.TalemarkVersion == 2
+                    ? world.Items.Values.Where(item => !item.Divisible)
+                        .OrderBy(item => item.Id.Value, StringComparer.Ordinal)
+                        .Select(item => (Item: item.Id, Groups: state.GetItemGroups(id, item.Id)))
+                        .Where(item => item.Groups.Count > 0)
+                        .Select(item => new ItemGroupSetPayload
+                        {
+                            Item = item.Item.Value,
+                            Groups = item.Groups.Select(group => new ItemGroupPayload
+                            {
+                                Quantity = group.Quantity.ToCanonicalString(),
+                                Properties = group.Properties.OrderBy(property => property.Key, StringComparer.Ordinal)
+                                    .Select(property => new ItemPropertyPayload
+                                    {
+                                        Key = property.Key,
+                                        Kind = (int)ItemPropertySnapshot.KindOf(property.Value),
+                                        Value = ItemPropertySnapshot.From(property.Key, property.Value).Value,
+                                    }).ToList(),
+                            }).ToList(),
+                        }).ToList()
+                    : [],
             });
         }
         payload.Standings = world.Factions.Keys.OrderBy(id => id.Value, StringComparer.Ordinal)
@@ -262,6 +324,8 @@ internal sealed class ContinuationCheckpoint
             }
 
             CharacterStatePayload? orphan = null;
+            var savedItemGroups = savedCharacter.ItemGroups?.ToDictionary(item => item.Item, StringComparer.Ordinal)
+                ?? new Dictionary<string, ItemGroupSetPayload>(StringComparer.Ordinal);
             foreach (var stat in savedCharacter.Stats)
             {
                 var statId = new StatId(stat.Id);
@@ -294,6 +358,8 @@ internal sealed class ContinuationCheckpoint
             {
                 (orphan ??= CharacterStatePayload.Empty(savedCharacter.Id)).Items.Add(item);
                 notes.Add($"Item '{item.Id}' is no longer declared; {id}'s {item.Number.ToCanonicalString()} saved are kept but not used.");
+                if (savedItemGroups.TryGetValue(item.Id, out var groups))
+                    (orphan ??= CharacterStatePayload.Empty(savedCharacter.Id)).ItemGroups!.Add(groups);
             }
             foreach (var item in world.Items.Keys.OrderBy(item => item.Value, StringComparer.Ordinal))
             {
@@ -302,14 +368,30 @@ internal sealed class ContinuationCheckpoint
                     ? savedItems.GetValueOrDefault(item.Value) : before;
                 if ((world.TalemarkVersion == 1 || !world.Items[item].Divisible) && !FitsInt32(after))
                     throw Structural($"the item '{item}' cannot hold its saved fractional quantity");
-                if (after == before) continue;
-                if (world.TalemarkVersion == 2 && world.Items[item].Divisible)
+                if (after != before && world.TalemarkVersion == 2 && world.Items[item].Divisible)
                 {
                     if (after > before) events.Add(new ExactItemsGranted(id, item, (after - before).ToCanonicalString()));
                     else events.Add(new ExactItemsRemoved(id, item, (before - after).ToCanonicalString()));
                 }
-                else if (after > before) events.Add(new ItemsGranted(id, item, (after - before).ToInt32RoundedAwayFromZero()));
-                else events.Add(new ItemsRemoved(id, item, (before - after).ToInt32RoundedAwayFromZero()));
+                else if (after != before && after > before)
+                    events.Add(new ItemsGranted(id, item, (after - before).ToInt32RoundedAwayFromZero()));
+                else if (after != before)
+                    events.Add(new ItemsRemoved(id, item, (before - after).ToInt32RoundedAwayFromZero()));
+
+                if (world.TalemarkVersion == 2 && !world.Items[item].Divisible
+                    && savedCharacter.ItemGroups is not null && knownItems.Contains(item.Value) && after > 0)
+                {
+                    if (!savedItemGroups.TryGetValue(item.Value, out var savedGroups))
+                        throw new InvalidDataException(SaveFormat.MalformedMessage);
+                    var groups = savedGroups.Groups.Select(group => new ItemGroupSnapshot(group.Quantity,
+                        group.Properties.Select(property => new ItemPropertySnapshot(property.Key,
+                            (ItemPropertyValueKind)property.Kind, property.Value)).ToArray())).ToArray();
+                    var total = groups.Aggregate(ExactNumber.Zero,
+                        (sum, group) => sum + ExactNumber.Parse(group.Quantity));
+                    if (total != after)
+                        throw new InvalidDataException(SaveFormat.MalformedMessage);
+                    events.Add(new ItemGroupsRestored(id, item, groups));
+                }
             }
 
             if (orphan is not null) retained.Characters.Add(orphan);
@@ -459,6 +541,12 @@ internal sealed class ContinuationCheckpoint
             {
                 current.Stats.AddRange(character.Stats.Where(stat => current.Stats.All(existing => existing.Id != stat.Id)));
                 current.Items.AddRange(character.Items.Where(item => current.Items.All(existing => existing.Id != item.Id)));
+                if (character.ItemGroups is not null)
+                {
+                    current.ItemGroups ??= [];
+                    current.ItemGroups.AddRange(character.ItemGroups.Where(item =>
+                        current.ItemGroups.All(existing => existing.Item != item.Item)));
+                }
             }
             else
             {
@@ -480,6 +568,15 @@ internal sealed class ContinuationCheckpoint
         {
             character.Stats.Sort((a, b) => StringComparer.Ordinal.Compare(a.Id, b.Id));
             character.Items.Sort((a, b) => StringComparer.Ordinal.Compare(a.Id, b.Id));
+            if (character.ItemGroups is not null)
+            {
+                character.ItemGroups.Sort((a, b) => StringComparer.Ordinal.Compare(a.Item, b.Item));
+                foreach (var item in character.ItemGroups)
+                {
+                    foreach (var group in item.Groups)
+                        group.Properties.Sort((a, b) => StringComparer.Ordinal.Compare(a.Key, b.Key));
+                }
+            }
         }
         payload.Standings.Sort((a, b) => StringComparer.Ordinal.Compare(a.Id, b.Id));
         payload.Flags.Sort((a, b) => StringComparer.Ordinal.Compare(a.Id, b.Id));
@@ -762,8 +859,31 @@ internal sealed partial class CharacterStatePayload
     [Key(3)] public PronounsPayload? Pronouns { get; set; }
     [Key(4)] public List<NamedValuePayload> Stats { get; set; } = [];
     [Key(5)] public List<NamedValuePayload> Items { get; set; } = [];
+    [Key(6)] public List<ItemGroupSetPayload>? ItemGroups { get; set; }
 
-    public static CharacterStatePayload Empty(string id) => new() { Id = id };
+    public static CharacterStatePayload Empty(string id) => new() { Id = id, ItemGroups = [] };
+}
+
+[MessagePackObject(AllowPrivate = true)]
+internal sealed partial class ItemGroupSetPayload
+{
+    [Key(0)] public string Item { get; set; } = "";
+    [Key(1)] public List<ItemGroupPayload> Groups { get; set; } = [];
+}
+
+[MessagePackObject(AllowPrivate = true)]
+internal sealed partial class ItemGroupPayload
+{
+    [Key(0)] public string Quantity { get; set; } = "";
+    [Key(1)] public List<ItemPropertyPayload> Properties { get; set; } = [];
+}
+
+[MessagePackObject(AllowPrivate = true)]
+internal sealed partial class ItemPropertyPayload
+{
+    [Key(0)] public string Key { get; set; } = "";
+    [Key(1)] public int Kind { get; set; }
+    [Key(2)] public string Value { get; set; } = "";
 }
 
 [MessagePackObject(AllowPrivate = true)]

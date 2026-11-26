@@ -495,9 +495,42 @@ public static class SaveFormat
                     reader.Skip();
                 }
             }
+            else if (field == 6)
+            {
+                ValidateCheckpointItemGroups(ref reader);
+            }
             else
             {
                 reader.Skip();
+            }
+        }
+    }
+
+    private static void ValidateCheckpointItemGroups(ref MessagePackReader reader)
+    {
+        if (reader.TryReadNil())
+            return;
+        var itemCount = reader.ReadArrayHeader();
+        for (var i = 0; i < itemCount; i++)
+        {
+            if (reader.ReadArrayHeader() != 2)
+                throw new InvalidDataException(MalformedMessage);
+            ReadString(ref reader);
+            var groupCount = reader.ReadArrayHeader();
+            for (var group = 0; group < groupCount; group++)
+            {
+                if (reader.ReadArrayHeader() != 2)
+                    throw new InvalidDataException(MalformedMessage);
+                ReadString(ref reader);
+                var propertyCount = reader.ReadArrayHeader();
+                for (var property = 0; property < propertyCount; property++)
+                {
+                    if (reader.ReadArrayHeader() != 3)
+                        throw new InvalidDataException(MalformedMessage);
+                    ReadString(ref reader);
+                    reader.ReadInt32();
+                    ReadString(ref reader);
+                }
             }
         }
     }

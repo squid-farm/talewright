@@ -66,13 +66,19 @@ entered. It is an array of:
 12. known item ids;
 13. pending rendered blocks.
 
-A character is `[id, first name, last name, pronouns or nil, stats, items]`. Pronouns are
+A character is `[id, first name, last name, pronouns or nil, stats, items, item groups or nil]`.
+The trailing item-groups field is optional for older saves. Pronouns are
 `[subject, object, possessive, possessive pronoun, reflexive, agreement]`. Stats, items, standings,
 flags (0 or 1), number variables and visits use `[id, int32, exact or nil]` arrays; text variables use
 `[id, string]`. For version-2 numeric variables, stats and item quantities, the exact field is a
 canonical reduced integer or `numerator/denominator` string and the int32 field is zero.
 Other values use the int32 field. Older `[id, int32]` pairs convert exactly. Every id list is sorted ordinally. Seed and character selection remain in the
 top-level fields.
+
+Item groups are `[item id, groups]` arrays sorted by item id. Each group is `[count, properties]`;
+the group array preserves front-to-back order. A property is `[key, kind, value]`, where kind is
+0 for an exact number, 1 for a boolean, or 2 for text. Property arrays are sorted by key. Missing
+item groups load as one group per held non-divisible item, using the current declaration's properties.
 
 The transcript contains frames before the current passage, including earlier continuation segments.
 The base transcript length says how many of those frames precede the optional base. A frame is
@@ -179,6 +185,12 @@ The checkpoint restores state from current declarations, then enters its target 
 updated story. The current passage's entry effects, checks, prose and choices come from the update;
 effects of the choice that led there were already applied and are not repeated. Pending output from
 that choice is retained. Automatic diverts continue normally.
+
+Stored non-divisible item groups preserve their order and property values. If an older checkpoint
+has no group field, each held item is restored as one group using its current declared properties.
+When an updated story adds a property missing from a stored group, the declared value is filled once;
+groups that become identical are merged without changing the earlier group's position. Later
+definition changes do not alter properties already stored on held groups.
 
 Earlier passages are saved rendered frames: History shows their original text and choice labels
 without executing or re-rendering them. A continuation starts a new undo boundary at cursor zero;

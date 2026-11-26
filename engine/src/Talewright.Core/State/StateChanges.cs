@@ -1,6 +1,7 @@
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Core;
+using Talewright.Core.World;
 
 namespace Talewright.Core.State;
 
@@ -85,6 +86,28 @@ public static class StateChanges
         var held = state.GetExactItemCount(character, item);
         var removed = quantity < held ? quantity : held;
         return removed > 0 ? [new ExactItemsRemoved(character, item, removed.ToCanonicalString())] : [];
+    }
+
+    public static IEnumerable<GameEvent> SetItemProperty(IGameStateView state, EntityId character, ItemId item,
+        string property, ItemPropertyValue value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        if (!state.World.Items.TryGetValue(item, out var definition))
+            throw new KeyNotFoundException($"Unknown item '{item}'.");
+        if (definition.Divisible)
+            throw new InvalidOperationException($"Divisible item '{item}' has no individual copies.");
+        if (!definition.CustomProperties.TryGetValue(property, out var declaredValue))
+            throw new KeyNotFoundException($"Item '{item}' has no declared property '{property}'.");
+
+        var snapshot = ItemPropertySnapshot.From(property, value);
+        if (ItemPropertySnapshot.KindOf(declaredValue) != snapshot.Kind)
+            throw new ArgumentException($"Item property '{property}' must keep its declared type.", nameof(value));
+        var groups = state.GetItemGroups(character, item);
+        if (groups.Count == 0)
+            return [];
+        var current = groups[0].Properties.GetValueOrDefault(property, declaredValue);
+        return current == value ? [] :
+            [new ItemPropertyChanged(character, item, snapshot.Key, snapshot.Kind, snapshot.Value)];
     }
 
     public static IEnumerable<GameEvent> SetStanding(IGameStateView state, FactionId faction, int value)

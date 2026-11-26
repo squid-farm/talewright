@@ -2,6 +2,7 @@ using Talewright.Core.Identity;
 using Talewright.Core.Randomness;
 using Talewright.Core.World;
 using Talewright.Core;
+using Talewright.Core.State;
 
 namespace Talewright.Core.Events;
 
@@ -30,6 +31,13 @@ public sealed record ItemsRemoved(EntityId Character, ItemId Item, int Quantity)
 public sealed record ExactItemsGranted(EntityId Character, ItemId Item, string Quantity) : GameEvent;
 
 public sealed record ExactItemsRemoved(EntityId Character, ItemId Item, string Quantity) : GameEvent;
+
+public sealed record ItemPropertyChanged(EntityId Character, ItemId Item, string Property,
+    ItemPropertyValueKind Kind, string NewValue) : GameEvent;
+
+/// <summary>Restores grouped inventory while rebuilding a continuation checkpoint.</summary>
+public sealed record ItemGroupsRestored(EntityId Character, ItemId Item,
+    IReadOnlyList<ItemGroupSnapshot> Groups) : GameEvent;
 
 /// <summary>The player's standing with a faction changed.</summary>
 public sealed record StandingChanged(FactionId Faction, int OldValue, int NewValue) : GameEvent;
