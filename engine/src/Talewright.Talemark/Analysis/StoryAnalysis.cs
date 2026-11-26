@@ -136,7 +136,10 @@ public sealed class StoryAnalysis
                 : source).ToArray();
         _sites = new CompletionSiteIndex(siteSources, TalemarkVersion, World);
         var names = collector.Names.ToArray();
-        _names = currentFileAnalysis ? null : new(() => NameIndex.Build(Symbols, names, siteSources));
+        var itemVariables = collector.SymbolContext?.ItemVariables
+            .Select(variable => variable.Value)
+            .ToHashSet(StringComparer.Ordinal);
+        _names = currentFileAnalysis ? null : new(() => NameIndex.Build(Symbols, names, siteSources, itemVariables));
         Tokens = Array.AsReadOnly(collector.Tokens.ToArray());
         var classificationSources = collector.ClassificationSources.ToArray();
         _classifications = new(() => Array.AsReadOnly(classificationSources

@@ -170,6 +170,44 @@ public sealed class StoryRenameTests
     }
 
     [Fact]
+    public void Renaming_an_item_updates_item_variable_comparisons()
+    {
+        var story = new StorySource(new Dictionary<string, string>(StringComparer.Ordinal)
+        {
+            [StorySource.ManifestFileName] = """
+                game:
+                  id: item-comparison
+                  title: Item comparison
+                  talemark: 2
+                  start: start
+                characters:
+                  player: {first-name: Ada}
+                items:
+                  sword: Sword
+                """,
+            ["main.tale"] = """
+                === start
+                ~ var:chosen = item:sword
+                {if var:chosen == sword}A blade.{/if}
+                -> END
+                """,
+        });
+        var analysis = StoryAnalyzer.Analyze(story);
+
+        var result = StoryRename.Rename(analysis,
+            Find(story, StorySource.ManifestFileName, "  |sword: Sword"), "blade", Analyze);
+
+        Assert.Null(result.Refusal);
+        Assert.Equal(3, result.Edits.Count);
+        var renamed = new StorySource(Apply(story, result.Edits));
+        Assert.Contains("blade: Sword", renamed.Files[StorySource.ManifestFileName]);
+        Assert.Contains("item:blade", renamed.Files["main.tale"]);
+        Assert.Contains("var:chosen == blade", renamed.Files["main.tale"]);
+        Assert.DoesNotContain(StoryAnalyzer.Analyze(renamed).Diagnostics,
+            diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+    }
+
+    [Fact]
     public void Renaming_an_item_updates_custom_item_property_references()
     {
         var story = new StorySource(new Dictionary<string, string>(StringComparer.Ordinal)

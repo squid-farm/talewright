@@ -1,6 +1,7 @@
 using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Parsing;
 using Talewright.Talemark.Vocabulary;
+using Talewright.Rules.Expressions;
 
 namespace Talewright.Talemark.Analysis;
 
@@ -72,7 +73,7 @@ public sealed class NameIndex
             .ToArray();
 
     internal static NameIndex Build(IReadOnlyList<AuthoringSymbol> symbols, IReadOnlyList<NameOccurrence> names,
-        IReadOnlyList<CompletionSiteSource> sources)
+        IReadOnlyList<CompletionSiteSource> sources, IReadOnlySet<string>? itemVariables = null)
     {
         var references = new HashSet<NameOccurrence>();
         foreach (var name in names.Where(name => !name.IsDeclaration)) references.Add(name);
@@ -88,7 +89,7 @@ public sealed class NameIndex
         }
         foreach (var source in sources)
             if (source.Expression is { } expression)
-                ExpressionReferences(expression, references);
+                ExpressionReferences(expression, references, itemVariables);
 
         var declared = new HashSet<(AuthoringSymbolKind, string)>();
         var occurrences = new HashSet<NameOccurrence>(references);
@@ -111,7 +112,8 @@ public sealed class NameIndex
     }
 
     // Reads names from the same expression syntax the compiler binds, so each name keeps the meaning of its slot.
-    private static void ExpressionReferences(ExpressionSiteSource source, HashSet<NameOccurrence> references)
+    private static void ExpressionReferences(ExpressionSiteSource source, HashSet<NameOccurrence> references,
+        IReadOnlySet<string>? itemVariables)
     {
         var map = new ExpressionSourceMap(source);
         var text = source.Text;
@@ -121,6 +123,19 @@ public sealed class NameIndex
         void Add(AuthoringSymbolKind kind, ExpressionSpan span)
         {
             if (span.Length > 0) references.Add(new(kind, Text(span), map.Map(span.Start, span.Length), false));
+        }
+
+        bool ItemComparisonLeft(ExpressionNode node)
+        {
+            while (node is ParenthesizedExpressionNode parenthesized) node = parenthesized.Inner;
+            return node switch
+            {
+                ReferenceExpressionNode { Kind: ReferenceNamespace.Item, Member: null } => true,
+                ReferenceExpressionNode { Kind: ReferenceNamespace.Variable, Member: null } variable =>
+                    itemVariables?.Contains(Text(variable.Name)) == true,
+                InventoryItemNameExpressionNode => true,
+                _ => false,
+            };
         }
 
         void Item(ExpressionSpan span)
@@ -170,6 +185,10 @@ public sealed class NameIndex
                 case BinaryExpressionNode binary:
                     Expression(binary.Left);
                     Expression(binary.Right);
+                    if (binary is { Operator: BinaryOp.Equal or BinaryOp.NotEqual,
+                        Right: NameExpressionNode itemComparison } &&
+                        ItemComparisonLeft(binary.Left))
+                        Add(AuthoringSymbolKind.Item, itemComparison.Name);
                     break;
                 case SkillCheckExpressionNode skillCheck:
                     if (skillCheck.Actor is { } actor)
