@@ -1,3 +1,4 @@
+using System.Collections.ObjectModel;
 using Talewright.Core.Events;
 using Talewright.Core;
 using Talewright.Core.Identity;
@@ -67,6 +68,14 @@ public sealed class GameState : IGameStateView
                             ? qty
                             : qty.ToInt32RoundedAwayFromZero();
 
+            if (world.TalemarkVersion == 2)
+            {
+                foreach (var (item, quantity) in cs.Inventory)
+                {
+                    if (quantity > 0 && IsGroupedItem(world, item))
+                        cs.ItemGroups[item] = [NewGroup(quantity, world.Items[item].CustomProperties)];
+                }
+            }
             state._characters[character.Id] = cs;
         }
 
@@ -110,6 +119,8 @@ public sealed class GameState : IGameStateView
                 copy.ExactStats.Add(stat, value);
             foreach (var (item, quantity) in character.Inventory)
                 copy.Inventory.Add(item, quantity);
+            foreach (var (item, groups) in character.ItemGroups)
+                copy.ItemGroups.Add(item, groups.Select(group => group.Copy()).ToList());
             fork._characters.Add(id, copy);
         }
         foreach (var (id, value) in _standings)
@@ -154,9 +165,12 @@ public sealed class GameState : IGameStateView
                 inv[e.Item] = World.TalemarkVersion == 1
                     ? unchecked(inv.GetValueOrDefault(e.Item).ToInt32RoundedAwayFromZero() + e.Quantity)
                     : inv.GetValueOrDefault(e.Item) + e.Quantity;
+                if (IsGroupedItem(World, e.Item))
+                    ChangeGroupQuantity(e.Character, e.Item, ExactNumber.FromInteger(e.Quantity));
                 break;
             case ItemsRemoved e:
                 var inventory = Character(e.Character).Inventory;
+                var previous = inventory.GetValueOrDefault(e.Item);
                 var left = World.TalemarkVersion == 1
                     ? unchecked(inventory.GetValueOrDefault(e.Item).ToInt32RoundedAwayFromZero() - e.Quantity)
                     : inventory.GetValueOrDefault(e.Item) - e.Quantity;
@@ -169,18 +183,33 @@ public sealed class GameState : IGameStateView
                     inventory.Remove(e.Item);
                 }
 
+                if (IsGroupedItem(World, e.Item))
+                    ChangeGroupQuantity(e.Character, e.Item, -Min(ExactNumber.FromInteger(Math.Max(0, e.Quantity)), Max(ExactNumber.Zero, previous)));
                 break;
             case ExactItemsGranted e:
                 var exactInventory = Character(e.Character).Inventory;
-                exactInventory[e.Item] = exactInventory.GetValueOrDefault(e.Item) + ExactNumber.Parse(e.Quantity);
+                var exactGrant = ExactNumber.Parse(e.Quantity);
+                exactInventory[e.Item] = exactInventory.GetValueOrDefault(e.Item) + exactGrant;
+                if (IsGroupedItem(World, e.Item))
+                    ChangeGroupQuantity(e.Character, e.Item, exactGrant);
                 break;
             case ExactItemsRemoved e:
                 var exactItems = Character(e.Character).Inventory;
-                var exactLeft = exactItems.GetValueOrDefault(e.Item) - ExactNumber.Parse(e.Quantity);
+                var exactPrevious = exactItems.GetValueOrDefault(e.Item);
+                var exactRemoved = ExactNumber.Parse(e.Quantity);
+                var exactLeft = exactPrevious - exactRemoved;
                 if (exactLeft > 0)
                     exactItems[e.Item] = exactLeft;
                 else
                     exactItems.Remove(e.Item);
+                if (IsGroupedItem(World, e.Item))
+                    ChangeGroupQuantity(e.Character, e.Item, -Min(exactRemoved, Max(ExactNumber.Zero, exactPrevious)));
+                break;
+            case ItemPropertyChanged e:
+                ChangeItemProperty(e);
+                break;
+            case ItemGroupsRestored e:
+                RestoreItemGroups(e);
                 break;
             case StandingChanged e:
                 _standings[e.Faction] = e.NewValue;
@@ -312,6 +341,30 @@ public sealed class GameState : IGameStateView
     public IEnumerable<KeyValuePair<ItemId, ExactNumber>> GetExactInventory(EntityId character) =>
         Character(character).Inventory.Where(kv => kv.Value > 0);
 
+    public IReadOnlyList<HeldItemGroup> GetItemGroups(EntityId character, ItemId item)
+    {
+        if (!IsGroupedItem(World, item)
+            || !Character(character).ItemGroups.TryGetValue(item, out var groups))
+            return [];
+        return Array.AsReadOnly(groups.Select(group => new HeldItemGroup(group.Quantity,
+            new ReadOnlyDictionary<string, ItemPropertyValue>(
+                new Dictionary<string, ItemPropertyValue>(group.Properties, StringComparer.Ordinal))))
+            .ToArray());
+    }
+
+    public ItemPropertyValue GetItemProperty(EntityId character, ItemId item, string property)
+    {
+        if (!World.Items.TryGetValue(item, out var definition))
+            throw new KeyNotFoundException($"Unknown item '{item}'.");
+        if (definition.Divisible)
+            throw new InvalidOperationException($"Divisible item '{item}' has no individual copies.");
+        if (!definition.CustomProperties.TryGetValue(property, out var declaredValue))
+            throw new KeyNotFoundException($"Item '{item}' has no declared property '{property}'.");
+        return Character(character).ItemGroups.TryGetValue(item, out var groups) && groups.Count > 0
+            ? groups[0].Properties.GetValueOrDefault(property, declaredValue)
+            : declaredValue;
+    }
+
     public int GetStanding(FactionId faction) => _standings.GetValueOrDefault(faction);
 
     public bool GetFlag(FlagId flag) => _flags.Contains(flag);
@@ -333,11 +386,179 @@ public sealed class GameState : IGameStateView
     private CharacterState Character(EntityId id) =>
         _characters.TryGetValue(id, out var cs) ? cs : throw new KeyNotFoundException($"Unknown character '{id}'.");
 
+    private void ChangeItemProperty(ItemPropertyChanged change)
+    {
+        if (!IsGroupedItem(World, change.Item)
+            || !World.Items[change.Item].CustomProperties.TryGetValue(change.Property, out var declared))
+            throw new InvalidOperationException($"Item property '{change.Item}:{change.Property}' cannot be changed.");
+        var newValue = new ItemPropertySnapshot(change.Property, change.Kind, change.NewValue).ToValue();
+        if (ItemPropertySnapshot.KindOf(declared) != change.Kind)
+            throw new InvalidOperationException($"Item property '{change.Item}:{change.Property}' changed type.");
+
+        var character = Character(change.Character);
+        if (!character.ItemGroups.TryGetValue(change.Item, out var groups) || groups.Count == 0)
+            throw new InvalidOperationException($"Character '{change.Character}' does not hold '{change.Item}'.");
+        var front = groups[0];
+        if (!front.Properties.TryGetValue(change.Property, out var oldValue))
+            throw new InvalidOperationException($"Held item '{change.Item}' is missing property '{change.Property}'.");
+        if (oldValue == newValue)
+            return;
+
+        var properties = new Dictionary<string, ItemPropertyValue>(front.Properties, StringComparer.Ordinal)
+        {
+            [change.Property] = newValue,
+        };
+        front.Quantity -= ExactNumber.One;
+        if (front.Quantity == ExactNumber.Zero)
+            groups.RemoveAt(0);
+
+        var matching = groups.FindIndex(group => SameProperties(group.Properties, properties));
+        if (matching >= 0)
+        {
+            var group = groups[matching];
+            groups.RemoveAt(matching);
+            groups.Insert(0, new ItemGroupState(group.Quantity + ExactNumber.One, group.Properties));
+        }
+        else
+        {
+            groups.Insert(0, new ItemGroupState(ExactNumber.One, properties));
+        }
+    }
+
+    private void RestoreItemGroups(ItemGroupsRestored restore)
+    {
+        if (!IsGroupedItem(World, restore.Item))
+            throw new InvalidOperationException($"Item '{restore.Item}' cannot have held-item groups.");
+        ArgumentNullException.ThrowIfNull(restore.Groups);
+        var definition = World.Items[restore.Item];
+        var groups = new List<ItemGroupState>(restore.Groups.Count);
+        foreach (var snapshot in restore.Groups)
+        {
+            var quantity = ExactNumber.Parse(snapshot.Quantity);
+            if (quantity <= 0 || !quantity.Denominator.IsOne)
+                throw new InvalidOperationException($"Item '{restore.Item}' has an invalid saved group quantity.");
+            var properties = new Dictionary<string, ItemPropertyValue>(StringComparer.Ordinal);
+            foreach (var property in snapshot.Properties)
+            {
+                if (string.IsNullOrEmpty(property.Key) || !properties.TryAdd(property.Key, property.ToValue()))
+                    throw new InvalidOperationException($"Item '{restore.Item}' has invalid saved group properties.");
+            }
+            groups.Add(new ItemGroupState(quantity, properties));
+        }
+
+        var normalized = NormalizeGroups(groups, definition);
+        var total = normalized.Aggregate(ExactNumber.Zero, (sum, group) => sum + group.Quantity);
+        var character = Character(restore.Character);
+        if (total > 0)
+        {
+            character.Inventory[restore.Item] = total;
+            character.ItemGroups[restore.Item] = normalized;
+        }
+        else
+        {
+            character.Inventory.Remove(restore.Item);
+            character.ItemGroups.Remove(restore.Item);
+        }
+    }
+
+    private void ChangeGroupQuantity(EntityId characterId, ItemId item, ExactNumber delta)
+    {
+        var character = Character(characterId);
+        if (!delta.Denominator.IsOne)
+            throw new InvalidOperationException($"Non-divisible item '{item}' cannot have a fractional group.");
+        if (delta > 0)
+        {
+            if (!World.Items.TryGetValue(item, out var definition))
+                return;
+            if (!character.ItemGroups.TryGetValue(item, out var groups))
+                character.ItemGroups[item] = groups = [];
+            var matching = groups.FindIndex(group => SameProperties(group.Properties, definition.CustomProperties));
+            if (matching >= 0)
+            {
+                var group = groups[matching];
+                groups.RemoveAt(matching);
+                groups.Add(new ItemGroupState(group.Quantity + delta, group.Properties));
+            }
+            else
+            {
+                groups.Add(NewGroup(delta, definition.CustomProperties));
+            }
+            return;
+        }
+
+        if (delta == ExactNumber.Zero)
+            return;
+        if (!character.ItemGroups.TryGetValue(item, out var existing))
+            return;
+        var remaining = -delta;
+        while (remaining > 0 && existing.Count > 0)
+        {
+            var amount = Min(remaining, existing[0].Quantity);
+            existing[0].Quantity -= amount;
+            remaining -= amount;
+            if (existing[0].Quantity == ExactNumber.Zero)
+                existing.RemoveAt(0);
+        }
+        if (existing.Count == 0)
+            character.ItemGroups.Remove(item);
+    }
+
+    private static List<ItemGroupState> NormalizeGroups(IEnumerable<ItemGroupState> groups, ItemDefinition definition)
+    {
+        var normalized = new List<ItemGroupState>();
+        foreach (var group in groups)
+        {
+            var properties = new Dictionary<string, ItemPropertyValue>(group.Properties, StringComparer.Ordinal);
+            foreach (var (key, value) in definition.CustomProperties)
+            {
+                if (properties.TryGetValue(key, out var oldValue))
+                {
+                    if (ItemPropertySnapshot.KindOf(oldValue) != ItemPropertySnapshot.KindOf(value))
+                        throw new InvalidOperationException($"Held item property '{definition.Id}:{key}' changed type.");
+                }
+                else
+                {
+                    properties.Add(key, value);
+                }
+            }
+
+            var matching = normalized.FindIndex(existing => SameProperties(existing.Properties, properties));
+            if (matching >= 0)
+                normalized[matching].Quantity += group.Quantity;
+            else
+                normalized.Add(new ItemGroupState(group.Quantity, properties));
+        }
+        return normalized;
+    }
+
+    private static ItemGroupState NewGroup(ExactNumber quantity,
+        IReadOnlyDictionary<string, ItemPropertyValue> properties) =>
+        new(quantity, new Dictionary<string, ItemPropertyValue>(properties, StringComparer.Ordinal));
+
+    private static bool SameProperties(IReadOnlyDictionary<string, ItemPropertyValue> left,
+        IReadOnlyDictionary<string, ItemPropertyValue> right) =>
+        left.Count == right.Count && left.All(property =>
+            right.TryGetValue(property.Key, out var value) && value == property.Value);
+
+    private static bool IsGroupedItem(WorldDefinition world, ItemId item) =>
+        world.TalemarkVersion == 2 && world.Items.TryGetValue(item, out var definition) && !definition.Divisible;
+
+    private static ExactNumber Min(ExactNumber left, ExactNumber right) => left < right ? left : right;
+    private static ExactNumber Max(ExactNumber left, ExactNumber right) => left > right ? left : right;
+
     private sealed class CharacterState
     {
         public CharacterDefinition? Definition { get; set; }
         public Dictionary<StatId, int> Stats { get; } = [];
         public Dictionary<StatId, ExactNumber> ExactStats { get; } = [];
         public Dictionary<ItemId, ExactNumber> Inventory { get; } = [];
+        public Dictionary<ItemId, List<ItemGroupState>> ItemGroups { get; } = [];
+    }
+
+    private sealed class ItemGroupState(ExactNumber quantity, Dictionary<string, ItemPropertyValue> properties)
+    {
+        public ExactNumber Quantity { get; set; } = quantity;
+        public Dictionary<string, ItemPropertyValue> Properties { get; } = properties;
+        public ItemGroupState Copy() => new(Quantity, new(Properties, StringComparer.Ordinal));
     }
 }

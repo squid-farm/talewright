@@ -93,6 +93,104 @@ public class GameStateTests
     }
 
     [Fact]
+    public void Non_divisible_item_changes_stay_at_the_front_and_are_removed_first()
+    {
+        var world = CreateGroupedWorld();
+        var log = new EventLog(world, 1);
+        var sword = new ItemId("sword");
+
+        log.AppendRange(StateChanges.GiveItem(log.State, EntityId.Player, sword, 3));
+        log.AppendRange(StateChanges.SetItemProperty(log.State, EntityId.Player, sword, "durability",
+            new ItemPropertyValue.Number(ExactNumber.FromInteger(90))));
+        log.AppendRange(StateChanges.SetItemProperty(log.State, EntityId.Player, sword, "durability",
+            new ItemPropertyValue.Number(ExactNumber.FromInteger(80))));
+        log.AppendRange(StateChanges.GiveItem(log.State, EntityId.Player, sword, 1));
+
+        Assert.Equal(4, log.State.GetItemCount(EntityId.Player, sword));
+        Assert.Collection(log.State.GetItemGroups(EntityId.Player, sword),
+            group => AssertGroup(group, 1, 80),
+            group => AssertGroup(group, 3, 100));
+        Assert.Equal(new ItemPropertyValue.Number(ExactNumber.FromInteger(80)),
+            log.State.GetItemProperty(EntityId.Player, sword, "durability"));
+
+        log.AppendRange(StateChanges.TakeItem(log.State, EntityId.Player, sword, 1));
+
+        Assert.Equal(3, log.State.GetItemCount(EntityId.Player, sword));
+        Assert.Collection(log.State.GetItemGroups(EntityId.Player, sword),
+            group => AssertGroup(group, 3, 100));
+        var replay = EventLog.Replay(world, 1, log.Events);
+        Assert.Collection(replay.State.GetItemGroups(EntityId.Player, sword),
+            group => AssertGroup(group, 3, 100));
+    }
+
+    [Fact]
+    public void Unheld_item_property_reads_the_definition_and_a_change_is_a_no_op()
+    {
+        var state = GameState.CreateInitial(CreateGroupedWorld(), 1);
+        var sword = new ItemId("sword");
+
+        Assert.Equal(new ItemPropertyValue.Number(ExactNumber.FromInteger(100)),
+            state.GetItemProperty(EntityId.Player, sword, "durability"));
+        Assert.Empty(StateChanges.SetItemProperty(state, EntityId.Player, sword, "durability",
+            new ItemPropertyValue.Number(ExactNumber.FromInteger(90))));
+    }
+
+    [Fact]
+    public void Divisible_items_keep_a_tally_without_groups()
+    {
+        var world = CreateGroupedWorld(divisible: true);
+        var log = new EventLog(world, 1);
+        var item = new ItemId("sword");
+
+        log.AppendRange(StateChanges.GiveItem(log.State, EntityId.Player, item, ExactNumber.Parse("1/2")));
+
+        Assert.Equal(ExactNumber.Parse("1/2"), log.State.GetExactItemCount(EntityId.Player, item));
+        Assert.Empty(log.State.GetItemGroups(EntityId.Player, item));
+        Assert.Throws<InvalidOperationException>(() => StateChanges.SetItemProperty(log.State, EntityId.Player,
+            item, "durability", new ItemPropertyValue.Number(ExactNumber.FromInteger(90))));
+    }
+
+    [Fact]
+    public void Restored_groups_fill_new_properties_and_merge_in_existing_order()
+    {
+        var world = CreateGroupedWorld();
+        var log = new EventLog(world, 1);
+        var sword = new ItemId("sword");
+        var declared = ItemPropertySnapshot.From("durability",
+            new ItemPropertyValue.Number(ExactNumber.FromInteger(100)));
+
+        log.Append(new ItemGroupsRestored(EntityId.Player, sword,
+        [
+            new("1", []),
+            new("2", [declared]),
+        ]));
+
+        Assert.Equal(3, log.State.GetItemCount(EntityId.Player, sword));
+        Assert.Collection(log.State.GetItemGroups(EntityId.Player, sword),
+            group => AssertGroup(group, 3, 100));
+    }
+
+    [Fact]
+    public void Granting_a_copy_moves_its_matching_group_to_the_back()
+    {
+        var log = new EventLog(CreateGroupedWorld(), 1);
+        var sword = new ItemId("sword");
+
+        log.Append(new ItemGroupsRestored(EntityId.Player, sword,
+        [
+            new("1", [ItemPropertySnapshot.From("durability",
+                new ItemPropertyValue.Number(ExactNumber.FromInteger(100)))]),
+            new("1", [ItemPropertySnapshot.From("durability",
+                new ItemPropertyValue.Number(ExactNumber.FromInteger(90)))]),
+        ]));
+        log.AppendRange(StateChanges.GiveItem(log.State, EntityId.Player, sword, 1));
+
+        Assert.Collection(log.State.GetItemGroups(EntityId.Player, sword),
+            group => AssertGroup(group, 1, 90),
+            group => AssertGroup(group, 2, 100));
+    }
+
+    [Fact]
     public void No_op_changes_emit_no_events()
     {
         var log = new EventLog(CreateWorld(), 1);
@@ -190,6 +288,26 @@ public class GameStateTests
     {
         public int GetModifier(IGameStateView state, EntityId character, StatId stat) =>
             stat == Stat ? int.MaxValue : 0;
+    }
+
+    private static WorldDefinition CreateGroupedWorld(bool divisible = false) => new(
+        GenericRuleset.Create(),
+        [new CharacterDefinition(EntityId.Player, "Mara", "", Pronouns.She,
+            new Dictionary<StatId, int>(), new Dictionary<ItemId, int>())],
+        [new ItemDefinition(new ItemId("sword"), "sword", new Dictionary<StatId, int>(), Divisible: divisible)
+        {
+            CustomProperties = new Dictionary<string, ItemPropertyValue>(StringComparer.Ordinal)
+            {
+                ["durability"] = new ItemPropertyValue.Number(ExactNumber.FromInteger(100)),
+            },
+        }],
+        [], [], new Dictionary<VarId, int>(), talemarkVersion: 2);
+
+    private static void AssertGroup(HeldItemGroup group, int quantity, int durability)
+    {
+        Assert.Equal(ExactNumber.FromInteger(quantity), group.Quantity);
+        Assert.Equal(new ItemPropertyValue.Number(ExactNumber.FromInteger(durability)),
+            group.Properties["durability"]);
     }
 
     [Fact]

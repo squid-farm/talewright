@@ -433,6 +433,8 @@ internal static class ReplayEvidence
         ItemsRemoved => "ItemsRemoved",
         ExactItemsGranted => "ExactItemsGranted",
         ExactItemsRemoved => "ExactItemsRemoved",
+        ItemPropertyChanged => "ItemPropertyChanged",
+        ItemGroupsRestored => "ItemGroupsRestored",
         StandingChanged => "StandingChanged",
         FlagChanged => "FlagChanged",
         VariableChanged => "VariableChanged",

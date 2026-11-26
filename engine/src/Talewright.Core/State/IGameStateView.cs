@@ -60,6 +60,29 @@ public interface IGameStateView
         ? GetInventory(character).Select(item => KeyValuePair.Create(item.Key, ExactNumber.FromInteger(item.Value)))
         : throw new NotSupportedException("This state view does not expose exact inventory quantities.");
 
+    /// <summary>Ordered groups for a non-divisible item; the first group is used by unqualified reads.</summary>
+    IReadOnlyList<HeldItemGroup> GetItemGroups(EntityId character, ItemId item)
+    {
+        if (World.TalemarkVersion != 2 || !World.Items.TryGetValue(item, out var definition) || definition.Divisible)
+            return [];
+        var quantity = GetExactItemCount(character, item);
+        return quantity > 0 ? [new HeldItemGroup(quantity, definition.CustomProperties)] : [];
+    }
+
+    /// <summary>Reads the front held copy, or the declared value when the item is not held.</summary>
+    ItemPropertyValue GetItemProperty(EntityId character, ItemId item, string property)
+    {
+        if (!World.Items.TryGetValue(item, out var definition))
+            throw new KeyNotFoundException($"Unknown item '{item}'.");
+        if (definition.Divisible)
+            throw new InvalidOperationException($"Divisible item '{item}' has no individual copies.");
+        if (!definition.CustomProperties.TryGetValue(property, out var declaredValue))
+            throw new KeyNotFoundException($"Item '{item}' has no declared property '{property}'.");
+        var groups = GetItemGroups(character, item);
+        return groups.Count > 0 && groups[0].Properties.TryGetValue(property, out var heldValue)
+            ? heldValue : declaredValue;
+    }
+
     int GetStanding(FactionId faction);
 
     bool GetFlag(FlagId flag);

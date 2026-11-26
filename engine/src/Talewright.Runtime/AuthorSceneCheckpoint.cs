@@ -96,6 +96,9 @@ public sealed class AuthorSceneCheckpoint
             ItemsRemoved changed => world.Items.ContainsKey(changed.Item),
             ExactItemsGranted changed => world.Items.ContainsKey(changed.Item),
             ExactItemsRemoved changed => world.Items.ContainsKey(changed.Item),
+            ItemPropertyChanged changed => world.Items.TryGetValue(changed.Item, out var item)
+                && item.CustomProperties.TryGetValue(changed.Property, out var value)
+                && ItemPropertySnapshot.KindOf(value) == changed.Kind,
             LevelChanged => world.Ruleset.LevelingRule is { } leveling
                 && world.Ruleset.StatsById.ContainsKey(leveling.LevelStat),
             _ => true,

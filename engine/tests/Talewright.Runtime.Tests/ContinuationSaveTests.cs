@@ -1,7 +1,9 @@
 using System.Buffers;
 using MessagePack;
+using Talewright.Core;
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
+using Talewright.Core.State;
 using Talewright.Core.World;
 using Talewright.Narrative.Rendering;
 using Talewright.Narrative.Templates;
@@ -108,6 +110,66 @@ public sealed class ContinuationSaveTests
             Assert.Equal(original.State.VisitCount(new SceneId("market")), restored.State.VisitCount(new SceneId("market")));
             Assert.Equal(original.Current.Document.ToPlainText(), restored.Current.Document.ToPlainText());
         }
+    }
+
+    [Fact]
+    public void Item_group_order_and_values_survive_checkpoint_save_load_and_new_property_fill()
+    {
+        var originalStory = CompileGroupedItems();
+        var sword = new ItemId("sword");
+        var log = new EventLog(originalStory.World, 42);
+        log.Append(new ItemGroupsRestored(EntityId.Player, sword,
+        [
+            new("1", [ItemPropertySnapshot.From("durability",
+                new ItemPropertyValue.Number(ExactNumber.FromInteger(100)))]),
+            new("2",
+            [
+                ItemPropertySnapshot.From("durability", new ItemPropertyValue.Number(ExactNumber.FromInteger(100))),
+                ItemPropertySnapshot.From("color", new ItemPropertyValue.Text("blue")),
+            ]),
+        ]));
+        var checkpoint = CaptureCheckpoint(originalStory, log);
+        var bytes = SaveCheckpoint(originalStory, checkpoint);
+
+        var updatedBlue = StoryHistory.RestoreFromCheckpoint(CompileGroupedItems("blue"), bytes);
+
+        Assert.Collection(updatedBlue.State.GetItemGroups(EntityId.Player, sword),
+            group =>
+            {
+                Assert.Equal(ExactNumber.FromInteger(3), group.Quantity);
+                Assert.Equal(new ItemPropertyValue.Text("blue"), group.Properties["color"]);
+            });
+
+        var updatedGreen = StoryHistory.RestoreFromCheckpoint(CompileGroupedItems("green"), updatedBlue.Save());
+
+        Assert.Collection(updatedGreen.State.GetItemGroups(EntityId.Player, sword),
+            group =>
+            {
+                Assert.Equal(ExactNumber.FromInteger(3), group.Quantity);
+                Assert.Equal(new ItemPropertyValue.Text("blue"), group.Properties["color"]);
+            });
+    }
+
+    [Fact]
+    public void Checkpoints_without_item_groups_load_as_one_group_per_held_item()
+    {
+        var story = CompileGroupedItems("blue");
+        var log = new EventLog(story.World, 42);
+        log.Append(new ItemsGranted(EntityId.Player, new ItemId("sword"), 3));
+        var checkpoint = CaptureCheckpoint(story, log);
+        checkpoint.Characters.Single(character => character.Id == "player").ItemGroups = null;
+        var bytes = SaveCheckpoint(story, checkpoint);
+
+        var restored = StoryHistory.RestoreFromCheckpoint(story, bytes);
+
+        Assert.Collection(restored.State.GetItemGroups(EntityId.Player, new ItemId("sword")),
+            group =>
+            {
+                Assert.Equal(ExactNumber.FromInteger(3), group.Quantity);
+                Assert.Equal(new ItemPropertyValue.Number(ExactNumber.FromInteger(100)),
+                    group.Properties["durability"]);
+                Assert.Equal(new ItemPropertyValue.Text("blue"), group.Properties["color"]);
+            });
     }
 
     [Fact]
@@ -616,7 +678,7 @@ public sealed class ContinuationSaveTests
         Assert.Equal("square", reader.ReadString());
         Assert.Equal("market", reader.ReadString());
         Assert.Equal(1, reader.ReadArrayHeader());
-        Assert.Equal(6, reader.ReadArrayHeader());
+        Assert.Equal(7, reader.ReadArrayHeader());
         Assert.Equal("player", reader.ReadString());
         Assert.Equal("Robin", reader.ReadString());
         Assert.Equal("", reader.ReadString());
@@ -625,6 +687,7 @@ public sealed class ContinuationSaveTests
         Assert.InRange(reader.ReadInt32(), 0, 1);
         ReadSortedPairs(ref reader, textValues: false);
         ReadSortedPairs(ref reader, textValues: false);
+        Assert.Equal(0, reader.ReadArrayHeader());
         ReadSortedPairs(ref reader, textValues: false);
         ReadSortedPairs(ref reader, textValues: false);
         ReadSortedPairs(ref reader, textValues: false);
@@ -838,6 +901,52 @@ public sealed class ContinuationSaveTests
         var history = StoryHistory.Restore(story, bytes);
         Assert.Equal(copy, bytes);
         return history;
+    }
+
+    private static CheckpointPayload CaptureCheckpoint(StoryDefinition story, EventLog log) =>
+        ContinuationCheckpoint.Capture(story, log.State.Seed, log.Events,
+            new PlayerEntryBoundary(new DivertTarget(new SceneId("next")), log.Events.Count, [], []), null);
+
+    private static byte[] SaveCheckpoint(StoryDefinition story, CheckpointPayload checkpoint) =>
+        SaveFormat.Write(new SavedGame
+        {
+            StoryId = story.Id,
+            StoryVersion = story.Version,
+            ContentFingerprint = story.ContentFingerprint
+                ?? throw new InvalidOperationException("The test story must have a content fingerprint."),
+            Seed = 42,
+            Choices = [],
+            Cursor = 0,
+            Continuation = new SaveContinuation(new ContinuationPayload
+            {
+                Current = checkpoint,
+                Transcript = [],
+            }),
+        });
+
+    private static StoryDefinition CompileGroupedItems(string? color = null)
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = $$"""
+                game:
+                  id: held-items
+                  title: Held items
+                  talemark: 2
+                  start: start
+                characters:
+                  player:
+                    first-name: Tester
+                items:
+                  sword:
+                    name: sword
+                    durability: 100
+                    color: {{color ?? "blue"}}
+                """,
+            ["main.tale"] = "=== start\n* [Next] -> next\n=== next\nReady.\n-> END",
+        }));
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        return result.Story!;
     }
 
     private sealed record Options

@@ -501,6 +501,8 @@ internal sealed class ScenarioCommand
 [JsonSerializable(typeof(ItemsRemoved))]
 [JsonSerializable(typeof(ExactItemsGranted))]
 [JsonSerializable(typeof(ExactItemsRemoved))]
+[JsonSerializable(typeof(ItemPropertyChanged))]
+[JsonSerializable(typeof(ItemGroupsRestored))]
 [JsonSerializable(typeof(StandingChanged))]
 [JsonSerializable(typeof(FlagChanged))]
 [JsonSerializable(typeof(VariableChanged))]
