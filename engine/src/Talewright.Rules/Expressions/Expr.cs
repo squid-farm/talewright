@@ -221,6 +221,19 @@ public sealed record InventoryCountRef(EntityId Character, ItemOperand Item) : E
     public InventoryCountRef(EntityId character, Expr item) : this(character, new ResolvedItemOperand(item)) { }
 }
 
+/// <summary>A declared property on the front held copy, or its definition value when none is held.</summary>
+public sealed record InventoryItemPropertyRef(EntityId Character, ItemId Item, string Property,
+    ItemPropertyValue DeclaredValue) : Expr
+{
+    public override ExprType Type => DeclaredValue switch
+    {
+        ItemPropertyValue.Number => ExprType.Number,
+        ItemPropertyValue.Boolean => ExprType.Bool,
+        ItemPropertyValue.Text => ExprType.Text,
+        _ => throw new InvalidOperationException("Unknown item property value type."),
+    };
+}
+
 /// <summary>A keyed skill check; without a DC it evaluates to the ruleset total, otherwise to pass/fail.</summary>
 public sealed record SkillCheckExpr(EntityId Actor, StatId Skill, SkillCheckIdentity Identity, Expr? Difficulty,
     bool IsHidden = false) : Expr

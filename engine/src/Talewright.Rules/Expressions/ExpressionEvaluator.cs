@@ -179,6 +179,8 @@ public static class ExpressionEvaluator
                 ? Value.Of(state.GetExactItemCount(inventoryCount.Character, itemId))
                 : Value.Of(ExactNumber.Zero);
         }
+        if (expr is InventoryItemPropertyRef itemProperty)
+            return ItemProperty(state.GetItemProperty(itemProperty.Character, itemProperty.Item, itemProperty.Property));
 
         return expr switch
         {

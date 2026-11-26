@@ -3,6 +3,14 @@
 Complete stories to play, read and copy. The desktop player and the
 [web player](https://play.trytalewright.com/) both include them.
 
+## A Sharp Edge (`Blacksmith/`)
+
+A short Talemark 2 story about sharpening one of three swords. It demonstrates
+reading and changing the front held copy's declared properties while preserving
+the other two copies.
+
+Run it with `dotnet run --project apps/desktop -- samples/Blacksmith`.
+
 ## The Lost Relic (`LostRelic/`)
 
 A four-chapter adventure with three endings. Mara Burns (or your created

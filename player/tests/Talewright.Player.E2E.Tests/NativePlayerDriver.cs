@@ -153,7 +153,7 @@ public sealed class NativePlayerDriver(string artifacts, string? executableOverr
         await CommandAsync("upload", new { path, control_name = "Import save file" });
     }
 
-    public async Task OpenBundledAsync() => await CommandAsync("click", new { pattern = @".* Built-in$", role = "push button" });
+    public async Task OpenBundledAsync() => await ClickAsync("The Lost Relic Built-in");
     public async Task ClickAsync(string name) =>
         await CommandAsync("click", new { name, role = "push button" });
     public async Task ClickByNameAsync(string name) =>

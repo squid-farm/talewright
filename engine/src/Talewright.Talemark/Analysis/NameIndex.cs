@@ -167,9 +167,9 @@ public sealed class NameIndex
                     Add(AuthoringSymbolKind.Character, visited.Character);
                     Add(AuthoringSymbolKind.Scene, visited.Scene);
                     break;
-                case InventoryCountExpressionNode inventoryCount:
-                    Add(AuthoringSymbolKind.Character, inventoryCount.Character);
-                    Add(AuthoringSymbolKind.Item, inventoryCount.Item);
+                case InventoryItemPropertyExpressionNode inventoryProperty:
+                    Add(AuthoringSymbolKind.Character, inventoryProperty.Character);
+                    Add(AuthoringSymbolKind.Item, inventoryProperty.Item);
                     break;
                 case InventoryItemNameExpressionNode inventoryItemName:
                     Add(AuthoringSymbolKind.Character, inventoryItemName.Character);

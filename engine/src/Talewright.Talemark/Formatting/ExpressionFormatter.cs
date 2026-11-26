@@ -126,6 +126,8 @@ public static class ExpressionFormatter
                 Character(count.Character), Inventory, Write(resolved.Expression), Count),
             _ => throw new NotSupportedException($"Unknown item operand '{count.Item.GetType().Name}'."),
         },
+        InventoryItemPropertyRef property => Reference(
+            Character(property.Character), Inventory, Name(property.Item.Value), Name(property.Property)),
         SkillCheckExpr check => SkillCheck(check),
         NamedPredicate predicate => $"{PredicateMarker}{Name(predicate.Name)}",
         UnaryExpr or BinaryExpr => throw new InvalidOperationException("Composite expressions are formatted separately."),

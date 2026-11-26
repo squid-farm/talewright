@@ -18,7 +18,7 @@ public sealed class CompletionSiteQueryTests
             name: Ada Hart
             pronouns: she
         items:
-          lantern: { name: lantern }
+          lantern: { name: lantern, color: blue, weight: 1.25, fragile: false }
         flags: [met]
         vars: { gold: 3 }
         triggers:
@@ -58,6 +58,48 @@ public sealed class CompletionSiteQueryTests
         Assert.Equal("met", site.Text);
         Assert.Equal([AuthoringSymbolKind.Flag], site.Kinds);
         Assert.Equal(position.Column - 1, site.Range.Start.Column);
+    }
+
+    [Fact]
+    public void Held_item_property_completions_include_declared_keys_and_filter_numeric_slots()
+    {
+        var version2Manifest = Manifest.Replace("start: start", "start: start\n  talemark: 2", StringComparison.Ordinal);
+        var (analysis, position) = Analyze("=== start\n{player:inventory:lantern:|}", manifest: version2Manifest);
+        var site = Assert.Single(analysis.CompletionSitesAt(position));
+
+        Assert.Contains("count", site.Keywords);
+        Assert.Contains("color", site.Keywords);
+        Assert.Contains("weight", site.Keywords);
+        Assert.Contains("fragile", site.Keywords);
+        Assert.Contains("Held item property (number)", site.KeywordDetails!["weight"]);
+
+        var (numericAnalysis, numericPosition) = Analyze(
+            "=== start\n* [Try] skill-check athletics dc player:inventory:lantern:|\n  success: -> END\n  failure: -> END",
+            manifest: version2Manifest);
+        var numericSites = numericAnalysis.CompletionSitesAt(numericPosition);
+        var numericSite = numericSites.First(site => site.Keywords.Contains("weight"));
+
+        Assert.Contains("weight", numericSite.Keywords);
+        Assert.DoesNotContain("color", numericSite.Keywords);
+        Assert.DoesNotContain("fragile", numericSite.Keywords);
+    }
+
+    [Theory]
+    [InlineData("count", true)]
+    [InlineData("weight", true)]
+    [InlineData("color", false)]
+    [InlineData("fragile", false)]
+    public void Held_item_property_modifier_completions_follow_declared_property_type(string property, bool isNumeric)
+    {
+        var version2Manifest = Manifest.Replace("start: start", "start: start\n  talemark: 2", StringComparison.Ordinal);
+        var (analysis, position) = Analyze(
+            $"=== start\n{{player:inventory:lantern:{property}#|}}\n-> END",
+            manifest: version2Manifest);
+        var site = Assert.Single(analysis.CompletionSitesAt(position));
+
+        Assert.Equal(isNumeric, site.Keywords.Contains("round"));
+        Assert.Equal(isNumeric, site.Keywords.Contains("round-up"));
+        Assert.Equal(isNumeric, site.Keywords.Contains("round-down"));
     }
 
     [Fact]
@@ -165,13 +207,14 @@ public sealed class CompletionSiteQueryTests
         }
     }
 
-    private static (StoryAnalysis Analysis, SourceLocation Position) Analyze(string marked, CompilerOptions? options = null)
+    private static (StoryAnalysis Analysis, SourceLocation Position) Analyze(string marked, CompilerOptions? options = null,
+        string? manifest = null)
     {
         var caret = marked.IndexOf('|');
         var lines = marked[..caret].Split('\n');
         var source = new StorySource(new Dictionary<string, string>
         {
-            [StorySource.ManifestFileName] = Manifest,
+            [StorySource.ManifestFileName] = manifest ?? Manifest,
             ["main.tale"] = marked.Remove(caret, 1),
         });
         return (StoryAnalyzer.Analyze(source, options), new SourceLocation("main.tale", lines.Length, lines[^1].Length + 1));

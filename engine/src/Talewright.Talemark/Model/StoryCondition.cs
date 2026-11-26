@@ -56,6 +56,9 @@ public enum StoryStateReadKind
 
     /// <summary>A skill check whose result affects the condition.</summary>
     SkillCheck,
+
+    /// <summary>A held item's property, such as <c>player:inventory:sword:sharpness</c>.</summary>
+    InventoryItemProperty,
 }
 
 /// <summary>Preview. One distinct reference to story state used by a condition.</summary>
@@ -149,6 +152,7 @@ public sealed class StoryCondition
                 FactionNameRef value => Create(StoryStateReadKind.FactionName, value),
                 ItemNameRef value => Create(StoryStateReadKind.ItemName, value),
                 ItemPropertyRef value => Create(StoryStateReadKind.ItemProperty, value),
+                InventoryItemPropertyRef value => Create(StoryStateReadKind.InventoryItemProperty, value),
                 HasItem value => Create(StoryStateReadKind.ItemsHeld, value),
                 Visited value => Create(StoryStateReadKind.VisitedScene, value),
                 NamedPredicate value => Create(StoryStateReadKind.NamedPredicate, value, isOpaque: true),

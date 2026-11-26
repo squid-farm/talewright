@@ -20,16 +20,16 @@ public class ExpressionFormatterTests
             .Register("_Can.Open-door", _ => false),
     };
 
-    private static CompilationResult Compile(string source, bool condition = false) =>
+    private static CompilationResult Compile(string source, bool condition = false, string? manifest = null) =>
         StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
         {
-            ["story.talewright.yaml"] = Manifest,
+            ["story.talewright.yaml"] = manifest ?? Manifest,
             ["main.tale"] = condition ? $"=== a\n@requires {source}\n-> END" : $"=== a\n{{{source}}}\n-> END",
         }), Options);
 
-    private static Expr Parse(string source)
+    private static Expr Parse(string source, string? manifest = null)
     {
-        var result = Compile(source);
+        var result = Compile(source, manifest: manifest);
         Assert.True(result.Success, string.Join("\n", result.Diagnostics));
         var paragraph = Assert.IsType<ParagraphTemplate>(Assert.Single(CompilerTests.Templates(result.Story!.Scenes[0])));
         return Assert.IsType<SubstitutionTemplate>(Assert.Single(paragraph.Inlines)).Value;
@@ -204,6 +204,8 @@ public class ExpressionFormatterTests
             "player:inventory:lantern:count", "@CanGo", "not true", "1 + 2",
         ];
         var covered = representatives.Select(source => Parse(source).GetType()).ToHashSet();
+        var version2Manifest = Manifest.Replace("talemark: 1", "talemark: 2", StringComparison.Ordinal);
+        covered.Add(Parse("player:inventory:lantern:color", version2Manifest).GetType());
         covered.Add(ParseCondition("skill-check perception dc 12").GetType());
         var nodes = typeof(Expr).Assembly.GetTypes().Where(type => type.IsSubclassOf(typeof(Expr)) && !type.IsAbstract);
         Assert.Equal(nodes.OrderBy(type => type.Name), covered.OrderBy(type => type.Name));

@@ -1,4 +1,5 @@
 using Talewright.Talemark.Analysis;
+using Talewright.Talemark.Compilation;
 
 namespace Talewright.LanguageServer.Tests;
 
@@ -56,9 +57,19 @@ public sealed partial class ServerTests
             === start
             {player:inventory:first-name:count}
             {guide:inventory:first-name:count}
+            {player:inventory:sword:sharpness}
             -> END
             """;
         await using var client = new Client();
+        File.WriteAllText(client.PathOf(StorySource.ManifestFileName), """
+            game: { id: semantic-items, title: Semantic items, start: start, talemark: 2 }
+            characters:
+              player: { first-name: Ada }
+              guide: { first-name: Bea }
+            items:
+              first-name: { name: Token }
+              sword: { name: Sword, sharpness: 5 }
+            """);
         var initialized = await client.Initialize();
         await client.Open("start.tale", tale, 1);
         var response = await client.Request("textDocument/semanticTokens/full", new
@@ -72,9 +83,10 @@ public sealed partial class ServerTests
             .EnumerateArray().Select(value => value.GetString()!).ToArray();
         var tokens = Decode(data, legend, tale);
 
-        Assert.Equal(2, tokens.Count(token => token.Text == "inventory" && token.Type == "keyword"));
+        Assert.Equal(3, tokens.Count(token => token.Text == "inventory" && token.Type == "keyword"));
         Assert.Equal(2, tokens.Count(token => token.Text == "first-name" && token.Type == "variable"));
         Assert.Equal(2, tokens.Count(token => token.Text == "count" && token.Type == "property"));
+        Assert.Contains(tokens, token => token.Text == "sharpness" && token.Type == "property");
     }
 
     [Theory]

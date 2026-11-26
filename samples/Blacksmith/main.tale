@@ -1,0 +1,24 @@
+=== blacksmith
+@title The Blacksmith
+
+~ give player sword 3
+~ give player coin 5
+
+The smith sets three old swords on the counter. Each has sharpness
+{player:inventory:sword:sharpness}.
+
+* [Pay five coins to sharpen one sword] { take player coin 5; player:inventory:sword:sharpness += 2 } -> forge
+* [Keep your coins and leave] -> END
+
+=== forge
+@title A Sharper Blade
+
+The smith returns one sword. Its sharpness is now
+{player:inventory:sword:sharpness}; the other two remain unchanged.
+
+~ player:inventory:sword:durability -= 10
+{if player:inventory:sword:durability < 20}
+Your blade is chipped.
+{/if}
+
+-> END

@@ -10,6 +10,27 @@ namespace Talewright.LanguageServer.Tests;
 public sealed partial class ServerTests
 {
     [Fact]
+    public async Task Held_item_property_completion_uses_declared_properties()
+    {
+        await using var client = new Client();
+        File.WriteAllText(client.PathOf(StorySource.ManifestFileName), """
+            game: { id: held-item-completion, title: Held item completion, start: start, talemark: 2 }
+            characters:
+              player: { first-name: Ada }
+            items:
+              sword: { name: Sword, sharpness: 5, material: iron }
+            """);
+        await client.Initialize();
+        const string marked = "=== start\n{player:inventory:sword:sha|}\n-> END";
+        await client.Open("start.tale", marked.Replace("|", "", StringComparison.Ordinal), 1);
+
+        var items = Items(await Completion(client, "start.tale", marked));
+        var sharpness = Assert.Single(items, HasLabel("sharpness"));
+
+        Assert.Equal("sharpness", sharpness.GetProperty("textEdit").GetProperty("newText").GetString());
+    }
+
+    [Fact]
     public async Task Completion_can_use_the_request_snapshot_after_a_newer_document_change()
     {
         await using var client = new Client();

@@ -36,7 +36,7 @@ For the design rules behind new syntax, see the
 | stat | A number belonging to a character, read as `character:stat`. Held items can change it. | `player:dex` |
 | skill | A stat declared with `category: skill`, used by skill checks. | `player:athletics` |
 | skill check | A roll against a difficulty, with `success:` and `failure:` outcomes. | `skill-check athletics dc 14` |
-| item | Something characters can hold. `item:id` shows its name; declared custom scalar properties are static, read-only values. | `item:rope:material` |
+| item | Something characters can hold. `item:id` shows its name; `item:id:key` reads a declared property. In Talemark 2, non-divisible held copies can carry and change their own property values. | `player:inventory:sword:sharpness` |
 | faction | A group in the story. `faction:id` shows its name. | `faction:guild` |
 | standing | The player's numeric standing with a faction. | `faction:guild:standing += 5` |
 | tier | The named band a faction standing falls in, such as `hostile` or `friendly`. | `faction:guild:tier >= friendly` |

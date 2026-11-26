@@ -1,6 +1,7 @@
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Core.State;
+using Talewright.Core.World;
 using Talewright.Core;
 using Talewright.Rules.Diagnostics;
 using Talewright.Rules.Expressions;
@@ -29,6 +30,9 @@ public sealed record ChangeVariable(VarId Variable, AssignOp Op, Expr Amount) : 
 public sealed record SetTextVariable(VarId Variable, Expr Value) : Effect;
 
 public sealed record SetFlag(FlagId Flag, bool Value) : Effect;
+
+public sealed record ChangeItemProperty(EntityId Character, ItemId Item, string Property,
+    AssignOp Op, Expr Amount) : Effect;
 
 public sealed record GiveItem(EntityId Character, ItemOperand Item, Expr Quantity) : Effect
 {
@@ -100,6 +104,7 @@ public static class EffectExecutor
                 StateChanges.SetTextVariable(state, e.Variable, ExpressionEvaluator.Evaluate(e.Value, context).Text
                     ?? throw new InvalidOperationException("A text expression produced no text.")),
             SetFlag e => StateChanges.SetFlag(state, e.Flag, e.Value),
+            ChangeItemProperty e => ChangeHeldItemProperty(state, e, context),
             GiveItem e => e.Item.Resolve(context) is { } item
                 ? integerArithmetic
                     ? StateChanges.GiveItem(e.Character, item, EvalWhole(e.Quantity))
@@ -113,6 +118,29 @@ public static class EffectExecutor
             _ => throw new NotSupportedException($"Unknown effect {effect.GetType().Name}."),
         };
         log.AppendRange(events.ToArray());
+    }
+
+    private static IEnumerable<GameEvent> ChangeHeldItemProperty(IGameStateView state,
+        ChangeItemProperty change, EvaluationContext context)
+    {
+        if (state.GetItemGroups(change.Character, change.Item).Count == 0)
+            return [];
+
+        var current = state.GetItemProperty(change.Character, change.Item, change.Property);
+        var amount = ExpressionEvaluator.Evaluate(change.Amount, context);
+        ItemPropertyValue value = (current, change.Op, amount.Type) switch
+        {
+            (ItemPropertyValue.Number number, _, ExprType.Number) =>
+                new ItemPropertyValue.Number(Apply(state, number.Value, change.Op, amount.ExactNumber)),
+            (ItemPropertyValue.Boolean, AssignOp.Set, ExprType.Bool) =>
+                new ItemPropertyValue.Boolean(amount.Bool),
+            (ItemPropertyValue.Text, AssignOp.Set, ExprType.Text) =>
+                new ItemPropertyValue.Text(amount.Text
+                    ?? throw new InvalidOperationException("A text expression produced no text.")),
+            _ => throw new InvalidOperationException(
+                $"Cannot apply '{change.Op}' with a {amount.Type} expression to item property '{change.Property}'."),
+        };
+        return StateChanges.SetItemProperty(state, change.Character, change.Item, change.Property, value);
     }
 
     private static int Apply(int current, AssignOp op, int amount) => op switch

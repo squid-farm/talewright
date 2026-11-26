@@ -45,6 +45,21 @@ public sealed class CompilerDiagnosticCoverageTests
           player: {first-name: Ada}
         """;
 
+    private const string DivisibleItemsYaml = """
+        game:
+          id: coverage
+          title: Coverage
+          start: start
+          talemark: 2
+        characters:
+          player: {first-name: Ada}
+        items:
+          coin:
+            name: coin
+            divisible: true
+            weight: 1
+        """;
+
     // A C#-registered ruleset with a stat but no skill-check rule.
     private static readonly CompilerOptions NoChecksOptions = new()
     {
@@ -102,6 +117,8 @@ public sealed class CompilerDiagnosticCoverageTests
         Error("TW2005", Scene("{if @Lucky}x{/if}\n-> END")),
         Error("TW2006", Scene("{player:name#shout}\n-> END")),
         Error("TW2007", Scene("~ var:x = var:y\n~ var:y = var:x\n-> END")),
+        Error("TW2008", Scene("{player:inventory:coin:weight}\n-> END", DivisibleItemsYaml),
+            new(MainFile, 2, 24), Scene("-> END", DivisibleItemsYaml)),
         Error("TW2010", Scene("{image(\"../map.png\", \"Map\")}\n-> END")),
         Error("TW2011", Scene("{image(\"map.bmp\", \"Map\")}\n-> END", imagePaths: ["images/map.bmp"])),
         Error("TW2012", Scene("{image(\"missing.png\", \"Map\")}\n-> END")),
@@ -199,6 +216,7 @@ public sealed class CompilerDiagnosticCoverageTests
     [InlineData("TW1018")]
     [InlineData("TW2015")]
     [InlineData("TW2016")]
+    [InlineData("TW2008")]
     [InlineData("TW3001")]
     [InlineData("TW3014")]
     public void Previously_uncovered_codes_have_a_location_and_a_valid_counterpart(string code)

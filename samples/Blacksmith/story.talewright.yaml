@@ -1,0 +1,19 @@
+game:
+  id: a-sharp-edge
+  title: A Sharp Edge
+  start: blacksmith
+  talemark: 2
+  ruleset: none
+
+characters:
+  player:
+    first-name: Ada
+
+items:
+  sword:
+    name: old sword
+    sharpness: 5
+    durability: 100
+  coin:
+    name: silver coin
+    divisible: true

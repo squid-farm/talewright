@@ -83,7 +83,7 @@ internal static class ExpressionCompletion
                 if (kind == ExpressionContextKind.Substitution)
                 {
                     kinds = [AuthoringSymbolKind.Modifier];
-                    if (talemarkVersion == 2 && IsNumericExpressionBeforeModifier(tokens, start, symbols))
+                    if (talemarkVersion == 2 && IsNumericExpressionBeforeModifier(tokens, start, symbols, world))
                     {
                         keywords = NumericModifierKeywords;
                         details = NumericModifierDetails;
@@ -96,7 +96,7 @@ internal static class ExpressionCompletion
                 }
                 else if (kind is ExpressionContextKind.Condition or ExpressionContextKind.Number or ExpressionContextKind.Effects)
                 {
-                    if (talemarkVersion == 2 && IsNumericExpressionBeforeModifier(tokens, start, symbols))
+                    if (talemarkVersion == 2 && IsNumericExpressionBeforeModifier(tokens, start, symbols, world))
                     {
                         keywords = NumericModifierKeywords;
                         details = NumericModifierDetails;
@@ -121,9 +121,18 @@ internal static class ExpressionCompletion
                      HasSymbol(symbols, AuthoringSymbolKind.Character, inventoryCharacter) &&
                      HasSymbol(symbols, AuthoringSymbolKind.Item, item))
             {
+                var definition = world?.Items.GetValueOrDefault(new ItemId(item.Text.ToString()));
+                var availableProperties = talemarkVersion == 2 && definition is { Divisible: false }
+                    ? definition.CustomProperties
+                        .Where(property => property.Key != Count && property.Key != Name &&
+                                           (kind != ExpressionContextKind.Number || property.Value is ItemPropertyValue.Number))
+                        .ToArray()
+                    : [];
                 keywords = kind == ExpressionContextKind.Number
-                    ? NumericInventoryItemKeywords
-                    : InventoryItemKeywords;
+                    ? [.. NumericInventoryItemKeywords, .. availableProperties.Select(property => property.Key)]
+                    : [.. InventoryItemKeywords, .. availableProperties.Select(property => property.Key)];
+                details = availableProperties.ToDictionary(property => property.Key,
+                    property => HeldItemPropertyDetails(property.Value), StringComparer.Ordinal);
             }
             else if (tokenIndex >= 4 &&
                      tokens.Slice(tokenIndex - 4, 4) is [{ Kind: TokenKind.Identifier } inventoryOwner,
@@ -297,15 +306,24 @@ internal static class ExpressionCompletion
         _ => throw new InvalidOperationException("Unknown item property value type."),
     };
 
+    private static string HeldItemPropertyDetails(ItemPropertyValue value) => value switch
+    {
+        ItemPropertyValue.Number number => $"Held item property (number): {number.Value.ToDecimalString()}.",
+        ItemPropertyValue.Boolean boolean => $"Held item property (boolean): {boolean.Value.ToString().ToLowerInvariant()}.",
+        ItemPropertyValue.Text text => $"Held item property (text): {text.Value}.",
+        _ => throw new InvalidOperationException("Unknown item property value type."),
+    };
+
     private static bool HasSymbol(IReadOnlyList<AuthoringSymbol> symbols, AuthoringSymbolKind kind, Token token)
     {
+        if (kind == AuthoringSymbolKind.Character && token.Is(Player)) return true;
         for (var index = 0; index < symbols.Count; index++)
             if (symbols[index].Kind == kind && token.Is(symbols[index].Name)) return true;
         return false;
     }
 
     private static bool IsNumericExpressionBeforeModifier(TokenBuffer tokens, int position,
-        IReadOnlyList<AuthoringSymbol> symbols)
+        IReadOnlyList<AuthoringSymbol> symbols, WorldDefinition? world)
     {
         var hashIndex = -1;
         for (var index = 0; index < tokens.Count; index++)
@@ -320,7 +338,7 @@ internal static class ExpressionCompletion
         {
             var openIndex = FindMatchingOpenParen(tokens, hashIndex - 1);
             if (openIndex >= 0)
-                return IsNumericExpression(tokens, tokens[openIndex].Offset, hashOffset, symbols);
+                return IsNumericExpression(tokens, tokens[openIndex].Offset, hashOffset, symbols, world);
         }
 
         for (var index = hashIndex - 1; index >= 0; index--)
@@ -333,7 +351,7 @@ internal static class ExpressionCompletion
                 tokens[index - 1].Kind is TokenKind.Colon or TokenKind.Hash)
                 continue;
 
-            if (IsNumericExpression(tokens, token.Offset, hashOffset, symbols))
+            if (IsNumericExpression(tokens, token.Offset, hashOffset, symbols, world))
                 return true;
         }
 
@@ -341,13 +359,13 @@ internal static class ExpressionCompletion
     }
 
     private static bool IsNumericExpression(TokenBuffer tokens, int startOffset, int endOffset,
-        IReadOnlyList<AuthoringSymbol> symbols)
+        IReadOnlyList<AuthoringSymbol> symbols, WorldDefinition? world)
     {
         var source = tokens.Source[startOffset..endOffset];
         var operandTokens = Lexer.Tokenize(source, tokens.TalemarkVersion);
         var syntax = ExpressionSyntaxParser.ParseExpression(operandTokens, source.Length,
             offset => new SourceLocation("completion", 1, offset + 1), new DiagnosticBag());
-        return !syntax.HasErrors && InferNumeric(operandTokens, syntax.Root, symbols) == true;
+        return !syntax.HasErrors && InferNumeric(operandTokens, syntax.Root, symbols, world) == true;
     }
 
     private static int FindMatchingOpenParen(TokenBuffer tokens, int closingIndex)
@@ -370,7 +388,7 @@ internal static class ExpressionCompletion
     }
 
     private static bool? InferNumeric(TokenBuffer tokens, ExpressionNode node,
-        IReadOnlyList<AuthoringSymbol> symbols)
+        IReadOnlyList<AuthoringSymbol> symbols, WorldDefinition? world)
     {
         return node switch
         {
@@ -380,23 +398,23 @@ internal static class ExpressionCompletion
             NameExpressionNode => false,
             NamedPredicateExpressionNode => false,
             PlayerVisitedExpressionNode => false,
-            ParenthesizedExpressionNode parenthesized => InferNumeric(tokens, parenthesized.Inner, symbols),
-            InventoryCountExpressionNode => true,
+            ParenthesizedExpressionNode parenthesized => InferNumeric(tokens, parenthesized.Inner, symbols, world),
+            InventoryItemPropertyExpressionNode property => InferHeldItemPropertyNumeric(tokens, property, world),
             InventoryItemNameExpressionNode => false,
             SkillCheckExpressionNode => true,
             HasItemExpressionNode => false,
             UnaryExpressionNode unary => unary.Operator switch
             {
                 UnaryOp.Not => false,
-                UnaryOp.Negate => InferNumeric(tokens, unary.Operand, symbols),
+                UnaryOp.Negate => InferNumeric(tokens, unary.Operand, symbols, world),
                 UnaryOp.Round or UnaryOp.RoundUp or UnaryOp.RoundDown =>
-                    InferNumeric(tokens, unary.Operand, symbols),
+                    InferNumeric(tokens, unary.Operand, symbols, world),
                 _ => null,
             },
             BinaryExpressionNode binary => binary.Operator switch
             {
                 BinaryOp.Add or BinaryOp.Subtract or BinaryOp.Multiply or BinaryOp.Divide =>
-                    InferNumeric(tokens, binary.Left, symbols) & InferNumeric(tokens, binary.Right, symbols),
+                    InferNumeric(tokens, binary.Left, symbols, world) & InferNumeric(tokens, binary.Right, symbols, world),
                 BinaryOp.Equal or BinaryOp.NotEqual or BinaryOp.Less or BinaryOp.LessOrEqual or
                     BinaryOp.Greater or BinaryOp.GreaterOrEqual or BinaryOp.And or BinaryOp.Or => false,
                 _ => null,
@@ -404,6 +422,20 @@ internal static class ExpressionCompletion
             ReferenceExpressionNode reference => InferReferenceNumeric(tokens, reference, symbols),
             _ => null,
         };
+    }
+
+    private static bool? InferHeldItemPropertyNumeric(TokenBuffer tokens,
+        InventoryItemPropertyExpressionNode property, WorldDefinition? world)
+    {
+        var itemName = SpanText(tokens, property.Item);
+        var propertyName = SpanText(tokens, property.Property);
+        if (propertyName == Count)
+            return true;
+        if (world is null || !world.Items.TryGetValue(new ItemId(itemName), out var definition))
+            return null;
+        if (!definition.CustomProperties.TryGetValue(propertyName, out var declaredValue))
+            return null;
+        return declaredValue is ItemPropertyValue.Number;
     }
 
     private static bool? InferReferenceNumeric(TokenBuffer tokens, ReferenceExpressionNode reference,

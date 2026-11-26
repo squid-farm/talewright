@@ -24,6 +24,21 @@ public sealed class TalemarkClassifierTests
     }
 
     [Fact]
+    public void Held_item_property_names_use_the_existing_property_token_category()
+    {
+        const string tale = """
+            === start
+            {player:inventory:sword:sharpness}
+            ~ player:inventory:sword:sharpness -= 10
+            -> END
+            """;
+        var classifications = TalemarkClassifier.Classify("main.tale", tale);
+
+        Assert.Equal(2, classifications.Count(classification =>
+            classification.Kind == TalemarkClassificationKind.Property && TextOf(tale, classification) == "sharpness"));
+    }
+
+    [Fact]
     public void Classifies_documented_file_constructs_without_binding_story_symbols()
     {
         const string tale = """
