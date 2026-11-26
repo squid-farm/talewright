@@ -178,7 +178,7 @@ internal sealed class ExpressionSyntaxParser
         TokenAt(position + 3).Kind == TokenKind.Colon &&
         TokenAt(position + 4).Kind == TokenKind.Identifier;
 
-    private bool IsInventoryCountReference(int position) =>
+    private bool IsInventoryPropertyReference(int position) =>
         IsInventoryItemReference(position) &&
         TokenAt(position + 5).Kind == TokenKind.Colon &&
         TokenAt(position + 6).Kind == TokenKind.Identifier;
@@ -526,7 +526,7 @@ internal sealed class ExpressionSyntaxParser
                         return new InventoryItemNameExpressionNode(Span(token), Span(item), span);
                     }
 
-                    return new InventoryCountExpressionNode(Span(token), Span(item), Span(property), span);
+                    return new InventoryItemPropertyExpressionNode(Span(token), Span(item), Span(property), span);
                 }
 
                 return new InventoryItemNameExpressionNode(Span(token), Span(item),
@@ -824,8 +824,8 @@ internal sealed class ExpressionSyntaxParser
 
     private EffectSyntax ParseEffect()
     {
-        if (IsInventoryCountReference(_position))
-            return ParseInventoryCountAssignment();
+        if (IsInventoryPropertyReference(_position))
+            return ParseInventoryPropertyAssignment();
 
         var first = Expect(TokenKind.Identifier, "an effect");
         if (first.Is(ExpressionVocabulary.Set) || first.Is(ExpressionVocabulary.Clear))
@@ -886,7 +886,7 @@ internal sealed class ExpressionSyntaxParser
             member is null ? null : Span(member.Value), kind, amount, new(first.Offset, amount.Span.End - first.Offset));
     }
 
-    private EffectSyntax ParseInventoryCountAssignment()
+    private EffectSyntax ParseInventoryPropertyAssignment()
     {
         var character = Next();
         Expect(TokenKind.Colon, "':'");
@@ -910,7 +910,7 @@ internal sealed class ExpressionSyntaxParser
         }
 
         var amount = ParseSum();
-        return new InventoryCountAssignmentEffectSyntax(Span(character), Span(item), Span(property), kind, amount,
+        return new InventoryPropertyAssignmentEffectSyntax(Span(character), Span(item), Span(property), kind, amount,
             new(character.Offset, amount.Span.End - character.Offset));
     }
 }

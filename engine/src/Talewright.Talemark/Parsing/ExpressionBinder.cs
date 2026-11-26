@@ -193,7 +193,7 @@ internal sealed class ExpressionBinder
         PlayerVisitedExpressionNode visited => BindPlayerVisited(visited),
         ParenthesizedExpressionNode parenthesized => Bind(parenthesized.Inner),
         ReferenceExpressionNode reference => BindReference(reference),
-        InventoryCountExpressionNode count => BindInventoryCount(count),
+        InventoryItemPropertyExpressionNode property => BindInventoryItemProperty(property),
         InventoryItemNameExpressionNode itemName => BindInventoryItemName(itemName),
         SkillCheckExpressionNode skillCheck => BindSkillCheck(skillCheck),
         HasItemExpressionNode hasItem => new HasItem(Character(hasItem.Character), Item(hasItem.Item)),
@@ -424,20 +424,24 @@ internal sealed class ExpressionBinder
             : ResolveStat(character, reference.Name, reference.Namespace);
     }
 
-    private Expr BindInventoryCount(InventoryCountExpressionNode reference)
+    private Expr BindInventoryItemProperty(InventoryItemPropertyExpressionNode reference)
     {
         var character = InventoryCharacter(reference.Character);
         var item = InventoryItem(reference.Item);
         var property = Text(reference.Property);
-        if (property != ExpressionVocabulary.Count)
+        if (property == ExpressionVocabulary.Count)
+            return new InventoryCountRef(character, item);
+
+        var definition = _symbols.World.Items[item];
+        if (!definition.CustomProperties.TryGetValue(property, out var declaredValue))
         {
             Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
-                $"Unknown inventory property '{property}'. Use '{Text(reference.Character)}:" +
-                $"{ExpressionVocabulary.Inventory}:{Text(reference.Item)}:{ExpressionVocabulary.Count}'.",
+                $"Unknown inventory property '{property}' on '{Text(reference.Item)}'.",
                 reference.Property);
         }
 
-        return new InventoryCountRef(character, item);
+        RequireHeldItemProperty(definition, property, reference.Property);
+        return new InventoryItemPropertyRef(character, item, property, declaredValue);
     }
 
     private Expr BindInventoryItemName(InventoryItemNameExpressionNode reference)
@@ -632,7 +636,7 @@ internal sealed class ExpressionBinder
         ErrorEffectSyntax => Fail<Effect>(CompilerDiagnosticCodes.InvalidExpression, "Expression is incomplete.", effect.Span.Start),
         SetFlagEffectSyntax setFlag => new SetFlag(new FlagId(Text(setFlag.Flag)), setFlag.Set),
         GiveTakeEffectSyntax giveTake => BindGiveTake(giveTake),
-        InventoryCountAssignmentEffectSyntax assignment => BindInventoryCountAssignment(assignment),
+        InventoryPropertyAssignmentEffectSyntax assignment => BindInventoryPropertyAssignment(assignment),
         AssignmentEffectSyntax assignment => BindAssignment(assignment),
         _ => throw new InvalidOperationException($"Unknown effect syntax node '{effect.GetType().Name}'."),
     };
@@ -662,7 +666,7 @@ internal sealed class ExpressionBinder
             : new TakeItem(character, item, quantity);
     }
 
-    private Effect BindInventoryCountAssignment(InventoryCountAssignmentEffectSyntax effect)
+    private Effect BindInventoryPropertyAssignment(InventoryPropertyAssignmentEffectSyntax effect)
     {
         var character = InventoryCharacter(effect.Character);
         var item = InventoryItem(effect.Item);
@@ -674,19 +678,66 @@ internal sealed class ExpressionBinder
                 new ExpressionSpan(effect.Character.Start, effect.Property.End - effect.Character.Start));
         }
 
-        if (property != ExpressionVocabulary.Count)
+        if (property == ExpressionVocabulary.Count)
         {
             Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
-                $"Unknown inventory property '{Text(effect.Property)}'. Use '{Text(effect.Character)}:" +
-                $"{ExpressionVocabulary.Inventory}:{Text(effect.Item)}:{ExpressionVocabulary.Count}'.",
+                $"Inventory counts are read-only; use 'give {character} {item}' or 'take {character} {item}' to change inventory.",
+                new ExpressionSpan(effect.Character.Start, effect.Property.End - effect.Character.Start));
+        }
+
+        var definition = _symbols.World.Items[item];
+        if (!definition.CustomProperties.TryGetValue(property, out var declaredValue))
+        {
+            Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
+                $"Unknown inventory property '{property}' on '{Text(effect.Item)}'.",
                 effect.Property);
         }
 
-        Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
-            $"Inventory counts are read-only; use 'give {character} {item}' or 'take {character} {item}' to change inventory.",
-            new ExpressionSpan(effect.Character.Start, effect.Property.End - effect.Character.Start));
-        return default!;
+        RequireHeldItemProperty(definition, property, effect.Property);
+        var expectedType = ItemPropertyType(declaredValue);
+        if (effect.Operator != AssignOp.Set && expectedType != ExprType.Number)
+        {
+            Fail(CompilerDiagnosticCodes.TypeMismatch,
+                $"Only numeric held item properties support '{ExpressionVocabulary.Spelling(AssignOp.Add)}' or " +
+                $"'{ExpressionVocabulary.Spelling(AssignOp.Subtract)}'.",
+                effect.Property);
+        }
+
+        var amount = Bind(effect.Amount);
+        if (amount.Type != expectedType)
+        {
+            Fail(CompilerDiagnosticCodes.TypeMismatch,
+                $"Item property '{property}' needs a {Describe(expectedType)} expression, not {Describe(amount.Type)}.",
+                TypeMismatchSpan(effect.Amount));
+        }
+
+        return new ChangeItemProperty(character, item, property, effect.Operator, amount);
     }
+
+    private void RequireHeldItemProperty(ItemDefinition definition, string property, ExpressionSpan span)
+    {
+        if (_symbols.World.TalemarkVersion != 2)
+        {
+            Fail(CompilerDiagnosticCodes.UnsupportedHeldItemPropertyAccess,
+                "Per-copy item properties are available only in Talemark 2. Set 'game.talemark: 2' to use this feature.",
+                span);
+        }
+
+        if (definition.Divisible)
+        {
+            Fail(CompilerDiagnosticCodes.UnsupportedHeldItemPropertyAccess,
+                $"Divisible items have no individual copies, so property '{property}' cannot be read or changed per copy.",
+                span);
+        }
+    }
+
+    private static ExprType ItemPropertyType(ItemPropertyValue value) => value switch
+    {
+        ItemPropertyValue.Number => ExprType.Number,
+        ItemPropertyValue.Boolean => ExprType.Bool,
+        ItemPropertyValue.Text => ExprType.Text,
+        _ => throw new InvalidOperationException("Unknown item property value type."),
+    };
 
     private Effect BindAssignment(AssignmentEffectSyntax effect)
     {

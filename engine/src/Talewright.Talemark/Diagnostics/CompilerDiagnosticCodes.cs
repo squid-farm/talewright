@@ -29,6 +29,7 @@ public static class CompilerDiagnosticCodes
     public const string UnknownPredicate = "TW2005";
     public const string InvalidModifier = "TW2006";
     public const string UnresolvedVariableType = "TW2007";
+    public const string UnsupportedHeldItemPropertyAccess = "TW2008";
     public const string UnsafeImagePath = "TW2010";
     public const string UnsupportedImageFormat = "TW2011";
     public const string MissingImage = "TW2012";

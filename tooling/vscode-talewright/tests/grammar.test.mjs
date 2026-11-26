@@ -74,6 +74,14 @@ test('fallback highlights skill-check expressions and their modifier', () => {
   hasScope(line, 'hidden', 'keyword.control.skill-check.tale');
 });
 
+test('fallback highlights held item property references', () => {
+  const line = '~ player:inventory:sword:sharpness -= 10';
+  hasScope(line, 'player', 'variable.other.character.tale');
+  hasScope(line, 'inventory', 'keyword.control.inventory.tale');
+  hasScope(line, 'sword', 'entity.name.item.tale');
+  hasScope(line, 'sharpness', 'variable.other.property.tale');
+});
+
 test('fallback keeps common bold and italic forms', () => {
   hasScope('**bold** text', 'bold', 'markup.bold.markdown');
   hasScope('__strong__ text', 'strong', 'markup.bold.markdown');

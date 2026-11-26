@@ -72,6 +72,18 @@
         {"include": "#string"},
         {"include": "#template"},
         {
+          "match": "\\b([A-Za-z_][A-Za-z0-9_.-]*)(:)(inventory)(:)([A-Za-z_][A-Za-z0-9_.-]*)(:)([A-Za-z_][A-Za-z0-9_.-]*)\\b",
+          "captures": {
+            "1": {"name": "variable.other.character.tale"},
+            "2": {"name": "punctuation.separator.property.tale"},
+            "3": {"name": "keyword.control.inventory.tale"},
+            "4": {"name": "punctuation.separator.property.tale"},
+            "5": {"name": "entity.name.item.tale"},
+            "6": {"name": "punctuation.separator.property.tale"},
+            "7": {"name": "variable.other.property.tale"}
+          }
+        },
+        {
           "match": "\\b(skill-check|dc)\\b",
           "name": "keyword.control.skill-check.tale"
         },

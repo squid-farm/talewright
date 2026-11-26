@@ -33,7 +33,7 @@ internal sealed record ParenthesizedExpressionNode(ExpressionNode Inner, Express
 internal sealed record ReferenceExpressionNode(ReferenceNamespace Kind, ExpressionSpan Namespace, ExpressionSpan Name,
     ExpressionSpan? Member, ExpressionSpan? SubMember, ExpressionSpan Span) : ExpressionNode(Span);
 
-internal sealed record InventoryCountExpressionNode(ExpressionSpan Character, ExpressionSpan Item,
+internal sealed record InventoryItemPropertyExpressionNode(ExpressionSpan Character, ExpressionSpan Item,
     ExpressionSpan Property, ExpressionSpan Span) : ExpressionNode(Span);
 
 internal sealed record InventoryItemNameExpressionNode(ExpressionSpan Character, ExpressionSpan Item,
@@ -70,7 +70,7 @@ internal sealed record GiveTakeEffectSyntax(bool Give, ExpressionSpan Character,
 internal sealed record AssignmentEffectSyntax(ReferenceNamespace Kind, ExpressionSpan Namespace, ExpressionSpan Target,
     ExpressionSpan? Member, AssignOp Operator, ExpressionNode Amount, ExpressionSpan Span) : EffectSyntax(Span);
 
-internal sealed record InventoryCountAssignmentEffectSyntax(ExpressionSpan Character, ExpressionSpan Item,
+internal sealed record InventoryPropertyAssignmentEffectSyntax(ExpressionSpan Character, ExpressionSpan Item,
     ExpressionSpan Property, AssignOp Operator, ExpressionNode Amount, ExpressionSpan Span) : EffectSyntax(Span);
 
 internal sealed record EffectsSyntaxTree(TokenBuffer Tokens, ImmutableArray<EffectSyntax> Effects, bool HasErrors);

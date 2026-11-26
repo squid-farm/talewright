@@ -93,7 +93,8 @@ underscores, and single dots or hyphens between words; start with a letter or un
 "look inside" another value.
 Scene IDs cannot match character IDs, and `scene` is reserved for the current-scene visit-count
 reference. `inventory` is reserved as an item ID because it names the inventory in
-`player:inventory:rope` and `player:inventory:rope:count`.
+`player:inventory:rope`, `player:inventory:rope:count` and
+`player:inventory:rope:sharpness`.
 Lowercase hyphenated words (kebab-case) are a style recommendation, not a parser restriction.
 The naming lint rules TWL001/TWL002 check that style only if you enable them; they do not make an
 otherwise valid name illegal.
@@ -623,6 +624,7 @@ Text wraps to fit the player, with tabs at four-space stops.
 | `faction:<id>:name`, `item:<id>`, `item:<id>:name`                                         | Display names                             |
 | `item:<id>:<property>`                                                                      | A declared custom item property           |
 | `character:inventory:item`, `character:inventory:item:name`                               | The item's display name, even when not held |
+| `character:inventory:item:<property>`                                                     | A declared property on the front held copy |
 | `var:<id>`, `flag:<id>`                                                                     | Story variables / flags                   |
 
 Every property separator is `:`. For example, use `faction:explorers-guild:standing` and
@@ -845,6 +847,33 @@ error. Engine keys such as `name`, `name-agreement`, `uncountable`, `divisible`,
 retain their engine behavior and cannot be read as custom properties. `stowable` is reserved but not
 implemented.
 
+### Changing a held item property
+
+Talemark 2 can read or change a declared property on the front held copy:
+
+```tale
+=== blacksmith
+* [Pay to sharpen your sword] { take player gold 5; player:inventory:sword:sharpness += 2 } -> forge
+
+=== ambush
+~ player:inventory:sword:durability -= 10
+{if player:inventory:sword:durability < 20}
+Your blade is chipped.
+{/if}
+```
+
+Changing a number with `=`, `+=` or `-=` affects one copy from the front group. That copy's
+resulting group moves to the front, so the next change affects it again and the next `take` removes
+it. Boolean and text properties accept `=` only. Reading uses the front group's value; when the
+item is not held, it uses the declared value, and a change is a no-op. `item:<id>:<property>` stays
+read-only and always reads the declaration.
+
+This syntax is available only in Talemark 2 and only for non-divisible items: divisible items have
+no individual copies. The existing `:count` suffix still means inventory quantity, and `:name`
+still means the item's display name; neither can select a custom property. Other custom property
+keys must be declared on the item. Unknown keys report TW2001 and incompatible value types report
+TW2003.
+
 ### Images
 
 ```tale
@@ -947,6 +976,8 @@ or / and / not            boolean logic
 player has rope           inventory check (any character id)
 player:inventory:rope:count
                           quantity of rope held by a character; 0 if not held
+player:inventory:sword:sharpness
+                          front held copy's property, or the declared value if not held (Talemark 2)
 player visited temple.hall
                           whether the player has entered the scene
 temple.hall:player:visits  number of times the player has entered the scene

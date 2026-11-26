@@ -308,6 +308,14 @@ internal static class ChoiceReplayIdentity
                 writer.WriteStringValue(change.Flag.Value);
                 writer.WriteBooleanValue(change.Value);
                 break;
+            case ChangeItemProperty change:
+                writer.WriteStringValue("item-property");
+                writer.WriteStringValue(change.Character.Value);
+                writer.WriteStringValue(change.Item.Value);
+                writer.WriteStringValue(change.Property);
+                writer.WriteStringValue(Token(change.Op));
+                WriteExpr(writer, change.Amount);
+                break;
             case GiveItem change:
                 writer.WriteStringValue("give-item");
                 writer.WriteStringValue(change.Character.Value);
@@ -434,6 +442,13 @@ internal static class ChoiceReplayIdentity
                 writer.WriteStringValue("inventory-count-ref");
                 writer.WriteStringValue(value.Character.Value);
                 WriteItemOperand(writer, value.Item);
+                break;
+            case InventoryItemPropertyRef value:
+                writer.WriteStringValue("inventory-item-property-ref");
+                writer.WriteStringValue(value.Character.Value);
+                writer.WriteStringValue(value.Item.Value);
+                writer.WriteStringValue(value.Property);
+                WriteItemPropertyValue(writer, value.DeclaredValue);
                 break;
             case SkillCheckExpr value:
                 writer.WriteStringValue("skill-check-expr");

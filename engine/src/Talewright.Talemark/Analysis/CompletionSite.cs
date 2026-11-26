@@ -121,9 +121,18 @@ internal static class ExpressionCompletion
                      HasSymbol(symbols, AuthoringSymbolKind.Character, inventoryCharacter) &&
                      HasSymbol(symbols, AuthoringSymbolKind.Item, item))
             {
+                var definition = world?.Items.GetValueOrDefault(new ItemId(item.Text.ToString()));
+                var availableProperties = talemarkVersion == 2 && definition is { Divisible: false }
+                    ? definition.CustomProperties
+                        .Where(property => property.Key != Count && property.Key != Name &&
+                                           (kind != ExpressionContextKind.Number || property.Value is ItemPropertyValue.Number))
+                        .ToArray()
+                    : [];
                 keywords = kind == ExpressionContextKind.Number
-                    ? NumericInventoryItemKeywords
-                    : InventoryItemKeywords;
+                    ? [.. NumericInventoryItemKeywords, .. availableProperties.Select(property => property.Key)]
+                    : [.. InventoryItemKeywords, .. availableProperties.Select(property => property.Key)];
+                details = availableProperties.ToDictionary(property => property.Key,
+                    property => HeldItemPropertyDetails(property.Value), StringComparer.Ordinal);
             }
             else if (tokenIndex >= 4 &&
                      tokens.Slice(tokenIndex - 4, 4) is [{ Kind: TokenKind.Identifier } inventoryOwner,
@@ -297,8 +306,17 @@ internal static class ExpressionCompletion
         _ => throw new InvalidOperationException("Unknown item property value type."),
     };
 
+    private static string HeldItemPropertyDetails(ItemPropertyValue value) => value switch
+    {
+        ItemPropertyValue.Number number => $"Held item property (number): {number.Value.ToDecimalString()}.",
+        ItemPropertyValue.Boolean boolean => $"Held item property (boolean): {boolean.Value.ToString().ToLowerInvariant()}.",
+        ItemPropertyValue.Text text => $"Held item property (text): {text.Value}.",
+        _ => throw new InvalidOperationException("Unknown item property value type."),
+    };
+
     private static bool HasSymbol(IReadOnlyList<AuthoringSymbol> symbols, AuthoringSymbolKind kind, Token token)
     {
+        if (kind == AuthoringSymbolKind.Character && token.Is(Player)) return true;
         for (var index = 0; index < symbols.Count; index++)
             if (symbols[index].Kind == kind && token.Is(symbols[index].Name)) return true;
         return false;
@@ -381,7 +399,7 @@ internal static class ExpressionCompletion
             NamedPredicateExpressionNode => false,
             PlayerVisitedExpressionNode => false,
             ParenthesizedExpressionNode parenthesized => InferNumeric(tokens, parenthesized.Inner, symbols),
-            InventoryCountExpressionNode => true,
+            InventoryItemPropertyExpressionNode => true,
             InventoryItemNameExpressionNode => false,
             SkillCheckExpressionNode => true,
             HasItemExpressionNode => false,
