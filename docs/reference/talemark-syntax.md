@@ -861,7 +861,10 @@ An item variable can also hold a specific group of held copies (available throug
 the engine API; loop assignment is not implemented yet). `has`, `take`, counts
 and property reads then target only that group, even when it is no longer at
 the front. The reference follows its stored property values, not a copy ID:
-if no group with those values remains, it holds nothing.
+if no group with those values remains, it holds nothing. When a story update
+adds properties, a saved reference still matches its captured values; if more
+than one group matches, it targets the first. A reference captured before an
+item had any properties therefore targets its first held group.
 
 An unset variable, an item removed from the story, or a missing group holds
 nothing: its name is empty, `has` is false, its count is zero, and `give` or

@@ -124,6 +124,29 @@ public class GameStateTests
     }
 
     [Fact]
+    public void Group_reference_matches_captured_values_and_picks_the_first_matching_group()
+    {
+        static HeldItemGroup Group(params (string Key, ItemPropertyValue Value)[] properties) =>
+            new(ExactNumber.One, properties.ToDictionary(property => property.Key, property => property.Value));
+
+        var reference = ItemReference.ForGroup(EntityId.Player, new ItemId("sword"),
+            Group(("sharpness", new ItemPropertyValue.Number(5))));
+        HeldItemGroup[] groups =
+        [
+            Group(("material", new ItemPropertyValue.Text("iron"))),
+            Group(("sharpness", new ItemPropertyValue.Text("5"))),
+            Group(("sharpness", new ItemPropertyValue.Number(5)), ("material", new ItemPropertyValue.Text("iron"))),
+            Group(("sharpness", new ItemPropertyValue.Number(5)), ("material", new ItemPropertyValue.Text("steel"))),
+        ];
+
+        Assert.Equal(2, reference.FindGroup(groups));
+        Assert.Equal(-1, reference.FindGroup(groups[..2]));
+        var propertyFree = ItemReference.ForGroup(EntityId.Player, new ItemId("sword"), Group());
+        Assert.Equal(0, propertyFree.FindGroup(groups));
+        Assert.Equal(-1, propertyFree.FindGroup([]));
+    }
+
+    [Fact]
     public void Unheld_item_property_reads_the_definition_and_a_change_is_a_no_op()
     {
         var state = GameState.CreateInitial(CreateGroupedWorld(), 1);

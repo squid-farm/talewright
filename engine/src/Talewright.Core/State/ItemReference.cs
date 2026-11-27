@@ -142,7 +142,7 @@ public sealed record ItemReference
             : null;
     }
 
-    /// <summary>Finds the held group with this reference's values, or -1 when that group is gone.</summary>
+    /// <summary>Finds the first held group with all captured values, or -1 when no group matches.</summary>
     public int FindGroup(IReadOnlyList<HeldItemGroup> groups)
     {
         ArgumentNullException.ThrowIfNull(groups);
@@ -159,8 +159,6 @@ public sealed record ItemReference
 
     private bool Matches(HeldItemGroup group)
     {
-        if (group.Properties.Count != Properties.Count)
-            return false;
         foreach (var property in Properties)
         {
             if (!group.Properties.TryGetValue(property.Key, out var value)
