@@ -56,11 +56,32 @@
                         <tr class="state-subhead"><th scope="col" colspan="3">Inventory</th></tr>
                         @foreach (var item in items)
                         {
+                            var groups = ItemGroups(character, item).ToArray();
                             <tr class="@RowClass(item.Field.Enabled)">
                                 <th scope="row"><code>@item.Field.Id</code> @item.Name</th>
-                                <td>@NumberInput(item.Field, item.Field.Label)@Was(item.Field.Enabled, item.Field.Initial)</td>
+                                <td>
+                                    @if (groups.Length > 0)
+                                    {
+                                        @(item.Field.Value)
+                                    }
+                                    else
+                                    {
+                                        @NumberInput(item.Field, item.Field.Label)@Was(item.Field.Enabled, item.Field.Initial)
+                                    }
+                                </td>
                                 <td></td>
                             </tr>
+                            @foreach (var group in groups)
+                            {
+                                <tr class="@RowClass(group.Enabled)">
+                                    <th scope="row">
+                                        <span class="state-muted">Group @(group.Position + 1)@(group.Position == 0 ? " (front)" : ""):</span>
+                                        @GroupProperties(group.Snapshot)
+                                    </th>
+                                    <td>@GroupNumberInput(group)@Was(group.Enabled, group.Initial)</td>
+                                    <td></td>
+                                </tr>
+                            }
                         }
                         @if (UnheldItems(character).ToList() is { Count: > 0 } unheld && !Session.Current.IsEnded)
                         {
@@ -138,6 +159,9 @@
     private IEnumerable<ItemRow> Items(AuthorCharacterInspection character) => AllItems(character)
         .Where(item => item.Field.Initial != "0" || item.Field.Enabled || _revealed.Contains((character.Id.Value, item.Field.Id)));
 
+    private IEnumerable<SetupItemGroup> ItemGroups(AuthorCharacterInspection character, ItemRow item) =>
+        Model.EditItemGroups.Where(group => group.Character == character.Id.Value && group.Item == item.Field.Id);
+
     private IEnumerable<ItemRow> UnheldItems(AuthorCharacterInspection character) => AllItems(character)
         .Except(Items(character));
 
@@ -194,4 +218,14 @@
                   inputmode="@(field.Kind == SetupNumberKind.Variable && Model.Story?.TalemarkVersion == 2 ? "decimal" : "numeric")"
                   value="@field.Value"
                   disabled="@Session.Current.IsEnded" @oninput="args => field.Edit(args.Value?.ToString() ?? string.Empty)" />;
+
+    private RenderFragment GroupNumberInput(SetupItemGroup field) =>
+        @<input class="state-number" aria-label="@($"Edit {field.Label}")" inputmode="numeric"
+                value="@field.Value" disabled="@Session.Current.IsEnded"
+                @oninput="args => field.Edit(args.Value?.ToString() ?? string.Empty)" />;
+
+    private static string GroupProperties(Talewright.Core.State.ItemGroupSnapshot group) =>
+        string.Join(", ", group.Properties.Select(property =>
+            $"{property.Key} {(property.Kind == Talewright.Core.State.ItemPropertyValueKind.Text
+                ? System.Text.Json.JsonSerializer.Serialize(property.Value) : property.Value)}"));
 }

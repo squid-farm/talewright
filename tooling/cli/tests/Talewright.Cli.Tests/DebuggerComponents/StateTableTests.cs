@@ -38,6 +38,29 @@ public sealed class StateTableTests : BunitContext
     }
 
     [Fact]
+    public void Shows_held_item_groups_in_front_order_after_give_change_and_take()
+    {
+        using var model = ComponentStory.StartGroupedItems();
+
+        var afterGive = Show(model.Inspection!);
+        Assert.Equal(["2 sharpness 5, durability 100 (front)"],
+            afterGive.FindAll(".item-group-list > li").Select(group => group.TextContent));
+        Assert.Contains("coin Coin: 1", afterGive.FindAll("ul > li").Select(item => item.TextContent));
+
+        ComponentStory.Choose(model, "Change");
+        Assert.Equal("change", model.Inspection!.CurrentScene?.Value);
+        var afterChange = Show(model.Inspection!);
+        Assert.Equal(
+            ["1 sharpness 7, durability 100 (front)", "1 sharpness 5, durability 100"],
+            afterChange.FindAll(".item-group-list > li").Select(group => group.TextContent));
+
+        ComponentStory.Choose(model, "Take");
+        var afterTake = Show(model.Inspection!);
+        Assert.Equal(["1 sharpness 5, durability 100 (front)"],
+            afterTake.FindAll(".item-group-list > li").Select(group => group.TextContent));
+    }
+
+    [Fact]
     public void Text_variables_are_shown_as_quoted_literals()
     {
         using var model = ComponentStory.Load();

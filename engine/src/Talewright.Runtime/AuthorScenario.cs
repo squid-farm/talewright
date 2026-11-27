@@ -5,6 +5,7 @@ using System.Text.Json.Serialization;
 using Talewright.Core;
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
+using Talewright.Core.State;
 using Talewright.Narrative.Rendering;
 using Talewright.Talemark.Model;
 
@@ -347,6 +348,7 @@ internal sealed record ScenarioItem(string Character, string Item, [property: Js
 {
     public string? ExactQuantity { get; init; }
 }
+internal sealed record ScenarioItemGroups(string Character, string Item, ItemGroupSnapshot[] Groups);
 
 internal sealed class ScenarioValues
 {
@@ -357,6 +359,7 @@ internal sealed class ScenarioValues
     public required Dictionary<string, int> Standings { get; init; }
     public required ScenarioStat[] Stats { get; init; }
     public required ScenarioItem[] Inventory { get; init; }
+    public ScenarioItemGroups[]? ItemGroups { get; init; }
 
     public static ScenarioValues From(AuthorSetup setup) => new()
     {
@@ -375,6 +378,8 @@ internal sealed class ScenarioValues
         {
             ExactQuantity = value.ExactQuantity?.ToCanonicalString(),
         }).ToArray(),
+        ItemGroups = setup.ItemGroups.Count == 0 ? null : setup.ItemGroups.Select(value =>
+            new ScenarioItemGroups(value.Character.Value, value.Item.Value, value.Groups.ToArray())).ToArray(),
     };
 
     public void Validate()
@@ -426,6 +431,29 @@ internal sealed class ScenarioValues
             AuthorScenario.Identifier(item.Character);
             AuthorScenario.Identifier(item.Item);
         }
+        foreach (var item in ItemGroups ?? [])
+        {
+            if (item is null || item.Groups is null)
+            {
+                throw new InvalidDataException("Scenario item groups must not contain null entries or collections.");
+            }
+            AuthorScenario.Identifier(item.Character);
+            AuthorScenario.Identifier(item.Item);
+            foreach (var group in item.Groups)
+            {
+                if (group is null || group.Quantity is null || group.Properties is null)
+                {
+                    throw new InvalidDataException("Scenario item group quantities and properties must not be null.");
+                }
+                foreach (var property in group.Properties)
+                {
+                    if (property is null || string.IsNullOrEmpty(property.Key) || property.Value is null)
+                    {
+                        throw new InvalidDataException("Scenario item group properties must have a key and non-null value.");
+                    }
+                }
+            }
+        }
     }
 
     public AuthorSetup ToSetup() => new()
@@ -442,6 +470,8 @@ internal sealed class ScenarioValues
         Inventory = Inventory.Select(value => value.ExactQuantity is { } exact
             ? new AuthorItemValue(new(value.Character), new(value.Item), ExactNumber.Parse(exact))
             : new AuthorItemValue(new(value.Character), new(value.Item), value.Quantity)).ToArray(),
+        ItemGroups = ItemGroups?.Select(value =>
+            new AuthorItemGroupsValue(new(value.Character), new(value.Item), value.Groups)).ToArray() ?? [],
     };
 }
 

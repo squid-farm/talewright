@@ -22,6 +22,9 @@ public sealed record AuthorItemInspection(ItemId Id, string Name, int Quantity)
 {
     [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
     public string? ExactQuantity { get; init; }
+
+    [JsonIgnore(Condition = JsonIgnoreCondition.WhenWritingNull)]
+    public IReadOnlyList<ItemGroupSnapshot>? Groups { get; init; }
 }
 public sealed record AuthorCharacterInspection(EntityId Id, string FirstName, string LastName, Pronouns Pronouns,
     IReadOnlyList<AuthorStatInspection> Stats, IReadOnlyList<AuthorItemInspection> Inventory);
@@ -66,6 +69,11 @@ public sealed class AuthorInspection
                 story.World.Items[item.Key].Name, item.Value.ToInt32RoundedAwayFromZero())
             {
                 ExactQuantity = story.TalemarkVersion == 2 ? item.Value.ToCanonicalString() : null,
+                Groups = story.TalemarkVersion != 2 || story.World.Items[item.Key].Divisible ? null :
+                    Array.AsReadOnly(state.GetItemGroups(id, item.Key).Select(group => new ItemGroupSnapshot(
+                        group.Quantity.ToCanonicalString(),
+                        Array.AsReadOnly(group.Properties.Select(property =>
+                            ItemPropertySnapshot.From(property.Key, property.Value)).ToArray()))).ToArray()),
             }).ToArray();
             return new AuthorCharacterInspection(id, identity.FirstName, identity.LastName, identity.Pronouns,
                 Array.AsReadOnly(stats), Array.AsReadOnly(inventory));

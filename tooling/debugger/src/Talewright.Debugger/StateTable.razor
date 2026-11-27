@@ -12,7 +12,28 @@
                 <tr><th>@stat.Id @stat.Name</th><td>@(stat.ExactBaseValue ?? stat.BaseValue.ToString())</td><td>@(stat.ExactEffectiveValue ?? stat.EffectiveValue.ToString())</td></tr>
             }</tbody>
         </table>
-        <ul>@foreach (var item in character.Inventory) { <li>@item.Id @item.Name: @(item.ExactQuantity ?? item.Quantity.ToString())</li> }</ul>
+        <ul>
+            @foreach (var item in character.Inventory)
+            {
+                if (item.Groups is { } groups)
+                {
+                    <li>
+                        @item.Id @item.Name:
+                        <ol class="item-group-list">
+                            @for (var index = 0; index < groups.Count; index++)
+                            {
+                                var group = groups[index];
+                                <li>@group.Quantity @string.Join(", ", group.Properties.Select(PropertyText))@(index == 0 ? " (front)" : "")</li>
+                            }
+                        </ol>
+                    </li>
+                }
+                else
+                {
+                    <li>@item.Id @item.Name: @(item.ExactQuantity ?? item.Quantity.ToString())</li>
+                }
+            }
+        </ul>
     </details>
 }
 <details>
@@ -42,4 +63,7 @@
     private Task OnFilterInput(ChangeEventArgs args) =>
         FilterChanged.InvokeAsync(args.Value?.ToString() ?? "");
     private bool Match(string text) => text.Contains(Filter, StringComparison.OrdinalIgnoreCase);
+    private static string PropertyText(Talewright.Core.State.ItemPropertySnapshot property) =>
+        $"{property.Key} {(property.Kind == Talewright.Core.State.ItemPropertyValueKind.Text
+            ? System.Text.Json.JsonSerializer.Serialize(property.Value) : property.Value)}";
 }

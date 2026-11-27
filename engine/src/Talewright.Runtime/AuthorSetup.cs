@@ -1,6 +1,7 @@
 using System.Collections.ObjectModel;
 using System.Globalization;
 using Talewright.Core;
+using Talewright.Core.Events;
 using Talewright.Core.Identity;
 using Talewright.Core.State;
 using Talewright.Talemark.Model;
@@ -23,6 +24,8 @@ public sealed record AuthorItemValue(EntityId Character, ItemId Item, int Quanti
     public ExactNumber? ExactQuantity { get; init; }
     public ExactNumber Value => ExactQuantity ?? Quantity;
 }
+public sealed record AuthorItemGroupsValue(EntityId Character, ItemId Item,
+    IReadOnlyList<ItemGroupSnapshot> Groups);
 
 /// <summary>Fresh-world prerequisites, applied before trigger priming and target scene entry.</summary>
 public sealed record AuthorSetup
@@ -35,6 +38,8 @@ public sealed record AuthorSetup
     public IReadOnlyDictionary<FactionId, int> Standings { get; init; } = new Dictionary<FactionId, int>();
     public IReadOnlyList<AuthorStatValue> Stats { get; init; } = [];
     public IReadOnlyList<AuthorItemValue> Inventory { get; init; } = [];
+    /// <summary>Held groups to replace; their character/item pairs must not also occur in Inventory.</summary>
+    public IReadOnlyList<AuthorItemGroupsValue> ItemGroups { get; init; } = [];
 
     /// <summary>Revalidates against declared IDs and returns a copied setup without entering a scene.</summary>
     public AuthorSetup Validate(StoryDefinition story)
@@ -47,6 +52,7 @@ public sealed record AuthorSetup
         ArgumentNullException.ThrowIfNull(Standings);
         ArgumentNullException.ThrowIfNull(Stats);
         ArgumentNullException.ThrowIfNull(Inventory);
+        ArgumentNullException.ThrowIfNull(ItemGroups);
         var world = story.World;
         foreach (var id in Flags.Keys)
         {
@@ -122,6 +128,51 @@ public sealed record AuthorSetup
                 throw new ArgumentException($"Duplicate setup item '{value.Character}:{value.Item}'.");
             }
         }
+        var itemGroups = new HashSet<(EntityId, ItemId)>();
+        var validatedItemGroups = new List<AuthorItemGroupsValue>(ItemGroups.Count);
+        foreach (var value in ItemGroups)
+        {
+            if (value is null || story.TalemarkVersion != 2 || !world.Characters.ContainsKey(value.Character) ||
+                !world.Items.TryGetValue(value.Item, out var definition) || definition.Divisible ||
+                value.Groups is null)
+            {
+                throw new ArgumentException("Every setup item group must name a Talemark 2 character and grouped item.");
+            }
+            if (!itemGroups.Add((value.Character, value.Item)))
+            {
+                throw new ArgumentException($"Duplicate setup item groups '{value.Character}:{value.Item}'.");
+            }
+            if (items.Contains((value.Character, value.Item)))
+            {
+                throw new ArgumentException($"Setup item '{value.Character}:{value.Item}' cannot specify both inventory and item groups.");
+            }
+
+            var groups = new List<ItemGroupSnapshot>(value.Groups.Count);
+            foreach (var group in value.Groups)
+            {
+                if (group is null || group.Properties is null ||
+                    !ExactNumber.TryParse(group.Quantity, out var quantity) || quantity <= 0 ||
+                    !quantity.Denominator.IsOne || quantity.ToCanonicalString() != group.Quantity)
+                {
+                    throw new ArgumentException($"Setup item '{value.Item}' has an invalid group quantity.");
+                }
+
+                var properties = new HashSet<string>(StringComparer.Ordinal);
+                foreach (var property in group.Properties)
+                {
+                    if (property is null || string.IsNullOrEmpty(property.Key) ||
+                        !properties.Add(property.Key) ||
+                        !definition.CustomProperties.TryGetValue(property.Key, out var declared) ||
+                        ItemPropertySnapshot.KindOf(declared) != property.Kind)
+                    {
+                        throw new ArgumentException($"Setup item '{value.Item}' has invalid group properties.");
+                    }
+                    _ = property.ToValue();
+                }
+                groups.Add(group with { Properties = Array.AsReadOnly(group.Properties.ToArray()) });
+            }
+            validatedItemGroups.Add(value with { Groups = Array.AsReadOnly(groups.ToArray()) });
+        }
         return this with
         {
             Flags = new ReadOnlyDictionary<FlagId, bool>(Flags.ToDictionary()),
@@ -133,6 +184,7 @@ public sealed record AuthorSetup
                 .ThenBy(v => v.Stat.Value, StringComparer.Ordinal).ToArray()),
             Inventory = Array.AsReadOnly(Inventory.OrderBy(v => v.Character.Value, StringComparer.Ordinal)
                 .ThenBy(v => v.Item.Value, StringComparer.Ordinal).ToArray()),
+            ItemGroups = Array.AsReadOnly(validatedItemGroups.ToArray()),
         };
     }
 
@@ -148,6 +200,10 @@ public sealed record AuthorSetup
             log.AppendRange(value.Value >= current
                 ? StateChanges.GiveItem(log.State, value.Character, value.Item, value.Value - current)
                 : StateChanges.TakeItem(log.State, value.Character, value.Item, current - value.Value));
+        }
+        foreach (var value in ItemGroups)
+        {
+            log.AppendRange([new ItemGroupsRestored(value.Character, value.Item, value.Groups)]);
         }
         foreach (var (id, value) in Standings.OrderBy(v => v.Key.Value, StringComparer.Ordinal))
         {
@@ -200,6 +256,15 @@ public sealed record AuthorSetup
         foreach (var value in Inventory)
         {
             yield return new($"inventory:{value.Character}:{value.Item}", state.GetExactItemCount(value.Character, value.Item).ToCanonicalString());
+        }
+        foreach (var value in ItemGroups)
+        {
+            var groups = state.GetItemGroups(value.Character, value.Item).Select(group => new ItemGroupSnapshot(
+                group.Quantity.ToCanonicalString(),
+                Array.AsReadOnly(group.Properties.Select(property =>
+                    ItemPropertySnapshot.From(property.Key, property.Value)).ToArray()))).ToArray();
+            yield return new($"inventory-groups:{value.Character}:{value.Item}",
+                System.Text.Json.JsonSerializer.Serialize(groups));
         }
     }
 }

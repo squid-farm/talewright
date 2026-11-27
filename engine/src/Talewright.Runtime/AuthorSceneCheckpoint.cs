@@ -80,6 +80,12 @@ public sealed class AuthorSceneCheckpoint
             Stats = _setup.Stats.Where(value => world.Characters.ContainsKey(value.Character)
                 && world.Ruleset.StatsById.ContainsKey(value.Stat)).ToArray(),
             Inventory = _setup.Inventory.Where(value => world.Items.ContainsKey(value.Item)).ToArray(),
+            ItemGroups = _setup.ItemGroups.Where(value => world.TalemarkVersion == 2
+                && world.Characters.ContainsKey(value.Character)
+                && world.Items.TryGetValue(value.Item, out var item) && !item.Divisible
+                && value.Groups.All(group => group.Properties.All(property =>
+                    item.CustomProperties.TryGetValue(property.Key, out var declared)
+                    && ItemPropertySnapshot.KindOf(declared) == property.Kind))).ToArray(),
         };
         var events = Events.Where(gameEvent => gameEvent switch
         {
@@ -211,6 +217,10 @@ internal sealed class AuthorStateView(GameState state) : IGameStateView
     public ExactNumber GetExactItemCount(EntityId character, ItemId item) => state.GetExactItemCount(character, item);
     public IEnumerable<KeyValuePair<ItemId, int>> GetInventory(EntityId character) => state.GetInventory(character);
     public IEnumerable<KeyValuePair<ItemId, ExactNumber>> GetExactInventory(EntityId character) => state.GetExactInventory(character);
+    public IReadOnlyList<HeldItemGroup> GetItemGroups(EntityId character, ItemId item) =>
+        state.GetItemGroups(character, item);
+    public ItemPropertyValue GetItemProperty(EntityId character, ItemId item, string property) =>
+        state.GetItemProperty(character, item, property);
     public int GetStanding(FactionId faction) => state.GetStanding(faction);
     public bool GetFlag(FlagId flag) => state.GetFlag(flag);
     public int GetVariable(VarId variable) => state.GetVariable(variable);

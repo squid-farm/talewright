@@ -280,6 +280,75 @@ public sealed class AuthorSessionTests
         Assert.Same(checkpoint, session.Checkpoint);
     }
 
+    [Theory]
+    [InlineData(0, null)]
+    [InlineData(1, "1")]
+    [InlineData(3, "2")]
+    public void Overlapping_inventory_and_group_setup_is_rejected_without_changing_the_session(
+        int quantity, string? groupQuantity)
+    {
+        var story = Compile("""
+            === start
+            * [Wait] -> start
+            """, """
+            game: {id: groups, title: Groups, start: start, talemark: 2}
+            characters:
+              player: {first-name: Ada}
+            items:
+              sword: {name: Sword}
+            """);
+        var sword = new ItemId("sword");
+        var groups = groupQuantity is null ? Array.Empty<ItemGroupSnapshot>() : [new(groupQuantity, [])];
+        var setup = new AuthorSetup
+        {
+            Inventory = [new(EntityId.Player, sword, quantity)],
+            ItemGroups = [new(EntityId.Player, sword, groups)],
+        };
+        var session = Start(story);
+        var frame = session.Current;
+        var events = session.Events;
+        var checkpoint = session.Checkpoint;
+
+        var error = Assert.Throws<ArgumentException>(() => setup.Validate(story));
+        Assert.Contains("player:sword", error.Message);
+        Assert.Throws<ArgumentException>(() => session.Edit(setup));
+        Assert.Throws<ArgumentException>(() => session.JumpFresh(new SceneId("start"), setup));
+        Assert.Same(frame, session.Current);
+        Assert.Same(events, session.Events);
+        Assert.Same(checkpoint, session.Checkpoint);
+    }
+
+    [Fact]
+    public void Inventory_and_group_setup_for_distinct_character_item_pairs_are_applied()
+    {
+        var story = Compile("""
+            === start
+            * [Wait] -> start
+            """, """
+            game: {id: groups, title: Groups, start: start, talemark: 2}
+            characters:
+              player: {first-name: Ada}
+              guide: {first-name: Guide}
+            items:
+              sword: {name: Sword}
+              shield: {name: Shield}
+            """);
+        var sword = new ItemId("sword");
+        var shield = new ItemId("shield");
+        var setup = new AuthorSetup
+        {
+            Inventory = [new(Guide, sword, 3), new(EntityId.Player, shield, 4)],
+            ItemGroups = [new(EntityId.Player, sword, [new("2", [])])],
+        };
+
+        var session = Start(story, setup);
+
+        Assert.Equal(3, session.State.GetItemCount(Guide, sword));
+        Assert.Equal(4, session.State.GetItemCount(EntityId.Player, shield));
+        Assert.Equal(2, session.State.GetItemCount(EntityId.Player, sword));
+        Assert.Single(session.State.GetItemGroups(EntityId.Player, sword));
+    }
+
     [Fact]
     public void Failed_target_choice_or_runtime_entry_preserves_the_active_run()
     {
