@@ -336,6 +336,9 @@ public static class StoryAnalyzer
             }, DiscoverEffects, cancellationToken);
             collector.SkillCheckOutcomeSites(file, syntax);
 
+            var variableDeclarations = (context?.VariableDeclarations ?? [])
+                .Where(declaration => declaration.Location.File != file)
+                .Concat(declarations).ToArray();
             var previousFileSymbols = previousSymbols
                 .Where(symbol => symbol.Declaration?.Start.File == file).ToArray();
             var unchangedDeclarations = context is not null &&
@@ -385,9 +388,7 @@ public static class StoryAnalyzer
                         }
                     mutableUnresolved.Clear();
                     mutableItemVariables.Clear();
-                    resolveDeclarations = context.VariableDeclarations
-                        .Where(declaration => declaration.Location.File != file)
-                        .Concat(declarations)
+                    resolveDeclarations = variableDeclarations
                         .OrderBy(declaration => StorySource.IsConfigurationFile(declaration.Location.File) ? 1 : 0)
                         .ThenBy(declaration => StorySource.IsConfigurationFile(declaration.Location.File)
                             ? "" : declaration.Location.File, StringComparer.Ordinal);
@@ -426,6 +427,7 @@ public static class StoryAnalyzer
                 Variables = variables,
                 UnresolvedVariables = unresolved,
                 ItemVariables = itemVariables,
+                VariableDeclarations = variableDeclarations,
                 VariableTypeOrigins = unchangedDeclarations ? context!.VariableTypeOrigins : new Dictionary<VarId, SourceLocation?>(),
                 Scenes = scenes,
                 Predicates = context?.Predicates ?? options.Predicates,
