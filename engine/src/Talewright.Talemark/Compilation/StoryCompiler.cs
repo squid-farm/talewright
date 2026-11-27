@@ -122,7 +122,7 @@ public static class StoryCompiler
             }
         }
 
-        var itemVariables = new HashSet<VarId>();
+        var itemVariables = manifest.InitialItemVariables.Keys.ToHashSet();
         var unresolved = VariableDiscovery.Resolve(manifest.World, flags, scenes.Keys.ToHashSet(),
             declarations, variables, textVariables, options, diagnostics, itemVariables);
         var variableTypeOrigins = manifest.World.ExactVariables.Keys.Concat(manifest.World.TextVariables.Keys)
@@ -140,6 +140,7 @@ public static class StoryCompiler
             Variables = world.Variables.Keys.Concat(world.TextVariables.Keys).Concat(unresolved).ToHashSet(),
             UnresolvedVariables = unresolved,
             ItemVariables = itemVariables,
+            InitialItemVariables = manifest.InitialItemVariables,
             VariableTypeOrigins = variableTypeOrigins,
             VariableDeclarations = analysis is null ? [] : declarations.ToArray(),
             Scenes = scenes.Keys.ToHashSet(),

@@ -161,7 +161,7 @@ public sealed class StoryAnalysis
             : Array.Empty<string>().ToFrozenSet(StringComparer.Ordinal);
         StaticallyKnownItemVariables = SymbolContext is { } itemContext
             ? VariableDiscovery.StaticallyKnownItemVariables(itemContext.VariableDeclarations,
-                    itemContext.ItemVariables, TalemarkVersion)
+                    itemContext.ItemVariables, TalemarkVersion, itemContext.InitialItemVariables)
                 .ToFrozenDictionary(pair => pair.Key.Value, pair => pair.Value.Value, StringComparer.Ordinal)
             : new Dictionary<string, string>(StringComparer.Ordinal).ToFrozenDictionary(StringComparer.Ordinal);
         _statDiagnosticGuidance = collector.SymbolContext?.StatGuidance;
@@ -387,7 +387,8 @@ public static class StoryAnalyzer
                             textVariables.Remove(id);
                         }
                     mutableUnresolved.Clear();
-                    mutableItemVariables.Clear();
+                    mutableItemVariables = context.InitialItemVariables.Keys
+                        .Where(textVariables.ContainsKey).ToHashSet();
                     resolveDeclarations = variableDeclarations
                         .OrderBy(declaration => StorySource.IsConfigurationFile(declaration.Location.File) ? 1 : 0)
                         .ThenBy(declaration => StorySource.IsConfigurationFile(declaration.Location.File)
@@ -427,6 +428,7 @@ public static class StoryAnalyzer
                 Variables = variables,
                 UnresolvedVariables = unresolved,
                 ItemVariables = itemVariables,
+                InitialItemVariables = context?.InitialItemVariables ?? new Dictionary<VarId, ItemId>(),
                 VariableDeclarations = variableDeclarations,
                 VariableTypeOrigins = unchangedDeclarations ? context!.VariableTypeOrigins : new Dictionary<VarId, SourceLocation?>(),
                 Scenes = scenes,

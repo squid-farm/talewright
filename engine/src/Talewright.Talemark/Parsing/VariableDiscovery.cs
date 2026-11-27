@@ -68,13 +68,14 @@ internal static class VariableDiscovery
     }
 
     internal static IReadOnlyDictionary<VarId, ItemId> StaticallyKnownItemVariables(
-        IReadOnlyList<VariableDeclaration> declarations, IReadOnlySet<VarId> itemVariables, int talemarkVersion)
+        IReadOnlyList<VariableDeclaration> declarations, IReadOnlySet<VarId> itemVariables, int talemarkVersion,
+        IReadOnlyDictionary<VarId, ItemId> initialItems)
     {
-        var knownItems = new Dictionary<VarId, ItemId>();
+        var knownItems = initialItems.Where(pair => itemVariables.Contains(pair.Key)).ToDictionary();
         foreach (var group in declarations.Where(declaration => itemVariables.Contains(declaration.Id))
                      .GroupBy(declaration => declaration.Id))
         {
-            ItemId? item = null;
+            ItemId? item = knownItems.TryGetValue(group.Key, out var initial) ? initial : null;
             var isKnown = true;
             foreach (var declaration in group)
             {
@@ -107,7 +108,9 @@ internal static class VariableDiscovery
             }
 
             if (isKnown && item is { } known)
-                knownItems.Add(group.Key, known);
+                knownItems[group.Key] = known;
+            else
+                knownItems.Remove(group.Key);
         }
 
         return knownItems;
