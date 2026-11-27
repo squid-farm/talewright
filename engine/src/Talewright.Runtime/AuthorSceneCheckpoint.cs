@@ -80,6 +80,12 @@ public sealed class AuthorSceneCheckpoint
             Stats = _setup.Stats.Where(value => world.Characters.ContainsKey(value.Character)
                 && world.Ruleset.StatsById.ContainsKey(value.Stat)).ToArray(),
             Inventory = _setup.Inventory.Where(value => world.Items.ContainsKey(value.Item)).ToArray(),
+            ItemGroups = _setup.ItemGroups.Where(value => world.TalemarkVersion == 2
+                && world.Characters.ContainsKey(value.Character)
+                && world.Items.TryGetValue(value.Item, out var item) && !item.Divisible
+                && value.Groups.All(group => group.Properties.All(property =>
+                    item.CustomProperties.TryGetValue(property.Key, out var declared)
+                    && ItemPropertySnapshot.KindOf(declared) == property.Kind))).ToArray(),
         };
         var events = Events.Where(gameEvent => gameEvent switch
         {

@@ -1,5 +1,7 @@
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
+using Talewright.Core.State;
+using Talewright.Core.World;
 using Talewright.Narrative.Rendering;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Diagnostics;
@@ -596,6 +598,102 @@ public sealed class AuthorReloadTests
             Assert.Empty(candidate.Setup.TextVariables);
             Assert.Contains(new VarId("count"), candidate.Story.World.TextVariables.Keys);
         }
+    }
+
+    [Fact]
+    public void Removed_grouped_item_setup_is_pruned_on_in_place_reload()
+    {
+        const string tale = """
+            === start
+            * [Go] -> current
+            === current
+            Current passage.
+            * [Finish] -> END
+            """;
+        const string originalManifest = """
+            game: {id: reload, title: Reload, start: start, talemark: 2}
+            characters: {player: {first-name: Tester}}
+            items: {sword: {sharpness: 5}, shield: {durability: 10}}
+            """;
+        const string candidateManifest = """
+            game: {id: reload, title: Reload, start: start, talemark: 2}
+            characters: {player: {first-name: Tester}}
+            items: {shield: {durability: 10}}
+            """;
+        var original = AuthorSession.Create(Compile(tale, originalManifest), new("start"), seed: 42, setup: new()
+        {
+            ItemGroups =
+            [
+                new(EntityId.Player, new("sword"), [new("2", [new("sharpness", ItemPropertyValueKind.Number, "7")])]),
+                new(EntityId.Player, new("shield"), [new("3", [new("durability", ItemPropertyValueKind.Number, "8")])]),
+            ],
+        });
+        original.Choose("c0");
+
+        var candidate = original.Reload(Compile(tale, candidateManifest), out var historyChanged);
+
+        Assert.True(historyChanged);
+        Assert.Equal(new SceneId("current"), candidate.Current.Scene);
+        Assert.False(candidate.CanBack);
+        Assert.Equal(new ItemId("shield"), Assert.Single(candidate.Setup.ItemGroups).Item);
+        Assert.DoesNotContain(candidate.Events, e => e is ItemGroupsRestored restored && restored.Item == new ItemId("sword"));
+        Assert.Equal(3, candidate.State.GetItemCount(EntityId.Player, new("shield")));
+        Assert.Equal(new ItemPropertyValue.Number(8),
+            Assert.Single(candidate.State.GetItemGroups(EntityId.Player, new("shield"))).Properties["durability"]);
+        Assert.Equal(candidate.Events, candidate.Checkpoint!.Reenter().Events);
+        Assert.Equal(2, original.State.GetItemCount(EntityId.Player, new("sword")));
+    }
+
+    [Theory]
+    [InlineData("removed-character")]
+    [InlineData("removed-item")]
+    [InlineData("divisible")]
+    [InlineData("version-1")]
+    [InlineData("removed-property")]
+    [InlineData("retyped-property")]
+    [InlineData("unchanged")]
+    public void Continuation_filters_group_setup_against_candidate_compatibility(string change)
+    {
+        const string tale = "=== start\n* [Wait] -> start";
+        const string originalManifest = """
+            game: {id: reload, title: Reload, start: start, talemark: 2}
+            characters: {player: {first-name: Tester}, guide: {first-name: Guide}}
+            items: {sword: {sharpness: 5}, shield: {durability: 10}}
+            """;
+        var version = change == "version-1" ? 1 : 2;
+        var guide = change == "removed-character" ? "" : "guide: {first-name: Guide}";
+        var sword = change switch
+        {
+            "removed-item" => "",
+            "divisible" => "sword: {divisible: true}",
+            "removed-property" => "sword: {}",
+            "retyped-property" => "sword: {sharpness: keen}",
+            _ => "sword: {sharpness: 5}",
+        };
+        var candidateManifest = $$"""
+            game: {id: reload, title: Reload, start: start, talemark: {{version}}}
+            characters:
+              player: {first-name: Tester}
+              {{guide}}
+            items:
+              {{sword}}
+              shield: {durability: 10}
+            """;
+        var original = AuthorSession.Create(Compile(tale, originalManifest), new("start"), seed: 42, setup: new()
+        {
+            ItemGroups =
+            [
+                new(new("guide"), new("sword"), [new("2", [new("sharpness", ItemPropertyValueKind.Number, "7")])]),
+                new(EntityId.Player, new("shield"), []),
+            ],
+        });
+
+        var candidate = Compile(tale, candidateManifest);
+        var setup = original.Checkpoint!.ContinueInPlace(candidate).Setup;
+
+        setup.Validate(candidate);
+        Assert.Equal(change == "unchanged", setup.ItemGroups.Any(value => value.Item == new ItemId("sword")));
+        Assert.Equal(version == 2, setup.ItemGroups.Any(value => value.Item == new ItemId("shield")));
     }
 
     [Fact]
