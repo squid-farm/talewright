@@ -154,7 +154,10 @@ internal sealed class ExpressionBinder
                     && symbols.World.Items[fixedItem.Item].NameAgreement == GrammaticalNumber.Plural,
                 _ => false,
             };
-            var substitution = new SubstitutionTemplate(value, modifiers, isPlural);
+            var substitution = new SubstitutionTemplate(value, modifiers, isPlural)
+            {
+                UseItemGrammar = value is not ItemNameRef { Item: ResolvedItemOperand },
+            };
             return style == TextStyle.None ? substitution : new StyledTemplate(style, [substitution]);
         }
         catch (BindingException)

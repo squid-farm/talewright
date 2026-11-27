@@ -146,7 +146,7 @@ public sealed class TemplateRenderer(IGrammar grammar, NamedPredicateRegistry pr
         if (substitution.Modifiers.Count == 0)
             return text;
 
-        var item = substitution.Value is ItemNameRef { Item: FixedItemOperand } itemName
+        var item = substitution.UseItemGrammar && substitution.Value is ItemNameRef itemName
             && itemName.Item.Resolve(context) is { } itemId
             && context.State.World.Items.TryGetValue(itemId, out var resolvedItem)
                 ? resolvedItem

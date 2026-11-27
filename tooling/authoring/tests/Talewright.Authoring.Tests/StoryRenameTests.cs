@@ -169,8 +169,11 @@ public sealed class StoryRenameTests
         Assert.Empty(renamed.Names.Occurrences(target.Kind, target.Name));
     }
 
-    [Fact]
-    public void Renaming_an_item_updates_item_variable_comparisons()
+    [Theory]
+    [InlineData("var:chosen", "==")]
+    [InlineData("var:chosen:name", "==")]
+    [InlineData("(var:chosen:name)", "!=")]
+    public void Renaming_an_item_updates_item_variable_comparisons(string left, string op)
     {
         var story = new StorySource(new Dictionary<string, string>(StringComparer.Ordinal)
         {
@@ -185,10 +188,10 @@ public sealed class StoryRenameTests
                 items:
                   sword: Sword
                 """,
-            ["main.tale"] = """
+            ["main.tale"] = $$"""
                 === start
                 ~ var:chosen = item:sword
-                {if var:chosen == sword}A blade.{/if}
+                {if {{left}} {{op}} sword}A blade.{/if}
                 -> END
                 """,
         });
@@ -202,7 +205,7 @@ public sealed class StoryRenameTests
         var renamed = new StorySource(Apply(story, result.Edits));
         Assert.Contains("blade: Sword", renamed.Files[StorySource.ManifestFileName]);
         Assert.Contains("item:blade", renamed.Files["main.tale"]);
-        Assert.Contains("var:chosen == blade", renamed.Files["main.tale"]);
+        Assert.Contains($"{left} {op} blade", renamed.Files["main.tale"]);
         Assert.DoesNotContain(StoryAnalyzer.Analyze(renamed).Diagnostics,
             diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
     }

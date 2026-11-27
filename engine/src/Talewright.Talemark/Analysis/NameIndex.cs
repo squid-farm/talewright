@@ -131,7 +131,8 @@ public sealed class NameIndex
             return node switch
             {
                 ReferenceExpressionNode { Kind: ReferenceNamespace.Item, Member: null } => true,
-                ReferenceExpressionNode { Kind: ReferenceNamespace.Variable, Member: null } variable =>
+                ReferenceExpressionNode { Kind: ReferenceNamespace.Variable } variable =>
+                    (variable.Member is null || Text(variable.Member.Value) == ExpressionVocabulary.Name) &&
                     itemVariables?.Contains(Text(variable.Name)) == true,
                 InventoryItemNameExpressionNode => true,
                 _ => false,

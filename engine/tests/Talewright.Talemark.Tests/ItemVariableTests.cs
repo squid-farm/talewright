@@ -118,6 +118,22 @@ public sealed class ItemVariableTests
     }
 
     [Fact]
+    public void Explicit_item_variable_name_keeps_text_modifier_behavior()
+    {
+        var story = Compile("""
+            === start
+            ~ var:word = item:pants
+            {var:word:name#that}. {player:inventory:var:word:name#that}.
+            -> END
+            """);
+        var log = new EventLog(story.World, 1);
+        EffectExecutor.Execute(story.Scenes[0].Steps.OfType<EffectStep>().Single().Effects.Single(),
+            log, story.Predicates);
+        Assert.Equal("that pants. that pants.", new TemplateRenderer()
+            .Render(CompilerTests.Templates(story.Scenes[0]), log.State).ToPlainText());
+    }
+
+    [Fact]
     public void Group_reference_follows_values_not_front_position_and_take_only_spends_that_group()
     {
         var story = Compile("""
