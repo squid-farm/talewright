@@ -85,6 +85,83 @@ public sealed partial class ServerTests
     }
 
     [Fact]
+    public async Task Held_item_property_hover_reports_its_default_and_front_group_scope()
+    {
+        await using var client = new Client();
+        File.WriteAllText(client.PathOf(StorySource.ManifestFileName), """
+            game: { id: held-item-hover, title: Held item hover, start: start, talemark: 2 }
+            characters:
+              player: { first-name: Ada }
+            items:
+              sword: { name: Sword, sharpness: 5, cursed: false, material: iron }
+            """);
+        await client.Initialize();
+        const string source = """
+            === start
+            {player:inventory:sword:sharpness}
+            {player:inventory:sword:cursed}
+            {player:inventory:sword:material}
+            -> END
+            """;
+        await client.Open("start.tale", source, 1);
+
+        var number = Text(await Hover(client, "start.tale",
+            source.Replace("sharpness}", "sharp|ness}", StringComparison.Ordinal)));
+        var boolean = Text(await Hover(client, "start.tale",
+            source.Replace("cursed}", "cur|sed}", StringComparison.Ordinal)));
+        var text = Text(await Hover(client, "start.tale",
+            source.Replace("material}", "mate|rial}", StringComparison.Ordinal)));
+
+        Assert.Contains("Held item property (number), default: 5", number);
+        Assert.Contains("Held item property (boolean), default: false", boolean);
+        Assert.Contains("Held item property (text), default: iron", text);
+        foreach (var hover in new[] { number, boolean, text })
+        {
+            Assert.Contains("per held copy", hover, StringComparison.OrdinalIgnoreCase);
+            Assert.Contains("front group", hover, StringComparison.OrdinalIgnoreCase);
+        }
+    }
+
+    [Fact]
+    public async Task Item_variable_hover_reports_item_and_known_item_instead_of_text()
+    {
+        await using var client = new Client();
+        File.WriteAllText(client.PathOf(StorySource.ManifestFileName), """
+            game: { id: item-variable-hover, title: Item variable hover, start: start, talemark: 2 }
+            characters:
+              player: { first-name: Ada }
+            items:
+              sword: { name: Sword }
+              shield: { name: Shield }
+            """);
+        await client.Initialize();
+        const string source = """
+            === start
+            ~ var:chosen = item:sword
+            ~ var:choice = item:sword
+            ~ var:choice = item:shield
+            {var:chosen}
+            {var:choice}
+            -> END
+            """;
+        await client.Open("start.tale", source, 1);
+
+        var known = Text(await Hover(client, "start.tale",
+            source.Replace("{var:chosen}", "{var:cho|sen}", StringComparison.Ordinal)));
+        var changing = Text(await Hover(client, "start.tale",
+            source.Replace("{var:choice}", "{var:cho|ice}", StringComparison.Ordinal)));
+
+        Assert.Contains("Item variable (item)", known);
+        Assert.Contains("sword", known);
+        Assert.Contains("Sword", known);
+        Assert.DoesNotContain("(text)", known);
+        Assert.Contains("Item variable (item)", changing);
+        Assert.DoesNotContain("sword", changing);
+        Assert.DoesNotContain("shield", changing);
+        Assert.DoesNotContain("(text)", changing);
+    }
+
+    [Fact]
     public async Task Hover_prefers_the_first_supported_client_format()
     {
         await using var client = new Client();

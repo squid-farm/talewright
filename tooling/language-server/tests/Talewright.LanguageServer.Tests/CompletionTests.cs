@@ -31,6 +31,37 @@ public sealed partial class ServerTests
     }
 
     [Fact]
+    public async Task Held_item_completion_matches_declared_properties_and_excludes_divisible_properties()
+    {
+        await using var client = new Client();
+        File.WriteAllText(client.PathOf(StorySource.ManifestFileName), """
+            game: { id: held-item-properties, title: Held item properties, start: start, talemark: 2 }
+            characters:
+              player: { first-name: Ada }
+            items:
+              sword: { name: Sword, sharpness: 5, material: iron }
+              gold: { name: Gold, divisible: true, purity: 99 }
+            """);
+        await client.Initialize();
+        const string source = "=== start\n{player:inventory:sword:}\n{item:sword:}\n{player:inventory:gold:pur}\n-> END";
+        await client.Open("start.tale", source, 1);
+
+        var heldLabels = Items(await Completion(client, "start.tale",
+                source.Replace("{player:inventory:sword:}", "{player:inventory:sword:|}", StringComparison.Ordinal)))
+            .Select(item => item.GetProperty("label").GetString()).ToArray();
+        var declaredLabels = Items(await Completion(client, "start.tale",
+                source.Replace("{item:sword:}", "{item:sword:|}", StringComparison.Ordinal)))
+            .Select(item => item.GetProperty("label").GetString()).ToArray();
+        var divisibleLabels = Items(await Completion(client, "start.tale",
+                source.Replace("{player:inventory:gold:pur}", "{player:inventory:gold:pur|}", StringComparison.Ordinal)))
+            .Select(item => item.GetProperty("label").GetString()).ToArray();
+
+        Assert.Equal(new[] { "count", "material", "name", "sharpness" }, heldLabels);
+        Assert.Equal(new[] { "material", "name", "sharpness" }, declaredLabels);
+        Assert.DoesNotContain("purity", divisibleLabels);
+    }
+
+    [Fact]
     public async Task Completion_can_use_the_request_snapshot_after_a_newer_document_change()
     {
         await using var client = new Client();

@@ -69,6 +69,40 @@ public sealed partial class ServerTests
     }
 
     [Fact]
+    public async Task Item_references_and_rename_include_item_variables_comparisons_and_held_properties()
+    {
+        await using var client = new Client();
+        File.WriteAllText(client.PathOf(StorySource.ManifestFileName), """
+            game: { id: item-rename, title: Item rename, start: start, talemark: 2 }
+            characters:
+              player: { first-name: Ada }
+            items:
+              sword: { name: Sword, sharpness: 5 }
+            """);
+        const string tale = """
+            === start
+            ~ var:chosen = item:sword
+            {if var:chosen == sword}A sword.{/if}
+            {player:inventory:sword:sharpness}
+            -> END
+            """;
+        File.WriteAllText(client.PathOf("start.tale"), tale);
+        await client.Initialize(capabilities: RenameCapabilities);
+        await client.Open("start.tale", tale, 1);
+        var itemColumn = tale.Split('\n')[1].IndexOf("sword", StringComparison.Ordinal);
+
+        var references = Locations(await References(client, "start.tale", 1, itemColumn, false));
+        Assert.Equal(new[] { 1, 2, 3 }, references.Select(reference => reference.Line));
+        Assert.All(references, reference =>
+            Assert.Equal("sword", tale.Split('\n')[reference.Line][reference.Start..reference.End]));
+
+        var changes = DocumentChanges(await RenameAt(client, "start.tale", 1, itemColumn, "blade"));
+        var edits = changes.SelectMany(change => change.Edits).ToArray();
+        Assert.Equal(4, edits.Length);
+        Assert.All(edits, edit => Assert.Equal("blade", edit.Text));
+    }
+
+    [Fact]
     public async Task Cross_file_scene_rename_edits_unsaved_tale_and_manifest_documents_with_their_versions()
     {
         await using var client = new Client();

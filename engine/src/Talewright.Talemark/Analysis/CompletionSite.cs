@@ -308,9 +308,9 @@ internal static class ExpressionCompletion
 
     private static string HeldItemPropertyDetails(ItemPropertyValue value) => value switch
     {
-        ItemPropertyValue.Number number => $"Held item property (number): {number.Value.ToDecimalString()}.",
-        ItemPropertyValue.Boolean boolean => $"Held item property (boolean): {boolean.Value.ToString().ToLowerInvariant()}.",
-        ItemPropertyValue.Text text => $"Held item property (text): {text.Value}.",
+        ItemPropertyValue.Number number => $"Held item property (number), default: {number.Value.ToDecimalString()}. Value is per held copy (front group).",
+        ItemPropertyValue.Boolean boolean => $"Held item property (boolean), default: {boolean.Value.ToString().ToLowerInvariant()}. Value is per held copy (front group).",
+        ItemPropertyValue.Text text => $"Held item property (text), default: {text.Value}. Value is per held copy (front group).",
         _ => throw new InvalidOperationException("Unknown item property value type."),
     };
 
