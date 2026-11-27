@@ -255,6 +255,76 @@ public sealed class ItemVariableTests
         Assert.Contains(result.Diagnostics, diagnostic => diagnostic.Message.Contains(message, StringComparison.Ordinal));
     }
 
+    [Fact]
+    public void Manifest_text_variable_explains_why_an_item_assignment_does_not_change_its_type()
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = Manifest + "\nvars:\n  chosen: \"\"\n",
+            ["main.tale"] = "=== start\n~ var:chosen = item:iron-ore\n~ give player var:chosen\n-> END",
+        }));
+        var error = Assert.Single(result.Errors);
+        Assert.Equal("TW2003", error.Code);
+        Assert.Equal(("main.tale", 3), (error.Location.File, error.Location.Line));
+        Assert.Contains("holds text", error.Message);
+        Assert.Contains("declaration under 'vars:' fixed its type", error.Message);
+        Assert.Contains("Remove its 'vars:' entry", error.Message);
+        Assert.Contains("its first assignment can be an item", error.Message);
+    }
+
+    [Theory]
+    [InlineData("\"label\"", "text")]
+    [InlineData("1", "a number")]
+    public void Earlier_assignment_is_identified_across_files(string initialValue, string type)
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = Manifest,
+            ["z.tale"] = "=== later\n~ var:chosen = item:iron-ore\n~ give player var:chosen\n-> END",
+            ["a.tale"] = $"=== start\n~ var:chosen = {initialValue}\n-> later",
+        }));
+        var error = Assert.Single(result.Errors, diagnostic => diagnostic.Location.Line == 3);
+        Assert.Equal("TW2003", error.Code);
+        Assert.Equal("z.tale", error.Location.File);
+        Assert.Contains($"holds {type}", error.Message);
+        Assert.Contains("first assignment at a.tale:2:", error.Message);
+        Assert.Contains("Change that first assignment to an item", error.Message);
+    }
+
+    [Fact]
+    public void Earlier_assignment_is_identified_in_the_same_file()
+    {
+        var result = Result("=== start\n~ var:chosen = \"label\"\n~ var:chosen = item:iron-ore\n~ give player var:chosen\n-> END");
+        var error = Assert.Single(result.Errors);
+        Assert.Equal(("TW2003", "main.tale", 4), (error.Code, error.Location.File, error.Location.Line));
+        Assert.Contains("first assignment at main.tale:2:", error.Message);
+    }
+
+    [Fact]
+    public void First_item_assignment_still_rejects_later_text_assignment()
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = Manifest,
+            ["a.tale"] = "=== start\n~ var:chosen = item:iron-ore\n-> later",
+            ["z.tale"] = "=== later\n~ var:chosen = \"label\"\n~ give player var:chosen\n-> END",
+        }));
+        var error = Assert.Single(result.Errors);
+        Assert.Equal(("TW2003", "z.tale", 2), (error.Code, error.Location.File, error.Location.Line));
+        Assert.Contains("needs an item reference", error.Message);
+    }
+
+    [Fact]
+    public void Text_variable_can_still_copy_an_item_name()
+    {
+        var story = Compile("=== start\n~ var:chosen = \"label\"\n~ var:chosen = item:iron-ore\n{var:chosen}\n-> END");
+        var log = new EventLog(story.World, 1);
+        foreach (var effect in story.Scenes[0].Steps.OfType<EffectStep>().SelectMany(step => step.Effects))
+            EffectExecutor.Execute(effect, log, story.Predicates);
+        Assert.Equal("iron ore", new TemplateRenderer()
+            .Render(CompilerTests.Templates(story.Scenes[0]), log.State).ToPlainText());
+    }
+
     private static StoryDefinition Compile(string source, int version = 2)
     {
         var result = Result(source, version);

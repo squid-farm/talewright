@@ -4,6 +4,7 @@ using Talewright.Narrative.Templates;
 using Talewright.Rules.Expressions;
 using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Diagnostics;
 
 namespace Talewright.Talemark.Parsing;
 
@@ -21,6 +22,9 @@ internal sealed class StorySymbols
     public required IReadOnlySet<VarId> Variables { get; init; }
     public IReadOnlySet<VarId> UnresolvedVariables { get; init; } = new HashSet<VarId>();
     public IReadOnlySet<VarId> ItemVariables { get; init; } = new HashSet<VarId>();
+    // Null marks a manifest declaration; a missing entry means the origin is unknown.
+    public IReadOnlyDictionary<VarId, SourceLocation?> VariableTypeOrigins { get; init; } =
+        new Dictionary<VarId, SourceLocation?>();
     public required IReadOnlySet<SceneId> Scenes { get; init; }
     public required NamedPredicateRegistry Predicates { get; init; }
     public required TextModifierRegistry Modifiers { get; init; }

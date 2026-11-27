@@ -929,9 +929,24 @@ internal sealed class ExpressionBinder
                 "Item variables are available only in Talemark 2. Set 'game.talemark: 2' to use them.", span.Start);
         var variable = new VarId(text[(separator + 1)..].Trim());
         if (!_symbols.ItemVariables.Contains(variable))
+        {
+            if (_symbols.World.TextVariables.ContainsKey(variable) || _symbols.World.ExactVariables.ContainsKey(variable))
+            {
+                var type = _symbols.World.TextVariables.ContainsKey(variable) ? "text" : "a number";
+                var guidance = _symbols.VariableTypeOrigins.TryGetValue(variable, out var origin)
+                    ? origin is { } location
+                        ? $"Its first assignment at {location} fixed its type. Change that first assignment to an item"
+                        : "Its declaration under 'vars:' fixed its type. Remove its 'vars:' entry so its first assignment can be an item"
+                    : "Its declaration under 'vars:' or its first assignment fixed its type. Remove its 'vars:' entry if present and make its first assignment an item";
+                return Fail<ItemOperand>(CompilerDiagnosticCodes.TypeMismatch,
+                    $"Variable '{variable}' does not hold an item; it holds {type}. {guidance}, " +
+                    $"for example '~ var:{variable} = item:rope'.",
+                    span.Start);
+            }
             return Fail<ItemOperand>(CompilerDiagnosticCodes.TypeMismatch,
                 $"Variable '{variable}' does not hold an item. Assign it an item first, for example '~ var:{variable} = item:rope'.",
                 span.Start);
+        }
         return new ResolvedItemOperand(new TextVarRef(variable));
     }
 

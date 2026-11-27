@@ -388,6 +388,7 @@ public static class StoryAnalyzer
                 Variables = variables,
                 UnresolvedVariables = unresolved,
                 ItemVariables = itemVariables,
+                VariableTypeOrigins = unchangedDeclarations ? context!.VariableTypeOrigins : new Dictionary<VarId, SourceLocation?>(),
                 Scenes = scenes,
                 Predicates = context?.Predicates ?? options.Predicates,
                 Modifiers = context?.Modifiers ?? options.Modifiers,

@@ -287,6 +287,52 @@ public sealed class SyntaxReuseTests
         Assert.False(obsolete.TryGetTarget(out _));
     }
 
+    [Fact]
+    public void Current_file_item_diagnostic_does_not_report_a_stale_first_assignment()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = """
+                game: {id: guidance, title: Guidance, start: start, talemark: 2}
+                characters: {player: {first-name: Ada}}
+                items: {rope: Rope}
+                """,
+            ["main.tale"] = "=== start\n~ var:chosen = \"label\"\n-> END",
+        });
+        var workspace = new StoryWorkspace(source, CompilerOptions.Default);
+        var snapshot = StoryAnalyzer.Analyze(source);
+        var text = "=== start\n// new line\n~ var:chosen = \"label\"\n~ give player var:chosen\n-> END";
+
+        var current = workspace.AnalyzeCurrentFile("main.tale", text, snapshot, CancellationToken.None);
+
+        var diagnostic = Assert.Single(current.Diagnostics, item => item.Code == "TW2003");
+        Assert.Contains("declaration under 'vars:' or its first assignment fixed its type", diagnostic.Message);
+        Assert.DoesNotContain("main.tale:2", diagnostic.Message);
+    }
+
+    [Fact]
+    public void Current_file_item_diagnostic_keeps_unchanged_cross_file_origin()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = """
+                game: {id: guidance, title: Guidance, start: start, talemark: 2}
+                characters: {player: {first-name: Ada}}
+                items: {rope: Rope}
+                """,
+            ["a.tale"] = "=== start\n-> later",
+            ["b.tale"] = "=== later\n~ var:chosen = \"label\"\n-> END",
+        });
+        var workspace = new StoryWorkspace(source, CompilerOptions.Default);
+        var snapshot = StoryAnalyzer.Analyze(source);
+        var text = "=== start\n~ give player var:chosen\n-> later";
+
+        var current = workspace.AnalyzeCurrentFile("a.tale", text, snapshot, CancellationToken.None);
+
+        var diagnostic = Assert.Single(current.Diagnostics, item => item.Code == "TW2003");
+        Assert.Contains("first assignment at b.tale:2:", diagnostic.Message);
+    }
+
     [MethodImpl(MethodImplOptions.NoInlining)]
     private static WeakReference<StoryAnalysis> ReplaceCurrentFileAnalysis(
         StoryWorkspace workspace, StoryAnalysis snapshot, string originalText)
