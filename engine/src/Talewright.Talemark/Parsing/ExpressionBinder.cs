@@ -933,11 +933,13 @@ internal sealed class ExpressionBinder
             if (_symbols.World.TextVariables.ContainsKey(variable) || _symbols.World.ExactVariables.ContainsKey(variable))
             {
                 var type = _symbols.World.TextVariables.ContainsKey(variable) ? "text" : "a number";
-                var guidance = _symbols.VariableTypeOrigins.TryGetValue(variable, out var origin)
-                    ? origin is { } location
-                        ? $"Its first assignment at {location} fixed its type. Change that first assignment to an item"
-                        : "Its declaration under 'vars:' fixed its type. Remove its 'vars:' entry so its first assignment can be an item"
-                    : "Its declaration under 'vars:' or its first assignment fixed its type. Remove its 'vars:' entry if present and make its first assignment an item";
+                string guidance;
+                if (!_symbols.VariableTypeOrigins.TryGetValue(variable, out var origin))
+                    guidance = "Its declaration under 'vars:' or its first assignment fixed its type. Remove its 'vars:' entry if present and make its first assignment an item";
+                else if (origin is { } location)
+                    guidance = $"Its first assignment at {location} fixed its type. Change that first assignment to an item";
+                else
+                    guidance = "Its declaration under 'vars:' fixed its type. Remove its 'vars:' entry so its first assignment can be an item";
                 return Fail<ItemOperand>(CompilerDiagnosticCodes.TypeMismatch,
                     $"Variable '{variable}' does not hold an item; it holds {type}. {guidance}, " +
                     $"for example '~ var:{variable} = item:rope'.",
