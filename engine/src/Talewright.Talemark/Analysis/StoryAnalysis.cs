@@ -1083,13 +1083,26 @@ internal sealed class AnalysisCollector(StorySource source, CompilerOptions opti
                     else if (path is [ManifestVocabulary.Characters, _, ManifestVocabulary.Inventory]) ReferenceNode(key, AuthoringSymbolKind.Item, file: file);
                     else if (next is [ManifestVocabulary.Characters, _, ManifestVocabulary.Inventory] && value is YamlSequenceNode)
                         ReferenceNode(value, AuthoringSymbolKind.Item, file: file);
+                    else if (path is [ManifestVocabulary.Vars] &&
+                        value is YamlScalarNode { Style: YamlDotNet.Core.ScalarStyle.Plain, Value: { } reference } itemReference &&
+                        reference.StartsWith(ExpressionVocabulary.Item + ExpressionVocabulary.Separator, StringComparison.Ordinal))
+                    {
+                        Scalar(itemReference, file);
+                        var location = new SourceLocation(file, (int)itemReference.Start.Line, (int)itemReference.Start.Column);
+                        var offset = ExpressionVocabulary.Item.Length + 1;
+                        var nameText = reference[offset..];
+                        var scalarSource = _scalars[location];
+                        AddSite(new(nameText, scalarSource.Range(offset, nameText.Length), [AuthoringSymbolKind.Item], [],
+                            Enumerable.Range(0, nameText.Length + 1)
+                                .Select(index => scalarSource.Range(offset + index, 0).Start).ToArray()));
+                    }
                     else if (path is [ManifestVocabulary.Game, ManifestVocabulary.CharacterSheet, ManifestVocabulary.Stats]
                         && name != ManifestVocabulary.Shown) ReferenceNode(key, AuthoringSymbolKind.Stat, file: file);
                     else if (path is [ManifestVocabulary.Characters, _, ManifestVocabulary.Stats] or [ManifestVocabulary.Items, _, ManifestVocabulary.Modifiers] or [ManifestVocabulary.Game, ManifestVocabulary.Creation, ManifestVocabulary.Stats]
                         or [ManifestVocabulary.Game, ManifestVocabulary.Creation, ManifestVocabulary.Presets, _, ManifestVocabulary.Stats]) ReferenceNode(key, AuthoringSymbolKind.Stat, file: file);
                     if (next is [ManifestVocabulary.Game] or [ManifestVocabulary.Characters] or [ManifestVocabulary.Characters, _] or [ManifestVocabulary.Characters, _, ManifestVocabulary.Inventory]
                         or [ManifestVocabulary.Characters, _, ManifestVocabulary.Stats] or [ManifestVocabulary.Items] or [ManifestVocabulary.Items, _] or [ManifestVocabulary.Items, _, ManifestVocabulary.Modifiers]
-                        or [ManifestVocabulary.Game, ManifestVocabulary.Ruleset] or [ManifestVocabulary.Game, ManifestVocabulary.Creation] or [ManifestVocabulary.Game, ManifestVocabulary.Creation, ManifestVocabulary.Stats] or [ManifestVocabulary.Game, ManifestVocabulary.Creation, ManifestVocabulary.Presets]
+                        or [ManifestVocabulary.Vars] or [ManifestVocabulary.Game, ManifestVocabulary.Ruleset] or [ManifestVocabulary.Game, ManifestVocabulary.Creation] or [ManifestVocabulary.Game, ManifestVocabulary.Creation, ManifestVocabulary.Stats] or [ManifestVocabulary.Game, ManifestVocabulary.Creation, ManifestVocabulary.Presets]
                         or [ManifestVocabulary.Game, ManifestVocabulary.Creation, ManifestVocabulary.Presets, _] or [ManifestVocabulary.Game, ManifestVocabulary.Creation, ManifestVocabulary.Presets, _, ManifestVocabulary.Stats])
                         Walk(value, next);
                 }

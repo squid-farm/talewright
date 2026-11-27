@@ -873,9 +873,18 @@ or an item without that property. A plain item reference still names its item
 when none is held; giving through a valid group reference grants the item's
 declared values, not the group's changed values.
 
-Item variables support `=` only, not arithmetic or numeric assignment. Their
-first assignment determines their type; item declarations under `vars:` are not
-supported. For a text copy instead, write `~ var:word = item:pants:name`.
+Initialize an item variable before the first scene in Talemark 2:
+
+```yaml
+vars:
+  chosen: item:iron-ore
+  literal: "item:iron-ore"
+```
+
+The item must be declared under `items`. The unquoted reference initializes an
+item variable; the quoted value is ordinary text. Item variables support `=`
+only, not arithmetic or numeric assignment. Their manifest initializer or first
+assignment determines their type. For a text copy instead, write `~ var:word = item:pants:name`.
 Talemark 1 continues copying name text for `item:pants` too. Saves preserve item
 variables without any save-format change.
 

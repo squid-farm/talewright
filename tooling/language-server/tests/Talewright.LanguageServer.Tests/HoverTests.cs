@@ -162,6 +162,27 @@ public sealed partial class ServerTests
     }
 
     [Fact]
+    public async Task Manifest_initialized_item_variable_hover_reports_known_item()
+    {
+        await using var client = new Client();
+        File.WriteAllText(client.PathOf(StorySource.ManifestFileName), """
+            game: { id: item-variable-hover, title: Item variable hover, start: start, talemark: 2 }
+            characters: { player: { first-name: Ada } }
+            items: { sword: Sword }
+            vars: { chosen: item:sword }
+            """);
+        const string marked = "=== start\n{var:cho|sen}\n-> END";
+        File.WriteAllText(client.PathOf("start.tale"), marked.Replace("|", "", StringComparison.Ordinal));
+        await client.Initialize();
+        await client.Open("start.tale", marked.Replace("|", "", StringComparison.Ordinal), 1);
+        var hover = Text(await Hover(client, "start.tale", marked));
+        Assert.Contains("Item variable (item)", hover);
+        Assert.Contains("sword", hover);
+        Assert.Contains("Sword", hover);
+        Assert.DoesNotContain("(text)", hover);
+    }
+
+    [Fact]
     public async Task Hover_prefers_the_first_supported_client_format()
     {
         await using var client = new Client();

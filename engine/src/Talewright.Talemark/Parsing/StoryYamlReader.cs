@@ -53,12 +53,13 @@ internal sealed class StoryYamlReader(StoryYamlContext yaml, CompilerOptions opt
         var characters = world.ReadCharacters(Get(root, ManifestVocabulary.Characters), root, ruleset, items, talemarkVersion);
         var flags = world.ReadFlags(Get(root, ManifestVocabulary.Flags));
         var declaredFlags = flags.Keys.ToArray();
-        var (numericVars, textVars) = world.ReadVars(Get(root, ManifestVocabulary.Vars), talemarkVersion);
+        var (numericVars, textVars, itemVars) = world.ReadVars(Get(root, ManifestVocabulary.Vars), talemarkVersion, items);
 
         var manifest = new StoryManifest
         {
             World = new WorldDefinition(ruleset, characters, items.Values, factions, declaredFlags,
                 numericVars, textVars, flags, talemarkVersion),
+            InitialItemVariables = itemVars,
             CharacterLocations = world.CharacterLocations,
             Id = _yaml.RequiredIdentifier(game, ManifestVocabulary.Id) ?? string.Empty,
             Title = _yaml.RequiredScalar(game, ManifestVocabulary.Title) ?? string.Empty,

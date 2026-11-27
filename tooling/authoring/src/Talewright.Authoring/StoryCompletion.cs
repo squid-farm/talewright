@@ -23,6 +23,8 @@ public static class StoryCompletion
                 .Select(symbol => (Name: symbol.Name, Detail: symbol.Kind == AuthoringSymbolKind.Modifier &&
                     AuthoringSyntaxVocabulary.TryGetKeywordHelp(symbol.Name, out var help)
                         ? help.Description
+                        : symbol.Kind == AuthoringSymbolKind.Variable && analysis.ItemVariables.Contains(symbol.Name)
+                            ? $"{symbol.Kind}: {ManifestVocabulary.SymbolItem}"
                         : $"{symbol.Kind}: {symbol.Type}", IsKeyword: false));
             var keywords = site.Keywords.Select(keyword =>
                 (Name: keyword, Detail: KeywordDetail(site, keyword), IsKeyword: true));
