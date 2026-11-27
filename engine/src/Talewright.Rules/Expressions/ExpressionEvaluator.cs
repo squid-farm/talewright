@@ -168,16 +168,18 @@ public static class ExpressionEvaluator
                 : Value.Of(string.Empty);
         }
         if (expr is HasItem hasItem)
-        {
-            var item = ResolveItemOperand(hasItem.Item, context, out childTrace);
-            return Value.Of(item is { } itemId && state.GetExactItemCount(hasItem.Character, itemId) > 0);
-        }
+            return Value.Of(HeldQuantity(hasItem.Character, hasItem.Item, context, out childTrace) > 0);
         if (expr is InventoryCountRef inventoryCount)
+            return Value.Of(HeldQuantity(inventoryCount.Character, inventoryCount.Item, context, out childTrace));
+        if (expr is ItemComparison comparison)
         {
-            var item = ResolveItemOperand(inventoryCount.Item, context, out childTrace);
-            return item is { } itemId
-                ? Value.Of(state.GetExactItemCount(inventoryCount.Character, itemId))
-                : Value.Of(ExactNumber.Zero);
+            var item = ResolveItemOperand(comparison.Item, context, out childTrace);
+            return Value.Of((item == comparison.Expected) == (comparison.Op == BinaryOp.Equal));
+        }
+        if (expr is ItemReferencePropertyRef referenceProperty)
+        {
+            var reference = ResolveItemReference(referenceProperty.Item, context, out childTrace);
+            return ItemProperty(ReferencedProperty(reference, referenceProperty, state));
         }
         if (expr is InventoryItemPropertyRef itemProperty)
             return ItemProperty(state.GetItemProperty(itemProperty.Character, itemProperty.Item, itemProperty.Property));
@@ -214,17 +216,64 @@ public static class ExpressionEvaluator
     }
 
     private static ItemId? ResolveItemOperand(ItemOperand item, EvaluationContext context,
+        out ExpressionTrace? trace) => ResolveItemReference(item, context, out trace)?.Resolve(context.State);
+
+    private static ItemReference? ResolveItemReference(ItemOperand item, EvaluationContext context,
         out ExpressionTrace? trace)
     {
         trace = null;
         if (item is not ResolvedItemOperand || context.Trace is null)
-            return item.Resolve(context);
+            return item.ResolveReference(context);
 
         ExpressionTrace? operandTrace = null;
         var operandContext = context with { Trace = observed => operandTrace = observed };
-        var resolved = item.Resolve(operandContext);
+        var resolved = item.ResolveReference(operandContext);
         trace = operandTrace;
         return resolved;
+    }
+
+    // A group reference counts only the character's group with the same values; a plain item counts every copy.
+    private static ExactNumber HeldQuantity(EntityId character, ItemOperand operand, EvaluationContext context,
+        out ExpressionTrace? trace)
+    {
+        var reference = ResolveItemReference(operand, context, out trace);
+        if (reference is null)
+            return ExactNumber.Zero;
+        if (!reference.IsGroup)
+            return context.State.GetExactItemCount(character, reference.Item);
+        if (reference.Holder != character)
+            return ExactNumber.Zero;
+        var groups = context.State.GetItemGroups(character, reference.Item);
+        var index = reference.FindGroup(groups);
+        return index >= 0 ? groups[index].Quantity : ExactNumber.Zero;
+    }
+
+    private static ItemPropertyValue ReferencedProperty(ItemReference? reference, ItemReferencePropertyRef read,
+        IGameStateView state)
+    {
+        ItemPropertyValue? value = null;
+        if (reference?.Resolve(state) is { } item)
+        {
+            if (reference.Holder is { } holder)
+            {
+                var groups = state.GetItemGroups(holder, item);
+                groups[reference.FindGroup(groups)].Properties.TryGetValue(read.Property, out value);
+            }
+            else
+            {
+                state.World.Items[item].CustomProperties.TryGetValue(read.Property, out value);
+            }
+        }
+
+        return value is not null && ItemPropertySnapshot.KindOf(value) == read.Kind
+            ? value
+            : read.Kind switch
+            {
+                ItemPropertyValueKind.Number => new ItemPropertyValue.Number(ExactNumber.Zero),
+                ItemPropertyValueKind.Boolean => new ItemPropertyValue.Boolean(false),
+                ItemPropertyValueKind.Text => new ItemPropertyValue.Text(string.Empty),
+                _ => throw new InvalidOperationException("Unknown item property value type."),
+            };
     }
 
     private static Value ItemProperty(ItemPropertyValue value) => value switch

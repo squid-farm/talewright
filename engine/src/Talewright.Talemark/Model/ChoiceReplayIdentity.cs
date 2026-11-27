@@ -3,6 +3,7 @@ using System.Buffers.Binary;
 using System.Security.Cryptography;
 using System.Text.Json;
 using Talewright.Core.Identity;
+using Talewright.Core.State;
 using Talewright.Core.World;
 using Talewright.Rules.Checks;
 using Talewright.Rules.Effects;
@@ -418,6 +419,24 @@ internal static class ChoiceReplayIdentity
             case ItemNameRef value:
                 writer.WriteStringValue("item-name-ref");
                 WriteItemOperand(writer, value.Item);
+                break;
+            case ItemComparison value:
+                writer.WriteStringValue("item-comparison");
+                WriteItemOperand(writer, value.Item);
+                writer.WriteStringValue(Token(value.Op));
+                writer.WriteStringValue(value.Expected.Value);
+                break;
+            case ItemReferencePropertyRef value:
+                writer.WriteStringValue("item-reference-property-ref");
+                WriteItemOperand(writer, value.Item);
+                writer.WriteStringValue(value.Property);
+                writer.WriteStringValue(value.Kind switch
+                {
+                    ItemPropertyValueKind.Number => "number",
+                    ItemPropertyValueKind.Boolean => "bool",
+                    ItemPropertyValueKind.Text => "text",
+                    _ => throw new NotSupportedException($"Unknown item property kind '{value.Kind}'."),
+                });
                 break;
             case ItemPropertyRef value:
                 writer.WriteStringValue("item-property-ref");

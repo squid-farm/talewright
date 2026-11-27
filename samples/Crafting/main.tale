@@ -1,0 +1,32 @@
+=== crafting
+@title Choose Your Ingredients
+
+~ var:first = item:iron-ore
+~ var:second = item:charcoal
+
+You set aside {var:first} and {var:second} for the smith.
+
+* [Carry the ingredients to the forge] -> forge
+
+=== forge
+@title At the Forge
+
+{if var:first == iron-ore}
+The ore glows.
+{/if}
+
+You have {player:inventory:var:first:count} of the first ingredient
+and {player:inventory:var:second:count} of the second.
+
+{if player has var:first and player has var:second}
+* [Combine {var:first} and {var:second}] { take player var:first; take player var:second; give player steel } -> smithy
+{/if}
+* [Leave the ingredients untouched] -> END
+
+=== smithy
+@title Steel
+
+The smith hands you {item:steel}. Your chosen ingredients were
+{var:first} and {var:second}; now neither remains in your inventory.
+
+-> END

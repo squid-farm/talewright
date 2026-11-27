@@ -65,8 +65,12 @@ public sealed record MediaTemplate(string MediaId, string AltText) : TemplateInl
 /// </summary>
 /// <param name="Value">Expression producing the value.</param>
 /// <param name="Modifiers">Resolved modifiers applied left to right.</param>
-/// <param name="IsPlural">Grammatical number of the value. Pronoun and item references resolve their original grammar from state at render time.</param>
-public sealed record SubstitutionTemplate(Expr Value, IReadOnlyList<ITextModifier> Modifiers, bool IsPlural = false) : TemplateInline;
+/// <param name="IsPlural">Grammatical number of the value. Pronoun references and item references using item grammar resolve their original grammar from state at render time.</param>
+public sealed record SubstitutionTemplate(Expr Value, IReadOnlyList<ITextModifier> Modifiers, bool IsPlural = false) : TemplateInline
+{
+    /// <summary>Whether item references use their definition's grammatical number and countability.</summary>
+    public bool UseItemGrammar { get; init; } = true;
+}
 
 /// <summary>Inline conditional inside a paragraph.</summary>
 public sealed record ConditionalInlineTemplate(Expr Condition, IReadOnlyList<TemplateInline> Then, IReadOnlyList<TemplateInline> Else) : TemplateInline;

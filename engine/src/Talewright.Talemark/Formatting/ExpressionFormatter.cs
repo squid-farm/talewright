@@ -103,6 +103,9 @@ public static class ExpressionFormatter
             _ => throw new NotSupportedException($"Unknown item operand '{item.Item.GetType().Name}'."),
         },
         ItemPropertyRef property => Reference(Item, Name(property.Item.Value), Name(property.Property)),
+        ItemComparison comparison =>
+            $"{Operand(comparison.Item)} {ExpressionVocabulary.Spelling(comparison.Op)} {ComparisonItem(comparison.Expected)}",
+        ItemReferencePropertyRef property => Reference(Operand(property.Item), Name(property.Property)),
         HasItem item => item.Item switch
         {
             FixedItemOperand fixedItem => $"{Character(item.Character)} {Has} {Name(fixedItem.Item.Value)}",
@@ -145,6 +148,19 @@ public static class ExpressionFormatter
     }
 
     private static string Reference(params string[] parts) => string.Join(Separator, parts);
+
+    private static string ComparisonItem(ItemId item)
+    {
+        var name = Name(item.Value);
+        return name == SceneVocabulary.SkillCheck ? Reference(Item, name) : name;
+    }
+
+    private static string Operand(ItemOperand operand) => operand switch
+    {
+        FixedItemOperand fixedItem => Reference(Item, Name(fixedItem.Item.Value)),
+        ResolvedItemOperand resolved => Write(resolved.Expression),
+        _ => throw new NotSupportedException($"Unknown item operand '{operand.GetType().Name}'."),
+    };
 
     private static string PronounReference(string character, PronounForm form)
     {
@@ -201,7 +217,7 @@ public static class ExpressionFormatter
         BinaryExpr { Op: BinaryOp.And } => 2,
         UnaryExpr { Op: UnaryOp.Not } => 3,
         BinaryExpr { Op: BinaryOp.Equal or BinaryOp.NotEqual or BinaryOp.Less or BinaryOp.LessOrEqual
-            or BinaryOp.Greater or BinaryOp.GreaterOrEqual } => 4,
+            or BinaryOp.Greater or BinaryOp.GreaterOrEqual } or ItemComparison => 4,
         BinaryExpr { Op: BinaryOp.Add or BinaryOp.Subtract } => 5,
         BinaryExpr { Op: BinaryOp.Multiply or BinaryOp.Divide } => 6,
         UnaryExpr { Op: UnaryOp.Round or UnaryOp.RoundUp or UnaryOp.RoundDown } => 7,

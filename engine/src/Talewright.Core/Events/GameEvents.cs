@@ -35,7 +35,10 @@ public sealed record ExactItemsRemoved(EntityId Character, ItemId Item, string Q
 public sealed record ItemPropertyChanged(EntityId Character, ItemId Item, string Property,
     ItemPropertyValueKind Kind, string NewValue) : GameEvent;
 
-/// <summary>Restores grouped inventory while rebuilding a continuation checkpoint.</summary>
+/// <summary>
+/// Replaces a character's held groups for an item: when rebuilding a continuation checkpoint, or after taking copies
+/// from a group that is not at the front.
+/// </summary>
 public sealed record ItemGroupsRestored(EntityId Character, ItemId Item,
     IReadOnlyList<ItemGroupSnapshot> Groups) : GameEvent;
 

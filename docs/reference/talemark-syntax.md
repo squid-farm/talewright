@@ -817,15 +817,67 @@ The original item reference retains its grammar throughout a manipulator chain:
 `{item:pants#upper#one-many("is", "are")}` still gives "are". Inventory quantity
 does not matter to an item-name reference: one unit of pants remains plural;
 five swords do not change the singular displayed name. Use an inventory count
-reference when wording should depend on quantity. Assigning
-`~ var:word = item:pants` copies only the text "pants", not item identity or
-grammar. `{var:word#that}` therefore gives "that pants", and `#one-many` on that
-text variable is invalid.
+reference when wording should depend on quantity. In Talemark 1, assigning
+`~ var:word = item:pants` copies only the text "pants". In Talemark 2, it stores
+an item reference and `{var:word}` still displays "pants". Variable substitutions
+keep their existing text manipulator behavior: `{var:word#that}` gives "that pants",
+and `#one-many` on the variable is invalid. Use `{item:pants}` for item-name grammar.
 
 Choose helpers explicitly. They do not infer context, inflect nouns, count items,
 or add pair/suit/unit wording. Author exceptional phrasing directly; `#a` retains
 the existing a/an rules, not a pronunciation dictionary. These helpers take no
 arguments; only `#one-many` accepts its exact two quoted strings.
+
+### Remember an item (Talemark 2)
+
+Assign an item to a variable, then use that variable in another scene:
+
+```tale
+=== crafting
+~ var:first = item:iron-ore
+~ var:second = item:charcoal
+-> forge
+
+=== forge
+{if player has var:first and player has var:second}
+* [Combine {var:first} and {var:second}] { take player var:first; take player var:second; give player steel } -> smithy
+{/if}
+{if var:first == iron-ore}
+The ore glows.
+{/if}
+```
+
+In Talemark 2, a variable first assigned `item:<id>` holds that item, not its name
+text. Copy it with `~ var:remembered = var:first`. `{var:first}` displays its
+name; `player:inventory:var:first:count` reads the held quantity. `give` and
+`take` accept it wherever an item ID normally goes. Compare it with a bare item
+ID on the right of `==` or `!=`, including `true` and `false`. If an ID conflicts
+with expression syntax, use `item:<id>` instead, for example
+`var:first == item:skill-check`. Quoted names do not compare item identities.
+`var:first:<key>` reads a declared item property. That key must have the same
+scalar type on every item that declares it.
+
+An item variable can also hold a specific group of held copies (available through
+the engine API; loop assignment is not implemented yet). `has`, `take`, counts
+and property reads then target only that group, even when it is no longer at
+the front. The reference follows its stored property values, not a copy ID:
+if no group with those values remains, it holds nothing. When a story update
+adds properties, a saved reference still matches its captured values; if more
+than one group matches, it targets the first. A reference captured before an
+item had any properties therefore targets its first held group.
+
+An unset variable, an item removed from the story, or a missing group holds
+nothing: its name is empty, `has` is false, its count is zero, and `give` or
+`take` does nothing. Property reads return zero, false or empty text for nothing
+or an item without that property. A plain item reference still names its item
+when none is held; giving through a valid group reference grants the item's
+declared values, not the group's changed values.
+
+Item variables support `=` only, not arithmetic or numeric assignment. Their
+first assignment determines their type; item declarations under `vars:` are not
+supported. For a text copy instead, write `~ var:word = item:pants:name`.
+Talemark 1 continues copying name text for `item:pants` too. Saves preserve item
+variables without any save-format change.
 
 ### Custom item properties
 

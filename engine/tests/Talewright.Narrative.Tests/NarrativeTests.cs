@@ -89,6 +89,22 @@ public class NarrativeTests
             [template with { Modifiers = [renamed, new OneManyTextModifier("is", "are")] }], state)));
     }
 
+    [Fact]
+    public void CSharp_resolved_item_references_use_item_grammar()
+    {
+        var world = State().World;
+        var item = new ItemDefinition(new("pants"), "pants", new Dictionary<StatId, int>(),
+            NameAgreement: GrammaticalNumber.Plural, Uncountable: true);
+        var state = GameState.CreateInitial(new WorldDefinition(world.Ruleset, world.Characters.Values,
+            [item], [], [], new Dictionary<VarId, int>()), 1);
+        var template = new SubstitutionTemplate(new ItemNameRef(new TextLiteral("pants")), [Mod("that")]);
+        var renderer = new TemplateRenderer();
+
+        Assert.Equal("those pants", RenderedInline.ToPlainText(renderer.RenderInlines([template], state)));
+        Assert.Equal("some pants", RenderedInline.ToPlainText(renderer.RenderInlines(
+            [template with { Modifiers = [Mod("a")] }], state)));
+    }
+
     [Theory]
     [InlineData("0.995", "one")]
     [InlineData("1.004", "one")]

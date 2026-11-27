@@ -198,8 +198,13 @@ For prose, `{item:pants#that#capitalize} {item:pants#one-many("is", "are")} expe
 gives "Those pants are expensive." `#a` produces "some pants" or "some armor";
 `#the` always adds "the". Uncountable armor still takes "this armor is".
 The defaults are singular agreement and countable names, independent of inventory
-quantity. Copying an item's name into a text variable copies text only.
+quantity. In Talemark 1, `~ var:chosen = item:pants` copies name text only.
+In Talemark 2 it remembers the item: `{var:chosen}` still displays its name,
+while `player has var:chosen` and `take player var:chosen` use the remembered item.
+Use `item:pants:name` when you only want text.
 See the [item-name grammar table](../reference/talemark-syntax.md#item-name-grammar).
+See [remembering an item](../reference/talemark-syntax.md#remember-an-item-talemark-2)
+for comparisons, counts and crafting.
 
 ### Read and spend item counts
 

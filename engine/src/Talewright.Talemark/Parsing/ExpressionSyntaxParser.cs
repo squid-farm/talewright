@@ -515,7 +515,7 @@ internal sealed class ExpressionSyntaxParser
                 }
 
                 Next();
-                var item = Expect(TokenKind.Identifier, "an item id after the inventory namespace");
+                var item = ParseItemOperand(inventory: true);
                 if (Peek.Kind == TokenKind.Colon)
                 {
                     Next();
@@ -523,14 +523,14 @@ internal sealed class ExpressionSyntaxParser
                     var span = new ExpressionSpan(token.Offset, property.Offset + property.Length - token.Offset);
                     if (property.Is(ExpressionVocabulary.Name))
                     {
-                        return new InventoryItemNameExpressionNode(Span(token), Span(item), span);
+                        return new InventoryItemNameExpressionNode(Span(token), item, span);
                     }
 
-                    return new InventoryItemPropertyExpressionNode(Span(token), Span(item), Span(property), span);
+                    return new InventoryItemPropertyExpressionNode(Span(token), item, Span(property), span);
                 }
 
-                return new InventoryItemNameExpressionNode(Span(token), Span(item),
-                    new(token.Offset, item.Offset + item.Length - token.Offset));
+                return new InventoryItemNameExpressionNode(Span(token), item,
+                    new(token.Offset, item.End - token.Offset));
             }
 
             Token? member = null;
@@ -558,9 +558,9 @@ internal sealed class ExpressionSyntaxParser
         if (IsKeyword(ExpressionVocabulary.Has))
         {
             Next();
-            var item = Expect(TokenKind.Identifier, "an item id after 'has'");
-            return new HasItemExpressionNode(Span(token), Span(item),
-                new(token.Offset, item.Offset + item.Length - token.Offset));
+            var item = ParseItemOperand();
+            return new HasItemExpressionNode(Span(token), item,
+                new(token.Offset, item.End - token.Offset));
         }
 
         return new NameExpressionNode(Span(token), Span(token));
@@ -845,15 +845,15 @@ internal sealed class ExpressionSyntaxParser
         if (first.Is(ExpressionVocabulary.Give) || first.Is(ExpressionVocabulary.Take))
         {
             var who = Expect(TokenKind.Identifier, "a character id");
-            var item = Expect(TokenKind.Identifier, "an item id");
+            var item = ParseItemOperand();
             ExpressionNode? quantity = null;
             if (Peek.Kind is not (TokenKind.End or TokenKind.Semicolon))
             {
                 quantity = ParseSum();
             }
 
-            return new GiveTakeEffectSyntax(first.Is(ExpressionVocabulary.Give), Span(who), Span(item), quantity,
-                new(first.Offset, (quantity?.Span.End ?? item.Offset + item.Length) - first.Offset));
+            return new GiveTakeEffectSyntax(first.Is(ExpressionVocabulary.Give), Span(who), item, quantity,
+                new(first.Offset, (quantity?.Span.End ?? item.End) - first.Offset));
         }
 
         Expect(TokenKind.Colon, "':' (effects look like 'player:hp -= 3', 'set flag:x', 'give player rope')");
@@ -884,6 +884,19 @@ internal sealed class ExpressionSyntaxParser
         var amount = ParseSum();
         return new AssignmentEffectSyntax(ExpressionVocabulary.Namespace(first.Text), Span(first), Span(target),
             member is null ? null : Span(member.Value), kind, amount, new(first.Offset, amount.Span.End - first.Offset));
+    }
+
+    private ExpressionSpan ParseItemOperand(bool inventory = false)
+    {
+        var first = Expect(TokenKind.Identifier, "an item id or item variable");
+        if (!first.Is(ExpressionVocabulary.Var) || Peek.Kind != TokenKind.Colon)
+            return Span(first);
+        // inventory:var:count still names the fixed item `var`; dynamic inventory reads have another property.
+        if (inventory && TokenAt(_position + 2).Kind != TokenKind.Colon)
+            return Span(first);
+        Next();
+        var variable = Expect(TokenKind.Identifier, "an item variable name");
+        return new(first.Offset, variable.Offset + variable.Length - first.Offset);
     }
 
     private EffectSyntax ParseInventoryPropertyAssignment()

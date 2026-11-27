@@ -903,6 +903,130 @@ public sealed class ContinuationSaveTests
         return history;
     }
 
+    [Fact]
+    public void Group_item_variable_round_trips_checkpoint_and_takes_the_matching_group_after_load()
+    {
+        var compilation = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = """
+                game: {id: group-variable, title: Group variable, start: start, talemark: 2}
+                characters:
+                  player: {first-name: Ada}
+                items:
+                  sword: {name: old sword, sharpness: 5, material: "iron", magical: false}
+                """,
+            ["main.tale"] = """
+                === start
+                ~ var:chosen = item:sword
+                -> next
+                === next
+                {var:chosen}: {var:chosen:sharpness}, {var:chosen:material}, {var:chosen:magical}; {player:inventory:var:chosen:count}.
+                * [Spend chosen group] (requires player has var:chosen) { take player var:chosen 2 } -> after
+                === after
+                {var:chosen}: {player:inventory:var:chosen:count}.
+                * [Finish] -> END
+                """,
+        }));
+        Assert.True(compilation.Success, string.Join("\n", compilation.Diagnostics));
+        var story = compilation.Story!;
+        var sword = new ItemId("sword");
+        var chosen = new VarId("chosen");
+        var log = new EventLog(story.World, 42);
+        log.Append(new ItemsGranted(EntityId.Player, sword, 3));
+        var reference = ItemReference.ForGroup(EntityId.Player, sword, log.State.GetItemGroups(EntityId.Player, sword)[0]);
+        log.AppendRange(StateChanges.SetTextVariable(log.State, chosen, reference.Encode()));
+        log.AppendRange(StateChanges.SetItemProperty(log.State, EntityId.Player, sword, "sharpness",
+            new ItemPropertyValue.Number(7)));
+        var bytes = SaveCheckpoint(story, CaptureCheckpoint(story, log));
+        var restored = StoryHistory.RestoreFromCheckpoint(story, bytes);
+        Assert.Equal(reference.Encode(), restored.State.GetTextVariable(chosen));
+        Assert.Equal("old sword: 5, iron, false; 2.", restored.Current.Document.ToPlainText());
+        restored.Choose(restored.Current.Choices.Single().Key);
+        Assert.Equal("[Lost: old sword ×2]\n\n: 0.", restored.Current.Document.ToPlainText());
+        var remaining = Assert.Single(restored.State.GetItemGroups(EntityId.Player, sword));
+        Assert.Equal(ExactNumber.One, remaining.Quantity);
+        Assert.Equal(new ItemPropertyValue.Number(7), remaining.Properties["sharpness"]);
+        var replayed = StoryHistory.Restore(story, restored.Save());
+        Assert.Equal("[Lost: old sword ×2]\n\n: 0.", replayed.Current.Document.ToPlainText());
+        Assert.Equal(reference.Encode(), replayed.State.GetTextVariable(chosen));
+        Assert.Equal(ExactNumber.One, Assert.Single(replayed.State.GetItemGroups(EntityId.Player, sword)).Quantity);
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Group_item_variable_survives_continuation_when_item_gains_a_property(bool originallyHadProperty)
+    {
+        StoryDefinition CompileVersion(bool upgraded)
+        {
+            var sharpness = originallyHadProperty ? "    sharpness: 5\n" : "";
+            var material = upgraded ? "    material: iron\n" : "";
+            var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+            {
+                [StorySource.ManifestFileName] = $$"""
+                    game: {id: group-upgrade, title: Group upgrade, start: start, talemark: 2}
+                    characters:
+                      player: {first-name: Ada}
+                    items:
+                      sword:
+                        name: sword
+                    {{sharpness}}{{material}}
+                    """,
+                ["main.tale"] = """
+                    === start
+                    ~ var:chosen = item:sword
+                    -> next
+                    === next
+                    {var:chosen}: {player:inventory:var:chosen:count}.
+                    * [Use] (requires player has var:chosen) { take player var:chosen 2 } -> after
+                    === after
+                    {var:chosen}: {player:inventory:var:chosen:count}.
+                    -> END
+                    """,
+            }));
+            Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+            return result.Story!;
+        }
+
+        var original = CompileVersion(false);
+        var sword = new ItemId("sword");
+        var chosen = new VarId("chosen");
+        var log = new EventLog(original.World, 42);
+        log.Append(new ItemsGranted(EntityId.Player, sword, 2));
+        var reference = ItemReference.ForGroup(EntityId.Player, sword, log.State.GetItemGroups(EntityId.Player, sword)[0]);
+        log.AppendRange(StateChanges.SetTextVariable(log.State, chosen, reference.Encode()));
+        if (originallyHadProperty)
+        {
+            log.Append(new ItemsGranted(EntityId.Player, sword, 1));
+            log.AppendRange(StateChanges.SetItemProperty(log.State, EntityId.Player, sword, "sharpness",
+                new ItemPropertyValue.Number(7)));
+        }
+
+        var bytes = SaveCheckpoint(original, CaptureCheckpoint(original, log));
+        var saved = StoryHistory.RestoreFromCheckpoint(original, bytes).Save();
+        var updated = CompileVersion(true);
+        var restored = Restore(updated, saved);
+
+        Assert.NotNull(restored.Continuation);
+        Assert.Equal(reference.Encode(), restored.State.GetTextVariable(chosen));
+        Assert.Equal("sword: 2.", restored.Current.Document.ToPlainText());
+        Assert.Equal(new ItemPropertyValue.Text("iron"),
+            restored.State.GetItemGroups(EntityId.Player, sword)[0].Properties["material"]);
+        var resumed = StoryHistory.Restore(updated, restored.Save());
+        Assert.Equal("sword: 2.", resumed.Current.Document.ToPlainText());
+        resumed.Choose(resumed.Current.Choices.Single().Key);
+        Assert.Equal("[Lost: sword ×2]\n\n: 0.", resumed.Current.Document.ToPlainText());
+        if (originallyHadProperty)
+        {
+            var remaining = Assert.Single(resumed.State.GetItemGroups(EntityId.Player, sword));
+            Assert.Equal(new ItemPropertyValue.Number(7), remaining.Properties["sharpness"]);
+        }
+        else
+        {
+            Assert.Empty(resumed.State.GetItemGroups(EntityId.Player, sword));
+        }
+    }
+
     private static CheckpointPayload CaptureCheckpoint(StoryDefinition story, EventLog log) =>
         ContinuationCheckpoint.Capture(story, log.State.Seed, log.Events,
             new PlayerEntryBoundary(new DivertTarget(new SceneId("next")), log.Events.Count, [], []), null);

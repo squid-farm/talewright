@@ -99,6 +99,11 @@ public sealed class AuthorSceneCheckpoint
             ItemPropertyChanged changed => world.Items.TryGetValue(changed.Item, out var item)
                 && item.CustomProperties.TryGetValue(changed.Property, out var value)
                 && ItemPropertySnapshot.KindOf(value) == changed.Kind,
+            ItemGroupsRestored changed => world.TalemarkVersion == 2
+                && world.Items.TryGetValue(changed.Item, out var grouped) && !grouped.Divisible
+                && changed.Groups.All(group => group.Properties.All(property =>
+                    !grouped.CustomProperties.TryGetValue(property.Key, out var declared)
+                    || ItemPropertySnapshot.KindOf(declared) == property.Kind)),
             LevelChanged => world.Ruleset.LevelingRule is { } leveling
                 && world.Ruleset.StatsById.ContainsKey(leveling.LevelStat),
             _ => true,

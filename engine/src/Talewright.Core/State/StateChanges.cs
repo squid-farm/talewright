@@ -88,6 +88,43 @@ public static class StateChanges
         return removed > 0 ? [new ExactItemsRemoved(character, item, removed.ToCanonicalString())] : [];
     }
 
+    /// <summary>
+    /// Takes copies from the held group a reference names. Removal reports the taken quantity; when the group is
+    /// not at the front, the remaining groups are then restored so only the referenced group shrinks.
+    /// </summary>
+    public static IEnumerable<GameEvent> TakeItemGroup(IGameStateView state, EntityId character,
+        ItemReference reference, ExactNumber quantity)
+    {
+        ArgumentNullException.ThrowIfNull(reference);
+        if (!reference.IsGroup)
+            return TakeItem(state, character, reference.Item, quantity);
+        if (reference.Holder != character || reference.Resolve(state) is null)
+            return [];
+
+        var groups = state.GetItemGroups(character, reference.Item);
+        var index = reference.FindGroup(groups);
+        if (index < 0)
+            return [];
+        var requested = ExactNumber.FromInteger(quantity.ToInt32RoundedAwayFromZero());
+        var removed = requested < groups[index].Quantity ? requested : groups[index].Quantity;
+        if (removed <= 0)
+            return [];
+
+        var events = new List<GameEvent> { new ItemsRemoved(character, reference.Item, removed.ToInt32RoundedAwayFromZero()) };
+        if (index > 0)
+        {
+            var remaining = groups.Select((group, position) => position == index
+                    ? group with { Quantity = group.Quantity - removed }
+                    : group)
+                .Where(group => group.Quantity > 0)
+                .Select(group => group.ToSnapshot())
+                .ToArray();
+            events.Add(new ItemGroupsRestored(character, reference.Item, Array.AsReadOnly(remaining)));
+        }
+
+        return events;
+    }
+
     public static IEnumerable<GameEvent> SetItemProperty(IGameStateView state, EntityId character, ItemId item,
         string property, ItemPropertyValue value)
     {

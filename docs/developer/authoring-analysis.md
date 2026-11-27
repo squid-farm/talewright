@@ -117,6 +117,9 @@ An unchanged analyzed revision returns its existing analysis without parsing.
 Invalid or incomplete syntax is reusable too; diagnostics and symbols are not
 cached separately from their analysis revision.
 
+For current-file Talemark 2 analysis, the snapshot retains variable assignments so an edited file can
+re-infer types and item-variable aliases in story order while preserving manifest-declared types.
+
 Changing effective text or deleting a file evicts its syntax immediately. Disk
 updates beneath an open overlay do not evict matching overlay syntax; closing
 restores the supplied disk text and evicts any mismatch. Manifest and image

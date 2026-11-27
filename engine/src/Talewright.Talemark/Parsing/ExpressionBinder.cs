@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using Talewright.Core.Identity;
 using Talewright.Core.Randomness;
+using Talewright.Core.State;
 using Talewright.Core.World;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Effects;
@@ -45,6 +46,7 @@ internal sealed class ExpressionBinder
             var value = binder.Bind(syntax.Root);
             if (expectedType is { } expected && value.Type != expected)
             {
+                if (expected == ExprType.Number) binder.RejectItemNumber(value, syntax.Root.Span);
                 if (expected == ExprType.Number && value is FactionNameRef faction)
                 {
                     binder.Fail(CompilerDiagnosticCodes.TypeMismatch,
@@ -81,7 +83,8 @@ internal sealed class ExpressionBinder
                 ITextModifier modifier;
                 if (call.Name == OneManyTextModifier.ModifierName)
                 {
-                    if (value.Type != ExprType.Number && value is not (PronounRef or ItemNameRef) ||
+                    if (value.Type != ExprType.Number &&
+                        value is not (PronounRef or ItemNameRef { Item: FixedItemOperand }) ||
                         call.Argument is null || call.PluralArgument is null)
                     {
                         binder.Fail(CompilerDiagnosticCodes.InvalidModifier,
@@ -151,7 +154,10 @@ internal sealed class ExpressionBinder
                     && symbols.World.Items[fixedItem.Item].NameAgreement == GrammaticalNumber.Plural,
                 _ => false,
             };
-            var substitution = new SubstitutionTemplate(value, modifiers, isPlural);
+            var substitution = new SubstitutionTemplate(value, modifiers, isPlural)
+            {
+                UseItemGrammar = value is not ItemNameRef { Item: ResolvedItemOperand },
+            };
             return style == TextStyle.None ? substitution : new StyledTemplate(style, [substitution]);
         }
         catch (BindingException)
@@ -196,7 +202,7 @@ internal sealed class ExpressionBinder
         InventoryItemPropertyExpressionNode property => BindInventoryItemProperty(property),
         InventoryItemNameExpressionNode itemName => BindInventoryItemName(itemName),
         SkillCheckExpressionNode skillCheck => BindSkillCheck(skillCheck),
-        HasItemExpressionNode hasItem => new HasItem(Character(hasItem.Character), Item(hasItem.Item)),
+        HasItemExpressionNode hasItem => new HasItem(Character(hasItem.Character), ItemValue(hasItem.Item)),
         UnaryExpressionNode unary => BindUnary(unary),
         BinaryExpressionNode binary => BindBinary(binary),
         _ => throw new InvalidOperationException($"Unknown expression syntax node '{node.GetType().Name}'."),
@@ -226,8 +232,11 @@ internal sealed class ExpressionBinder
 
         var difficulty = syntax.Difficulty is { } difficultySyntax ? Bind(difficultySyntax) : null;
         if (difficulty is { Type: not ExprType.Number })
+        {
+            RejectItemNumber(difficulty, syntax.Difficulty!.Span);
             Fail(CompilerDiagnosticCodes.TypeMismatch,
                 $"'{SceneVocabulary.Difficulty}' needs a number.", TypeMismatchSpan(syntax.Difficulty!));
+        }
 
         var identity = _createSkillCheckIdentity(actor, skill);
         return new SkillCheckExpr(actor, skill, identity, difficulty, syntax.IsHidden);
@@ -381,12 +390,6 @@ internal sealed class ExpressionBinder
 
             case ReferenceNamespace.Variable:
             {
-                if (member is not null)
-                {
-                    Fail(CompilerDiagnosticCodes.UnknownNameOrProperty, $"Variable references do not have properties; use 'var:{path}'.",
-                        reference.Member!.Value.Start);
-                }
-
                 var variable = new VarId(path);
                 if (_symbols.UnresolvedVariables.Contains(variable))
                 {
@@ -401,6 +404,27 @@ internal sealed class ExpressionBinder
                         reference.Name.Start);
                 }
 
+                if (_symbols.ItemVariables.Contains(variable))
+                {
+                    var operand = new ResolvedItemOperand(new TextVarRef(variable));
+                    if (member is null || member == ExpressionVocabulary.Name)
+                        return new ItemNameRef(operand);
+                    var kinds = _symbols.World.Items.Values
+                        .Where(item => item.CustomProperties.ContainsKey(member))
+                        .Select(item => ItemPropertySnapshot.KindOf(item.CustomProperties[member])).Distinct().ToArray();
+                    if (kinds.Length == 0)
+                        Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
+                            $"Unknown item property '{member}'.", reference.Member!.Value);
+                    if (kinds.Length != 1)
+                        Fail(CompilerDiagnosticCodes.TypeMismatch,
+                            $"Item property '{member}' has different types on different items.", reference.Member!.Value);
+                    return new ItemReferencePropertyRef(operand, member, kinds[0]);
+                }
+
+                if (member is not null)
+                    Fail(CompilerDiagnosticCodes.UnknownNameOrProperty,
+                        $"Variable references do not have properties; use 'var:{path}'.",
+                        reference.Member!.Value);
                 return _symbols.World.TextVariables.ContainsKey(variable)
                     ? new TextVarRef(variable)
                     : new VarRef(variable);
@@ -427,10 +451,16 @@ internal sealed class ExpressionBinder
     private Expr BindInventoryItemProperty(InventoryItemPropertyExpressionNode reference)
     {
         var character = InventoryCharacter(reference.Character);
-        var item = InventoryItem(reference.Item);
+        var operand = ItemValue(reference.Item, inventory: true);
         var property = Text(reference.Property);
         if (property == ExpressionVocabulary.Count)
-            return new InventoryCountRef(character, item);
+            return new InventoryCountRef(character, operand);
+
+        if (operand is not FixedItemOperand fixedItem)
+            return Fail<Expr>(CompilerDiagnosticCodes.UnsupportedHeldItemPropertyAccess,
+                $"Read an item variable's property directly: '{Text(reference.Item)}:{property}'.",
+                reference.Property.Start);
+        var item = fixedItem.Item;
 
         var definition = _symbols.World.Items[item];
         if (!definition.CustomProperties.TryGetValue(property, out var declaredValue))
@@ -447,7 +477,7 @@ internal sealed class ExpressionBinder
     private Expr BindInventoryItemName(InventoryItemNameExpressionNode reference)
     {
         _ = InventoryCharacter(reference.Character);
-        return new ItemNameRef(InventoryItem(reference.Item));
+        return new ItemNameRef(ItemValue(reference.Item, inventory: true));
     }
 
     private PronounForm ParsePronounForm(string property, string? subMember, ReferenceExpressionNode reference)
@@ -493,6 +523,7 @@ internal sealed class ExpressionBinder
             case UnaryOp.Negate:
                 if (operand.Type != ExprType.Number)
                 {
+                    RejectItemNumber(operand, unary.Operand.Span);
                     if (operand is FactionNameRef faction)
                     {
                         Fail(CompilerDiagnosticCodes.TypeMismatch,
@@ -527,6 +558,7 @@ internal sealed class ExpressionBinder
 
                 if (operand.Type != ExprType.Number)
                 {
+                    RejectItemNumber(operand, unary.Operand.Span);
                     Fail(CompilerDiagnosticCodes.InvalidModifier,
                         $"Numeric modifier '{modifier}' requires a number-valued expression, but found {Describe(operand.Type)}.",
                         TypeMismatchSpan(unary.Operand, unary.OperatorSpan));
@@ -551,7 +583,22 @@ internal sealed class ExpressionBinder
         var left = Bind(first);
         while (chain.TryPop(out var current))
         {
-            left = BindBinaryOperation(current, left, Bind(current.Right));
+            if (left is ItemNameRef { Item: ResolvedItemOperand operand } &&
+                current.Operator is BinaryOp.Equal or BinaryOp.NotEqual)
+            {
+                var item = current.Right switch
+                {
+                    NameExpressionNode name => name.Name,
+                    BooleanExpressionNode boolean => boolean.Span,
+                    ReferenceExpressionNode { Kind: ReferenceNamespace.Item, Member: null } reference => reference.Name,
+                    _ => Fail<ExpressionSpan>(CompilerDiagnosticCodes.TypeMismatch,
+                        "Compare an item variable with a bare item id or item reference, for example 'var:tool == hammer'.",
+                        current.Right.Span.Start),
+                };
+                left = new ItemComparison(operand, current.Operator, Item(item));
+            }
+            else
+                left = BindBinaryOperation(current, left, Bind(current.Right));
         }
 
         return left;
@@ -573,6 +620,8 @@ internal sealed class ExpressionBinder
             case BinaryOp.Add or BinaryOp.Subtract or BinaryOp.Multiply or BinaryOp.Divide:
                 if (left.Type != ExprType.Number || right.Type != ExprType.Number)
                 {
+                    RejectItemNumber(left, binary.Left.Span);
+                    RejectItemNumber(right, binary.Right.Span);
                     if (left is FactionNameRef leftFaction)
                     {
                         Fail(CompilerDiagnosticCodes.TypeMismatch,
@@ -594,6 +643,8 @@ internal sealed class ExpressionBinder
                 break;
             case BinaryOp.Equal or BinaryOp.NotEqual or BinaryOp.Less or BinaryOp.LessOrEqual or BinaryOp.Greater
                 or BinaryOp.GreaterOrEqual:
+                RejectItemNumber(left, binary.Left.Span);
+                RejectItemNumber(right, binary.Right.Span);
                 if (left.Type != right.Type)
                 {
                     if (left is FactionNameRef leftFaction && right.Type is ExprType.Number or ExprType.Tier)
@@ -644,13 +695,14 @@ internal sealed class ExpressionBinder
     private Effect BindGiveTake(GiveTakeEffectSyntax effect)
     {
         var character = Character(effect.Character);
-        var item = Item(effect.Item);
+        var item = ItemValue(effect.Item);
         Expr quantity = new NumberLiteral(1);
         if (effect.Quantity is { } quantitySyntax)
         {
             quantity = Bind(quantitySyntax);
             if (quantity.Type != ExprType.Number)
             {
+                RejectItemNumber(quantity, quantitySyntax.Span);
                 if (quantity is FactionNameRef faction)
                 {
                     Fail(CompilerDiagnosticCodes.TypeMismatch,
@@ -783,6 +835,24 @@ internal sealed class ExpressionBinder
         }
 
         var op = effect.Operator;
+        if (effect.Kind == ReferenceNamespace.Variable && _symbols.ItemVariables.Contains(variable))
+        {
+            if (op != AssignOp.Set)
+                Fail(CompilerDiagnosticCodes.TypeMismatch,
+                    $"Item variable '{targetName}' supports '=' only.", effect.Target);
+            var source = Unwrap(effect.Amount);
+            Expr stored;
+            if (source is ReferenceExpressionNode { Kind: ReferenceNamespace.Item, Member: null } itemReference)
+                stored = new TextLiteral(Item(itemReference.Name).Value);
+            else if (source is ReferenceExpressionNode { Kind: ReferenceNamespace.Variable, Member: null } &&
+                     Bind(source) is ItemNameRef { Item: ResolvedItemOperand resolved })
+                stored = resolved.Expression;
+            else
+                return Fail<Effect>(CompilerDiagnosticCodes.TypeMismatch,
+                    $"Item variable '{targetName}' needs an item reference, for example 'item:rope' or another item variable.",
+                    effect.Amount.Span.Start);
+            return new SetTextVariable(variable, stored);
+        }
         var amount = Bind(effect.Amount);
         if (effect.Kind == ReferenceNamespace.Variable && _symbols.World.TextVariables.ContainsKey(variable))
         {
@@ -803,6 +873,7 @@ internal sealed class ExpressionBinder
 
         if (amount.Type != ExprType.Number)
         {
+            RejectItemNumber(amount, effect.Amount.Span);
             if (amount is FactionNameRef faction)
             {
                 Fail(CompilerDiagnosticCodes.TypeMismatch,
@@ -829,6 +900,59 @@ internal sealed class ExpressionBinder
         return property == ExpressionVocabulary.Tier
             ? $"Faction names are text. Use '{value}' to compare the faction's standing tier."
             : $"Faction names are text. Use '{value}' for the numeric standing.";
+    }
+
+    private static ExpressionNode Unwrap(ExpressionNode node) =>
+        node is ParenthesizedExpressionNode parenthesized ? Unwrap(parenthesized.Inner) : node;
+
+    internal static bool IsItemSource(ExpressionNode node, Expr? expression) => Unwrap(node) switch
+    {
+        ReferenceExpressionNode { Kind: ReferenceNamespace.Item, Member: null } => true,
+        ReferenceExpressionNode { Kind: ReferenceNamespace.Variable, Member: null } =>
+            expression is ItemNameRef { Item: ResolvedItemOperand },
+        _ => false,
+    };
+
+    private void RejectItemNumber(Expr expression, ExpressionSpan span)
+    {
+        if (expression is ItemNameRef { Item: ResolvedItemOperand { Expression: TextVarRef variable } })
+            Fail(CompilerDiagnosticCodes.TypeMismatch,
+                $"Variable '{variable.Variable}' holds an item, not a number. " +
+                $"Use 'player:inventory:var:{variable.Variable}:count' for its count.", span);
+    }
+
+    private ItemOperand ItemValue(ExpressionSpan span, bool inventory = false)
+    {
+        var text = Text(span);
+        var separator = text.IndexOf(ExpressionVocabulary.Separator);
+        if (separator < 0)
+            return new FixedItemOperand(inventory ? InventoryItem(span) : Item(span));
+        if (_symbols.World.TalemarkVersion != 2)
+            return Fail<ItemOperand>(CompilerDiagnosticCodes.TypeMismatch,
+                "Item variables are available only in Talemark 2. Set 'game.talemark: 2' to use them.", span.Start);
+        var variable = new VarId(text[(separator + 1)..].Trim());
+        if (!_symbols.ItemVariables.Contains(variable))
+        {
+            if (_symbols.World.TextVariables.ContainsKey(variable) || _symbols.World.ExactVariables.ContainsKey(variable))
+            {
+                var type = _symbols.World.TextVariables.ContainsKey(variable) ? "text" : "a number";
+                string guidance;
+                if (!_symbols.VariableTypeOrigins.TryGetValue(variable, out var origin))
+                    guidance = "Its declaration under 'vars:' or its first assignment fixed its type. Remove its 'vars:' entry if present and make its first assignment an item";
+                else if (origin is { } location)
+                    guidance = $"Its first assignment at {location} fixed its type. Change that first assignment to an item";
+                else
+                    guidance = "Its declaration under 'vars:' fixed its type. Remove its 'vars:' entry so its first assignment can be an item";
+                return Fail<ItemOperand>(CompilerDiagnosticCodes.TypeMismatch,
+                    $"Variable '{variable}' does not hold an item; it holds {type}. {guidance}, " +
+                    $"for example '~ var:{variable} = item:rope'.",
+                    span.Start);
+            }
+            return Fail<ItemOperand>(CompilerDiagnosticCodes.TypeMismatch,
+                $"Variable '{variable}' does not hold an item. Assign it an item first, for example '~ var:{variable} = item:rope'.",
+                span.Start);
+        }
+        return new ResolvedItemOperand(new TextVarRef(variable));
     }
 
     private static string FactionReference(string faction, string property) =>

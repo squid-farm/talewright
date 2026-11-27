@@ -1,0 +1,16 @@
+game:
+  id: remembered-ingredients
+  title: Remembered Ingredients
+  start: crafting
+  talemark: 2
+  ruleset: none
+
+characters:
+  player:
+    first-name: Ada
+    inventory: {iron-ore: 1, charcoal: 1}
+
+items:
+  iron-ore: {name: iron ore}
+  charcoal: {name: charcoal}
+  steel: {name: steel}

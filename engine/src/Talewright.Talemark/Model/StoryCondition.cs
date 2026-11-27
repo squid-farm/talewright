@@ -152,6 +152,8 @@ public sealed class StoryCondition
                 FactionNameRef value => Create(StoryStateReadKind.FactionName, value),
                 ItemNameRef value => Create(StoryStateReadKind.ItemName, value),
                 ItemPropertyRef value => Create(StoryStateReadKind.ItemProperty, value),
+                ItemComparison value => Create(StoryStateReadKind.ItemName, value),
+                ItemReferencePropertyRef value => Create(StoryStateReadKind.InventoryItemProperty, value),
                 InventoryItemPropertyRef value => Create(StoryStateReadKind.InventoryItemProperty, value),
                 HasItem value => Create(StoryStateReadKind.ItemsHeld, value),
                 Visited value => Create(StoryStateReadKind.VisitedScene, value),
@@ -167,6 +169,10 @@ public sealed class StoryCondition
                 pending.Push(hasItemOperand.Expression);
             else if (current is InventoryCountRef { Item: ResolvedItemOperand inventoryOperand })
                 pending.Push(inventoryOperand.Expression);
+            else if (current is ItemComparison { Item: ResolvedItemOperand comparisonOperand })
+                pending.Push(comparisonOperand.Expression);
+            else if (current is ItemReferencePropertyRef { Item: ResolvedItemOperand propertyOperand })
+                pending.Push(propertyOperand.Expression);
         }
     }
 

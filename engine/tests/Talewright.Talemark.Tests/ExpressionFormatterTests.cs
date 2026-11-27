@@ -206,6 +206,15 @@ public class ExpressionFormatterTests
         var covered = representatives.Select(source => Parse(source).GetType()).ToHashSet();
         var version2Manifest = Manifest.Replace("talemark: 1", "talemark: 2", StringComparison.Ordinal);
         covered.Add(Parse("player:inventory:lantern:color", version2Manifest).GetType());
+        var itemVariable = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = version2Manifest,
+            ["main.tale"] = "=== a\n~ var:tool = item:lantern\n{var:tool == lantern} {var:tool:color}\n-> END",
+        }), Options);
+        Assert.True(itemVariable.Success, string.Join("\n", itemVariable.Diagnostics));
+        foreach (var substitution in CompilerTests.Templates(itemVariable.Story!.Scenes[0])
+                     .OfType<ParagraphTemplate>().SelectMany(paragraph => paragraph.Inlines).OfType<SubstitutionTemplate>())
+            covered.Add(substitution.Value.GetType());
         covered.Add(ParseCondition("skill-check perception dc 12").GetType());
         var nodes = typeof(Expr).Assembly.GetTypes().Where(type => type.IsSubclassOf(typeof(Expr)) && !type.IsAbstract);
         Assert.Equal(nodes.OrderBy(type => type.Name), covered.OrderBy(type => type.Name));

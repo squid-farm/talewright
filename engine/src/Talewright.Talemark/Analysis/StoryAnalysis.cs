@@ -136,7 +136,10 @@ public sealed class StoryAnalysis
                 : source).ToArray();
         _sites = new CompletionSiteIndex(siteSources, TalemarkVersion, World);
         var names = collector.Names.ToArray();
-        _names = currentFileAnalysis ? null : new(() => NameIndex.Build(Symbols, names, siteSources));
+        var itemVariables = collector.SymbolContext?.ItemVariables
+            .Select(variable => variable.Value)
+            .ToHashSet(StringComparer.Ordinal);
+        _names = currentFileAnalysis ? null : new(() => NameIndex.Build(Symbols, names, siteSources, itemVariables));
         Tokens = Array.AsReadOnly(collector.Tokens.ToArray());
         var classificationSources = collector.ClassificationSources.ToArray();
         _classifications = new(() => Array.AsReadOnly(classificationSources
@@ -332,6 +335,7 @@ public static class StoryAnalyzer
             IReadOnlySet<FlagId> flags;
             IReadOnlySet<VarId> variables;
             IReadOnlySet<VarId> unresolved;
+            IReadOnlySet<VarId> itemVariables;
             IReadOnlySet<SceneId> scenes;
             if (unchangedDeclarations)
             {
@@ -339,6 +343,7 @@ public static class StoryAnalyzer
                 flags = context!.Flags;
                 variables = context.Variables;
                 unresolved = context.UnresolvedVariables;
+                itemVariables = context.ItemVariables;
                 scenes = context.Scenes;
                 collector.CurrentWorld(world);
             }
@@ -353,12 +358,37 @@ public static class StoryAnalyzer
                     textVariables, mutableUnresolved, mutableScenes);
                 mutableFlags.UnionWith(localFlags);
                 mutableScenes.UnionWith(currentScenes);
+                var resolveDeclarations = declarations.AsEnumerable();
+                var mutableItemVariables = context?.ItemVariables.Where(textVariables.ContainsKey).ToHashSet() ?? [];
+                if (context is not null && collector.TalemarkVersion == 2)
+                {
+                    // Re-infer every non-manifest variable: aliases can depend on an edited first assignment.
+                    foreach (var (id, origin) in context.VariableTypeOrigins)
+                        if (origin is not null)
+                        {
+                            numbers.Remove(id);
+                            textVariables.Remove(id);
+                        }
+                    mutableUnresolved.Clear();
+                    mutableItemVariables.Clear();
+                    resolveDeclarations = context.VariableDeclarations
+                        .Where(declaration => declaration.Location.File != file)
+                        .Concat(declarations)
+                        .OrderBy(declaration => StorySource.IsConfigurationFile(declaration.Location.File) ? 1 : 0)
+                        .ThenBy(declaration => StorySource.IsConfigurationFile(declaration.Location.File)
+                            ? "" : declaration.Location.File, StringComparer.Ordinal);
+                }
                 var baseWorld = new WorldDefinition(previousWorld.Ruleset, previousWorld.Characters.Values,
                     previousWorld.Items.Values, previousWorld.Factions.Values, mutableFlags, numbers, textVariables,
                     previousWorld.InitialFlags.Where(pair => mutableFlags.Contains(pair.Key)).ToDictionary(),
                     previousWorld.TalemarkVersion);
+                var discoveryDiagnostics = context is not null && collector.TalemarkVersion == 2
+                    ? new DiagnosticBag() : diagnostics;
                 var localUnresolved = VariableDiscovery.Resolve(baseWorld, mutableFlags, mutableScenes,
-                    declarations, numbers, textVariables, options, diagnostics);
+                    resolveDeclarations.ToArray(), numbers, textVariables, options, discoveryDiagnostics, mutableItemVariables);
+                if (!ReferenceEquals(discoveryDiagnostics, diagnostics))
+                    foreach (var diagnostic in discoveryDiagnostics.Items.Where(diagnostic => diagnostic.Location.File == file))
+                        diagnostics.Error(diagnostic.Code, diagnostic.Message, diagnostic.Location);
                 mutableUnresolved.UnionWith(localUnresolved);
                 world = new WorldDefinition(previousWorld.Ruleset, previousWorld.Characters.Values,
                     previousWorld.Items.Values, previousWorld.Factions.Values, mutableFlags, numbers, textVariables,
@@ -368,6 +398,7 @@ public static class StoryAnalyzer
                 flags = mutableFlags;
                 variables = numbers.Keys.Concat(textVariables.Keys).Concat(mutableUnresolved).ToHashSet();
                 unresolved = mutableUnresolved;
+                itemVariables = mutableItemVariables;
                 scenes = mutableScenes;
             }
 
@@ -380,6 +411,8 @@ public static class StoryAnalyzer
                 Flags = flags,
                 Variables = variables,
                 UnresolvedVariables = unresolved,
+                ItemVariables = itemVariables,
+                VariableTypeOrigins = unchangedDeclarations ? context!.VariableTypeOrigins : new Dictionary<VarId, SourceLocation?>(),
                 Scenes = scenes,
                 Predicates = context?.Predicates ?? options.Predicates,
                 Modifiers = context?.Modifiers ?? options.Modifiers,

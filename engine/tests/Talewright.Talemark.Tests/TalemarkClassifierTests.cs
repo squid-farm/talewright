@@ -8,6 +8,25 @@ namespace Talewright.Talemark.Tests;
 public sealed class TalemarkClassifierTests
 {
     [Fact]
+    public void Item_variables_keep_namespace_name_and_property_categories_in_each_slot()
+    {
+        const string tale = """
+            === start
+            ~ var:chosen = item:sword
+            {var:chosen:sharpness} {player:inventory:var:chosen:count}
+            * [Use {var:chosen}] (requires player has var:chosen and var:chosen == sword) { take player var:chosen } -> END
+            """;
+        var tokens = TalemarkClassifier.Classify("main.tale", tale, talemarkVersion: 2);
+        Assert.All(tokens.Where(token => TextOf(tale, token) == "chosen"),
+            token => Assert.Equal(TalemarkClassificationKind.Identifier, token.Kind));
+        Assert.All(tokens.Where(token => TextOf(tale, token) == "var"),
+            token => Assert.Equal(TalemarkClassificationKind.Namespace, token.Kind));
+        Assert.All(tokens.Where(token => TextOf(tale, token) is "sharpness" or "count"),
+            token => Assert.Equal(TalemarkClassificationKind.Property, token.Kind));
+        Assert.Equal(7, tokens.Count(token => TextOf(tale, token) == "chosen"));
+    }
+
+    [Fact]
     public void Indented_prose_and_speech_keep_inline_token_source_ranges()
     {
         const string tale = "=== start\n  **Bold** {player:first-name}\n\t> guide:  \t{player:first-name}\n  -> END";

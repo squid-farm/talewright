@@ -14,7 +14,7 @@ internal static class VariableDiscovery
     internal static HashSet<VarId> Resolve(WorldDefinition manifest, HashSet<FlagId> flags,
         HashSet<SceneId> scenes, IReadOnlyList<VariableDeclaration> declarations,
         Dictionary<VarId, ExactNumber> numbers, Dictionary<VarId, string> text,
-        CompilerOptions options, DiagnosticBag diagnostics)
+        CompilerOptions options, DiagnosticBag diagnostics, HashSet<VarId> itemVariables)
     {
         var first = declarations.DistinctBy(declaration => declaration.Id)
             .Where(declaration => !numbers.ContainsKey(declaration.Id) && !text.ContainsKey(declaration.Id)).ToArray();
@@ -26,6 +26,7 @@ internal static class VariableDiscovery
             World = world, Flags = flags, Scenes = scenes,
             Variables = numbers.Keys.Concat(text.Keys).Concat(unresolved).ToHashSet(),
             UnresolvedVariables = unresolved, Predicates = options.Predicates, Modifiers = options.Modifiers,
+            ItemVariables = itemVariables,
         };
         var syntax = first.Where(declaration => !declaration.Numeric).ToDictionary(declaration => declaration.Id,
             declaration =>
@@ -43,10 +44,14 @@ internal static class VariableDiscovery
             foreach (var declaration in first.Where(declaration => unresolved.Contains(declaration.Id)))
             {
                 // Arithmetic and compound assignment constrain a variable to numbers, including self-increments.
-                var type = declaration.Numeric ? ExprType.Number :
+                var expression = declaration.Numeric ? null :
                     ExpressionBinder.Bind(syntax[declaration.Id], symbols, new DiagnosticBag(),
-                        declaration.Location.Offset, createSkillCheckIdentity: static (_, _) => default)?.Type;
+                        declaration.Location.Offset, createSkillCheckIdentity: static (_, _) => default);
+                var type = declaration.Numeric ? ExprType.Number : expression?.Type;
                 if (type is not (ExprType.Number or ExprType.Text)) continue;
+                if (!declaration.Numeric && manifest.TalemarkVersion == 2 &&
+                    ExpressionBinder.IsItemSource(syntax[declaration.Id].Root, expression))
+                    itemVariables.Add(declaration.Id);
                 if (type == ExprType.Text) text.Add(declaration.Id, "");
                 else numbers.Add(declaration.Id, ExactNumber.Zero);
                 unresolved.Remove(declaration.Id);

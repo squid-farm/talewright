@@ -3,6 +3,7 @@ using Talewright.Core;
 using Talewright.Core.Identity;
 using Talewright.Core.Randomness;
 using Talewright.Core.Rulesets;
+using Talewright.Core.State;
 using Talewright.Core.World;
 using Talewright.Rules.Checks;
 using Talewright.Rules.Effects;
@@ -63,6 +64,11 @@ public sealed class ChoiceReplayIdentityEncodingTests
             """["pronoun-ref","player","PossessivePronoun"]""" },
         { "faction name", new FactionNameRef(Guild), """["faction-name-ref","guild"]""" },
         { "item name", new ItemNameRef(Torch), """["item-name-ref","torch"]""" },
+        { "item variable comparison", new ItemComparison(new TextVarRef(new VarId("chosen")), BinaryOp.Equal, Rope),
+            """["item-comparison",["resolved-item",["text-variable-ref","chosen"]],"Equal","rope"]""" },
+        { "item variable property", new ItemReferencePropertyRef(new TextVarRef(new VarId("chosen")), "weight",
+            ItemPropertyValueKind.Number),
+            """["item-reference-property-ref",["resolved-item",["text-variable-ref","chosen"]],"weight","number"]""" },
         { "item property", new ItemPropertyRef(Rope, "weight",
             new ItemPropertyValue.Number(ExactNumber.FromFraction(5, 4))),
             """["item-property-ref","rope","weight",["number","5/4"]]""" },
