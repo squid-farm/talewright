@@ -149,7 +149,7 @@
           { "type": "string" }
         ]
       },
-      "description": "Optional numeric or text variables keyed by story-specific IDs. Version 1 accepts integers; version 2 accepts exact decimal numbers. Quote text initial values, including empty text and numeric-looking text. Initial values establish fixed types."
+      "description": "Optional variables keyed by story-specific IDs. Version 1 accepts integers; version 2 accepts exact decimals and plain item references such as item:iron-ore. Quote text initial values, including empty text, numeric-looking text and text beginning with item:. Initial values establish fixed types. The compiler checks YAML quoting, item IDs and the language version."
     },
     "triggers": {
       "type": "array",

@@ -103,6 +103,39 @@ public sealed partial class ServerTests
     }
 
     [Fact]
+    public async Task Item_rename_includes_plain_manifest_initializer_but_not_quoted_text()
+    {
+        await using var client = new Client();
+        const string manifest = """
+            game: { id: item-rename, title: Item rename, start: start, talemark: 2 }
+            characters: { player: { first-name: Ada } }
+            items: { sword: Sword }
+            vars:
+              chosen: item:sword
+              literal: "item:sword"
+            """;
+        const string tale = "=== start\n{var:chosen}\n-> END";
+        File.WriteAllText(client.PathOf(StorySource.ManifestFileName), manifest);
+        File.WriteAllText(client.PathOf("start.tale"), tale);
+        await client.Initialize(capabilities: RenameCapabilities);
+        await client.Open(StorySource.ManifestFileName, manifest, 1);
+        var line = LineOf(manifest, "  chosen:");
+        var column = manifest.Split('\n')[line].IndexOf("sword", StringComparison.Ordinal);
+        var prepared = (await PrepareRename(client, StorySource.ManifestFileName, line, column)).GetProperty("result");
+        Assert.Equal("sword", prepared.GetProperty("placeholder").GetString());
+        var references = Locations(await References(client, StorySource.ManifestFileName, line, column, false));
+        var use = Assert.Single(references);
+        Assert.Equal((client.UriOf(StorySource.ManifestFileName), line, column, column + "sword".Length), use);
+        var changes = DocumentChanges(await RenameAt(client, StorySource.ManifestFileName, line, column, "blade"));
+        var edits = Assert.Single(changes).Edits;
+        Assert.Equal(2, edits.Length);
+        var reference = Assert.Single(edits, edit => edit.Line == line);
+        Assert.Equal(column, reference.Start);
+        Assert.Equal(column + "sword".Length, reference.End);
+        Assert.DoesNotContain(edits, edit => edit.Line == LineOf(manifest, "  literal:"));
+    }
+
+    [Fact]
     public async Task Cross_file_scene_rename_edits_unsaved_tale_and_manifest_documents_with_their_versions()
     {
         await using var client = new Client();

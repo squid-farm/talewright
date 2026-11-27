@@ -10,6 +10,49 @@ namespace Talewright.LanguageServer.Tests;
 public sealed partial class ServerTests
 {
     [Fact]
+    public async Task Manifest_item_initializer_completes_dotted_item_ids_without_replacing_prefix()
+    {
+        await using var client = new Client();
+        const string marked = """
+            game: { id: item-completion, title: Item completion, start: start, talemark: 2 }
+            characters: { player: { first-name: Ada } }
+            items: { weapon.knife: Knife, weapon.sword: Sword, rope: Rope }
+            vars: { chosen: item:weapon.k|ni }
+            """;
+        File.WriteAllText(client.PathOf(StorySource.ManifestFileName), marked.Replace("|", "", StringComparison.Ordinal));
+        File.WriteAllText(client.PathOf("start.tale"), "=== start\n-> END");
+        await client.Initialize();
+        await client.Open(StorySource.ManifestFileName, marked.Replace("|", "", StringComparison.Ordinal), 1);
+        var completions = Items(await Completion(client, StorySource.ManifestFileName, marked));
+        var knife = Assert.Single(completions, HasLabel("weapon.knife"));
+        Assert.DoesNotContain(completions, HasLabel("rope"));
+        var edit = knife.GetProperty("textEdit");
+        Assert.Equal("weapon.knife", edit.GetProperty("newText").GetString());
+        var line = marked.Split('\n')[3].Replace("|", "", StringComparison.Ordinal);
+        var start = line.IndexOf("weapon.kni", StringComparison.Ordinal);
+        Assert.Equal(start, edit.GetProperty("range").GetProperty("start").GetProperty("character").GetInt32());
+        Assert.Equal(start + "weapon.kni".Length, edit.GetProperty("range").GetProperty("end").GetProperty("character").GetInt32());
+    }
+
+    [Fact]
+    public async Task Manifest_initialized_item_variable_completion_reports_item_type()
+    {
+        await using var client = new Client();
+        File.WriteAllText(client.PathOf(StorySource.ManifestFileName), """
+            game: { id: item-completion, title: Item completion, start: start, talemark: 2 }
+            characters: { player: { first-name: Ada } }
+            items: { sword: Sword }
+            vars: { chosen: item:sword }
+            """);
+        const string marked = "=== start\n{var:cho|}\n-> END";
+        File.WriteAllText(client.PathOf("start.tale"), marked.Replace("|", "", StringComparison.Ordinal));
+        await client.Initialize();
+        await client.Open("start.tale", marked.Replace("|", "", StringComparison.Ordinal), 1);
+        var chosen = Assert.Single(Items(await Completion(client, "start.tale", marked)), HasLabel("chosen"));
+        Assert.Equal("Variable: item", chosen.GetProperty("detail").GetString());
+    }
+
+    [Fact]
     public async Task Held_item_property_completion_uses_declared_properties()
     {
         await using var client = new Client();

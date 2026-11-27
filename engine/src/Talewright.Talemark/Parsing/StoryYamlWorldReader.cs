@@ -2,6 +2,7 @@ using System.Globalization;
 using Talewright.Core;
 using Talewright.Core.Identity;
 using Talewright.Core.Rulesets;
+using Talewright.Core.State;
 using Talewright.Core.Text;
 using Talewright.Core.World;
 using Talewright.Talemark.Model;
@@ -568,14 +569,16 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
         return flags;
     }
 
-    internal (Dictionary<VarId, ExactNumber> Numbers, Dictionary<VarId, string> Text) ReadVars(
-        YamlNode? node, int talemarkVersion)
+    internal (Dictionary<VarId, ExactNumber> Numbers, Dictionary<VarId, string> Text,
+        Dictionary<VarId, ItemId> Items) ReadVars(
+        YamlNode? node, int talemarkVersion, IReadOnlyDictionary<ItemId, ItemDefinition> items)
     {
         var numericVars = new Dictionary<VarId, ExactNumber>();
         var textVars = new Dictionary<VarId, string>();
+        var itemVars = new Dictionary<VarId, ItemId>();
         if (node is null || _yaml.Mapping(node, ManifestVocabulary.Vars) is not { } map)
         {
-            return (numericVars, textVars);
+            return (numericVars, textVars, itemVars);
         }
 
         foreach (var (key, value) in map.Children)
@@ -585,6 +588,27 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
             {
                 textVars.Add(new VarId(id), text.Value ?? "");
             }
+            else if (talemarkVersion == 2 && value is YamlScalarNode { Style: ScalarStyle.Plain, Value: { } reference }
+                && reference.StartsWith(ExpressionVocabulary.Item + ExpressionVocabulary.Separator, StringComparison.Ordinal))
+            {
+                var name = reference[(ExpressionVocabulary.Item.Length + 1)..];
+                if (!IdentifierRules.IsValid(name))
+                {
+                    _yaml.Error(value, CompilerDiagnosticCodes.InvalidConfigurationValue,
+                        $"Variable '{id}' needs a valid item reference, such as item:iron-ore.", 0);
+                }
+                else if (!items.ContainsKey(new ItemId(name)))
+                {
+                    _yaml.Error(value, CompilerDiagnosticCodes.UnknownConfigurationReference,
+                        $"Unknown item '{name}' for variable '{id}'. Declare it under items.", 0);
+                }
+                else
+                {
+                    var item = new ItemId(name);
+                    itemVars.Add(new VarId(id), item);
+                    textVars.Add(new VarId(id), ItemReference.ForItem(item).Encode());
+                }
+            }
             else if (value is YamlScalarNode { Value: { } raw } &&
                 TryParseVariableNumber(raw, talemarkVersion, out var number))
             {
@@ -593,11 +617,16 @@ internal sealed class StoryYamlWorldReader(StoryYamlContext yaml, StatDiagnostic
             else
             {
                 _yaml.Error(value, CompilerDiagnosticCodes.InvalidConfigurationValue,
-                    $"Variable '{id}' needs {(talemarkVersion == 1 ? "a whole number" : "a decimal number")} or quoted text value.", 0);
+                    talemarkVersion == 1 && value is YamlScalarNode { Style: ScalarStyle.Plain, Value: { } legacy }
+                        && legacy.StartsWith(ExpressionVocabulary.Item + ExpressionVocabulary.Separator, StringComparison.Ordinal)
+                        ? $"Variable '{id}' needs a whole number or quoted text value. Item variable initializers require game.talemark: 2."
+                    : talemarkVersion == 1
+                        ? $"Variable '{id}' needs a whole number or quoted text value."
+                        : $"Variable '{id}' needs a decimal number, quoted text, or an item reference such as item:iron-ore.", 0);
             }
         }
 
-        return (numericVars, textVars);
+        return (numericVars, textVars, itemVars);
     }
 
     private static bool TryParseVariableNumber(string raw, int talemarkVersion, out ExactNumber number)

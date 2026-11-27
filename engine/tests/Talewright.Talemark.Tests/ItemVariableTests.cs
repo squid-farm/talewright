@@ -34,6 +34,110 @@ public sealed class ItemVariableTests
         """;
 
     [Fact]
+    public void Manifest_item_initializer_is_available_before_any_assignment()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = Manifest + "\nvars:\n  chosen: item:iron-ore\n  literal: \"item:iron-ore\"\n  amount: 0.5\n",
+            ["main.tale"] = """
+                === start
+                {var:chosen}: {var:chosen:heat}, {var:literal}, {var:amount}.
+                ~ give player var:chosen 2
+                * [Use] (requires player has var:chosen and var:chosen == iron-ore) { take player var:chosen; var:chosen = item:steel; give player var:chosen } -> END
+                """,
+        });
+        var result = StoryCompiler.Compile(source);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var story = result.Story!;
+        var log = new EventLog(story.World, 1);
+        Assert.Equal("iron-ore", log.State.GetTextVariable(new("chosen")));
+        Assert.Equal("item:iron-ore", log.State.GetTextVariable(new("literal")));
+        Assert.Equal("iron ore: 5, item:iron-ore, 0.5.", new TemplateRenderer()
+            .Render(CompilerTests.Templates(story.Scenes[0]), log.State).ToPlainText());
+        foreach (var effect in story.Scenes[0].Steps.OfType<EffectStep>().SelectMany(step => step.Effects))
+            EffectExecutor.Execute(effect, log, story.Predicates);
+        var choice = Assert.Single(story.Scenes[0].Steps.OfType<ChoiceStep>()).Choice;
+        Assert.True(ExpressionEvaluator.IsTrue(choice.Requires!, EvaluationContext.For(log.State)));
+        foreach (var effect in choice.Effects)
+            EffectExecutor.Execute(effect, log, story.Predicates);
+        Assert.Equal(1, log.State.GetItemCount(EntityId.Player, new("iron-ore")));
+        Assert.Equal(1, log.State.GetItemCount(EntityId.Player, new("steel")));
+        Assert.Equal("steel", log.State.GetTextVariable(new("chosen")));
+
+        var analysis = StoryAnalyzer.Analyze(source);
+        Assert.Contains("chosen", analysis.ItemVariables);
+        Assert.DoesNotContain("literal", analysis.ItemVariables);
+        Assert.False(analysis.StaticallyKnownItemVariables.ContainsKey("chosen"));
+    }
+
+    [Theory]
+    [InlineData("item:missing", "TW4005", "Unknown item")]
+    [InlineData("item:bad..id", "TW4003", "valid item reference")]
+    [InlineData("item:iron-ore:heat", "TW4003", "valid item reference")]
+    public void Manifest_item_initializer_reports_invalid_references(string value, string code, string message)
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = Manifest + $"\nvars:\n  chosen: {value}\n",
+            ["main.tale"] = "=== start\n-> END",
+        }));
+        var diagnostic = Assert.Single(result.Diagnostics, d => d.Code == code);
+        Assert.Contains(message, diagnostic.Message);
+        Assert.Equal(StorySource.ManifestFileName, diagnostic.Location.File);
+        Assert.Equal("  chosen: ".Length + 1, diagnostic.Location.Column);
+    }
+
+    [Fact]
+    public void Incomplete_item_initializer_reports_invalid_yaml()
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = Manifest + "\nvars:\n  chosen: item:\n",
+            ["main.tale"] = "=== start\n-> END",
+        }));
+        Assert.Contains(result.Diagnostics, d => d.Code == "TW4001" && d.Message.Contains("Invalid YAML"));
+    }
+
+    [Fact]
+    public void Manifest_initializer_in_supporting_file_infers_item_alias()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = Manifest,
+            ["data/vars.talewright.yaml"] = "vars:\n  chosen: item:iron-ore\n",
+            ["main.tale"] = "=== start\n~ var:copy = var:chosen\n~ give player var:copy\n-> END",
+        });
+        var result = StoryCompiler.Compile(source);
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var analysis = StoryAnalyzer.Analyze(source);
+        Assert.Contains("chosen", analysis.ItemVariables);
+        Assert.Contains("copy", analysis.ItemVariables);
+        Assert.Equal("iron-ore", analysis.StaticallyKnownItemVariables["chosen"]);
+        var occurrence = Assert.Single(analysis.Names.Occurrences(AuthoringSymbolKind.Item, "iron-ore"),
+            occurrence => !occurrence.IsDeclaration);
+        Assert.Equal("data/vars.talewright.yaml", occurrence.Range.Start.File);
+    }
+
+    [Fact]
+    public void Manifest_item_initializer_requires_talemark_two_and_quoted_value_remains_text_in_one()
+    {
+        var manifest = Manifest.Replace("talemark: 2", "talemark: 1", StringComparison.Ordinal);
+        var rejected = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = manifest + "\nvars:\n  chosen: item:iron-ore\n",
+            ["main.tale"] = "=== start\n-> END",
+        }));
+        Assert.Contains(rejected.Diagnostics, d => d.Code == "TW4003" && d.Message.Contains("game.talemark: 2"));
+        var quoted = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = manifest + "\nvars:\n  chosen: \"item:iron-ore\"\n",
+            ["main.tale"] = "=== start\n-> END",
+        }));
+        Assert.True(quoted.Success, string.Join("\n", quoted.Diagnostics));
+        Assert.Equal("item:iron-ore", new EventLog(quoted.Story!.World, 1).State.GetTextVariable(new("chosen")));
+    }
+
+    [Fact]
     public void Discovery_infers_aliases_from_an_initial_item_variable()
     {
         var source = new StorySource(new Dictionary<string, string>

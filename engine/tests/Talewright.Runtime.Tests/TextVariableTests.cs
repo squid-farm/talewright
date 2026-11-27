@@ -8,6 +8,44 @@ namespace Talewright.Runtime.Tests;
 
 public class TextVariableTests
 {
+    [Fact]
+    public void Initially_declared_item_survives_replay_and_checkpoint_continuation()
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = """
+                game: { id: initial-item, title: Initial item, start: start, talemark: 2 }
+                characters: { player: { first-name: Ada } }
+                items: { sword: Sword }
+                vars: { chosen: item:sword }
+                """,
+            ["main.tale"] = """
+                === start
+                Chosen: {var:chosen}.
+                * [Take] (requires var:chosen == sword) { give player var:chosen } -> next
+                === next
+                {if player has var:chosen}Holding {var:chosen}.{/if}
+                * [Finish] { take player var:chosen } -> END
+                """,
+        }));
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var history = new StoryHistory(result.Story!, 42);
+        Assert.Contains("Chosen: Sword.", history.Current.Document.ToPlainText());
+        history.Choose("c0");
+        var bytes = history.Save();
+        var replay = StoryHistory.Restore(result.Story!, bytes);
+        var replayOnly = StoryHistory.Restore(result.Story!, SaveFormat.Write(SaveFormat.Read(bytes) with { Continuation = null }));
+        var checkpoint = StoryHistory.RestoreFromCheckpoint(result.Story!, bytes);
+        foreach (var restored in new[] { replay, replayOnly, checkpoint })
+        {
+            Assert.Equal("sword", restored.State.GetTextVariable(new("chosen")));
+            Assert.Equal(1, restored.State.GetItemCount(new("player"), new("sword")));
+            Assert.Contains("Holding Sword.", restored.Current.Document.ToPlainText());
+            restored.Choose("c0");
+            Assert.Equal(0, restored.State.GetItemCount(new("player"), new("sword")));
+        }
+    }
+
     [Theory]
     [InlineData(false)]
     [InlineData(true)]
