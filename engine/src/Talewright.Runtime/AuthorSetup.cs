@@ -38,6 +38,7 @@ public sealed record AuthorSetup
     public IReadOnlyDictionary<FactionId, int> Standings { get; init; } = new Dictionary<FactionId, int>();
     public IReadOnlyList<AuthorStatValue> Stats { get; init; } = [];
     public IReadOnlyList<AuthorItemValue> Inventory { get; init; } = [];
+    /// <summary>Held groups to replace; their character/item pairs must not also occur in Inventory.</summary>
     public IReadOnlyList<AuthorItemGroupsValue> ItemGroups { get; init; } = [];
 
     /// <summary>Revalidates against declared IDs and returns a copied setup without entering a scene.</summary>
@@ -140,6 +141,10 @@ public sealed record AuthorSetup
             if (!itemGroups.Add((value.Character, value.Item)))
             {
                 throw new ArgumentException($"Duplicate setup item groups '{value.Character}:{value.Item}'.");
+            }
+            if (items.Contains((value.Character, value.Item)))
+            {
+                throw new ArgumentException($"Setup item '{value.Character}:{value.Item}' cannot specify both inventory and item groups.");
             }
 
             var groups = new List<ItemGroupSnapshot>(value.Groups.Count);
