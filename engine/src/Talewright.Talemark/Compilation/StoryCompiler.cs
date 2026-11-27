@@ -141,6 +141,7 @@ public static class StoryCompiler
             UnresolvedVariables = unresolved,
             ItemVariables = itemVariables,
             VariableTypeOrigins = variableTypeOrigins,
+            VariableDeclarations = analysis is null ? [] : declarations.ToArray(),
             Scenes = scenes.Keys.ToHashSet(),
             Predicates = options.Predicates,
             Modifiers = options.Modifiers,

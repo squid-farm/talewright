@@ -25,6 +25,7 @@ internal sealed class StorySymbols
     // Null marks a manifest declaration; a missing entry means the origin is unknown.
     public IReadOnlyDictionary<VarId, SourceLocation?> VariableTypeOrigins { get; init; } =
         new Dictionary<VarId, SourceLocation?>();
+    public IReadOnlyList<VariableDeclaration> VariableDeclarations { get; init; } = [];
     public required IReadOnlySet<SceneId> Scenes { get; init; }
     public required NamedPredicateRegistry Predicates { get; init; }
     public required TextModifierRegistry Modifiers { get; init; }
