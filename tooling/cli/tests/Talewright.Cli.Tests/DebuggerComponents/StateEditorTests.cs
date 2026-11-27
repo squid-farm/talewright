@@ -86,6 +86,26 @@ public sealed class StateEditorTests : BunitContext
     }
 
     [Fact]
+    public void Editing_a_held_group_count_preserves_the_other_group_and_its_values()
+    {
+        using var model = ComponentStory.StartGroupedItems();
+        ComponentStory.Choose(model, "Change");
+        var editor = Show(model, model.ApplyEdits);
+
+        Field(editor, "player inventory:sword group 1 quantity").Input("0");
+        Assert.Equal(1, model.PendingEdits);
+        Button(editor, "Apply edits").Click();
+        editor.Render(parameters => parameters.Add(component => component.Inspection, model.Inspection!));
+
+        var sword = model.Inspection!.Characters.Single().Inventory.Single(item => item.Id.Value == "sword");
+        var group = Assert.Single(sword.Groups!);
+        Assert.Equal("1", group.Quantity);
+        Assert.Equal(["sharpness 5", "durability 100"], group.Properties.Select(property => $"{property.Key} {property.Value}"));
+        Assert.NotNull(Field(editor, "player inventory:sword group 1 quantity"));
+        Assert.Equal("1", Field(editor, "player inventory:sword group 1 quantity").GetAttribute("value"));
+    }
+
+    [Fact]
     public void Filter_narrows_the_rows()
     {
         using var model = ComponentStory.Start();

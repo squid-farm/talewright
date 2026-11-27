@@ -211,6 +211,10 @@ internal sealed class AuthorStateView(GameState state) : IGameStateView
     public ExactNumber GetExactItemCount(EntityId character, ItemId item) => state.GetExactItemCount(character, item);
     public IEnumerable<KeyValuePair<ItemId, int>> GetInventory(EntityId character) => state.GetInventory(character);
     public IEnumerable<KeyValuePair<ItemId, ExactNumber>> GetExactInventory(EntityId character) => state.GetExactInventory(character);
+    public IReadOnlyList<HeldItemGroup> GetItemGroups(EntityId character, ItemId item) =>
+        state.GetItemGroups(character, item);
+    public ItemPropertyValue GetItemProperty(EntityId character, ItemId item, string property) =>
+        state.GetItemProperty(character, item, property);
     public int GetStanding(FactionId faction) => state.GetStanding(faction);
     public bool GetFlag(FlagId flag) => state.GetFlag(flag);
     public int GetVariable(VarId variable) => state.GetVariable(variable);

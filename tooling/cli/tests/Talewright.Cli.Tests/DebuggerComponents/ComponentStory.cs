@@ -83,10 +83,42 @@ internal static class ComponentStory
         ["rooms.tale"] = string.Join("\n", Enumerable.Range(1, count).Select(i => $"=== room{i:000}\nRoom {i}.\n* [Stay] -> room{i:000}")),
     };
 
+    public static Dictionary<string, string> GroupedItems() => new()
+    {
+        [StorySource.ManifestFileName] = """
+            game: {id: grouped-items, title: Grouped items, start: give, talemark: 2, ruleset: {base: rpg}}
+            characters:
+              player: {first-name: Ada, inventory: [coin]}
+            items:
+              sword: {name: Sword, sharpness: 5, durability: 100}
+              coin: {name: Coin, divisible: true}
+            """,
+        ["main.tale"] = """
+            === give
+            ~ give player sword 2
+            * [Change] -> change
+            === change
+            ~ player:inventory:sword:sharpness += 2
+            * [Take] -> take
+            === take
+            ~ take player sword
+            -> END
+            """,
+    };
+
     /// <summary>A model with a playtest started at the hall.</summary>
     public static WorkbenchModel Start()
     {
         var model = Load();
+        model.Start();
+        Assert.Null(model.Error);
+        Assert.NotNull(model.Session);
+        return model;
+    }
+
+    public static WorkbenchModel StartGroupedItems()
+    {
+        var model = Load(GroupedItems());
         model.Start();
         Assert.Null(model.Error);
         Assert.NotNull(model.Session);

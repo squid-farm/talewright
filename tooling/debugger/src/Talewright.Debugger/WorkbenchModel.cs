@@ -49,6 +49,24 @@ public sealed class SetupNumber
     }
 }
 
+public sealed class SetupItemGroup(string character, string item, int position, ItemGroupSnapshot snapshot)
+{
+    public string Character { get; } = character;
+    public string Item { get; } = item;
+    public int Position { get; } = position;
+    public ItemGroupSnapshot Snapshot { get; } = snapshot;
+    public string Label => $"{Character} inventory:{Item} group {Position + 1} quantity";
+    public bool Enabled { get; private set; }
+    public string Initial { get; } = snapshot.Quantity;
+    public string Value { get; private set; } = snapshot.Quantity;
+
+    public void Edit(string value)
+    {
+        Value = value;
+        Enabled = value.Trim() != Initial;
+    }
+}
+
 public sealed class SetupFlag(FlagId id, bool value = false)
 {
     public FlagId Id { get; } = id;
@@ -151,6 +169,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
     public IReadOnlyList<SetupFlag> Flags { get; private set; } = [];
     public IReadOnlyList<SetupText> Texts { get; private set; } = [];
     public IReadOnlyList<SetupNumber> EditNumbers { get; private set; } = [];
+    public IReadOnlyList<SetupItemGroup> EditItemGroups { get; private set; } = [];
     public IReadOnlyList<SetupFlag> EditFlags { get; private set; } = [];
     public IReadOnlyList<SetupText> EditTexts { get; private set; } = [];
     public string ScenarioPath { get; set; } = "";
@@ -420,7 +439,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
                 });
             }
             var (numbers, flags, texts, missing) = SynchronizeSetup(story);
-            BuildSetup(numbers, flags, texts, story).Validate(story);
+            BuildSetup(numbers, [], flags, texts, story).Validate(story);
             var seed = Story is null ? story.Seed?.ToString(CultureInfo.InvariantCulture) ?? "" : Seed;
             var resolvedSeed = DeterministicDice.ResolveSeed(ParseSeed(seed), story.Seed, _randomSeed);
             var selection = RevalidateCharacter(story, resolvedSeed);
@@ -618,7 +637,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
         {
             var story = Story ?? throw new InvalidOperationException("Load a valid story first.");
             var candidate = AuthorSession.Create(story, new SceneId(Target), captureDecisions: true,
-                BuildSetup(Numbers, Flags, Texts, story),
+                BuildSetup(Numbers, [], Flags, Texts, story),
                 story.Creation is null ? ParseSeed(Seed) : ValidatedCreationSeed(), Character);
             var inspection = candidate.Inspect();
             Session = candidate;
@@ -677,7 +696,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
             }
         }
 
-        var setup = BuildSetup(Numbers, Flags, Texts, story).Validate(story);
+        var setup = BuildSetup(Numbers, [], Flags, Texts, story).Validate(story);
         foreach (var value in setup.Stats)
             Apply(StateChanges.SetStat(state, value.Character, value.Stat, value.Number));
         foreach (var value in setup.Inventory)
@@ -701,8 +720,8 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
         return state;
     }
 
-    private static AuthorSetup BuildSetup(IEnumerable<SetupNumber> numbers, IEnumerable<SetupFlag> flags,
-        IEnumerable<SetupText> texts, StoryDefinition story)
+    private static AuthorSetup BuildSetup(IEnumerable<SetupNumber> numbers, IEnumerable<SetupItemGroup> itemGroups,
+        IEnumerable<SetupFlag> flags, IEnumerable<SetupText> texts, StoryDefinition story)
     {
         var talemarkVersion = story.TalemarkVersion;
         var variables = new Dictionary<VarId, int>();
@@ -710,6 +729,9 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
         var standings = new Dictionary<FactionId, int>();
         var stats = new List<AuthorStatValue>();
         var inventory = new List<AuthorItemValue>();
+        var itemGroupFields = itemGroups.ToArray();
+        var changedGroupItems = itemGroupFields.Where(field => field.Enabled)
+            .Select(field => (field.Character, field.Item)).ToHashSet();
         foreach (var field in numbers.Where(field => field.Enabled))
         {
             switch (field.Kind)
@@ -737,6 +759,8 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
                         stats.Add(new(new(field.Character!), new(field.Id), ParseWhole(field)));
                     break;
                 case SetupNumberKind.Inventory:
+                    if (changedGroupItems.Contains((field.Character!, field.Id)))
+                        throw new ArgumentException($"{field.Label} cannot be edited alongside a held group count.");
                     if (talemarkVersion == 2 && story.World.Items[new(field.Id)].Divisible)
                     {
                         if (!ExactNumber.TryParse(field.Value, out var quantity))
@@ -749,6 +773,25 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
                 default: throw new InvalidOperationException($"Unsupported setup field {field.Kind}.");
             }
         }
+        var groupValues = itemGroupFields.Where(field => changedGroupItems.Contains((field.Character, field.Item)))
+            .GroupBy(field => (field.Character, field.Item))
+            .Select(fields =>
+            {
+                var groups = fields.OrderBy(field => field.Position).Select(field =>
+                {
+                    if (!int.TryParse(field.Value, NumberStyles.AllowLeadingSign,
+                            CultureInfo.InvariantCulture, out var quantity) || quantity < 0)
+                    {
+                        throw new ArgumentException($"{field.Label} requires a nonnegative 32-bit integer.");
+                    }
+                    return quantity == 0 ? null : field.Snapshot with
+                    {
+                        Quantity = ExactNumber.FromInteger(quantity).ToCanonicalString(),
+                    };
+                }).Where(group => group is not null).Select(group => group!).ToArray();
+                return new AuthorItemGroupsValue(new(fields.Key.Character), new(fields.Key.Item),
+                    Array.AsReadOnly(groups));
+            }).ToArray();
         return new AuthorSetup
         {
             Flags = flags.Where(field => field.Enabled).ToDictionary(field => field.Id, field => field.Value),
@@ -758,6 +801,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
             Standings = standings,
             Stats = stats,
             Inventory = inventory,
+            ItemGroups = groupValues,
         };
 
         static int ParseWhole(SetupNumber field) =>
@@ -768,12 +812,13 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
 
     public void Choose(string key) => RunCommand(session => session.Choose(key));
     public int PendingEdits =>
-        EditNumbers.Count(number => number.Enabled) + EditFlags.Count(flag => flag.Enabled) + EditTexts.Count(text => text.Enabled);
+        EditNumbers.Count(number => number.Enabled) + EditItemGroups.Count(group => group.Enabled) +
+        EditFlags.Count(flag => flag.Enabled) + EditTexts.Count(text => text.Enabled);
 
     public void RevertEdits() => RefreshEdits();
 
-    public void ApplyEdits() => RunCommand(session => session.Edit(BuildSetup(EditNumbers, EditFlags, EditTexts,
-        session.Story)));
+    public void ApplyEdits() => RunCommand(session => session.Edit(BuildSetup(EditNumbers, EditItemGroups,
+        EditFlags, EditTexts, session.Story)));
     public void JumpPreservingState() => RunCommand(session => session.Jump(new SceneId(Target)));
     public void Back() => RunCommand(session => session.Back());
     public void Forward() => RunCommand(session => session.Forward());
@@ -791,6 +836,7 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
         if (Session is not { } session)
         {
             EditNumbers = [];
+            EditItemGroups = [];
             EditFlags = [];
             EditTexts = [];
             return;
@@ -804,6 +850,11 @@ public sealed class WorkbenchModel(string root, string? requestedScene = null) :
             SetupNumberKind.Inventory => state.GetExactItemCount(new(field.Character!), new(field.Id)).ToCanonicalString(),
             _ => throw new InvalidOperationException($"Unsupported edit field {field.Kind}."),
         }, field.Character)).ToArray();
+        EditItemGroups = Inspection?.Characters
+            .SelectMany(character => character.Inventory.SelectMany(item =>
+                item.Groups?.Select((group, position) => new SetupItemGroup(character.Id.Value, item.Id.Value,
+                    position, group)) ?? []))
+            .ToArray() ?? [];
         EditFlags = Flags.Select(flag => new SetupFlag(flag.Id, state.GetFlag(flag.Id))).ToArray();
         EditTexts = Texts.Select(field => new SetupText(field.Id, state.GetTextVariable(field.Id))).ToArray();
     }
