@@ -7,9 +7,12 @@ using Talewright.Narrative.Rendering;
 using Talewright.Narrative.Templates;
 using Talewright.Rules.Effects;
 using Talewright.Rules.Expressions;
+using Talewright.Talemark.Analysis;
 using Talewright.Talemark.Compilation;
+using Talewright.Talemark.Diagnostics;
 using Talewright.Talemark.Formatting;
 using Talewright.Talemark.Model;
+using Talewright.Talemark.Parsing;
 
 namespace Talewright.Talemark.Tests;
 
@@ -29,6 +32,82 @@ public sealed class ItemVariableTests
           steel: {name: steel}
           pants: {name: pants, name-agreement: plural}
         """;
+
+    [Fact]
+    public void Discovery_infers_aliases_from_an_initial_item_variable()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = Manifest + "\nvars:\n  chosen: \"iron-ore\"\n",
+            ["main.tale"] = "=== start\n-> END",
+        });
+        var world = StoryCompiler.Compile(source).Story!.World;
+        var numbers = world.ExactVariables.ToDictionary();
+        var text = world.TextVariables.ToDictionary();
+        var items = new HashSet<VarId> { new("chosen") };
+        var diagnostics = new DiagnosticBag();
+
+        var unresolved = VariableDiscovery.Resolve(world, world.Flags.ToHashSet(), [new("start")],
+            [new(new("copy"), "var:chosen", false, new("main.tale", 2, 1))],
+            numbers, text, CompilerOptions.Default, diagnostics, items);
+
+        Assert.Empty(unresolved);
+        Assert.Empty(diagnostics.Items);
+        Assert.Contains(new VarId("copy"), items);
+        Assert.Contains(new VarId("copy"), text.Keys);
+    }
+
+    [Theory]
+    [InlineData(null, "iron-ore")]
+    [InlineData("item:iron-ore", "iron-ore")]
+    [InlineData("item:charcoal", null)]
+    [InlineData("var:other", null)]
+    public void Known_initial_item_is_conservative_about_later_assignments(string? expression, string? expected)
+    {
+        var chosen = new VarId("chosen");
+        var declarations = expression is null ? Array.Empty<VariableDeclaration>() :
+            [new VariableDeclaration(chosen, expression, false, new("main.tale", 2, 1))];
+        var known = VariableDiscovery.StaticallyKnownItemVariables(declarations, new HashSet<VarId> { chosen }, 2,
+            new Dictionary<VarId, ItemId> { [chosen] = new("iron-ore") });
+
+        Assert.Equal(expected, known.TryGetValue(chosen, out var item) ? item.Value : null);
+    }
+
+    [Fact]
+    public void Current_file_reinference_preserves_initial_item_type_and_aliases()
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = Manifest + "\nvars:\n  chosen: \"iron-ore\"\n",
+            ["main.tale"] = "=== start\n~ var:copy = var:chosen\n-> END",
+        });
+        var original = StoryAnalyzer.Analyze(source);
+        var context = original.SymbolContext!;
+        var chosen = new VarId("chosen");
+        var collector = new AnalysisCollector(source, CompilerOptions.Default);
+        collector.Symbols.AddRange(original.Symbols);
+        collector.World(context.World);
+        collector.SymbolContext = new StorySymbols
+        {
+            World = context.World, Flags = context.Flags, Variables = context.Variables,
+            Scenes = context.Scenes, Predicates = context.Predicates, Modifiers = context.Modifiers,
+            ItemVariables = new HashSet<VarId> { chosen },
+            InitialItemVariables = new Dictionary<VarId, ItemId> { [chosen] = new("iron-ore") },
+            VariableTypeOrigins = context.VariableTypeOrigins, VariableDeclarations = context.VariableDeclarations,
+        };
+        var snapshot = new StoryAnalysis(source, collector, []);
+        var edited = "=== start\n~ var:copy = var:chosen\n~ give player var:copy\n-> END";
+        var files = source.Files.ToDictionary();
+        files["main.tale"] = edited;
+
+        var current = StoryAnalyzer.AnalyzeCurrentFile(new StorySource(files), "main.tale", TaleSyntaxParser.Parse(edited),
+            snapshot, CompilerOptions.Default, CancellationToken.None);
+
+        Assert.Contains("chosen", current.ItemVariables);
+        Assert.Contains("copy", current.ItemVariables);
+        Assert.Equal("iron-ore", current.StaticallyKnownItemVariables["chosen"]);
+        Assert.DoesNotContain(current.Diagnostics, diagnostic => diagnostic.Code == "TW2003");
+    }
 
     [Fact]
     public void Items_assign_copy_render_compare_and_spend_without_loops()

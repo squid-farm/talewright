@@ -38,6 +38,8 @@ internal sealed class StoryManifest
     public IReadOnlyList<RawStatVisibilityRule> CharacterSheetStatRules { get; set; } = [];
     public CharacterCreation? Creation { get; set; }
     public required WorldDefinition World { get; init; }
+    public IReadOnlyDictionary<VarId, ItemId> InitialItemVariables { get; init; } =
+        new Dictionary<VarId, ItemId>();
     public IReadOnlyDictionary<EntityId, SourceLocation> CharacterLocations { get; init; } =
         new Dictionary<EntityId, SourceLocation>();
     public List<RawTrigger> Triggers { get; } = [];

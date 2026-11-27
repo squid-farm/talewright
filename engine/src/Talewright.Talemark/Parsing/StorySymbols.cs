@@ -22,6 +22,8 @@ internal sealed class StorySymbols
     public required IReadOnlySet<VarId> Variables { get; init; }
     public IReadOnlySet<VarId> UnresolvedVariables { get; init; } = new HashSet<VarId>();
     public IReadOnlySet<VarId> ItemVariables { get; init; } = new HashSet<VarId>();
+    public IReadOnlyDictionary<VarId, ItemId> InitialItemVariables { get; init; } =
+        new Dictionary<VarId, ItemId>();
     // Null marks a manifest declaration; a missing entry means the origin is unknown.
     public IReadOnlyDictionary<VarId, SourceLocation?> VariableTypeOrigins { get; init; } =
         new Dictionary<VarId, SourceLocation?>();
