@@ -3,6 +3,8 @@ using System.Text.Json.Nodes;
 using Talewright.Core;
 using Talewright.Core.Events;
 using Talewright.Core.Identity;
+using Talewright.Core.State;
+using Talewright.Core.World;
 using Talewright.Narrative.Rendering;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Model;
@@ -99,6 +101,87 @@ public sealed class AuthorScenarioTests
         Assert.Equal(ExactNumber.Parse("1/3"), copy.State.GetExactItemCount(EntityId.Player, new("coin")));
         Assert.Equal(source.Events, copy.Events);
         Assert.Equal(bytes, AuthorScenario.Export(copy, Extensions));
+    }
+
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Group_count_edits_and_setup_roundtrip_in_author_scenarios(bool redo)
+    {
+        var result = StoryCompiler.Compile(new StorySource(new Dictionary<string, string>
+        {
+            ["story.talewright.yaml"] = """
+                game: { id: groups-scenario, title: Groups, talemark: 2, start: start }
+                items: { sword: { sharpness: 5 } }
+                characters: { player: { first-name: Tester } }
+                """,
+            ["main.tale"] = """
+                === start
+                * [Continue] -> start
+                """,
+        }));
+        Assert.True(result.Success, string.Join("\n", result.Diagnostics));
+        var story = result.Story!;
+        var sword = new ItemId("sword");
+        var source = AuthorSession.Create(story, new("start"), seed: 42, setup: new()
+        {
+            ItemGroups = [new(EntityId.Player, sword, [new("1", [new("sharpness", ItemPropertyValueKind.Number, "5")])])],
+        });
+        source.Edit(new()
+        {
+            ItemGroups = [new(EntityId.Player, sword,
+            [
+                new("2", [new("sharpness", ItemPropertyValueKind.Number, "7")]),
+                new("3", [new("sharpness", ItemPropertyValueKind.Number, "5")]),
+            ])],
+        });
+        if (redo)
+        {
+            source.Back();
+        }
+
+        var bytes = AuthorScenario.Export(source, Extensions);
+        var copy = AuthorScenario.Import(story, bytes, Extensions).Session;
+        Assert.Equal(redo, copy.CanForward);
+        Assert.Equal(bytes, AuthorScenario.Export(copy, Extensions));
+        if (redo)
+        {
+            Assert.Equal(ExactNumber.One, copy.State.GetExactItemCount(EntityId.Player, sword));
+            copy.Forward();
+        }
+        Assert.Equal(ExactNumber.FromInteger(5), copy.State.GetExactItemCount(EntityId.Player, sword));
+        Assert.Collection(copy.State.GetItemGroups(EntityId.Player, sword),
+            group =>
+            {
+                Assert.Equal(ExactNumber.FromInteger(2), group.Quantity);
+                Assert.Equal(new ItemPropertyValue.Number(7), group.Properties["sharpness"]);
+            },
+            group =>
+            {
+                Assert.Equal(ExactNumber.FromInteger(3), group.Quantity);
+                Assert.Equal(new ItemPropertyValue.Number(5), group.Properties["sharpness"]);
+            });
+        copy.Edit(new() { ItemGroups = [new(EntityId.Player, sword, [])] });
+        var empty = AuthorScenario.Import(story, AuthorScenario.Export(copy, Extensions), Extensions).Session;
+        Assert.Empty(empty.State.GetItemGroups(EntityId.Player, sword));
+        Assert.Equal(ExactNumber.Zero, empty.State.GetExactItemCount(EntityId.Player, sword));
+    }
+
+    [Theory]
+    [InlineData(false, """[{"character":"player","item":"rope","groups":null}]""")]
+    [InlineData(true, """[{"character":"player","item":"rope","groups":[null]}]""")]
+    [InlineData(true, """[{"character":"player","item":"rope","groups":[{"quantity":"1","properties":[{"key":"x","kind":2,"value":null}]}]}]""")]
+    public void Null_group_data_is_rejected_without_changing_the_session(bool edit, string groups)
+    {
+        var source = Start();
+        source.Edit(new() { Variables = new Dictionary<VarId, int> { [new("count")] = 8 } });
+        var data = Data(source);
+        var before = AuthorScenario.Export(source, Extensions);
+        var values = edit ? data["commands"]![0]!["values"]! : data["setup"]!;
+        values["itemGroups"] = JsonNode.Parse(groups);
+
+        Assert.Throws<InvalidDataException>(() => AuthorScenario.Import(source.Story, Bytes(data), Extensions));
+        Assert.Equal(before, AuthorScenario.Export(source, Extensions));
     }
 
     [Theory]
