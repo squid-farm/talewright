@@ -160,6 +160,40 @@ public sealed class StoryHoverTests
         Assert.Equal("weight", tale.Split('\n')[1][(hover.Range.Start.Column - 1)..(hover.Range.End.Column - 1)]);
     }
 
+    [Theory]
+    [InlineData("", "~ var:chosen = item:rope", "", "rope", "Rope")]
+    [InlineData("~ var:chosen = item:rope", "~ var:chosen = item:first-name", "", "first-name", "Token")]
+    [InlineData("~ var:chosen = item:rope", "", "~ var:chosen = item:rope", "rope", "Rope")]
+    [InlineData("", "", "~ var:chosen = item:rope", "rope", "Rope")]
+    [InlineData("~ var:chosen = item:rope", "~ var:chosen = item:rope", "~ var:chosen = item:first-name", null, null)]
+    [InlineData("~ var:chosen = item:first-name", "", "~ var:chosen = item:rope", "rope", "Rope")]
+    public void Current_file_item_variable_hover_tracks_edited_and_cross_file_assignments(
+        string original, string edited, string other, string? itemId, string? displayName)
+    {
+        var source = new StorySource(new Dictionary<string, string>
+        {
+            [StorySource.ManifestFileName] = VersionTwoManifest,
+            ["main.tale"] = $"=== first\n{{var:chosen}}\n{original}\n-> second",
+            ["other.tale"] = $"=== second\n{other}\n-> END",
+        });
+        var workspace = new StoryWorkspace(source, CompilerOptions.Default);
+        var snapshot = StoryAnalyzer.Analyze(source);
+        var text = $"=== first\n{{var:chosen}}\n{edited}\n-> second";
+
+        var current = workspace.AnalyzeCurrentFile("main.tale", text, snapshot, CancellationToken.None);
+        var hover = Assert.IsType<AuthoringHover>(StoryHover.Get(current, new("main.tale", 2, 7)));
+
+        Assert.Contains("Item variable (item)", hover.PlainText);
+        if (itemId is null)
+        {
+            Assert.DoesNotContain("Item:", hover.PlainText);
+        }
+        else
+        {
+            Assert.Contains($"Item: {itemId} (\"{displayName}\")", hover.PlainText);
+        }
+    }
+
     [Fact]
     public void Governing_attribute_key_hover_explains_category_target_and_formula()
     {

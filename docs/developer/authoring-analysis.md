@@ -119,6 +119,8 @@ cached separately from their analysis revision.
 
 For current-file Talemark 2 analysis, the snapshot retains variable assignments so an edited file can
 re-infer types and item-variable aliases in story order while preserving manifest-declared types.
+Current-file symbols retain unchanged files' assignments and replace the edited file's assignments,
+so item-variable hovers keep known item IDs and display names up to date before whole-story analysis completes.
 
 Changing effective text or deleting a file evicts its syntax immediately. Disk
 updates beneath an open overlay do not evict matching overlay syntax; closing

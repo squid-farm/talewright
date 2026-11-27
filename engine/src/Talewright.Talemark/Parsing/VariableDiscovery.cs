@@ -4,6 +4,7 @@ using Talewright.Core.World;
 using Talewright.Rules.Expressions;
 using Talewright.Talemark.Compilation;
 using Talewright.Talemark.Diagnostics;
+using Talewright.Talemark.Vocabulary;
 
 namespace Talewright.Talemark.Parsing;
 
@@ -64,5 +65,51 @@ internal static class VariableDiscovery
                 $"Cannot infer a numeric or text type for variable '{declaration.Id}'. Declare an initial value under 'vars' in story.talewright.yaml.",
                 declaration.Location);
         return unresolved;
+    }
+
+    internal static IReadOnlyDictionary<VarId, ItemId> StaticallyKnownItemVariables(
+        IReadOnlyList<VariableDeclaration> declarations, IReadOnlySet<VarId> itemVariables, int talemarkVersion)
+    {
+        var knownItems = new Dictionary<VarId, ItemId>();
+        foreach (var group in declarations.Where(declaration => itemVariables.Contains(declaration.Id))
+                     .GroupBy(declaration => declaration.Id))
+        {
+            ItemId? item = null;
+            var isKnown = true;
+            foreach (var declaration in group)
+            {
+                if (declaration.Numeric)
+                {
+                    isKnown = false;
+                    break;
+                }
+
+                var tokens = Lexer.Tokenize(declaration.Expression, talemarkVersion);
+                var syntax = ExpressionSyntaxParser.ParseExpression(tokens, declaration.Expression.Length,
+                    declaration.Location.Offset, new DiagnosticBag(), sumOnly: true, allowSkillChecks: true);
+                var source = syntax.Root;
+                while (source is ParenthesizedExpressionNode parenthesized)
+                    source = parenthesized.Inner;
+                if (syntax.HasErrors ||
+                    source is not ReferenceExpressionNode { Kind: ReferenceNamespace.Item, Member: null } reference)
+                {
+                    isKnown = false;
+                    break;
+                }
+
+                var value = new ItemId(tokens.Source[reference.Name.Start..reference.Name.End]);
+                if (item is { } existing && existing != value)
+                {
+                    isKnown = false;
+                    break;
+                }
+                item = value;
+            }
+
+            if (isKnown && item is { } known)
+                knownItems.Add(group.Key, known);
+        }
+
+        return knownItems;
     }
 }

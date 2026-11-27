@@ -86,6 +86,8 @@ public sealed class StoryAnalysis
         Substitutions = original.Substitutions;
         _scenes = original._scenes;
         SymbolContext = original.SymbolContext;
+        ItemVariables = original.ItemVariables;
+        StaticallyKnownItemVariables = original.StaticallyKnownItemVariables;
         _statDiagnosticGuidance = original._statDiagnosticGuidance;
         _currentFile = original._currentFile;
         _currentFileSymbols = original._currentFileSymbols;
@@ -154,6 +156,14 @@ public sealed class StoryAnalysis
             ? new(() => OverlayScenes(snapshot, currentFile!, scenes))
             : new(() => scenes);
         SymbolContext = collector.SymbolContext;
+        ItemVariables = SymbolContext is { } symbolContext
+            ? symbolContext.ItemVariables.Select(variable => variable.Value).ToFrozenSet(StringComparer.Ordinal)
+            : Array.Empty<string>().ToFrozenSet(StringComparer.Ordinal);
+        StaticallyKnownItemVariables = SymbolContext is { } itemContext
+            ? VariableDiscovery.StaticallyKnownItemVariables(itemContext.VariableDeclarations,
+                    itemContext.ItemVariables, TalemarkVersion)
+                .ToFrozenDictionary(pair => pair.Key.Value, pair => pair.Value.Value, StringComparer.Ordinal)
+            : new Dictionary<string, string>(StringComparer.Ordinal).ToFrozenDictionary(StringComparer.Ordinal);
         _statDiagnosticGuidance = collector.SymbolContext?.StatGuidance;
         BaseRulesetStats = collector.BaseRulesetStats.ToFrozenSet(StringComparer.Ordinal);
         Diagnostics = Array.AsReadOnly(diagnostics.ToArray());
@@ -171,6 +181,10 @@ public sealed class StoryAnalysis
     public StorySource Source { get; }
     public int TalemarkVersion { get; }
     public IReadOnlyList<AuthoringSymbol> Symbols { get; }
+    /// <summary>Names of variables that hold item references in this story.</summary>
+    public IReadOnlySet<string> ItemVariables { get; }
+    /// <summary>Item IDs assigned to item variables when all their assignments use the same literal item.</summary>
+    public IReadOnlyDictionary<string, string> StaticallyKnownItemVariables { get; }
     public IReadOnlyList<ExpressionContext> Expressions { get; }
     public IReadOnlyList<Diagnostic> Diagnostics { get; }
 
@@ -322,6 +336,9 @@ public static class StoryAnalyzer
             }, DiscoverEffects, cancellationToken);
             collector.SkillCheckOutcomeSites(file, syntax);
 
+            var variableDeclarations = (context?.VariableDeclarations ?? [])
+                .Where(declaration => declaration.Location.File != file)
+                .Concat(declarations).ToArray();
             var previousFileSymbols = previousSymbols
                 .Where(symbol => symbol.Declaration?.Start.File == file).ToArray();
             var unchangedDeclarations = context is not null &&
@@ -371,9 +388,7 @@ public static class StoryAnalyzer
                         }
                     mutableUnresolved.Clear();
                     mutableItemVariables.Clear();
-                    resolveDeclarations = context.VariableDeclarations
-                        .Where(declaration => declaration.Location.File != file)
-                        .Concat(declarations)
+                    resolveDeclarations = variableDeclarations
                         .OrderBy(declaration => StorySource.IsConfigurationFile(declaration.Location.File) ? 1 : 0)
                         .ThenBy(declaration => StorySource.IsConfigurationFile(declaration.Location.File)
                             ? "" : declaration.Location.File, StringComparer.Ordinal);
@@ -412,6 +427,7 @@ public static class StoryAnalyzer
                 Variables = variables,
                 UnresolvedVariables = unresolved,
                 ItemVariables = itemVariables,
+                VariableDeclarations = variableDeclarations,
                 VariableTypeOrigins = unchangedDeclarations ? context!.VariableTypeOrigins : new Dictionary<VarId, SourceLocation?>(),
                 Scenes = scenes,
                 Predicates = context?.Predicates ?? options.Predicates,

@@ -72,6 +72,19 @@ public static class StoryHover
 
     private static AuthoringHover? Describe(StoryAnalysis analysis, AuthoringSymbol symbol, SourceRange range)
     {
+        if (symbol.Kind == AuthoringSymbolKind.Variable && analysis.ItemVariables.Contains(symbol.Name))
+        {
+            var description = "Item variable (item)";
+            if (analysis.StaticallyKnownItemVariables.TryGetValue(symbol.Name, out var itemId))
+            {
+                var item = analysis.World?.Items.Values.FirstOrDefault(candidate => candidate.Id.Value == itemId);
+                description += item is null
+                    ? $"\n\nItem: {itemId}"
+                    : $"\n\nItem: {itemId} ({StoryPreview.Quote(item.Name)})";
+            }
+            return Help(symbol.Name, description, range);
+        }
+
         if (symbol.Kind == AuthoringSymbolKind.Stat)
         {
             if (analysis.World is not { } world ||
